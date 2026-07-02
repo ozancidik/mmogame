@@ -1,0 +1,34 @@
+﻿# Unreal Engine .gitignore
+
+# Visual Studio / IDE
+.vs/
+.vscode/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Unreal generated
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vsconfig
+
+# Build
+Build/
+
+# Cache
+*.tps
+
+# Ignore packages
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# Compiled source
+*.pyc
+
+# Mac/OS
+.DS_Store
