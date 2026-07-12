@@ -2,6 +2,7 @@
 
 #include "Components/MMOInventoryComponent.h"
 #include "Items/MMOItemDatabase.h"
+#include "Items/MMOConsumableTypes.h"
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOStatsComponent.h"
 #include "Save/MMOSaveGame.h"
@@ -395,6 +396,46 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 void UMMOInventoryComponent::ServerBuyPotion_Implementation(int32 Count)
 {
 	BuyPotion(Count);
+}
+
+void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
+{
+	Count = FMath::Max(1, Count);
+
+	if (!HasAuthorityInternal())
+	{
+		ServerBuyConsumable(ItemId, Count);
+		return;
+	}
+
+	const FMMOConsumableDef* Def = FMMOConsumableDatabase::Find(ItemId);
+	if (!Def)
+	{
+		return;
+	}
+
+	const int32 Price = Def->Price * Count;
+	if (Gold < Price)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Altin yetersiz"));
+		}
+		return;
+	}
+
+	AddGold(-Price);
+	AddItem(ItemId, Count);
+	if (GEngine && IsLocallyControlledOwner())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120),
+			FString::Printf(TEXT("Satin alindi: %d %s (-%d altin)"), Count, *Def->Name, Price));
+	}
+}
+
+void UMMOInventoryComponent::ServerBuyConsumable_Implementation(FName ItemId, int32 Count)
+{
+	BuyConsumable(ItemId, Count);
 }
 
 void UMMOInventoryComponent::SellEquipment(int32 BagIndex)

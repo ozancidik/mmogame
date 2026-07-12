@@ -186,6 +186,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Combat")
 	bool ConsumeMana(float Amount);
 
+	/** Mana yeniler (clamp'li). Sadece otorite. */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Combat")
+	void RestoreMana(float Amount);
+
 	/** Deneyim ekler, gerekiyorsa (birden fazla) level atlatır. Sadece otorite. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Progression")
 	void GainExperience(int32 Amount);

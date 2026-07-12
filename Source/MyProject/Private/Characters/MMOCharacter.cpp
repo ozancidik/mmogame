@@ -8,6 +8,7 @@
 #include "Components/MMOQuestComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Core/MMOGameMode.h"
+#include "Items/MMOConsumableTypes.h"
 #include "Engine/DamageEvents.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Controller.h"
@@ -410,6 +411,7 @@ void AMMOCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 
 		// F = can iksiri kullan.
 		PlayerInputComponent->BindKey(EKeys::F, IE_Pressed, this, &AMMOCharacter::UseHealthPotion);
+		PlayerInputComponent->BindKey(EKeys::G, IE_Pressed, this, &AMMOCharacter::UseManaPotion);
 	}
 }
 
@@ -701,6 +703,101 @@ void AMMOCharacter::UseHealthPotion()
 void AMMOCharacter::ServerUseHealthPotion_Implementation()
 {
 	UseHealthPotion();
+}
+
+void AMMOCharacter::UseManaPotion()
+{
+	UseConsumable(FName(TEXT("ManaPotion")));
+}
+
+void AMMOCharacter::MMOUse(const FString& ItemId)
+{
+	UseConsumable(FName(*ItemId));
+}
+
+void AMMOCharacter::UseConsumable(FName ItemId)
+{
+	if (!Stats || !Inventory || Stats->bIsDead)
+	{
+		return;
+	}
+
+	const FMMOConsumableDef* Def = FMMOConsumableDatabase::Find(ItemId);
+	if (!Def)
+	{
+		return;
+	}
+
+	const bool bLocalFeedback = IsLocallyControlled();
+
+	if (Inventory->GetItemCount(ItemId) <= 0)
+	{
+		if (GEngine && bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver,
+				FString::Printf(TEXT("%s yok!"), *Def->Name));
+		}
+		return;
+	}
+
+	// Istemci: istegi sunucuya gonder (esya harcamasi + etki sadece otoritede).
+	if (!HasAuthority())
+	{
+		ServerUseConsumable(ItemId);
+		return;
+	}
+
+	if (Inventory->RemoveItem(ItemId, 1))
+	{
+		if (Def->Heal > 0.f)
+		{
+			Stats->Heal(Def->Heal);
+		}
+		if (Def->ManaRestore > 0.f)
+		{
+			Stats->RestoreMana(Def->ManaRestore);
+		}
+		if (!Def->EffectId.IsNone())
+		{
+			Stats->ApplyEffect(Def->EffectId, this);
+		}
+
+		if (GEngine && bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 200, 255),
+				FString::Printf(TEXT("Kullanildi: %s (kalan %d)"), *Def->Name, Inventory->GetItemCount(ItemId)));
+		}
+	}
+}
+
+void AMMOCharacter::ServerUseConsumable_Implementation(FName ItemId)
+{
+	UseConsumable(ItemId);
+}
+
+void AMMOCharacter::MMOGiveItem(const FString& ItemId, int32 Count)
+{
+	const FName Id(*ItemId);
+	const int32 C = FMath::Max(1, Count);
+	if (HasAuthority())
+	{
+		if (Inventory)
+		{
+			Inventory->AddItem(Id, C);
+		}
+	}
+	else
+	{
+		ServerGiveItem(Id, C);
+	}
+}
+
+void AMMOCharacter::ServerGiveItem_Implementation(FName ItemId, int32 Count)
+{
+	if (Inventory)
+	{
+		Inventory->AddItem(ItemId, Count);
+	}
 }
 
 void AMMOCharacter::MMOClass(const FString& ClassName)

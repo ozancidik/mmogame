@@ -85,6 +85,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|Inventory")
 	float PotionHealAmount = 75.f;
 
+	// Bir tuketilebilir (mana iksiri / buff parsomeni) kullanir: HP/MP yeniler ve/veya buff uygular.
+	UFUNCTION(BlueprintCallable, Category = "MMO|Inventory")
+	void UseConsumable(FName ItemId);
+
+	// G tusu -> mana iksiri (F zaten can iksiri).
+	void UseManaPotion();
+
+	// Konsol: "MMOUse ScrollRage" gibi bir tuketilebilir kullanir.
+	UFUNCTION(Exec)
+	void MMOUse(const FString& ItemId);
+
+	// Test: envantere item ekler (konsol: "MMOGiveItem ScrollHaste 3").
+	UFUNCTION(Exec)
+	void MMOGiveItem(const FString& ItemId, int32 Count = 1);
+
 	// --- Test/debug komutlari (PIE konsolundan cagrilabilir) ---
 	// Ornek: "MMODamage 30", "MMOHeal 20", "MMOGainXP 500", "MMOUseMana 10"
 	UFUNCTION(Exec)
@@ -159,6 +174,12 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerUseHealthPotion();
+
+	UFUNCTION(Server, Reliable)
+	void ServerUseConsumable(FName ItemId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerGiveItem(FName ItemId, int32 Count);
 
 	UFUNCTION(Server, Reliable)
 	void ServerSetPvP(bool bOn);

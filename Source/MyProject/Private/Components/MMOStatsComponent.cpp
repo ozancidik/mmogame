@@ -206,6 +206,17 @@ void UMMOStatsComponent::Heal(float Amount)
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 }
 
+void UMMOStatsComponent::RestoreMana(float Amount)
+{
+	if (!HasAuthorityInternal() || bIsDead || Amount <= 0.f)
+	{
+		return;
+	}
+
+	Mana = FMath::Clamp(Mana + Amount, 0.f, MaxMana);
+	OnManaChanged.Broadcast(Mana, MaxMana);
+}
+
 bool UMMOStatsComponent::ConsumeMana(float Amount)
 {
 	if (!HasAuthorityInternal() || Amount <= 0.f)

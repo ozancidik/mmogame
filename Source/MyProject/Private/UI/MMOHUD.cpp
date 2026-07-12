@@ -5,6 +5,7 @@
 #include "Characters/MMOMob.h"
 #include "Components/MMOStatsComponent.h"
 #include "Effects/MMOEffectDatabase.h"
+#include "Items/MMOConsumableTypes.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOSkillComponent.h"
 #include "Components/MMOQuestComponent.h"
@@ -951,7 +952,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	}
 
 	const float PW = 640.f;
-	const float PH = 452.f;
+	const float PH = 548.f;
 	const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
 	const float PY = 90.f;
 	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
@@ -979,6 +980,19 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("Can Iksiri  -  %d altin"), FMMOItemDatabase::PotionPrice),
 			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.78f);
+		LY += RowH;
+	}
+
+	// Tuketilebilirler (mana iksiri, buff parsomenleri).
+	for (const FMMOConsumableDef& Def : FMMOConsumableDatabase::GetAll())
+	{
+		DrawRect(FLinearColor(0.1f, 0.16f, 0.18f, 0.9f), LeftX, LY, ColW, RowH - 4.f);
+		FMMOClickRegion R;
+		R.SkillId = Def.ItemId;
+		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + RowH - 4.f));
+		ShopBuyRegions.Add(R);
+		DrawText(FString::Printf(TEXT("%s  -  %d altin"), *Def.Name, Def.Price),
+			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f);
 		LY += RowH;
 	}
 
@@ -1046,6 +1060,10 @@ bool AMMOHUD::HandleShopClick(const FVector2D& Pos)
 			if (R.SkillId == FName(TEXT("__POTION__")))
 			{
 				Inv->BuyPotion(1);
+			}
+			else if (FMMOConsumableDatabase::Find(R.SkillId))
+			{
+				Inv->BuyConsumable(R.SkillId, 1);
 			}
 			else
 			{

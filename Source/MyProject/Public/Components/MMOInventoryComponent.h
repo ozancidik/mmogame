@@ -108,6 +108,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Shop")
 	void BuyPotion(int32 Count = 1);
 
+	/** Saticidan bir tuketilebilir (mana iksiri, parsomen...) satin alir. Istemciden -> Server RPC. */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Shop")
+	void BuyConsumable(FName ItemId, int32 Count = 1);
+
 	/** Cantadaki ekipmani saticiya satar (altin kazanir). Istemciden -> Server RPC. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Shop")
 	void SellEquipment(int32 BagIndex);
@@ -147,6 +151,9 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerBuyPotion(int32 Count);
+
+	UFUNCTION(Server, Reliable)
+	void ServerBuyConsumable(FName ItemId, int32 Count);
 
 	UFUNCTION(Server, Reliable)
 	void ServerSellEquipment(int32 BagIndex);
