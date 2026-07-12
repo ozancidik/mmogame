@@ -47,6 +47,7 @@ void AMMOPlayerController::SetupInputComponent()
 		// K = skill kitabi, I = envanter.
 		InputComponent->BindKey(EKeys::K, IE_Pressed, this, &AMMOPlayerController::OnToggleSkillBook);
 		InputComponent->BindKey(EKeys::I, IE_Pressed, this, &AMMOPlayerController::OnToggleInventory);
+		InputComponent->BindKey(EKeys::C, IE_Pressed, this, &AMMOPlayerController::OnToggleCharacter);
 
 		// Z = en yakin dusmani sec, R = saldiri ac/kapa (KO tarzi).
 		InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AMMOPlayerController::OnTargetNearestEnemy);
@@ -188,7 +189,7 @@ bool AMMOPlayerController::IsAnyUIWindowOpen() const
 {
 	if (const AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		return H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen();
+		return H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen();
 	}
 	return false;
 }
@@ -209,6 +210,14 @@ void AMMOPlayerController::OnToggleInventory()
 	}
 }
 
+void AMMOPlayerController::OnToggleCharacter()
+{
+	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
+	{
+		H->ToggleStatWindow();
+	}
+}
+
 bool AMMOPlayerController::IsInAttackMode() const
 {
 	const AMMOCharacter* Enemy = TargetEnemy.Get();
@@ -220,7 +229,7 @@ void AMMOPlayerController::OnLeftClickPressed()
 	// UI penceresi acikken tiklama pencereye gider, karakteri hareket ettirmez.
 	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		if (H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen())
+		if (H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen())
 		{
 			float MX = 0.f, MY = 0.f;
 			if (GetMousePosition(MX, MY))
@@ -237,6 +246,10 @@ void AMMOPlayerController::OnLeftClickPressed()
 				else if (H->IsShopOpen())
 				{
 					H->HandleShopClick(Pos);
+				}
+				else if (H->IsStatWindowOpen())
+				{
+					H->HandleStatClick(Pos);
 				}
 				else
 				{

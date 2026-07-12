@@ -154,6 +154,15 @@ public:
 	UFUNCTION(Exec)
 	void MMOPartyLeave();    // partiden ayril
 
+	// Bir ana stata 1 puan harcar (stat penceresi / konsol). Istemciden -> Server RPC.
+	// StatName: "STR"/"DEX"/"INT"/"VIT" veya tam ad.
+	UFUNCTION(BlueprintCallable, Category = "MMO|Progression")
+	void RequestSpendStat(FName StatName);
+
+	// Konsol: "MMOStat str" gibi.
+	UFUNCTION(Exec)
+	void MMOStat(const FString& StatName);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -206,6 +215,9 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerSpawnMob(FName ArchetypeId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSpendStat(FName StatName);
 
 	// Yakin dovus vurus efektini tum makinelerde oynat.
 	UFUNCTION(NetMulticast, Unreliable)

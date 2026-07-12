@@ -43,6 +43,7 @@ protected:
 	void OnMouseY(float Value);
 	void OnToggleSkillBook();
 	void OnToggleInventory();
+	void OnToggleCharacter();
 	void OnCloseShop();
 
 	// Space: ziplama (Enhanced Input mapping'leri temizlendigi icin C++ ile suruyoruz).

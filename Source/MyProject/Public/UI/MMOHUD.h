@@ -75,6 +75,12 @@ public:
 	bool IsQuestWindowOpen() const { return bQuestWindowOpen; }
 	bool HandleQuestClick(const FVector2D& Pos);
 
+	// --- Karakter/stat penceresi (C ile ac/kapa) ---
+	void ToggleStatWindow();
+	bool IsStatWindowOpen() const { return bStatWindowOpen; }
+	// Sol tik: bir statin [+] butonuna basinca puan harcar. Islediyse true.
+	bool HandleStatClick(const FVector2D& Pos);
+
 protected:
 	// Sahnedeki dusmanlarin tepesine saglik bari cizer (dunya->ekran projeksiyonu).
 	void DrawEnemyHealthBars();
@@ -128,6 +134,9 @@ protected:
 	// Gorev penceresi (kabul et / odul al).
 	void DrawQuestWindow(class AMMOCharacter* PlayerChar);
 
+	// Karakter/stat penceresi (ana+turetilmis statlar + puan dagitma).
+	void DrawStatWindow(class AMMOCharacter* PlayerChar);
+
 	// Diger oyuncularin tepesine isim + level + HP bari (MP).
 	void DrawPlayerNameplates();
 
@@ -135,6 +144,10 @@ protected:
 	bool bInventoryOpen = false;
 	bool bShopOpen = false;
 	bool bQuestWindowOpen = false;
+	bool bStatWindowOpen = false;
+
+	// Stat penceresi [+] tiklama bolgeleri (SkillId = "STR"/"DEX"/"INT"/"VIT").
+	TArray<FMMOClickRegion> StatPlusRegions;
 
 	// Envanter tiklama bolgeleri: kusanilan slotlar (Slot=(int)EMMOEquipSlot) ve canta satirlari (Slot=canta index).
 	TArray<FMMOClickRegion> InvEquippedRegions;

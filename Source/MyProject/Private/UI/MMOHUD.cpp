@@ -124,6 +124,10 @@ void AMMOHUD::DrawHUD()
 	{
 		DrawShop(MMOChar);
 	}
+	if (bStatWindowOpen)
+	{
+		DrawStatWindow(MMOChar);
+	}
 
 	// Olum ekrani: karartma + OLDUN + geri sayim.
 	if (S->bIsDead)
@@ -469,6 +473,7 @@ void AMMOHUD::ToggleSkillBook()
 		bInventoryOpen = false; // pencereler ust uste binmesin
 		bShopOpen = false;
 		bQuestWindowOpen = false;
+		bStatWindowOpen = false;
 	}
 	else
 	{
@@ -484,6 +489,7 @@ void AMMOHUD::ToggleInventory()
 		bSkillBookOpen = false;
 		bShopOpen = false;
 		bQuestWindowOpen = false;
+		bStatWindowOpen = false;
 		PendingAssignSkill = NAME_None;
 	}
 }
@@ -983,6 +989,7 @@ void AMMOHUD::OpenShop()
 	bSkillBookOpen = false;
 	bInventoryOpen = false;
 	bQuestWindowOpen = false;
+	bStatWindowOpen = false;
 	PendingAssignSkill = NAME_None;
 }
 
@@ -1241,7 +1248,21 @@ void AMMOHUD::OpenQuestWindow()
 	bShopOpen = false;
 	bSkillBookOpen = false;
 	bInventoryOpen = false;
+	bStatWindowOpen = false;
 	PendingAssignSkill = NAME_None;
+}
+
+void AMMOHUD::ToggleStatWindow()
+{
+	bStatWindowOpen = !bStatWindowOpen;
+	if (bStatWindowOpen)
+	{
+		bSkillBookOpen = false;
+		bInventoryOpen = false;
+		bShopOpen = false;
+		bQuestWindowOpen = false;
+		PendingAssignSkill = NAME_None;
+	}
 }
 
 void AMMOHUD::CloseQuestWindow()
@@ -1468,6 +1489,104 @@ bool AMMOHUD::HandleQuestClick(const FVector2D& Pos)
 		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
 		{
 			Q->ClaimReward(R.SkillId);
+			return true;
+		}
+	}
+	return true;
+}
+
+void AMMOHUD::DrawStatWindow(AMMOCharacter* PlayerChar)
+{
+	StatPlusRegions.Reset();
+	if (!Canvas || !PlayerChar)
+	{
+		return;
+	}
+	UMMOStatsComponent* S = PlayerChar->GetStats();
+	if (!S)
+	{
+		return;
+	}
+
+	const float PW = 380.f;
+	const float PH = 320.f;
+	const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
+	const float PY = 110.f;
+	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
+	DrawRect(FLinearColor(0.6f, 0.75f, 1.f, 0.95f), PX, PY, PW, 4.f);
+
+	DrawText(TEXT("KARAKTER"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.35f);
+	DrawText(TEXT("(C ile kapat)"), FLinearColor(0.7f, 0.75f, 0.8f), PX + 190.f, PY + 16.f, nullptr, 0.8f);
+
+	DrawText(FString::Printf(TEXT("Seviye %d     Dagitilacak puan: %d"), S->Level, S->UnspentStatPoints),
+		S->UnspentStatPoints > 0 ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.7f, 0.75f, 0.8f),
+		PX + 14.f, PY + 42.f, nullptr, 0.9f);
+
+	// Ana statlar + [+] butonu.
+	struct FStatRow { const TCHAR* Label; const TCHAR* Key; int32 Value; };
+	const FStatRow Rows[] = {
+		{ TEXT("Guc (STR)"),    TEXT("STR"), S->Strength },
+		{ TEXT("Ceviklik (DEX)"), TEXT("DEX"), S->Dexterity },
+		{ TEXT("Zeka (INT)"),   TEXT("INT"), S->Intelligence },
+		{ TEXT("Dayaniklilik (VIT)"), TEXT("VIT"), S->Vitality },
+	};
+
+	float RowY = PY + 74.f;
+	const float RowH = 30.f;
+	const bool bHasPoints = S->UnspentStatPoints > 0;
+	for (const FStatRow& Row : Rows)
+	{
+		DrawText(FString::Printf(TEXT("%s:  %d"), Row.Label, Row.Value), FLinearColor::White,
+			PX + 18.f, RowY, nullptr, 0.95f);
+
+		// [+] butonu (puan varsa aktif).
+		const float BtnW = 30.f;
+		const float BtnX = PX + PW - BtnW - 18.f;
+		const FLinearColor BtnColor = bHasPoints ? FLinearColor(0.2f, 0.5f, 0.25f) : FLinearColor(0.2f, 0.2f, 0.22f);
+		DrawRect(BtnColor, BtnX, RowY - 2.f, BtnW, 24.f);
+		DrawText(TEXT("+"), FLinearColor::White, BtnX + 10.f, RowY, nullptr, 1.1f);
+
+		if (bHasPoints)
+		{
+			FMMOClickRegion R;
+			R.SkillId = FName(Row.Key);
+			R.Rect = FBox2D(FVector2D(BtnX, RowY - 2.f), FVector2D(BtnX + BtnW, RowY + 22.f));
+			StatPlusRegions.Add(R);
+		}
+		RowY += RowH;
+	}
+
+	// Turetilmis statlar (ozet).
+	RowY += 8.f;
+	DrawRect(FLinearColor(0.2f, 0.25f, 0.35f, 0.6f), PX + 14.f, RowY, PW - 28.f, 2.f);
+	RowY += 10.f;
+	DrawText(FString::Printf(TEXT("Saldiri: %d      Savunma: %d"),
+		FMath::RoundToInt(S->AttackPower), FMath::RoundToInt(S->Defense)),
+		FLinearColor(0.8f, 0.85f, 0.95f), PX + 18.f, RowY, nullptr, 0.85f);
+	RowY += 22.f;
+	DrawText(FString::Printf(TEXT("Max HP: %d      Max MP: %d"),
+		FMath::RoundToInt(S->MaxHealth), FMath::RoundToInt(S->MaxMana)),
+		FLinearColor(0.8f, 0.85f, 0.95f), PX + 18.f, RowY, nullptr, 0.85f);
+}
+
+bool AMMOHUD::HandleStatClick(const FVector2D& Pos)
+{
+	if (!bStatWindowOpen)
+	{
+		return false;
+	}
+
+	AMMOCharacter* Char = Cast<AMMOCharacter>(GetOwningPawn());
+	if (!Char)
+	{
+		return true;
+	}
+
+	for (const FMMOClickRegion& R : StatPlusRegions)
+	{
+		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
+		{
+			Char->RequestSpendStat(R.SkillId);
 			return true;
 		}
 	}

@@ -608,6 +608,53 @@ void AMMOCharacter::MMOPartyLeave()
 	}
 }
 
+namespace
+{
+	// "STR"/"str"/"strength" -> "Strength" (SpendStatPoint'in bekledigi ad).
+	FName MapMMOStatName(FName In)
+	{
+		const FString L = In.ToString().ToLower();
+		if (L == TEXT("str") || L == TEXT("strength"))     { return FName(TEXT("Strength")); }
+		if (L == TEXT("dex") || L == TEXT("dexterity"))    { return FName(TEXT("Dexterity")); }
+		if (L == TEXT("int") || L == TEXT("intelligence")) { return FName(TEXT("Intelligence")); }
+		if (L == TEXT("vit") || L == TEXT("vitality"))     { return FName(TEXT("Vitality")); }
+		return NAME_None;
+	}
+}
+
+void AMMOCharacter::RequestSpendStat(FName StatName)
+{
+	const FName Mapped = MapMMOStatName(StatName);
+	if (Mapped.IsNone())
+	{
+		return;
+	}
+	if (HasAuthority())
+	{
+		if (Stats)
+		{
+			Stats->SpendStatPoint(Mapped, 1);
+		}
+	}
+	else
+	{
+		ServerSpendStat(Mapped);
+	}
+}
+
+void AMMOCharacter::ServerSpendStat_Implementation(FName StatName)
+{
+	if (Stats)
+	{
+		Stats->SpendStatPoint(StatName, 1); // zaten eslendi
+	}
+}
+
+void AMMOCharacter::MMOStat(const FString& StatName)
+{
+	RequestSpendStat(FName(*StatName));
+}
+
 void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)
 {
 	UWorld* World = GetWorld();

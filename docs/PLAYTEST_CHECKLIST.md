@@ -93,6 +93,14 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Ön koşulu bitmemiş bir görevi almaya çalışırsan (normalde gizli) "Once '...' gorevini bitir" uyarısı.
 - [ ] Boss görevi: world boss'u (Ork Reisi) öldürünce görev tamamlanmalı.
 
+### Karakter/Stat penceresi (stat puanı dağıtma) — ÖNEMLİ boşluk kapandı
+- [ ] **C** tuşu → Karakter penceresi açılmalı (STR/DEX/INT/VIT + türetilmiş statlar + dağıtılacak puan).
+- [ ] Level atla → "Dagitilacak puan" artmalı (her level +3).
+- [ ] Puan varken bir statın **[+]** butonuna tıkla → o stat +1, puan -1, türetilmiş statlar güncellenmeli (ör. VIT → Max HP artar).
+- [ ] Puan bitince [+] butonları pasifleşmeli (tıklama iş görmemeli).
+- [ ] `MMOStat str` / `dex` / `int` / `vit` konsol komutu da çalışmalı.
+- [ ] Kaydet/yükle sonrası dağıtılmış statlar korunmalı.
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
