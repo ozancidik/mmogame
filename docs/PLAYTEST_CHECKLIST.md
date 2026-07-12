@@ -43,6 +43,12 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Normal `Haydut` mobu ara sıra zehir bulaştırmalı; `Trol` düşük canda öfkelenmeli.
 - [ ] Elit/boss'lar normal spawn'da rastgele çıkmamalı (sadece komutla veya özel yerleştirmeyle).
 
+### Mob leash / eve dönüş
+- [ ] Bir mobu kışkırt, sonra ondan uzağa (spawn noktasından ~18m+) koş.
+- [ ] Mob kovalamayı bırakıp spawn noktasına geri dönmeli.
+- [ ] Eve varınca canı **tam dolmalı** (ve varsa öfke/efektleri sıfırlanmalı).
+- [ ] Eve dönerken sana saldırmamalı; eve varınca tekrar normal aggro yapmalı.
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

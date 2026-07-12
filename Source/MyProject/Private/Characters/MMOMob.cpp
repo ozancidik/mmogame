@@ -85,6 +85,9 @@ void AMMOMob::BeginPlay()
 
 	if (HasAuthority())
 	{
+		// Spawn noktasini ev olarak kaydet (leash / eve donus icin).
+		HomeLocation = GetActorLocation();
+
 		// Arketip sec (belirtilmemisse rastgele) ve uygula.
 		const FMMOMobArchetype* Arch = FMMOMobDatabase::Find(ArchetypeId);
 		if (!Arch)
@@ -189,6 +192,51 @@ void AMMOMob::Tick(float DeltaSeconds)
 	{
 		bEnraged = true;
 		Stats->ApplyEffect(EnrageEffectId, this);
+	}
+
+	AAIController* AICtrl = Cast<AAIController>(GetController());
+	UWorld* TheWorld = GetWorld();
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(TheWorld);
+	const bool bHasNavmesh = AICtrl && Nav && Nav->GetMainNavData() != nullptr;
+	const float DistToHome = FVector::Dist(GetActorLocation(), HomeLocation);
+
+	// --- Leash / eve donus ---
+	if (bReturningHome)
+	{
+		// Eve varinca kovalamayi birak ve tam canlan (klasik MMO reset).
+		if (DistToHome < 140.f)
+		{
+			bReturningHome = false;
+			bEnraged = false;
+			Stats->ClearAllEffects();
+			Stats->Heal(Stats->MaxHealth);
+		}
+		else if (bHasNavmesh)
+		{
+			const float NowH = TheWorld->GetTimeSeconds();
+			if (NowH - LastRepathTime > 0.35f)
+			{
+				LastRepathTime = NowH;
+				AICtrl->MoveToLocation(HomeLocation, 100.f, /*bStopOnOverlap=*/true, /*bUsePathfinding=*/true);
+			}
+		}
+		else
+		{
+			const FVector Dir = (HomeLocation - GetActorLocation()).GetSafeNormal2D();
+			AddMovementInput(Dir, 1.f);
+		}
+		return;
+	}
+
+	// Evden cok uzaklastiysa kovalamayi birak, eve don.
+	if (DistToHome > LeashRange)
+	{
+		bReturningHome = true;
+		if (AICtrl)
+		{
+			AICtrl->StopMovement();
+		}
+		return;
 	}
 
 	// En yakin CANLI oyuncuyu bul (MP: birden fazla oyuncu olabilir).

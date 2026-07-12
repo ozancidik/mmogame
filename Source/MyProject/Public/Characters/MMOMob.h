@@ -47,6 +47,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float AttackRange = 160.f;
 
+	// Mob spawn noktasindan bu kadar uzaklasirsa kovalamayi birakip eve doner ve tam canlanir (leash).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
+	float LeashRange = 1800.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float MobAttackCooldown = 1.5f;
 
@@ -95,6 +99,10 @@ protected:
 	float LastMobAttackTime = -100.f;
 	float LastRepathTime = -100.f;
 	bool bDeathHandled = false;
+
+	// --- Leash (eve donus) ---
+	FVector HomeLocation = FVector::ZeroVector;
+	bool bReturningHome = false;
 
 	// --- Yetenekler (arketipten kopyalanir; sunucu tarafi) ---
 	bool bIsElite = false;
