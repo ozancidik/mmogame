@@ -101,6 +101,13 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] `MMOStat str` / `dex` / `int` / `vit` konsol komutu da çalışmalı.
 - [ ] Kaydet/yükle sonrası dağıtılmış statlar korunmalı.
 
+### Pencere yönetimi: X kapat + çoklu pencere
+- [ ] Her pencerenin (satıcı/görev/envanter/skill/karakter) sağ üstünde kırmızı **X** butonu olmalı; tıklayınca o pencere kapanmalı.
+- [ ] **Aynı anda birden çok pencere** açılabilmeli (ör. K skill + I envanter + C karakter birlikte).
+- [ ] Pencereler farklı konumlarda (skill sol, envanter sağ, görev sol-orta, karakter sağ-orta) — üst üste binmemeli.
+- [ ] Üst üste binen iki pencerede tıklama, **üstteki** pencereye gitmeli.
+- [ ] Bir pencereye tıklamak karakteri hareket ettirmemeli; sağ tık pencere üstündeyken kamerayı döndürmemeli.
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

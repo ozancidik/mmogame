@@ -467,15 +467,9 @@ void AMMOHUD::DrawFloatingTexts()
 
 void AMMOHUD::ToggleSkillBook()
 {
+	// Pencereler artik bagimsiz: digerlerini kapatma (ayni anda birden fazla acilabilir).
 	bSkillBookOpen = !bSkillBookOpen;
-	if (bSkillBookOpen)
-	{
-		bInventoryOpen = false; // pencereler ust uste binmesin
-		bShopOpen = false;
-		bQuestWindowOpen = false;
-		bStatWindowOpen = false;
-	}
-	else
+	if (!bSkillBookOpen)
 	{
 		PendingAssignSkill = NAME_None;
 	}
@@ -484,14 +478,6 @@ void AMMOHUD::ToggleSkillBook()
 void AMMOHUD::ToggleInventory()
 {
 	bInventoryOpen = !bInventoryOpen;
-	if (bInventoryOpen)
-	{
-		bSkillBookOpen = false;
-		bShopOpen = false;
-		bQuestWindowOpen = false;
-		bStatWindowOpen = false;
-		PendingAssignSkill = NAME_None;
-	}
 }
 
 void AMMOHUD::DrawHotbar(AMMOCharacter* PlayerChar)
@@ -577,6 +563,8 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 	const float PY = 90.f;
 	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.93f), PX, PY, PW, PH);
 	DrawRect(FLinearColor(0.3f, 0.5f, 0.8f, 0.95f), PX, PY, PW, 4.f);
+	SkillBookRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	SkillBookCloseRect = DrawCloseButton(PX, PY, PW);
 
 	FString ClassName;
 	switch (SkillComp->CharacterClass)
@@ -806,6 +794,8 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 	const float PY = 90.f;
 	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.93f), PX, PY, PW, PH);
 	DrawRect(FLinearColor(0.8f, 0.6f, 0.2f, 0.95f), PX, PY, PW, 4.f);
+	InventoryRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	InventoryCloseRect = DrawCloseButton(PX, PY, PW);
 
 	DrawText(TEXT("ENVANTER - EKIPMAN"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.3f);
 	DrawText(FString::Printf(TEXT("Altin: %d     Atk: %d   Def: %d"),
@@ -986,11 +976,6 @@ bool AMMOHUD::HandleInventoryRightClick(const FVector2D& Pos)
 void AMMOHUD::OpenShop()
 {
 	bShopOpen = true;
-	bSkillBookOpen = false;
-	bInventoryOpen = false;
-	bQuestWindowOpen = false;
-	bStatWindowOpen = false;
-	PendingAssignSkill = NAME_None;
 }
 
 void AMMOHUD::CloseShop()
@@ -1019,6 +1004,8 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	const float PY = 90.f;
 	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
 	DrawRect(FLinearColor(0.2f, 0.55f, 0.95f, 0.95f), PX, PY, PW, 4.f);
+	ShopRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	ShopCloseRect = DrawCloseButton(PX, PY, PW);
 
 	DrawText(TEXT("SATICI"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.4f);
 	DrawText(FString::Printf(TEXT("Altin: %d     (E ile kapat)"), Inv->Gold),
@@ -1245,24 +1232,11 @@ void AMMOHUD::DrawVendorNameplates()
 void AMMOHUD::OpenQuestWindow()
 {
 	bQuestWindowOpen = true;
-	bShopOpen = false;
-	bSkillBookOpen = false;
-	bInventoryOpen = false;
-	bStatWindowOpen = false;
-	PendingAssignSkill = NAME_None;
 }
 
 void AMMOHUD::ToggleStatWindow()
 {
 	bStatWindowOpen = !bStatWindowOpen;
-	if (bStatWindowOpen)
-	{
-		bSkillBookOpen = false;
-		bInventoryOpen = false;
-		bShopOpen = false;
-		bQuestWindowOpen = false;
-		PendingAssignSkill = NAME_None;
-	}
 }
 
 void AMMOHUD::CloseQuestWindow()
@@ -1398,13 +1372,14 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 
 	const float PW = 480.f;
 	const float PH = 466.f;
-	const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
+	const float PX = ((float)Canvas->SizeX - PW) * 0.5f - 180.f;
 	const float PY = 90.f;
 	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
 	DrawRect(FLinearColor(0.95f, 0.75f, 0.1f, 0.95f), PX, PY, PW, 4.f);
+	QuestRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	QuestCloseRect = DrawCloseButton(PX, PY, PW);
 
 	DrawText(TEXT("GOREVLER"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.35f);
-	DrawText(TEXT("(E ile kapat)"), FLinearColor(0.7f, 0.75f, 0.8f), PX + 150.f, PY + 16.f, nullptr, 0.8f);
 
 	const float RowX = PX + 14.f;
 	const float RowW = PW - 28.f;
@@ -1510,13 +1485,14 @@ void AMMOHUD::DrawStatWindow(AMMOCharacter* PlayerChar)
 
 	const float PW = 380.f;
 	const float PH = 320.f;
-	const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
+	const float PX = ((float)Canvas->SizeX - PW) * 0.5f + 210.f;
 	const float PY = 110.f;
 	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
 	DrawRect(FLinearColor(0.6f, 0.75f, 1.f, 0.95f), PX, PY, PW, 4.f);
+	StatRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	StatCloseRect = DrawCloseButton(PX, PY, PW);
 
-	DrawText(TEXT("KARAKTER"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.35f);
-	DrawText(TEXT("(C ile kapat)"), FLinearColor(0.7f, 0.75f, 0.8f), PX + 190.f, PY + 16.f, nullptr, 0.8f);
+	DrawText(TEXT("KARAKTER"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.15f);
 
 	DrawText(FString::Printf(TEXT("Seviye %d     Dagitilacak puan: %d"), S->Level, S->UnspentStatPoints),
 		S->UnspentStatPoints > 0 ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.7f, 0.75f, 0.8f),
@@ -1591,4 +1567,58 @@ bool AMMOHUD::HandleStatClick(const FVector2D& Pos)
 		}
 	}
 	return true;
+}
+
+FBox2D AMMOHUD::DrawCloseButton(float PX, float PY, float PW)
+{
+	const float S = 22.f;
+	const float BX = PX + PW - S - 6.f;
+	const float BY = PY + 6.f;
+	DrawRect(FLinearColor(0.55f, 0.12f, 0.12f, 0.95f), BX, BY, S, S);
+	DrawRect(FLinearColor(0.85f, 0.3f, 0.3f, 1.f), BX, BY, S, 2.f);
+	DrawText(TEXT("X"), FLinearColor::White, BX + 6.f, BY + 2.f, nullptr, 1.05f);
+	return FBox2D(FVector2D(BX, BY), FVector2D(BX + S, BY + S));
+}
+
+bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)
+{
+	// Ustteki pencere oncelikli (DrawHUD ciziminin tersi): Stat -> Shop -> Inventory -> SkillBook -> Quest.
+	// Tiklama bir pencerenin icindeyse: X'e denk geldiyse kapat, yoksa pencerenin kendi tiklamasini isle.
+	if (bStatWindowOpen && StatRect.IsInside(Pos))
+	{
+		if (StatCloseRect.IsInside(Pos)) { bStatWindowOpen = false; } else { HandleStatClick(Pos); }
+		return true;
+	}
+	if (bShopOpen && ShopRect.IsInside(Pos))
+	{
+		if (ShopCloseRect.IsInside(Pos)) { bShopOpen = false; } else { HandleShopClick(Pos); }
+		return true;
+	}
+	if (bInventoryOpen && InventoryRect.IsInside(Pos))
+	{
+		if (InventoryCloseRect.IsInside(Pos)) { bInventoryOpen = false; } else { HandleInventoryClick(Pos); }
+		return true;
+	}
+	if (bSkillBookOpen && SkillBookRect.IsInside(Pos))
+	{
+		if (SkillBookCloseRect.IsInside(Pos)) { bSkillBookOpen = false; PendingAssignSkill = NAME_None; } else { HandleSkillBookClick(Pos); }
+		return true;
+	}
+	if (bQuestWindowOpen && QuestRect.IsInside(Pos))
+	{
+		if (QuestCloseRect.IsInside(Pos)) { bQuestWindowOpen = false; } else { HandleQuestClick(Pos); }
+		return true;
+	}
+	return false;
+}
+
+bool AMMOHUD::HandleWindowRightClick(const FVector2D& Pos)
+{
+	// Sag tik: skill kitabinda skili hotbara ata; envanterde ekipmani yukselt (imlecin ustundeki pencereye gore).
+	if (bStatWindowOpen && StatRect.IsInside(Pos)) { return true; }
+	if (bShopOpen && ShopRect.IsInside(Pos)) { return true; }
+	if (bInventoryOpen && InventoryRect.IsInside(Pos)) { HandleInventoryRightClick(Pos); return true; }
+	if (bSkillBookOpen && SkillBookRect.IsInside(Pos)) { HandleSkillBookRightClick(Pos); return true; }
+	if (bQuestWindowOpen && QuestRect.IsInside(Pos)) { return true; }
+	return false;
 }

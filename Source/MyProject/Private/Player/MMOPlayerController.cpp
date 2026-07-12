@@ -229,32 +229,13 @@ void AMMOPlayerController::OnLeftClickPressed()
 	// UI penceresi acikken tiklama pencereye gider, karakteri hareket ettirmez.
 	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		if (H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen())
+		if (H->IsAnyWindowOpen())
 		{
+			// Tiklama, imlecin ustundeki acik pencereye gider (X ile kapatma dahil); karakter hareket etmez.
 			float MX = 0.f, MY = 0.f;
 			if (GetMousePosition(MX, MY))
 			{
-				const FVector2D Pos(MX, MY);
-				if (H->IsSkillBookOpen())
-				{
-					H->HandleSkillBookClick(Pos);
-				}
-				else if (H->IsInventoryOpen())
-				{
-					H->HandleInventoryClick(Pos);
-				}
-				else if (H->IsShopOpen())
-				{
-					H->HandleShopClick(Pos);
-				}
-				else if (H->IsStatWindowOpen())
-				{
-					H->HandleStatClick(Pos);
-				}
-				else
-				{
-					H->HandleQuestClick(Pos);
-				}
+				H->HandleWindowClick(FVector2D(MX, MY));
 			}
 			return;
 		}
@@ -337,24 +318,15 @@ void AMMOPlayerController::OnLeftClickReleased()
 
 void AMMOPlayerController::OnRightMousePressed()
 {
-	// Pencere acikken sag tik pencereye calisir (kitap: slota koy; envanter: +1 dene), kamera donmez.
+	// Pencere acikken sag tik, imlecin ustundeki pencereye calisir (kitap: slota koy; envanter: +1 dene), kamera donmez.
 	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		if (H->IsSkillBookOpen())
+		if (H->IsAnyWindowOpen())
 		{
 			float MX = 0.f, MY = 0.f;
 			if (GetMousePosition(MX, MY))
 			{
-				H->HandleSkillBookRightClick(FVector2D(MX, MY));
-			}
-			return;
-		}
-		if (H->IsInventoryOpen())
-		{
-			float MX = 0.f, MY = 0.f;
-			if (GetMousePosition(MX, MY))
-			{
-				H->HandleInventoryRightClick(FVector2D(MX, MY));
+				H->HandleWindowRightClick(FVector2D(MX, MY));
 			}
 			return;
 		}

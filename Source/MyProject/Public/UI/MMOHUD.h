@@ -81,6 +81,14 @@ public:
 	// Sol tik: bir statin [+] butonuna basinca puan harcar. Islediyse true.
 	bool HandleStatClick(const FVector2D& Pos);
 
+	// Acik pencerelerden birine sol-tiklandiysa isler (ustteki pencere oncelikli; X ile kapatma dahil).
+	// Bir pencereyi tuketti ise true doner (karakter hareket etmez).
+	bool HandleWindowClick(const FVector2D& Pos);
+	// Acik pencereye sag-tiklandiysa isler (skill ata / ekipman yukselt). Tuketti ise true.
+	bool HandleWindowRightClick(const FVector2D& Pos);
+	// Herhangi bir pencere acik mi?
+	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen; }
+
 protected:
 	// Sahnedeki dusmanlarin tepesine saglik bari cizer (dunya->ekran projeksiyonu).
 	void DrawEnemyHealthBars();
@@ -137,6 +145,9 @@ protected:
 	// Karakter/stat penceresi (ana+turetilmis statlar + puan dagitma).
 	void DrawStatWindow(class AMMOCharacter* PlayerChar);
 
+	// Bir pencerenin sag ustune X kapat butonu cizer; butonun dikdortgenini dondurur.
+	FBox2D DrawCloseButton(float PX, float PY, float PW);
+
 	// Diger oyuncularin tepesine isim + level + HP bari (MP).
 	void DrawPlayerNameplates();
 
@@ -148,6 +159,18 @@ protected:
 
 	// Stat penceresi [+] tiklama bolgeleri (SkillId = "STR"/"DEX"/"INT"/"VIT").
 	TArray<FMMOClickRegion> StatPlusRegions;
+
+	// Her pencerenin cerceve dikdortgeni + X-kapat buton dikdortgeni (her kare Draw'da guncellenir).
+	FBox2D SkillBookRect = FBox2D(ForceInit);
+	FBox2D SkillBookCloseRect = FBox2D(ForceInit);
+	FBox2D InventoryRect = FBox2D(ForceInit);
+	FBox2D InventoryCloseRect = FBox2D(ForceInit);
+	FBox2D ShopRect = FBox2D(ForceInit);
+	FBox2D ShopCloseRect = FBox2D(ForceInit);
+	FBox2D QuestRect = FBox2D(ForceInit);
+	FBox2D QuestCloseRect = FBox2D(ForceInit);
+	FBox2D StatRect = FBox2D(ForceInit);
+	FBox2D StatCloseRect = FBox2D(ForceInit);
 
 	// Envanter tiklama bolgeleri: kusanilan slotlar (Slot=(int)EMMOEquipSlot) ve canta satirlari (Slot=canta index).
 	TArray<FMMOClickRegion> InvEquippedRegions;
