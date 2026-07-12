@@ -129,6 +129,14 @@ void AMMOMob::ApplyArchetype(const FMMOMobArchetype& Arch)
 	MinGold = Arch.MinGold;
 	MaxGold = Arch.MaxGold;
 
+	// Yetenekler.
+	bIsElite = Arch.bIsElite;
+	OnHitEffectId = Arch.OnHitEffectId;
+	OnHitEffectChance = Arch.OnHitEffectChance;
+	EnrageEffectId = Arch.EnrageEffectId;
+	EnrageHealthPct = Arch.EnrageHealthPct;
+	bEnraged = false;
+
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->MaxWalkSpeed = Arch.MoveSpeed;
@@ -173,6 +181,14 @@ void AMMOMob::Tick(float DeltaSeconds)
 	if (!HasAuthority() || !Stats || Stats->bIsDead)
 	{
 		return;
+	}
+
+	// Enrage: can esigin altina dusunce mob bir defaya mahsus kendine buff (or. Ofke) uygular.
+	if (!bEnraged && EnrageHealthPct > 0.f && !EnrageEffectId.IsNone()
+		&& Stats->GetHealthPercent() <= EnrageHealthPct)
+	{
+		bEnraged = true;
+		Stats->ApplyEffect(EnrageEffectId, this);
 	}
 
 	// En yakin CANLI oyuncuyu bul (MP: birden fazla oyuncu olabilir).
@@ -255,6 +271,18 @@ void AMMOMob::Tick(float DeltaSeconds)
 		{
 			LastMobAttackTime = Now;
 			UGameplayStatics::ApplyDamage(Player, MobAttackDamage, GetController(), this, nullptr);
+
+			// Vurusta sansa bagli debuff uygula (or. zehir tukuren mob, yavaslatan orumcek).
+			if (!OnHitEffectId.IsNone() && OnHitEffectChance > 0.f && FMath::FRand() < OnHitEffectChance)
+			{
+				if (AMMOCharacter* PChar = Cast<AMMOCharacter>(Player))
+				{
+					if (PChar->GetStats() && !PChar->GetStats()->bIsDead)
+					{
+						PChar->GetStats()->ApplyEffect(OnHitEffectId, this);
+					}
+				}
+			}
 		}
 	}
 }

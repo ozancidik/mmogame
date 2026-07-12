@@ -567,6 +567,39 @@ void AMMOCharacter::ServerApplyBuff_Implementation(FName EffectId)
 	}
 }
 
+void AMMOCharacter::MMOSpawnMob(const FString& ArchetypeId)
+{
+	const FName Id(*ArchetypeId);
+	if (HasAuthority())
+	{
+		ServerSpawnMob_Implementation(Id);
+	}
+	else
+	{
+		ServerSpawnMob(Id);
+	}
+}
+
+void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// Oyuncunun ~3m onune, hafif yukariya spawn'la.
+	const FVector Loc = GetActorLocation() + GetActorForwardVector() * 300.f + FVector(0.f, 0.f, 60.f);
+	const FTransform SpawnTM(FRotator::ZeroRotator, Loc);
+
+	if (AMMOMob* Mob = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), SpawnTM))
+	{
+		// ArchetypeId'yi BeginPlay'den once ata ki ApplyArchetype dogru arketipi kullansin.
+		Mob->ArchetypeId = ArchetypeId;
+		UGameplayStatics::FinishSpawningActor(Mob, SpawnTM);
+	}
+}
+
 void AMMOCharacter::MulticastMeleeFX_Implementation(FVector ImpactLocation)
 {
 	if (UWorld* World = GetWorld())

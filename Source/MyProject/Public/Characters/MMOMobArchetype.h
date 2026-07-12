@@ -52,6 +52,26 @@ struct FMMOMobArchetype
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	FLinearColor Tint = FLinearColor(0.7f, 0.08f, 0.08f);
 
+	// --- Yetenekler (buff/debuff sistemi) ---
+	// Elit/boss mu? (daha guclu; ozel muamele/gorsel vurgu icin).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")
+	bool bIsElite = false;
+
+	// Vurusta oyuncuya uygulanabilecek debuff (MMOEffectDatabase EffectId; bos = yok).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")
+	FName OnHitEffectId;
+
+	// Vurusta OnHitEffectId'nin uygulanma sansi (0..1).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")
+	float OnHitEffectChance = 0.f;
+
+	// Can bu orana (0..1) dusunce mob kendine bir defa bu buff'i uygular (or. Rage). 0 = enrage yok.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")
+	FName EnrageEffectId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")
+	float EnrageHealthPct = 0.f;
+
 	bool IsValidArchetype() const { return !ArchetypeId.IsNone(); }
 };
 

@@ -19,7 +19,7 @@ namespace
 		return D;
 	}
 
-	const TArray<FMMOEffectDef>& BuildTable()
+	const TArray<FMMOEffectDef>& BuildEffectTable()
 	{
 		static TArray<FMMOEffectDef> Table;
 		if (Table.Num() > 0)
@@ -45,7 +45,7 @@ namespace
 
 const TArray<FMMOEffectDef>& FMMOEffectDatabase::GetAll()
 {
-	return BuildTable();
+	return BuildEffectTable();
 }
 
 const FMMOEffectDef* FMMOEffectDatabase::Find(FName EffectId)

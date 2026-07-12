@@ -17,7 +17,7 @@ namespace
 		return D;
 	}
 
-	const TArray<FMMOItemDef>& BuildTable()
+	const TArray<FMMOItemDef>& BuildItemTable()
 	{
 		static TArray<FMMOItemDef> Table;
 		if (Table.Num() > 0)
@@ -50,7 +50,7 @@ namespace
 
 const TArray<FMMOItemDef>& FMMOItemDatabase::GetAll()
 {
-	return BuildTable();
+	return BuildItemTable();
 }
 
 const FMMOItemDef* FMMOItemDatabase::Find(FName ItemId)

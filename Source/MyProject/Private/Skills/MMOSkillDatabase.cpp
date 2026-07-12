@@ -27,7 +27,7 @@ namespace
 		return D;
 	}
 
-	const TArray<FMMOSkillDef>& BuildTable()
+	const TArray<FMMOSkillDef>& BuildSkillTable()
 	{
 		static TArray<FMMOSkillDef> Table;
 		if (Table.Num() > 0)
@@ -101,7 +101,7 @@ namespace
 
 const TArray<FMMOSkillDef>& FMMOSkillDatabase::GetAll()
 {
-	return BuildTable();
+	return BuildSkillTable();
 }
 
 const FMMOSkillDef* FMMOSkillDatabase::Find(FName SkillId)

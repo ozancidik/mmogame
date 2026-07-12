@@ -96,5 +96,13 @@ protected:
 	float LastRepathTime = -100.f;
 	bool bDeathHandled = false;
 
+	// --- Yetenekler (arketipten kopyalanir; sunucu tarafi) ---
+	bool bIsElite = false;
+	FName OnHitEffectId;
+	float OnHitEffectChance = 0.f;
+	FName EnrageEffectId;
+	float EnrageHealthPct = 0.f;
+	bool bEnraged = false;
+
 	void DestroySelf();
 };

@@ -118,6 +118,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOBuff(const FString& EffectId);
 
+	// Test: onune belirtilen arketipte bir mob spawn'lar (konsol: "MMOSpawnMob OrcWarlord", "MMOSpawnMob SpiderQueen").
+	UFUNCTION(Exec)
+	void MMOSpawnMob(const FString& ArchetypeId);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -161,6 +165,9 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerApplyBuff(FName EffectId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSpawnMob(FName ArchetypeId);
 
 	// Yakin dovus vurus efektini tum makinelerde oynat.
 	UFUNCTION(NetMulticast, Unreliable)
