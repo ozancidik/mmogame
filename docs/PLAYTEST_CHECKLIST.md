@@ -62,6 +62,15 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] `MMOUse ScrollHaste` / `ScrollIronSkin` / `ScrollRegen` → ilgili buff binmeli.
 - [ ] Envanterde yokken kullanınca "yok!" uyarısı vermeli.
 
+### Parti (grup) sistemi — 2 pencereli PIE gerekir
+- [ ] İki oyuncu birbirine yaklaşsın. Oyuncu A konsola `MMOInvite` yazsın → en yakın oyuncu (B) davet edilmeli.
+- [ ] Oyuncu B ekranında "Parti daveti aldin!" mesajı çıkmalı; B `MMOPartyAccept` yazsın.
+- [ ] Her iki oyuncunun sol tarafında **PARTI** paneli belirmeli (diğer üyenin adı + HP barı).
+- [ ] Bir üye hasar alınca partnerin panelindeki HP barı düşmeli (replikasyon).
+- [ ] Ortak XP: A bir mob öldürsün, B menzildeyken (~30m) **B de XP almalı**.
+- [ ] `MMOPartyLeave` → panel kaybolmalı, iki oyuncu da partisiz olmalı.
+- [ ] Tek üye kalınca parti otomatik dağılmalı.
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

@@ -11,6 +11,7 @@
 #include "World/MMOLootPickup.h"
 #include "Items/MMOItemDatabase.h"
 #include "Components/MMOQuestComponent.h"
+#include "Components/MMOPartyComponent.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 #include "Engine/SkeletalMesh.h"
@@ -384,16 +385,35 @@ void AMMOMob::HandleDeath()
 	}
 	bDeathHandled = true;
 
-	// Olduren oyuncuya XP + gorev ilerlemesi ver.
+	// Olduren oyuncuya (ve partisi varsa menzildeki uyelere) XP + gorev ilerlemesi ver.
 	if (AMMOCharacter* Killer = Cast<AMMOCharacter>(LastDamageInstigator.Get()))
 	{
-		if (Killer->GetStats())
+		const float PartyXPShareRange = 3000.f;
+
+		TArray<AMMOCharacter*> Recipients;
+		if (UMMOPartyComponent* Party = Killer->GetPartyComponent())
 		{
-			Killer->GetStats()->GainExperience(XPReward);
+			if (Party->IsInParty())
+			{
+				Party->GetPartyInRange(GetActorLocation(), PartyXPShareRange, Recipients);
+			}
 		}
-		if (Killer->GetQuestComponent())
+		Recipients.AddUnique(Killer); // olduren her zaman kredi alir
+
+		for (AMMOCharacter* R : Recipients)
 		{
-			Killer->GetQuestComponent()->NotifyMobKilled(ArchetypeId);
+			if (!R)
+			{
+				continue;
+			}
+			if (R->GetStats())
+			{
+				R->GetStats()->GainExperience(XPReward);
+			}
+			if (R->GetQuestComponent())
+			{
+				R->GetQuestComponent()->NotifyMobKilled(ArchetypeId);
+			}
 		}
 	}
 

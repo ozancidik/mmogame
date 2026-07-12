@@ -6,6 +6,7 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOSkillComponent.h"
 #include "Components/MMOQuestComponent.h"
+#include "Components/MMOPartyComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Core/MMOGameMode.h"
 #include "Items/MMOConsumableTypes.h"
@@ -35,6 +36,7 @@ AMMOCharacter::AMMOCharacter()
 	Inventory = CreateDefaultSubobject<UMMOInventoryComponent>(TEXT("Inventory"));
 	SkillComponent = CreateDefaultSubobject<UMMOSkillComponent>(TEXT("SkillComponent"));
 	QuestComponent = CreateDefaultSubobject<UMMOQuestComponent>(TEXT("QuestComponent"));
+	PartyComponent = CreateDefaultSubobject<UMMOPartyComponent>(TEXT("PartyComponent"));
 }
 
 void AMMOCharacter::BeginPlay()
@@ -579,6 +581,30 @@ void AMMOCharacter::MMOSpawnMob(const FString& ArchetypeId)
 	else
 	{
 		ServerSpawnMob(Id);
+	}
+}
+
+void AMMOCharacter::MMOInvite()
+{
+	if (PartyComponent)
+	{
+		PartyComponent->RequestInviteNearest();
+	}
+}
+
+void AMMOCharacter::MMOPartyAccept()
+{
+	if (PartyComponent)
+	{
+		PartyComponent->RequestAccept();
+	}
+}
+
+void AMMOCharacter::MMOPartyLeave()
+{
+	if (PartyComponent)
+	{
+		PartyComponent->RequestLeave();
 	}
 }
 

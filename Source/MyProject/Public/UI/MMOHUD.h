@@ -101,6 +101,9 @@ protected:
 	// Aktif buff/debuff ikonlari (barlarin altinda: kisa etiket + kalan sure + suzulme cubugu).
 	void DrawActiveEffects(class AMMOCharacter* PlayerChar, float StartX, float StartY);
 
+	// Parti uyeleri paneli (ad + HP bari). Partide degilse cizmez.
+	void DrawParty(class AMMOCharacter* PlayerChar, float StartX, float StartY);
+
 	// Alt-orta hotbar (0-9 slot: atanan skill + cooldown). Tiklama bolgelerini de doldurur.
 	void DrawHotbar(class AMMOCharacter* PlayerChar);
 

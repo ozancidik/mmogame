@@ -4,6 +4,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
 #include "Components/MMOStatsComponent.h"
+#include "Components/MMOPartyComponent.h"
 #include "Effects/MMOEffectDatabase.h"
 #include "Items/MMOConsumableTypes.h"
 #include "Components/MMOInventoryComponent.h"
@@ -97,6 +98,9 @@ void AMMOHUD::DrawHUD()
 
 	// Aktif buff/debuff ikonlari (altin satirinin altinda).
 	DrawActiveEffects(MMOChar, X, ExpY + 40.f);
+
+	// Parti paneli (efekt ikonlarinin altinda).
+	DrawParty(MMOChar, X, ExpY + 84.f);
 
 	// Sag ust minimap + gorev takibi (her zaman) + gorev penceresi (acikken).
 	DrawMinimap(MMOChar);
@@ -218,6 +222,50 @@ void AMMOHUD::DrawActiveEffects(AMMOCharacter* PlayerChar, float StartX, float S
 		const float Pct = E.Duration > 0.f ? FMath::Clamp(E.RemainingTime / E.Duration, 0.f, 1.f) : 0.f;
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, StartY + BoxH - 4.f, BoxW, 4.f);
 		DrawRect(Border, BX, StartY + BoxH - 4.f, BoxW * Pct, 4.f);
+	}
+}
+
+void AMMOHUD::DrawParty(AMMOCharacter* PlayerChar, float StartX, float StartY)
+{
+	if (!PlayerChar)
+	{
+		return;
+	}
+	UMMOPartyComponent* Party = PlayerChar->GetPartyComponent();
+	if (!Party || !Party->IsInParty())
+	{
+		return;
+	}
+
+	DrawText(TEXT("PARTI"), FLinearColor(0.6f, 0.85f, 1.f), StartX, StartY, nullptr, 0.85f);
+	float Y = StartY + 18.f;
+
+	const float BarW = 150.f;
+	const float BarH = 8.f;
+
+	for (const TObjectPtr<AMMOCharacter>& MPtr : Party->Members)
+	{
+		AMMOCharacter* M = MPtr.Get();
+		UMMOStatsComponent* S = M ? M->GetStats() : nullptr;
+		if (!S)
+		{
+			continue;
+		}
+
+		FString Name = TEXT("Uye");
+		if (const APlayerState* PS = M->GetPlayerState())
+		{
+			Name = PS->GetPlayerName();
+		}
+
+		DrawText(FString::Printf(TEXT("%s  Lv%d"), *Name, S->Level),
+			S->bIsDead ? FLinearColor(0.7f, 0.3f, 0.3f) : FLinearColor::White, StartX, Y, nullptr, 0.75f);
+		Y += 14.f;
+
+		DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), StartX - 1.f, Y - 1.f, BarW + 2.f, BarH + 2.f);
+		DrawRect(FLinearColor(0.15f, 0.15f, 0.16f, 0.9f), StartX, Y, BarW, BarH);
+		DrawRect(FLinearColor(0.2f, 0.75f, 0.3f), StartX, Y, BarW * S->GetHealthPercent(), BarH);
+		Y += BarH + 8.f;
 	}
 }
 

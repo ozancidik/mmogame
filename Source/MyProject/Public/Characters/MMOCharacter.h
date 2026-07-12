@@ -10,6 +10,7 @@ class UMMOStatsComponent;
 class UMMOInventoryComponent;
 class UMMOSkillComponent;
 class UMMOQuestComponent;
+class UMMOPartyComponent;
 
 /**
  * MMO karakterleri (oyuncu ve NPC/mob) için C++ temel sınıfı.
@@ -36,6 +37,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
 	TObjectPtr<UMMOQuestComponent> QuestComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
+	TObjectPtr<UMMOPartyComponent> PartyComponent;
+
 	// Unreal'in standart hasar akışı (UGameplayStatics::ApplyDamage) buraya düşer;
 	// biz de stat bileşenine yönlendiririz. Sadece otoritede etki eder.
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
@@ -52,6 +56,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOQuestComponent* GetQuestComponent() const { return QuestComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MMO")
+	UMMOPartyComponent* GetPartyComponent() const { return PartyComponent; }
 
 	// Sinif degistirme konsol komutu: "MMOClass warrior|archer|mage|priest".
 	UFUNCTION(Exec)
@@ -136,6 +143,16 @@ public:
 	// Test: onune belirtilen arketipte bir mob spawn'lar (konsol: "MMOSpawnMob OrcWarlord", "MMOSpawnMob SpiderQueen").
 	UFUNCTION(Exec)
 	void MMOSpawnMob(const FString& ArchetypeId);
+
+	// --- Parti (grup) konsol komutlari ---
+	UFUNCTION(Exec)
+	void MMOInvite();        // en yakin oyuncuyu partiye davet et
+
+	UFUNCTION(Exec)
+	void MMOPartyAccept();   // gelen daveti kabul et
+
+	UFUNCTION(Exec)
+	void MMOPartyLeave();    // partiden ayril
 
 protected:
 	virtual void BeginPlay() override;
