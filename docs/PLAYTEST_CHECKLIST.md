@@ -71,6 +71,13 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] `MMOPartyLeave` → panel kaybolmalı, iki oyuncu da partisiz olmalı.
 - [ ] Tek üye kalınca parti otomatik dağılmalı.
 
+### Mob gezinme (idle wander) + World Boss
+- [ ] Kışkırtılmamış moblar spawn noktaları çevresinde ağır ağır rastgele gezinmeli (yerinde donmamalı).
+- [ ] Bir oyuncu aggro menziline girince gezinmeyi bırakıp saldırıya geçmeli.
+- [ ] Oyuncu başlangıcının epey ilerisinde tek bir **Ork Reisi (world boss)** bulunmalı.
+- [ ] Boss öldürülünce ~30 sn sonra aynı bölgede yeniden doğmalı.
+- [ ] Normal spawn alanında elit/boss çıkmamalı (sadece bu özel boss noktasında).
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

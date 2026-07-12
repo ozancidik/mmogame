@@ -312,6 +312,8 @@ void AMMOMob::Tick(float DeltaSeconds)
 	}
 	else if (!Player || Dist > AggroRange)
 	{
+		// Menzilde dusman yok: ev cevresinde rastgele gezin (dunya canli dursun).
+		IdleWander();
 		return;
 	}
 
@@ -373,6 +375,36 @@ void AMMOMob::Tick(float DeltaSeconds)
 			}
 		}
 	}
+}
+
+void AMMOMob::IdleWander()
+{
+	UWorld* World = GetWorld();
+	AAIController* AI = Cast<AAIController>(GetController());
+	if (!World || !AI)
+	{
+		return;
+	}
+
+	// Navmesh yoksa gezinme (duz-cizgi surukleme istemiyoruz).
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (!Nav || !Nav->GetMainNavData())
+	{
+		return;
+	}
+
+	const float Now = World->GetTimeSeconds();
+	if (Now < NextWanderTime)
+	{
+		return; // hedefe dogru gitmeye devam / bekle
+	}
+	NextWanderTime = Now + FMath::FRandRange(4.f, 8.f);
+
+	// Ev cevresinde rastgele bir noktaya yuru.
+	const float Ang = FMath::FRandRange(0.f, 2.f * PI);
+	const float Rad = FMath::FRandRange(0.f, WanderRadius);
+	const FVector Dest = HomeLocation + FVector(FMath::Cos(Ang) * Rad, FMath::Sin(Ang) * Rad, 0.f);
+	AI->MoveToLocation(Dest, 40.f, /*bStopOnOverlap=*/true, /*bUsePathfinding=*/true);
 }
 
 void AMMOMob::HandleDeath()

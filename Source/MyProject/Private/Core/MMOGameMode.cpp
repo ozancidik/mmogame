@@ -8,6 +8,7 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
 
 AMMOGameMode::AMMOGameMode()
@@ -51,6 +52,18 @@ void AMMOGameMode::SpawnMobArea()
 	UE_LOG(LogTemp, Log, TEXT("[MMODBG] SpawnMobArea: playerStart=%d origin=%s spawnerLoc=%s spawner=%s"),
 		bFoundStart ? 1 : 0, *Origin.ToCompactString(), *SpawnerLoc.ToCompactString(),
 		Spawner ? *Spawner->GetName() : TEXT("NULL"));
+
+	// World boss: mob alaninin biraz otesine, tek bir Ork Reisi tutan spawner (olunce ~30sn sonra respawn).
+	const FVector BossLoc = Origin + Facing.Vector() * (MobAreaDistance * 2.2f) + FVector(0.f, 0.f, 50.f);
+	const FTransform BossTM(FRotator::ZeroRotator, BossLoc);
+	if (AMMOMobSpawner* BossSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), BossTM))
+	{
+		BossSpawner->MaxMobs = 1;
+		BossSpawner->SpawnRadius = 150.f;
+		BossSpawner->TopUpInterval = 30.f;
+		BossSpawner->ForcedArchetypeId = FName(TEXT("OrcWarlord"));
+		UGameplayStatics::FinishSpawningActor(BossSpawner, BossTM);
+	}
 
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
 	FActorSpawnParameters NpcParams;

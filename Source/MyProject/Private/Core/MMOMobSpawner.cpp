@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Components/SceneComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
 AMMOMobSpawner::AMMOMobSpawner()
@@ -68,11 +69,28 @@ void AMMOMobSpawner::SpawnOne()
 	const float AngleRad = FMath::DegreesToRadians(AngleDeg);
 	const FVector Offset(FMath::Cos(AngleRad) * Radius, FMath::Sin(AngleRad) * Radius, 100.f);
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
 	const FVector SpawnLoc = Base + Offset;
-	AMMOMob* Mob = World->SpawnActor<AMMOMob>(MobClass, SpawnLoc, FRotator::ZeroRotator, SpawnParams);
+
+	AMMOMob* Mob = nullptr;
+	if (!ForcedArchetypeId.IsNone())
+	{
+		// Sabit arketip (world boss): ArchetypeId'yi BeginPlay'den once atamak icin deferred spawn.
+		const FTransform SpawnTM(FRotator::ZeroRotator, SpawnLoc);
+		Mob = World->SpawnActorDeferred<AMMOMob>(MobClass, SpawnTM, nullptr, nullptr,
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+		if (Mob)
+		{
+			Mob->ArchetypeId = ForcedArchetypeId;
+			UGameplayStatics::FinishSpawningActor(Mob, SpawnTM);
+		}
+	}
+	else
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		Mob = World->SpawnActor<AMMOMob>(MobClass, SpawnLoc, FRotator::ZeroRotator, SpawnParams);
+	}
+
 	UE_LOG(LogTemp, Log, TEXT("[MMODBG] SpawnOne: requested=%s result=%s actualLoc=%s"),
 		*SpawnLoc.ToCompactString(),
 		Mob ? *Mob->GetName() : TEXT("NULL"),

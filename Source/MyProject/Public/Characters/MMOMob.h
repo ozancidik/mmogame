@@ -55,6 +55,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float LeashRange = 1800.f;
 
+	// Bos zamanda (hedef yokken) ev cevresinde bu yaricap icinde rastgele gezinir.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
+	float WanderRadius = 450.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float MobAttackCooldown = 1.5f;
 
@@ -107,6 +111,10 @@ protected:
 	// --- Leash (eve donus) ---
 	FVector HomeLocation = FVector::ZeroVector;
 	bool bReturningHome = false;
+
+	// --- Idle gezinme ---
+	float NextWanderTime = 0.f;
+	void IdleWander();
 
 	// --- Hasarda aggro (menzilli pull) ---
 	TWeakObjectPtr<APawn> ForcedTarget;

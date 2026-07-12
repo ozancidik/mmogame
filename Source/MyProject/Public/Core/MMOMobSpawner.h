@@ -28,6 +28,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	int32 MaxMobs = 3;
 
+	// Bos ise rastgele arketip; doldurulursa tum moblar bu arketiple spawn olur (or. world boss).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	FName ForcedArchetypeId;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	float SpawnRadius = 500.f;
 
