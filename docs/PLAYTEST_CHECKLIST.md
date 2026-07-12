@@ -86,6 +86,13 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Satıcıda nadir eşya daha pahalıya satılmalı; satış satırı renkli görünmeli.
 - [ ] Kaydet/yükle sonrası eşyaların nadirliği korunmalı (SaveGame).
 
+### Görev zinciri + daha çok içerik
+- [ ] Görevciye tıkla → başta sadece "Goblin Avi" ve yan görevler (Temizlik/Güçlen/Tüccar Ruhu) görünmeli; zincir görevleri (Kurt/Ork/Haydut/Boss) **görünmemeli** (kilitli).
+- [ ] "Goblin Avi"yi bitir ve ödülü al → "Kurt Surusu" görev listesinde belirmeli.
+- [ ] Zinciri takip et: Goblin → Kurt → Ork → Haydut → **Ork Reisini Yen** (boss görevi, 1500 XP + 1000 altın).
+- [ ] Ön koşulu bitmemiş bir görevi almaya çalışırsan (normalde gizli) "Once '...' gorevini bitir" uyarısı.
+- [ ] Boss görevi: world boss'u (Ork Reisi) öldürünce görev tamamlanmalı.
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

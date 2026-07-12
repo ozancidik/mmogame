@@ -1395,7 +1395,8 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 
 	for (const FMMOQuestDef& Def : FMMOQuestDatabase::GetAll())
 	{
-		if (Q->IsQuestActive(Def.QuestId) || Q->IsCompleted(Def.QuestId))
+		// Sadece su an alinabilir gorevler (aktif/tamam olan ve on kosulu/level'i saglanmayan gizli).
+		if (!Q->IsQuestAvailable(Def.QuestId))
 		{
 			continue;
 		}

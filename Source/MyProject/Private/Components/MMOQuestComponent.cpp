@@ -54,6 +54,31 @@ bool UMMOQuestComponent::IsCompleted(FName QuestId) const
 	return CompletedQuests.Contains(QuestId);
 }
 
+bool UMMOQuestComponent::IsQuestAvailable(FName QuestId) const
+{
+	const FMMOQuestDef* Def = FMMOQuestDatabase::Find(QuestId);
+	if (!Def)
+	{
+		return false;
+	}
+	if (IsQuestActive(QuestId) || IsCompleted(QuestId))
+	{
+		return false;
+	}
+	// On kosul gorev tamamlanmis olmali.
+	if (!Def->PrereqQuestId.IsNone() && !IsCompleted(Def->PrereqQuestId))
+	{
+		return false;
+	}
+	// Level yeterli olmali.
+	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	if (Owner && Owner->GetStats() && Owner->GetStats()->Level < Def->RequiredLevel)
+	{
+		return false;
+	}
+	return true;
+}
+
 int32 UMMOQuestComponent::GetProgress(const FMMOQuestDef& Def) const
 {
 	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
@@ -105,6 +130,18 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 
 	if (IsQuestActive(QuestId) || IsCompleted(QuestId))
 	{
+		return;
+	}
+
+	// On kosul gorev tamamlanmadan alinamaz (zincir).
+	if (!Def->PrereqQuestId.IsNone() && !IsCompleted(Def->PrereqQuestId))
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			const FMMOQuestDef* Pre = FMMOQuestDatabase::Find(Def->PrereqQuestId);
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver,
+				FString::Printf(TEXT("Once '%s' gorevini bitir"), Pre ? *Pre->Name : TEXT("onceki")));
+		}
 		return;
 	}
 

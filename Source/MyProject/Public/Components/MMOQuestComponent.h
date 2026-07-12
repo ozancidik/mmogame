@@ -43,6 +43,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MMO|Quest")
 	bool IsCompleted(FName QuestId) const;
 
+	// Gorev su an alinabilir mi? (aktif/tamam degil, level yeterli, on kosul gorev tamamlanmis)
+	UFUNCTION(BlueprintPure, Category = "MMO|Quest")
+	bool IsQuestAvailable(FName QuestId) const;
+
 	// Gorevin su anki ilerlemesini (0..hedef) dondurur.
 	int32 GetProgress(const FMMOQuestDef& Def) const;
 

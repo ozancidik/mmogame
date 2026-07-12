@@ -50,6 +50,10 @@ struct FMMOQuestDef
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
 	int32 RequiredLevel = 1;
 
+	// Bu gorevi almadan once tamamlanmasi gereken gorev (zincir). Bos = yok.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
+	FName PrereqQuestId;
+
 	bool IsValidDef() const { return !QuestId.IsNone(); }
 };
 
