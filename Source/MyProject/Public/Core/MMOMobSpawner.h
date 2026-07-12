@@ -1,0 +1,45 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "MMOMobSpawner.generated.h"
+
+class AMMOMob;
+
+/**
+ * Belirli sayida mob'u alanda tutar. Sunucuda basladiginda MaxMobs kadar spawn eder ve
+ * periyodik "top-up" ile olen/yok olan moblarin yerine yenisini uretir (respawn).
+ */
+UCLASS()
+class MYPROJECT_API AMMOMobSpawner : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AMMOMobSpawner();
+
+	virtual void BeginPlay() override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	TSubclassOf<AMMOMob> MobClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	int32 MaxMobs = 3;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	float SpawnRadius = 500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	float TopUpInterval = 4.f;
+
+protected:
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AMMOMob>> LiveMobs;
+
+	FTimerHandle TopUpTimer;
+
+	void TopUp();
+	void SpawnOne();
+};
