@@ -81,7 +81,7 @@ public:
 
 	/** Yeni ekipman ornegi ekler (loot/odul). Sadece otorite. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
-	void AddEquipmentInstance(FName ItemId, int32 Plus = 0);
+	void AddEquipmentInstance(FName ItemId, int32 Plus = 0, EMMOItemRarity Rarity = EMMOItemRarity::Common);
 
 	/** Cantadaki ekipmani kusanir (slot doluysa takas eder). Istemciden cagrilirsa sunucuya yonlenir. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")

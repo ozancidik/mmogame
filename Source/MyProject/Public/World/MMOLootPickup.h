@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Items/MMOItemTypes.h"
 #include "MMOLootPickup.generated.h"
 
 class USphereComponent;
@@ -50,9 +51,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Loot")
 	int32 EquipPlus = 0;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Loot")
+	EMMOItemRarity EquipRarity = EMMOItemRarity::Common;
+
 	void SetupAsGold(int32 Amount);
 	void SetupAsItem(FName InItemId, int32 Count);
-	void SetupAsEquipment(FName InItemId, int32 InPlus);
+	void SetupAsEquipment(FName InItemId, int32 InPlus, EMMOItemRarity InRarity = EMMOItemRarity::Common);
 
 protected:
 	virtual void BeginPlay() override;

@@ -78,6 +78,14 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Boss öldürülünce ~30 sn sonra aynı bölgede yeniden doğmalı.
 - [ ] Normal spawn alanında elit/boss çıkmamalı (sadece bu özel boss noktasında).
 
+### Eşya nadirlik (rarity) sistemi
+- [ ] Moblardan ekipman düşür → düşerken "[Siradan/Nadir/Ender/Destansi/Efsanevi] X +N dustu" mesajı, nadirliğe göre renkli.
+- [ ] Envanteri aç (I) → çantadaki ve kuşanılan eşya isimleri nadirlik rengiyle (gri/yeşil/mavi/mor/turuncu) görünmeli.
+- [ ] Nadir bir eşya kuşan → Atk/Def değerleri Common'a göre daha yüksek olmalı (çarpan: Nadir 1.25x … Efsanevi 3.0x), karakter statlarına yansımalı.
+- [ ] Elit/boss mobların loot'u ortalamada daha yüksek nadirlikte olmalı (iki zar, iyisini seçer).
+- [ ] Satıcıda nadir eşya daha pahalıya satılmalı; satış satırı renkli görünmeli.
+- [ ] Kaydet/yükle sonrası eşyaların nadirliği korunmalı (SaveGame).
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

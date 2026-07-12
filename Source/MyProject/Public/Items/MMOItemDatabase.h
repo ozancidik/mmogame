@@ -35,4 +35,14 @@ public:
 	static constexpr int32 PotionPrice = 20;
 	static int32 GetBuyPrice(const FMMOItemDef& Def);
 	static int32 GetSellPrice(const FMMOItemDef& Def, int32 Plus);
+
+	// --- Nadirlik (rarity) ---
+	// Stat carpani (Common=1.0 ... Legendary=3.0).
+	static float GetRarityMultiplier(EMMOItemRarity Rarity);
+	// Isim/cerceve rengi.
+	static FLinearColor GetRarityColor(EMMOItemRarity Rarity);
+	// Kisa ad (HUD etiketi).
+	static FString GetRarityName(EMMOItemRarity Rarity);
+	// Agirlikli rastgele nadirlik (loot dususu icin).
+	static EMMOItemRarity RollRarity();
 };

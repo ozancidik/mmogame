@@ -112,3 +112,50 @@ int32 FMMOItemDatabase::GetSellPrice(const FMMOItemDef& Def, int32 Plus)
 	// Alis fiyatinin %40'i, arti seviyesiyle artar.
 	return FMath::RoundToInt(GetBuyPrice(Def) * 0.4f * (1.f + 0.3f * Plus));
 }
+
+float FMMOItemDatabase::GetRarityMultiplier(EMMOItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EMMOItemRarity::Uncommon:  return 1.25f;
+	case EMMOItemRarity::Rare:      return 1.6f;
+	case EMMOItemRarity::Epic:      return 2.1f;
+	case EMMOItemRarity::Legendary: return 3.0f;
+	default:                        return 1.0f; // Common
+	}
+}
+
+FLinearColor FMMOItemDatabase::GetRarityColor(EMMOItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EMMOItemRarity::Uncommon:  return FLinearColor(0.35f, 0.85f, 0.35f); // yesil
+	case EMMOItemRarity::Rare:      return FLinearColor(0.3f, 0.6f, 1.f);     // mavi
+	case EMMOItemRarity::Epic:      return FLinearColor(0.75f, 0.4f, 1.f);    // mor
+	case EMMOItemRarity::Legendary: return FLinearColor(1.f, 0.6f, 0.15f);    // turuncu
+	default:                        return FLinearColor(0.85f, 0.85f, 0.85f); // Common (gri-beyaz)
+	}
+}
+
+FString FMMOItemDatabase::GetRarityName(EMMOItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EMMOItemRarity::Uncommon:  return TEXT("Nadir");
+	case EMMOItemRarity::Rare:      return TEXT("Ender");
+	case EMMOItemRarity::Epic:      return TEXT("Destansi");
+	case EMMOItemRarity::Legendary: return TEXT("Efsanevi");
+	default:                        return TEXT("Siradan");
+	}
+}
+
+EMMOItemRarity FMMOItemDatabase::RollRarity()
+{
+	// Agirlikli: Common %60, Uncommon %25, Rare %10, Epic %4, Legendary %1.
+	const float R = FMath::FRand();
+	if (R < 0.60f) return EMMOItemRarity::Common;
+	if (R < 0.85f) return EMMOItemRarity::Uncommon;
+	if (R < 0.95f) return EMMOItemRarity::Rare;
+	if (R < 0.99f) return EMMOItemRarity::Epic;
+	return EMMOItemRarity::Legendary;
+}

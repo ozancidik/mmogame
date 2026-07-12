@@ -3,6 +3,7 @@
 #include "World/MMOLootPickup.h"
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Items/MMOItemDatabase.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -51,12 +52,13 @@ void AMMOLootPickup::SetupAsItem(FName InItemId, int32 Count)
 	ItemCount = FMath::Max(1, Count);
 }
 
-void AMMOLootPickup::SetupAsEquipment(FName InItemId, int32 InPlus)
+void AMMOLootPickup::SetupAsEquipment(FName InItemId, int32 InPlus, EMMOItemRarity InRarity)
 {
 	bIsGold = false;
 	bIsEquipment = true;
 	EquipItemId = InItemId;
 	EquipPlus = FMath::Max(0, InPlus);
+	EquipRarity = InRarity;
 }
 
 void AMMOLootPickup::BeginPlay()
@@ -151,11 +153,13 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 	}
 	else if (bIsEquipment)
 	{
-		Inv->AddEquipmentInstance(EquipItemId, EquipPlus);
+		Inv->AddEquipmentInstance(EquipItemId, EquipPlus, EquipRarity);
 		if (GEngine)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor(80, 230, 90),
-				FString::Printf(TEXT("Ekipman dustu: %s +%d  (I ile envanteri ac)"), *EquipItemId.ToString(), EquipPlus));
+			const FLinearColor RC = FMMOItemDatabase::GetRarityColor(EquipRarity);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, RC.ToFColor(true),
+				FString::Printf(TEXT("[%s] %s +%d dustu  (I ile envanteri ac)"),
+					*FMMOItemDatabase::GetRarityName(EquipRarity), *EquipItemId.ToString(), EquipPlus));
 		}
 	}
 	else

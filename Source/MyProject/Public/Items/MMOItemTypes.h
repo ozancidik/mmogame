@@ -16,6 +16,18 @@ enum class EMMOEquipSlot : uint8
 	MAX    UMETA(Hidden)
 };
 
+/** Esya nadirligi (kademe). Stat carpani + isim rengi bunlardan turer. */
+UENUM(BlueprintType)
+enum class EMMOItemRarity : uint8
+{
+	Common    UMETA(DisplayName = "Siradan"),
+	Uncommon  UMETA(DisplayName = "Nadir"),
+	Rare      UMETA(DisplayName = "Ender"),
+	Epic      UMETA(DisplayName = "Destansi"),
+	Legendary UMETA(DisplayName = "Efsanevi"),
+	MAX       UMETA(Hidden)
+};
+
 /** Bir ekipman turunun tanimi (KO'nun ITEM tablosunun karsiligi). */
 USTRUCT(BlueprintType)
 struct FMMOItemDef
@@ -59,6 +71,10 @@ struct FMMOEquipmentInstance
 	// Upgrade seviyesi: +0 .. +9.
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "MMO|Item")
 	int32 Plus = 0;
+
+	// Nadirlik kademesi (stat carpani + isim rengi). Kayitta saklanir.
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "MMO|Item")
+	EMMOItemRarity Rarity = EMMOItemRarity::Common;
 
 	bool IsValidInstance() const { return InstanceId != 0 && !ItemId.IsNone(); }
 };

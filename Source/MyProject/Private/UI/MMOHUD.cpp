@@ -831,20 +831,24 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		InvEquippedRegions.Add(R);
 
 		FString Line = FString::Printf(TEXT("%s:  "), GMMOSlotNames[s]);
+		FLinearColor LineColor = FLinearColor::White;
 		if (bHas)
 		{
 			if (const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId))
 			{
-				Line += FString::Printf(TEXT("%s +%d  (Atk %d / Def %d)"), *Def->Name, Inst.Plus,
-					FMath::RoundToInt(FMMOItemDatabase::GetAttack(*Def, Inst.Plus)),
-					FMath::RoundToInt(FMMOItemDatabase::GetDefense(*Def, Inst.Plus)));
+				const float RM = FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity);
+				LineColor = FMMOItemDatabase::GetRarityColor(Inst.Rarity);
+				Line += FString::Printf(TEXT("[%s] %s +%d  (Atk %d / Def %d)"),
+					*FMMOItemDatabase::GetRarityName(Inst.Rarity), *Def->Name, Inst.Plus,
+					FMath::RoundToInt(FMMOItemDatabase::GetAttack(*Def, Inst.Plus) * RM),
+					FMath::RoundToInt(FMMOItemDatabase::GetDefense(*Def, Inst.Plus) * RM));
 			}
 		}
 		else
 		{
 			Line += TEXT("(bos)");
 		}
-		DrawText(Line, FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.8f);
+		DrawText(Line, LineColor, RowX + 6.f, RowY + 4.f, nullptr, 0.8f);
 		RowY += RowH;
 	}
 
@@ -873,9 +877,12 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + RowH - 4.f));
 		InvBagRegions.Add(R);
 
-		FString Line = FString::Printf(TEXT("%s +%d  (Atk %d / Def %d, Lv%d)"), *Def->Name, Inst.Plus,
-			FMath::RoundToInt(FMMOItemDatabase::GetAttack(*Def, Inst.Plus)),
-			FMath::RoundToInt(FMMOItemDatabase::GetDefense(*Def, Inst.Plus)),
+		const float RM = FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity);
+		const FLinearColor RowColor = FMMOItemDatabase::GetRarityColor(Inst.Rarity);
+		FString Line = FString::Printf(TEXT("[%s] %s +%d  (Atk %d / Def %d, Lv%d)"),
+			*FMMOItemDatabase::GetRarityName(Inst.Rarity), *Def->Name, Inst.Plus,
+			FMath::RoundToInt(FMMOItemDatabase::GetAttack(*Def, Inst.Plus) * RM),
+			FMath::RoundToInt(FMMOItemDatabase::GetDefense(*Def, Inst.Plus) * RM),
 			Def->RequiredLevel);
 
 		if (!bMaxed)
@@ -890,7 +897,7 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 			Line += TEXT("   [MAX]");
 		}
 
-		DrawText(Line, FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.72f);
+		DrawText(Line, RowColor, RowX + 6.f, RowY + 4.f, nullptr, 0.72f);
 		RowY += RowH;
 	}
 
@@ -1076,8 +1083,11 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		R.Slot = i;
 		R.Rect = FBox2D(FVector2D(RightX, RY), FVector2D(RightX + ColW, RY + RowH - 4.f));
 		ShopSellRegions.Add(R);
-		DrawText(FString::Printf(TEXT("%s +%d  ->  %d altin"), *Def->Name, Inst.Plus, FMMOItemDatabase::GetSellPrice(*Def, Inst.Plus)),
-			FLinearColor::White, RightX + 6.f, RY + 4.f, nullptr, 0.72f);
+		const int32 SellPrice = FMath::RoundToInt(FMMOItemDatabase::GetSellPrice(*Def, Inst.Plus)
+			* FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity));
+		DrawText(FString::Printf(TEXT("[%s] %s +%d  ->  %d altin"),
+			*FMMOItemDatabase::GetRarityName(Inst.Rarity), *Def->Name, Inst.Plus, SellPrice),
+			FMMOItemDatabase::GetRarityColor(Inst.Rarity), RightX + 6.f, RY + 4.f, nullptr, 0.72f);
 		RY += RowH;
 	}
 

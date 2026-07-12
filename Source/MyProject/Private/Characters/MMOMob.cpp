@@ -490,12 +490,22 @@ void AMMOMob::HandleDeath()
 			{
 				const FMMOItemDef& Picked = AllItems[FMath::RandRange(0, AllItems.Num() - 1)];
 				const int32 Plus = (FMath::FRand() < 0.15f) ? 1 : 0;
+				// Nadirlik zar at (elit/boss daha iyi loot: bir kez daha atip iyisini sec).
+				EMMOItemRarity Rarity = FMMOItemDatabase::RollRarity();
+				if (bIsElite)
+				{
+					const EMMOItemRarity Second = FMMOItemDatabase::RollRarity();
+					if ((uint8)Second > (uint8)Rarity)
+					{
+						Rarity = Second;
+					}
+				}
 
 				const FVector Loc = Base + FVector(FMath::FRandRange(-60.f, 60.f), FMath::FRandRange(-60.f, 60.f), -40.f);
 				const FTransform SpawnTM(FRotator::ZeroRotator, Loc);
 				if (AMMOLootPickup* P = World->SpawnActorDeferred<AMMOLootPickup>(LootClass, SpawnTM))
 				{
-					P->SetupAsEquipment(Picked.ItemId, Plus);
+					P->SetupAsEquipment(Picked.ItemId, Plus, Rarity);
 					UGameplayStatics::FinishSpawningActor(P, SpawnTM);
 				}
 			}

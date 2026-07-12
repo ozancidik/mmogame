@@ -146,7 +146,7 @@ FMMOEquipmentInstance UMMOInventoryComponent::GetEquipped(EMMOEquipSlot Slot) co
 	return EquippedItems.IsValidIndex(Index) ? EquippedItems[Index] : FMMOEquipmentInstance();
 }
 
-void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus)
+void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMOItemRarity Rarity)
 {
 	if (!HasAuthorityInternal() || !FMMOItemDatabase::Find(ItemId))
 	{
@@ -157,6 +157,7 @@ void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus)
 	Inst.InstanceId = NextInstanceId++;
 	Inst.ItemId = ItemId;
 	Inst.Plus = FMath::Clamp(Plus, 0, FMMOItemDatabase::MaxPlus);
+	Inst.Rarity = Rarity;
 	EquipmentBag.Add(Inst);
 	OnInventoryChanged.Broadcast();
 }
@@ -178,8 +179,9 @@ void UMMOInventoryComponent::RecomputeEquipmentBonuses()
 		}
 		if (const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId))
 		{
-			TotalAttack += FMMOItemDatabase::GetAttack(*Def, Inst.Plus);
-			TotalDefense += FMMOItemDatabase::GetDefense(*Def, Inst.Plus);
+			const float RarityMult = FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity);
+			TotalAttack += FMMOItemDatabase::GetAttack(*Def, Inst.Plus) * RarityMult;
+			TotalDefense += FMMOItemDatabase::GetDefense(*Def, Inst.Plus) * RarityMult;
 		}
 	}
 
@@ -458,7 +460,8 @@ void UMMOInventoryComponent::SellEquipment(int32 BagIndex)
 		return;
 	}
 
-	const int32 Price = FMMOItemDatabase::GetSellPrice(*Def, Inst.Plus);
+	const int32 Price = FMath::RoundToInt(FMMOItemDatabase::GetSellPrice(*Def, Inst.Plus)
+		* FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity));
 	EquipmentBag.RemoveAt(BagIndex);
 	AddGold(Price);
 	OnInventoryChanged.Broadcast();
