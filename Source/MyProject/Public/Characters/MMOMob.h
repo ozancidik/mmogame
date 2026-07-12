@@ -24,6 +24,10 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	// Hasar alinca saldirgani hedef alir (menzilli "pull" calissin diye AggroRange'i asar).
+	virtual float TakeDamage(float DamageAmount, const struct FDamageEvent& DamageEvent,
+		class AController* EventInstigator, AActor* DamageCauser) override;
+
 	// Bos birakilirsa spawn'da rastgele bir arketip atanir; doldurulursa o arketip kullanilir.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Archetype, Category = "MMO|Mob")
 	FName ArchetypeId;
@@ -103,6 +107,14 @@ protected:
 	// --- Leash (eve donus) ---
 	FVector HomeLocation = FVector::ZeroVector;
 	bool bReturningHome = false;
+
+	// --- Hasarda aggro (menzilli pull) ---
+	TWeakObjectPtr<APawn> ForcedTarget;
+	float ForcedAggroUntil = -1.f;
+
+	// Hasar alan mobun saldirgani ne kadar sure zorla hedeflemeye devam edecegi.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
+	float ForcedAggroDuration = 8.f;
 
 	// --- Yetenekler (arketipten kopyalanir; sunucu tarafi) ---
 	bool bIsElite = false;

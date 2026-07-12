@@ -7,6 +7,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/DamageEvents.h"
 #include "World/MMOLootPickup.h"
 #include "Items/MMOItemDatabase.h"
 #include "Components/MMOQuestComponent.h"
@@ -108,6 +109,32 @@ void AMMOMob::BeginPlay()
 			ApplyTint(FLinearColor(0.7f, 0.08f, 0.08f));
 		}
 	}
+}
+
+float AMMOMob::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
+	AController* EventInstigator, AActor* DamageCauser)
+{
+	const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	// Saldirgan bir oyuncuysa onu zorla hedefle (uzaktan vurulunca da mob tepki versin).
+	if (HasAuthority() && Stats && !Stats->bIsDead && !bReturningHome)
+	{
+		APawn* Attacker = Cast<APawn>(DamageCauser);
+		if (!Attacker && EventInstigator)
+		{
+			Attacker = EventInstigator->GetPawn();
+		}
+		if (Attacker && Attacker->IsPlayerControlled())
+		{
+			ForcedTarget = Attacker;
+			if (const UWorld* W = GetWorld())
+			{
+				ForcedAggroUntil = W->GetTimeSeconds() + ForcedAggroDuration;
+			}
+		}
+	}
+
+	return Applied;
 }
 
 void AMMOMob::OnRep_Archetype()
@@ -265,18 +292,30 @@ void AMMOMob::Tick(float DeltaSeconds)
 		}
 	}
 
-	if (!Player)
+	// Zorla hedef (hasar alindiginda ayarlanir) aktifse onu kullan; AggroRange sinirini asar.
+	const float NowSel = TheWorld ? TheWorld->GetTimeSeconds() : 0.f;
+	APawn* Forced = ForcedTarget.Get();
+	bool bForcedActive = false;
+	if (Forced && NowSel < ForcedAggroUntil)
+	{
+		if (const AMMOCharacter* FC = Cast<AMMOCharacter>(Forced))
+		{
+			bForcedActive = FC->GetStats() && !FC->GetStats()->bIsDead;
+		}
+	}
+
+	if (bForcedActive)
+	{
+		Player = Forced;
+		Dist = FVector::Dist(GetActorLocation(), Forced->GetActorLocation());
+	}
+	else if (!Player || Dist > AggroRange)
 	{
 		return;
 	}
 
-	if (Dist > AggroRange)
-	{
-		return;
-	}
-
-	AAIController* AI = Cast<AAIController>(GetController());
-	UWorld* World = GetWorld();
+	AAIController* AI = AICtrl;
+	UWorld* World = TheWorld;
 
 	if (Dist > AttackRange)
 	{

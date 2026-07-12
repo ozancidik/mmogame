@@ -49,6 +49,10 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Eve varınca canı **tam dolmalı** (ve varsa öfke/efektleri sıfırlanmalı).
 - [ ] Eve dönerken sana saldırmamalı; eve varınca tekrar normal aggro yapmalı.
 
+### Hasarda aggro (menzilli pull)
+- [ ] Uzaktaki bir moba menzilli skille vur (örn. Okçu `Arc_QuickShot`) → mob AggroRange dışında olsa bile sana doğru gelip saldırmalı.
+- [ ] Vurmayı bırakınca ~8 sn sonra zorla-aggro düşer (leash/normal aggro kuralları devreye girer).
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
