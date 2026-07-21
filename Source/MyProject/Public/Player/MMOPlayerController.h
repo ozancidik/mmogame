@@ -37,6 +37,9 @@ protected:
 
 	void OnLeftClickPressed();
 	void OnLeftClickReleased();
+
+	// Sol-tik "tek dokunus" (surukleme yapilmadan birakildi) eylemi: tikla-git / NPC ac / saldiri hedefi.
+	void DoLeftClickAction();
 	void OnRightMousePressed();
 	void OnRightMouseReleased();
 	void OnMouseX(float Value);
@@ -91,6 +94,11 @@ protected:
 	FVector MoveToLocation = FVector::ZeroVector;
 	bool bHasMoveTarget = false;
 	bool bRotatingCamera = false;
+
+	// Sol-tus surukleme ile kamera cevirme (touchpad dostu): basili tutup parmagi kaydirinca doner.
+	bool bLeftPressed = false;   // sol tus su an basili (pencere yokken)
+	bool bLeftDragging = false;  // esik asildi -> surukleme (dokunus degil)
+	float LeftDragAccum = 0.f;   // birikmis fare hareketi (esik tespiti)
 
 	// Navmesh yol bulmayi cok sik yeniden hesaplamamak icin son istek zamani.
 	float LastPlayerRepathTime = -100.f;

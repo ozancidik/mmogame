@@ -241,6 +241,16 @@ void AMMOPlayerController::OnLeftClickPressed()
 		}
 	}
 
+	// Pencere yok: bunu bir "olasi surukleme" olarak baslat. Dunya eylemi (tikla-git/saldiri)
+	// sadece SURUKLEME YAPILMADAN birakilirsa (tek dokunus) OnLeftClickReleased'de calisir.
+	// Parmak kaydirilirsa OnMouseX/Y kamerayi cevirir (touchpad dostu).
+	bLeftPressed = true;
+	bLeftDragging = false;
+	LeftDragAccum = 0.f;
+}
+
+void AMMOPlayerController::DoLeftClickAction()
+{
 	// Fare altindaki dunyayi trace et.
 	FHitResult Hit;
 	if (!GetHitResultUnderCursor(ECC_Visibility, false, Hit) || !Hit.bBlockingHit)
@@ -314,6 +324,16 @@ void AMMOPlayerController::OnLeftClickReleased()
 			H->HandleSkillBookRelease(FVector2D(MX, MY));
 		}
 	}
+
+	// Tek dokunus (basip surukleme yapmadan birakma) -> dunya eylemi: tikla-git / NPC ac / saldiri.
+	// Surukleme yapildiysa (kamera cevrildi) hicbir sey yapma.
+	if (bLeftPressed && !bLeftDragging)
+	{
+		DoLeftClickAction();
+	}
+	bLeftPressed = false;
+	bLeftDragging = false;
+	LeftDragAccum = 0.f;
 }
 
 void AMMOPlayerController::OnRightMousePressed()
@@ -346,21 +366,65 @@ void AMMOPlayerController::OnRightMouseReleased()
 
 void AMMOPlayerController::OnMouseX(float Value)
 {
-	// Sadece sag tik basiliyken VE hicbir UI penceresi acik degilken kamerayi cevir.
-	if (bRotatingCamera && !IsAnyUIWindowOpen() && Value != 0.f)
+	if (Value == 0.f || IsAnyUIWindowOpen())
 	{
-		const float LookSensitivity = 1.6f;
+		return;
+	}
+
+	const float LookSensitivity = 1.6f;
+	const float DragThreshold = 4.f; // bu kadar hareket edince "surukleme" sayilir
+
+	// Sag tik basili: klasik serbest bakis.
+	if (bRotatingCamera)
+	{
 		AddYawInput(Value * LookSensitivity);
+		return;
+	}
+
+	// Sol tus basili + parmak kayiyor: touchpad dostu surukle-cevir.
+	if (bLeftPressed)
+	{
+		LeftDragAccum += FMath::Abs(Value);
+		if (LeftDragAccum > DragThreshold)
+		{
+			bLeftDragging = true;
+		}
+		if (bLeftDragging)
+		{
+			AddYawInput(Value * LookSensitivity);
+		}
 	}
 }
 
 void AMMOPlayerController::OnMouseY(float Value)
 {
-	if (bRotatingCamera && !IsAnyUIWindowOpen() && Value != 0.f)
+	if (Value == 0.f || IsAnyUIWindowOpen())
 	{
-		const float LookSensitivity = 1.6f;
-		// Ters-Y duzeltmesi: fareyi yukari itince yukari baksin.
+		return;
+	}
+
+	const float LookSensitivity = 1.6f;
+	const float DragThreshold = 4.f;
+
+	// Sag tik basili: klasik serbest bakis (ters-Y duzeltmesi).
+	if (bRotatingCamera)
+	{
 		AddPitchInput(-Value * LookSensitivity);
+		return;
+	}
+
+	// Sol tus basili + parmak kayiyor: surukle-cevir (dikey).
+	if (bLeftPressed)
+	{
+		LeftDragAccum += FMath::Abs(Value);
+		if (LeftDragAccum > DragThreshold)
+		{
+			bLeftDragging = true;
+		}
+		if (bLeftDragging)
+		{
+			AddPitchInput(-Value * LookSensitivity);
+		}
 	}
 }
 
@@ -442,14 +506,6 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
-	// --- Q/E ile kamera cevir (touchpad dostu; sag-tus surukleme gerektirmez) ---
-	if (!bBookOpen)
-	{
-		const float KeyYawSpeed = 120.f; // derece/sn
-		if (IsInputKeyDown(EKeys::Q)) { AddYawInput(-KeyYawSpeed * DeltaTime); }
-		if (IsInputKeyDown(EKeys::E)) { AddYawInput(KeyYawSpeed * DeltaTime); }
-	}
-
 	// --- WASD klavye hareketi (kameranin baktigi yona gore) ---
 	// Enhanced Input mapping'lerini temizledigimiz icin WASD'yi burada C++ ile suruyoruz.
 	if (!bBookOpen)
@@ -479,25 +535,8 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
-	// UI penceresi acikken tikla-git/kos devre disi.
-	const bool bLMB = IsInputKeyDown(EKeys::LeftMouseButton) && !bBookOpen;
-
-	// Her iki fare tusu birden basili: kameranin baktigi yonde ileri kos (klasik MMO). Manuel, path'i durdur.
-	if (bLMB && bRotatingCamera)
-	{
-		StopMovement();
-		const FVector Forward = FRotator(0.f, GetControlRotation().Yaw, 0.f).Vector();
-		P->AddMovementInput(Forward, 1.f);
-		TargetEnemy.Reset();
-		bHasMoveTarget = false;
-		return;
-	}
-
-	// Sadece sol tik BASILI: her kare imlecin oldugu yere hedef guncelle (surekli hareket).
-	if (bLMB)
-	{
-		OnLeftClickPressed();
-	}
+	// Not: tikla-git/saldiri artik "tek dokunus"ta (OnLeftClickReleased -> DoLeftClickAction) tetiklenir.
+	// Sol tusu basili tutup parmak kaydirmak kamerayi cevirir (touchpad dostu), hareket ettirmez.
 
 	// Dusman hedefi varsa: ona yol bul, menzilde saldir.
 	if (TargetEnemy.IsValid())
