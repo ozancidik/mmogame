@@ -53,8 +53,8 @@ void AMMOPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::Z, IE_Pressed, this, &AMMOPlayerController::OnTargetNearestEnemy);
 		InputComponent->BindKey(EKeys::R, IE_Pressed, this, &AMMOPlayerController::OnToggleAttack);
 
-		// E = acik dukkani kapat.
-		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &AMMOPlayerController::OnCloseShop);
+		// Q / E = kamerayi sola / saga cevir (touchpad dostu; PlayerTick'te islenir).
+		// (Eski E=dukkani kapat kaldirildi; artik pencereler sag ustteki X ile kapatiliyor.)
 
 		// Space = ziplama.
 		InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &AMMOPlayerController::OnJumpPressed);
@@ -440,6 +440,14 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		{
 			bShowMouseCursor = true;
 		}
+	}
+
+	// --- Q/E ile kamera cevir (touchpad dostu; sag-tus surukleme gerektirmez) ---
+	if (!bBookOpen)
+	{
+		const float KeyYawSpeed = 120.f; // derece/sn
+		if (IsInputKeyDown(EKeys::Q)) { AddYawInput(-KeyYawSpeed * DeltaTime); }
+		if (IsInputKeyDown(EKeys::E)) { AddYawInput(KeyYawSpeed * DeltaTime); }
 	}
 
 	// --- WASD klavye hareketi (kameranin baktigi yona gore) ---
