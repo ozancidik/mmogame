@@ -84,6 +84,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|Combat")
 	float RespawnDelay = 5.f;
 
+	// --- Kamera ayarlari (BP'deki Camera Boom uzerine runtime'da uygulanir) ---
+	// Karaktere uzaklik (spring arm boyu). Buyudukce daha uzaktan gorunur.
+	UPROPERTY(EditAnywhere, Category = "MMO|Camera")
+	float CameraDistance = 850.f;
+
+	// Baslangic kamera egimi (derece; negatif = yukaridan/tepeden bakis). Oyuncu suruklemeyle degistirebilir.
+	UPROPERTY(EditAnywhere, Category = "MMO|Camera")
+	float CameraStartPitch = -45.f;
+
+	// Spring arm boyunu + baslangic bakis acisini uygular.
+	void ApplyCameraSettings();
+
 	// Envanterden bir can iksiri kullanir (F tusu / konsol).
 	UFUNCTION(BlueprintCallable, Exec, Category = "MMO|Inventory")
 	void UseHealthPotion();

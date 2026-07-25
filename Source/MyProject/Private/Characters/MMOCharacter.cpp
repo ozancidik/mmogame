@@ -10,6 +10,7 @@
 #include "Core/MMOTargeting.h"
 #include "Core/MMOGameMode.h"
 #include "Items/MMOConsumableTypes.h"
+#include "GameFramework/SpringArmComponent.h"
 #include "Engine/DamageEvents.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Controller.h"
@@ -48,6 +49,28 @@ void AMMOCharacter::BeginPlay()
 		Stats->OnDeath.AddDynamic(this, &AMMOCharacter::HandleDeath);
 		Stats->OnRevived.AddDynamic(this, &AMMOCharacter::HandleRevived);
 		Stats->OnLevelUp.AddDynamic(this, &AMMOCharacter::OnLevelUpFeedback);
+	}
+
+	ApplyCameraSettings();
+}
+
+void AMMOCharacter::ApplyCameraSettings()
+{
+	// BP'deki Camera Boom'u (spring arm) bul ve uzaklik ayarla (yerel kameraya etki eder).
+	if (USpringArmComponent* Boom = FindComponentByClass<USpringArmComponent>())
+	{
+		Boom->TargetArmLength = CameraDistance;
+	}
+
+	// Baslangic bakis acisini biraz yukaridan yap (sadece yerel oyuncu; kamera control rotation'i takip eder).
+	if (IsLocallyControlled())
+	{
+		if (AController* C = GetController())
+		{
+			FRotator R = C->GetControlRotation();
+			R.Pitch = CameraStartPitch;
+			C->SetControlRotation(R);
+		}
 	}
 }
 
@@ -255,6 +278,9 @@ void AMMOCharacter::PawnClientRestart()
 	// Sahibi istemci: BP'nin ekledigi Enhanced Input mapping'lerini temizle.
 	// (Tikla-git kontrol semasi AMMOPlayerController'da; eski WASD/fare-bak cakismasin.)
 	ClearBPInputMappings();
+
+	// Kamera uzakligini/acisini bu istemcide de uygula (controller artik hazir).
+	ApplyCameraSettings();
 
 	// BP'nin BeginPlay'i mapping'i BIZDEN SONRA tekrar ekleyebilir (net/possess sirasina gore);
 	// bu yuzden ilk ~1.5 sn boyunca periyodik temizle. Aksi halde fare-bak RMB olmadan kamerayi cevirir.
