@@ -95,10 +95,9 @@ protected:
 	bool bHasMoveTarget = false;
 	bool bRotatingCamera = false;
 
-	// Sol tus: basili-tut/dokun = imlecin oldugu yere git; basili tutup parmagi KAYDIR = kamerayi cevir.
-	bool bLeftPressed = false;            // sol tus su an basili (pencere yokken)
-	bool bLeftRotatedThisFrame = false;   // bu kare parmak kaydi -> kamera dondu (tick o kare hareket etmesin)
-	bool bLeftRotatedDuringPress = false; // bu basma boyunca hic donduruldu mu (birakinca tikla-git yapma karari)
+	// Sol tus: basili-tut/dokun = imlecin oldugu yere git (kamerayi ASLA cevirmez).
+	// Kamera cevirme sadece sag tus basiliyken (bRotatingCamera) yapilir.
+	bool bLeftPressed = false; // sol tus su an basili (pencere yokken)
 
 	// Navmesh yol bulmayi cok sik yeniden hesaplamamak icin son istek zamani.
 	float LastPlayerRepathTime = -100.f;

@@ -241,10 +241,9 @@ void AMMOPlayerController::OnLeftClickPressed()
 		}
 	}
 
-	// Pencere yok: sol tus basildi. Basili kaldigi surece (parmak KAYMADIKCA) her kare imlecin
-	// oldugu yere git (basili-tut-git). Parmak belirgin kaydirilirsa OnMouseX/Y kamerayi cevirir.
+	// Pencere yok: sol tus basildi. Basili kaldigi surece her kare imlecin oldugu yere git
+	// (basili-tut-git). Sol tus kamerayi cevirmez.
 	bLeftPressed = true;
-	bLeftRotatedDuringPress = false;
 }
 
 void AMMOPlayerController::DoLeftClickAction()
@@ -332,15 +331,12 @@ void AMMOPlayerController::OnLeftClickReleased()
 		}
 	}
 
-	// Birakildi: bu basma boyunca kamera CEVRILMEDIYSE tikla-git/saldiri/NPC eylemini garantile
-	// (cok kisa dokunuslar tick'e denk gelmemis olabilir). Cevrildiyse hicbir sey yapma.
-	if (bLeftPressed && !bLeftRotatedDuringPress)
+	// Birakildi: tikla-git/saldiri/NPC eylemini garantile (cok kisa dokunuslar tick'e denk gelmemis olabilir).
+	if (bLeftPressed)
 	{
 		DoLeftClickAction();
 	}
 	bLeftPressed = false;
-	bLeftRotatedThisFrame = false;
-	bLeftRotatedDuringPress = false;
 }
 
 void AMMOPlayerController::OnRightMousePressed()
@@ -378,22 +374,11 @@ void AMMOPlayerController::OnMouseX(float Value)
 		return;
 	}
 
-	const float LookSensitivity = 1.6f;
-	const float RotateDeadzone = 1.f; // bu karede bu kadardan az hareket = "dokunus titremesi", cevirme
-
-	// Sag tik basili: klasik serbest bakis.
+	// Kamera cevirme SADECE sag tus basiliyken. Sol tus kamerayi cevirmez.
 	if (bRotatingCamera)
 	{
+		const float LookSensitivity = 1.6f;
 		AddYawInput(Value * LookSensitivity);
-		return;
-	}
-
-	// Sol tus basili + parmak BELIRGIN kayiyor: touchpad dostu surukle-cevir.
-	if (bLeftPressed && FMath::Abs(Value) > RotateDeadzone)
-	{
-		AddYawInput(Value * LookSensitivity);
-		bLeftRotatedThisFrame = true;
-		bLeftRotatedDuringPress = true;
 	}
 }
 
@@ -404,22 +389,11 @@ void AMMOPlayerController::OnMouseY(float Value)
 		return;
 	}
 
-	const float LookSensitivity = 1.6f;
-	const float RotateDeadzone = 1.f;
-
-	// Sag tik basili: klasik serbest bakis (ters-Y duzeltmesi).
+	// Kamera cevirme SADECE sag tus basiliyken (ters-Y duzeltmesi). Sol tus kamerayi cevirmez.
 	if (bRotatingCamera)
 	{
+		const float LookSensitivity = 1.6f;
 		AddPitchInput(-Value * LookSensitivity);
-		return;
-	}
-
-	// Sol tus basili + parmak BELIRGIN kayiyor: surukle-cevir (dikey).
-	if (bLeftPressed && FMath::Abs(Value) > RotateDeadzone)
-	{
-		AddPitchInput(-Value * LookSensitivity);
-		bLeftRotatedThisFrame = true;
-		bLeftRotatedDuringPress = true;
 	}
 }
 
@@ -530,24 +504,10 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
-	// Sol tus basili: bu kare parmak KAYDIYSA kamera dondu (OnMouseX/Y) -> hareket etme;
-	// kaymadiysa imlecin oldugu yere git/saldir (basili-tut-git). Bayragi okuyup hemen sifirla.
-	const bool bRotatedNow = bLeftRotatedThisFrame;
-	bLeftRotatedThisFrame = false;
+	// Sol tus basili: her kare imlecin oldugu yere git/saldir (tikla-git / basili-tut-git).
 	if (bLeftPressed && !bBookOpen)
 	{
-		if (bRotatedNow)
-		{
-			// Suruklenerek cevriliyor: hareketi durdur.
-			StopMovement();
-			bHasMoveTarget = false;
-			TargetEnemy.Reset();
-		}
-		else
-		{
-			// Her kare imlecin oldugu yeri hedefle (tikla-git / basili-tut-git / saldiri).
-			DoLeftClickAction();
-		}
+		DoLeftClickAction();
 	}
 
 	// Dusman hedefi varsa: ona yol bul, menzilde saldir.
