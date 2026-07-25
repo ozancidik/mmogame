@@ -44,18 +44,32 @@ AMMOCharacter::AMMOCharacter()
 	QuestComponent = CreateDefaultSubobject<UMMOQuestComponent>(TEXT("QuestComponent"));
 	PartyComponent = CreateDefaultSubobject<UMMOPartyComponent>(TEXT("PartyComponent"));
 
-	// Saldiri animasyonlari (Mannequin "Unarmed/Attack" seti). Sira onemli:
-	// 0..2 = temel vurus varyasyonlari, 3 = buyuk vurus / buyu okuma.
+	// Saldiri animasyonlari. Sira onemli: 0..2 = yakin dovus varyasyonlari, 3 = buyu okuma.
+	// Kilic savurma Mixamo'dan alinip Manny iskeletine retarget edildi (RT_ onekli).
 	{
+		static ConstructorHelpers::FObjectFinder<UAnimSequenceBase> Sword(TEXT("/Game/RT_Great_Sword_Slash_Anim.RT_Great_Sword_Slash_Anim"));
 		static ConstructorHelpers::FObjectFinder<UAnimSequenceBase> Atk1(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_01.MM_Attack_01"));
 		static ConstructorHelpers::FObjectFinder<UAnimSequenceBase> Atk2(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_02.MM_Attack_02"));
-		static ConstructorHelpers::FObjectFinder<UAnimSequenceBase> Atk3(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_03.MM_Attack_03"));
 		static ConstructorHelpers::FObjectFinder<UAnimSequenceBase> Charged(TEXT("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_ChargedAttack.MM_ChargedAttack"));
 
-		AttackAnims.Add(Atk1.Succeeded() ? Atk1.Object : nullptr);
-		AttackAnims.Add(Atk2.Succeeded() ? Atk2.Object : nullptr);
-		AttackAnims.Add(Atk3.Succeeded() ? Atk3.Object : nullptr);
-		AttackAnims.Add(Charged.Succeeded() ? Charged.Object : nullptr);
+		UAnimSequenceBase* SwordAnim = nullptr;
+		if (Sword.Succeeded()) { SwordAnim = Sword.Object; }
+
+		UAnimSequenceBase* Fallback1 = nullptr;
+		if (Atk1.Succeeded()) { Fallback1 = Atk1.Object; }
+
+		UAnimSequenceBase* Fallback2 = nullptr;
+		if (Atk2.Succeeded()) { Fallback2 = Atk2.Object; }
+
+		// Kilic animasyonu varsa yakin dovus slotlarini o doldurur; yoksa eski Unarmed setine duser.
+		AttackAnims.Add(SwordAnim ? SwordAnim : Fallback1);
+		AttackAnims.Add(SwordAnim ? SwordAnim : Fallback2);
+		AttackAnims.Add(SwordAnim ? SwordAnim : Fallback1);
+
+		// 3 = buyu okuma / buyuk vurus (henuz ozel bir cast animasyonu yok).
+		UAnimSequenceBase* ChargedAnim = nullptr;
+		if (Charged.Succeeded()) { ChargedAnim = Charged.Object; }
+		AttackAnims.Add(ChargedAnim);
 	}
 }
 
