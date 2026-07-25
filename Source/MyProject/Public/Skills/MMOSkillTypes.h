@@ -97,5 +97,10 @@ struct FMMOSkillDef : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Skill")
 	FName AppliedEffectId;
 
+	// Kullaninca oynatilacak animasyon (AMMOCharacter::AttackAnims indeksi; KO'nun skill tablosundaki
+	// animasyon id'sinin karsiligi). -1 = otomatik: yakin dovus -> vurus, digerleri -> buyu okuma.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Skill")
+	int32 AnimIndex = -1;
+
 	bool IsValidDef() const { return !SkillId.IsNone(); }
 };

@@ -108,6 +108,14 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Üst üste binen iki pencerede tıklama, **üstteki** pencereye gitmeli.
 - [ ] Bir pencereye tıklamak karakteri hareket ettirmemeli; sağ tık pencere üstündeyken kamerayı döndürmemeli.
 
+### Saldırı ve skill animasyonları (KO tarzı)
+- [ ] Bir moba saldır (sol tık / R) → karakter **kılıç savurma hareketi** yapmalı (her vuruşta 3 varyasyondan biri).
+- [ ] Animasyon oynarken yürüme/koşma bozulmamalı (üst katmanda oynuyor).
+- [ ] Yakın dövüş skill'i kullan (ör. Savaşçı `War_PowerStrike`, hotbar 1) → vuruş animasyonu oynamalı.
+- [ ] Menzilli/büyü/şifa/buff skill'i kullan (ör. Büyücü `Mag_IceBolt`, Priest `Pri_HolyLight`) → **büyü okuma (charged)** animasyonu oynamalı.
+- [ ] Mob sana vurduğunda **mob da** savurma animasyonu yapmalı.
+- [ ] 2 pencereli PIE: diğer oyuncunun/mobun animasyonu senin ekranında da görünmeli (replikasyon).
+
 ---
 
 ## Onaylanmış (test edilip çalıştığı doğrulandı)

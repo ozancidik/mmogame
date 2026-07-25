@@ -109,5 +109,5 @@ protected:
 
 	// Skill gorselini TUM makinelerde oynat (sunucu tetikler; her istemci yerel cizer).
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastSkillFX(EMMOSkillEffect Effect, FVector Start, FVector End, float Radius);
+	void MulticastSkillFX(EMMOSkillEffect Effect, FVector Start, FVector End, float Radius, int32 AnimIndex);
 };

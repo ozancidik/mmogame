@@ -362,6 +362,9 @@ void AMMOMob::Tick(float DeltaSeconds)
 			LastMobAttackTime = Now;
 			UGameplayStatics::ApplyDamage(Player, MobAttackDamage, GetController(), this, nullptr);
 
+			// Mob da vururken animasyon oynatsin (oyuncuyla ayni Mannequin animasyon seti).
+			MulticastMeleeFX(Player->GetActorLocation() + FVector(0.f, 0.f, 40.f), FMath::RandRange(0, 2));
+
 			// Vurusta sansa bagli debuff uygula (or. zehir tukuren mob, yavaslatan orumcek).
 			if (!OnHitEffectId.IsNone() && OnHitEffectChance > 0.f && FMath::FRand() < OnHitEffectChance)
 			{

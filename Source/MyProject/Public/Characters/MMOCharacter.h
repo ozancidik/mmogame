@@ -84,6 +84,18 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|Combat")
 	float RespawnDelay = 5.f;
 
+	// --- Saldiri animasyonlari (KO'daki gibi: her vurus/skill bir animasyon oynatir) ---
+	// 0..2 = temel vurus varyasyonlari, 3 = buyuk vurus / buyu okuma (charged).
+	// Constructor'da Mannequin Attack animasyonlariyla doldurulur; BP'den degistirilebilir.
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Anim")
+	TArray<TObjectPtr<class UAnimSequenceBase>> AttackAnims;
+
+	// Buyuk vurus / buyu okuma animasyonunun AttackAnims icindeki indeksi.
+	static constexpr int32 ChargedAnimIndex = 3;
+
+	/** Verilen indeksteki saldiri animasyonunu BU makinede oynatir (ABP'deki "DefaultSlot" uzerinden). */
+	void PlayAttackAnimLocal(int32 AnimIndex);
+
 	// --- Kamera ayarlari (BP'deki Camera Boom uzerine runtime'da uygulanir) ---
 	// Karaktere uzaklik (spring arm boyu). Buyudukce daha uzaktan gorunur.
 	UPROPERTY(EditAnywhere, Category = "MMO|Camera")
@@ -231,9 +243,10 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerSpendStat(FName StatName);
 
-	// Yakin dovus vurus efektini tum makinelerde oynat.
+	// Yakin dovus vurus efektini + saldiri animasyonunu tum makinelerde oynat.
+	// AnimIndex sunucuda secilir ki herkes ayni varyasyonu gorsun.
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastMeleeFX(FVector ImpactLocation);
+	void MulticastMeleeFX(FVector ImpactLocation, int32 AnimIndex);
 
 	// Hotbar tuslari 1..9,0 -> slot 0..9.
 	void UseHotbar0();

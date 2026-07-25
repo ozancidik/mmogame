@@ -70,12 +70,18 @@ void UMMOSkillComponent::ServerSetupForClass_Implementation(EMMOClass NewClass)
 	SetupForClass(NewClass);
 }
 
-void UMMOSkillComponent::MulticastSkillFX_Implementation(EMMOSkillEffect Effect, FVector Start, FVector End, float Radius)
+void UMMOSkillComponent::MulticastSkillFX_Implementation(EMMOSkillEffect Effect, FVector Start, FVector End, float Radius, int32 AnimIndex)
 {
 	UWorld* World = GetWorld();
 	if (!World)
 	{
 		return;
+	}
+
+	// Skill animasyonunu her makinede oynat (KO'daki gibi: skill kullanimi bir hareket tetikler).
+	if (AMMOCharacter* OwnerChar = Cast<AMMOCharacter>(GetOwner()))
+	{
+		OwnerChar->PlayAttackAnimLocal(AnimIndex);
 	}
 
 	switch (Effect)
@@ -429,6 +435,12 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 	AController* Instigator = Caster->GetController();
 	const FVector CasterLoc = Caster->GetActorLocation();
 
+	// Skill animasyonu: tanimda belirtilmisse onu, degilse efekt tipinden turet
+	// (yakin dovus -> vurus varyasyonu, digerleri -> buyu okuma/buyuk vurus).
+	const int32 AnimIndex = (Def.AnimIndex >= 0)
+		? Def.AnimIndex
+		: ((Def.Effect == EMMOSkillEffect::MeleeDamage) ? FMath::RandRange(0, 2) : AMMOCharacter::ChargedAnimIndex);
+
 	switch (Def.Effect)
 	{
 	case EMMOSkillEffect::HealSelf:
@@ -442,7 +454,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 				Caster->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 			}
 		}
-		MulticastSkillFX(Def.Effect, CasterLoc, CasterLoc, 90.f);
+		MulticastSkillFX(Def.Effect, CasterLoc, CasterLoc, 90.f, AnimIndex);
 		break;
 	}
 
@@ -453,7 +465,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		{
 			Caster->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 		}
-		MulticastSkillFX(EMMOSkillEffect::HealSelf, CasterLoc, CasterLoc, 90.f);
+		MulticastSkillFX(EMMOSkillEffect::HealSelf, CasterLoc, CasterLoc, 90.f, AnimIndex);
 		break;
 	}
 
@@ -475,7 +487,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 				Target->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 			}
 
-			MulticastSkillFX(Def.Effect, CasterLoc + FVector(0, 0, 40), Target->GetActorLocation() + FVector(0, 0, 40), 0.f);
+			MulticastSkillFX(Def.Effect, CasterLoc + FVector(0, 0, 40), Target->GetActorLocation() + FVector(0, 0, 40), 0.f, AnimIndex);
 		}
 		else if (GEngine)
 		{
@@ -502,7 +514,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 			Center = Target->GetActorLocation();
 		}
 
-		MulticastSkillFX(Def.Effect, Center, Center, Def.Radius);
+		MulticastSkillFX(Def.Effect, Center, Center, Def.Radius, AnimIndex);
 
 		// Yaricap icindeki tum MOBLARA vur (PvP simdilik kapali).
 		for (TActorIterator<AMMOMob> It(World); It; ++It)
