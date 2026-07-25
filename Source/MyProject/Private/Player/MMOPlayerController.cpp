@@ -241,16 +241,23 @@ void AMMOPlayerController::OnLeftClickPressed()
 		}
 	}
 
-	// Pencere yok: bunu bir "olasi surukleme" olarak baslat. Dunya eylemi (tikla-git/saldiri)
-	// sadece SURUKLEME YAPILMADAN birakilirsa (tek dokunus) OnLeftClickReleased'de calisir.
-	// Parmak kaydirilirsa OnMouseX/Y kamerayi cevirir (touchpad dostu).
+	// Pencere yok: sol tus basildi. Basili kaldigi surece (parmak KAYMADIKCA) her kare imlecin
+	// oldugu yere git (basili-tut-git). Parmak belirgin kaydirilirsa OnMouseX/Y kamerayi cevirir.
 	bLeftPressed = true;
-	bLeftDragging = false;
-	LeftDragAccum = 0.f;
+	bLeftRotatedDuringPress = false;
 }
 
 void AMMOPlayerController::DoLeftClickAction()
 {
+	// Bir pencere acikken dunyaya tiklama gitmesin (dukkan/gorev/envanter vs.).
+	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
+	{
+		if (H->IsAnyWindowOpen())
+		{
+			return;
+		}
+	}
+
 	// Fare altindaki dunyayi trace et.
 	FHitResult Hit;
 	if (!GetHitResultUnderCursor(ECC_Visibility, false, Hit) || !Hit.bBlockingHit)
@@ -325,15 +332,15 @@ void AMMOPlayerController::OnLeftClickReleased()
 		}
 	}
 
-	// Tek dokunus (basip surukleme yapmadan birakma) -> dunya eylemi: tikla-git / NPC ac / saldiri.
-	// Surukleme yapildiysa (kamera cevrildi) hicbir sey yapma.
-	if (bLeftPressed && !bLeftDragging)
+	// Birakildi: bu basma boyunca kamera CEVRILMEDIYSE tikla-git/saldiri/NPC eylemini garantile
+	// (cok kisa dokunuslar tick'e denk gelmemis olabilir). Cevrildiyse hicbir sey yapma.
+	if (bLeftPressed && !bLeftRotatedDuringPress)
 	{
 		DoLeftClickAction();
 	}
 	bLeftPressed = false;
-	bLeftDragging = false;
-	LeftDragAccum = 0.f;
+	bLeftRotatedThisFrame = false;
+	bLeftRotatedDuringPress = false;
 }
 
 void AMMOPlayerController::OnRightMousePressed()
@@ -372,7 +379,7 @@ void AMMOPlayerController::OnMouseX(float Value)
 	}
 
 	const float LookSensitivity = 1.6f;
-	const float DragThreshold = 4.f; // bu kadar hareket edince "surukleme" sayilir
+	const float RotateDeadzone = 1.f; // bu karede bu kadardan az hareket = "dokunus titremesi", cevirme
 
 	// Sag tik basili: klasik serbest bakis.
 	if (bRotatingCamera)
@@ -381,18 +388,12 @@ void AMMOPlayerController::OnMouseX(float Value)
 		return;
 	}
 
-	// Sol tus basili + parmak kayiyor: touchpad dostu surukle-cevir.
-	if (bLeftPressed)
+	// Sol tus basili + parmak BELIRGIN kayiyor: touchpad dostu surukle-cevir.
+	if (bLeftPressed && FMath::Abs(Value) > RotateDeadzone)
 	{
-		LeftDragAccum += FMath::Abs(Value);
-		if (LeftDragAccum > DragThreshold)
-		{
-			bLeftDragging = true;
-		}
-		if (bLeftDragging)
-		{
-			AddYawInput(Value * LookSensitivity);
-		}
+		AddYawInput(Value * LookSensitivity);
+		bLeftRotatedThisFrame = true;
+		bLeftRotatedDuringPress = true;
 	}
 }
 
@@ -404,7 +405,7 @@ void AMMOPlayerController::OnMouseY(float Value)
 	}
 
 	const float LookSensitivity = 1.6f;
-	const float DragThreshold = 4.f;
+	const float RotateDeadzone = 1.f;
 
 	// Sag tik basili: klasik serbest bakis (ters-Y duzeltmesi).
 	if (bRotatingCamera)
@@ -413,18 +414,12 @@ void AMMOPlayerController::OnMouseY(float Value)
 		return;
 	}
 
-	// Sol tus basili + parmak kayiyor: surukle-cevir (dikey).
-	if (bLeftPressed)
+	// Sol tus basili + parmak BELIRGIN kayiyor: surukle-cevir (dikey).
+	if (bLeftPressed && FMath::Abs(Value) > RotateDeadzone)
 	{
-		LeftDragAccum += FMath::Abs(Value);
-		if (LeftDragAccum > DragThreshold)
-		{
-			bLeftDragging = true;
-		}
-		if (bLeftDragging)
-		{
-			AddPitchInput(-Value * LookSensitivity);
-		}
+		AddPitchInput(-Value * LookSensitivity);
+		bLeftRotatedThisFrame = true;
+		bLeftRotatedDuringPress = true;
 	}
 }
 
@@ -535,8 +530,25 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
-	// Not: tikla-git/saldiri artik "tek dokunus"ta (OnLeftClickReleased -> DoLeftClickAction) tetiklenir.
-	// Sol tusu basili tutup parmak kaydirmak kamerayi cevirir (touchpad dostu), hareket ettirmez.
+	// Sol tus basili: bu kare parmak KAYDIYSA kamera dondu (OnMouseX/Y) -> hareket etme;
+	// kaymadiysa imlecin oldugu yere git/saldir (basili-tut-git). Bayragi okuyup hemen sifirla.
+	const bool bRotatedNow = bLeftRotatedThisFrame;
+	bLeftRotatedThisFrame = false;
+	if (bLeftPressed && !bBookOpen)
+	{
+		if (bRotatedNow)
+		{
+			// Suruklenerek cevriliyor: hareketi durdur.
+			StopMovement();
+			bHasMoveTarget = false;
+			TargetEnemy.Reset();
+		}
+		else
+		{
+			// Her kare imlecin oldugu yeri hedefle (tikla-git / basili-tut-git / saldiri).
+			DoLeftClickAction();
+		}
+	}
 
 	// Dusman hedefi varsa: ona yol bul, menzilde saldir.
 	if (TargetEnemy.IsValid())

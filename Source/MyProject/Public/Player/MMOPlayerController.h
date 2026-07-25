@@ -95,10 +95,10 @@ protected:
 	bool bHasMoveTarget = false;
 	bool bRotatingCamera = false;
 
-	// Sol-tus surukleme ile kamera cevirme (touchpad dostu): basili tutup parmagi kaydirinca doner.
-	bool bLeftPressed = false;   // sol tus su an basili (pencere yokken)
-	bool bLeftDragging = false;  // esik asildi -> surukleme (dokunus degil)
-	float LeftDragAccum = 0.f;   // birikmis fare hareketi (esik tespiti)
+	// Sol tus: basili-tut/dokun = imlecin oldugu yere git; basili tutup parmagi KAYDIR = kamerayi cevir.
+	bool bLeftPressed = false;            // sol tus su an basili (pencere yokken)
+	bool bLeftRotatedThisFrame = false;   // bu kare parmak kaydi -> kamera dondu (tick o kare hareket etmesin)
+	bool bLeftRotatedDuringPress = false; // bu basma boyunca hic donduruldu mu (birakinca tikla-git yapma karari)
 
 	// Navmesh yol bulmayi cok sik yeniden hesaplamamak icin son istek zamani.
 	float LastPlayerRepathTime = -100.f;
