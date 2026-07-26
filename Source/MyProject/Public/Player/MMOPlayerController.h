@@ -40,6 +40,10 @@ protected:
 
 	// Sol-tik "tek dokunus" (surukleme yapilmadan birakildi) eylemi: tikla-git / NPC ac / saldiri hedefi.
 	void DoLeftClickAction();
+
+	// Karakterin hareket yonune donmesini ac/kapa.
+	// WASD'de KAPALI (bakis yonu sabit, yana kayma), tikla-git'te ACIK (yola donerek yurur).
+	void SetOrientToMovement(bool bOrient);
 	void OnRightMousePressed();
 	void OnRightMouseReleased();
 	void OnMouseX(float Value);

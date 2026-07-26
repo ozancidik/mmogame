@@ -15,6 +15,8 @@
 #include "EngineUtils.h"
 #include "Blueprint/AIBlueprintHelperLibrary.h"
 #include "NavigationSystem.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 AMMOPlayerController::AMMOPlayerController()
 {
@@ -397,6 +399,20 @@ void AMMOPlayerController::OnMouseY(float Value)
 	}
 }
 
+void AMMOPlayerController::SetOrientToMovement(bool bOrient)
+{
+	if (ACharacter* Ch = Cast<ACharacter>(GetPawn()))
+	{
+		if (UCharacterMovementComponent* Move = Ch->GetCharacterMovement())
+		{
+			if (Move->bOrientRotationToMovement != bOrient)
+			{
+				Move->bOrientRotationToMovement = bOrient;
+			}
+		}
+	}
+}
+
 bool AMMOPlayerController::HasNavmesh() const
 {
 	const UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
@@ -410,6 +426,9 @@ void AMMOPlayerController::DrivePawnTowardLocation(const FVector& Dest)
 	{
 		return;
 	}
+
+	// Tikla-git: karakter gittigi yone donsun (WASD strafe'i kapatmis olabilir).
+	SetOrientToMovement(true);
 
 	if (HasNavmesh())
 	{
@@ -436,6 +455,9 @@ void AMMOPlayerController::DrivePawnTowardActor(AActor* Goal)
 	{
 		return;
 	}
+
+	// Hedefe kosarken de yone donsun.
+	SetOrientToMovement(true);
 
 	if (HasNavmesh())
 	{
@@ -475,8 +497,9 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
-	// --- WASD klavye hareketi (kameranin baktigi yona gore) ---
+	// --- WASD klavye hareketi (KARAKTERIN baktigi yona gore, yonu degistirmeden) ---
 	// Enhanced Input mapping'lerini temizledigimiz icin WASD'yi burada C++ ile suruyoruz.
+	// W/S = karakterin baktigi yonde ileri/geri, A/D = yana kayma (strafe). Karakter DONMEZ.
 	if (!bBookOpen)
 	{
 		float ForwardAxis = 0.f;
@@ -488,10 +511,13 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 
 		if (ForwardAxis != 0.f || RightAxis != 0.f)
 		{
-			// Yon kameranin yaw'ina gore hesaplanir (klasik ucuncu sahis).
-			const FRotator YawRot(0.f, GetControlRotation().Yaw, 0.f);
+			// Karakterin mevcut bakis yonunu temel al (kamera degil).
+			const FRotator YawRot(0.f, P->GetActorRotation().Yaw, 0.f);
 			const FVector Forward = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
 			const FVector Right = FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y);
+
+			// Hareket yonune donmeyi kapat ki bakis yonu sabit kalsin (yana kayarken de).
+			SetOrientToMovement(false);
 
 			// Klavye hareketi tikla-git yolunu ve hedefi iptal eder (manuel kontrol oncelikli).
 			StopMovement();
