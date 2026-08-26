@@ -356,9 +356,45 @@ void AMMOHUD::DrawNpcDialogue()
 	const float W = (float)Canvas->SizeX;
 	const float H = (float)Canvas->SizeY;
 
-	// Alt-ortada bir kutu.
+	// Alt-ortada bir kutu (genislik sabit; yukseklik satir sayisina gore buyur).
 	const float BoxW = FMath::Min(760.f, W * 0.6f);
-	const float BoxH = 96.f;
+	const float Pad = 16.f;
+	const float TextScale = 1.1f;
+
+	// Replik metnini kutu genisligine gore kelime kelime satirlara bol.
+	const float MaxTextW = BoxW - 2.f * Pad;
+	TArray<FString> Lines;
+	{
+		TArray<FString> Words;
+		NpcDialogueText.ParseIntoArray(Words, TEXT(" "), true);
+		FString Current;
+		for (const FString& Word : Words)
+		{
+			const FString Candidate = Current.IsEmpty() ? Word : Current + TEXT(" ") + Word;
+			float TW = 0.f, TH = 0.f;
+			GetTextSize(Candidate, TW, TH, nullptr, TextScale);
+			if (TW > MaxTextW && !Current.IsEmpty())
+			{
+				Lines.Add(Current);
+				Current = Word;
+			}
+			else
+			{
+				Current = Candidate;
+			}
+		}
+		if (!Current.IsEmpty())
+		{
+			Lines.Add(Current);
+		}
+	}
+	if (Lines.Num() == 0)
+	{
+		Lines.Add(NpcDialogueText);
+	}
+
+	const float LineH = 22.f;
+	const float BoxH = 44.f + Lines.Num() * LineH + 12.f; // ad satiri + replik satirlari + alt bosluk
 	const float BoxX = (W - BoxW) * 0.5f;
 	const float BoxY = H - BoxH - 140.f;
 
@@ -367,9 +403,14 @@ void AMMOHUD::DrawNpcDialogue()
 	DrawRect(FLinearColor(0.6f, 0.45f, 0.85f, 0.9f * Alpha), BoxX, BoxY, BoxW, 3.f);                 // ust cizgi
 	DrawRect(FLinearColor(0.6f, 0.45f, 0.85f, 0.9f * Alpha), BoxX, BoxY + BoxH - 3.f, BoxW, 3.f);    // alt cizgi
 
-	// Konusan adi (mor tonu) + replik (beyaz).
-	DrawText(NpcDialogueSpeaker, FLinearColor(0.78f, 0.6f, 1.f, Alpha), BoxX + 16.f, BoxY + 10.f, nullptr, 1.2f);
-	DrawText(NpcDialogueText, FLinearColor(1.f, 1.f, 1.f, Alpha), BoxX + 16.f, BoxY + 40.f, nullptr, 1.1f);
+	// Konusan adi (mor tonu) + kaydirilmis replik satirlari (beyaz).
+	DrawText(NpcDialogueSpeaker, FLinearColor(0.78f, 0.6f, 1.f, Alpha), BoxX + Pad, BoxY + 10.f, nullptr, 1.2f);
+	float LineY = BoxY + 40.f;
+	for (const FString& Line : Lines)
+	{
+		DrawText(Line, FLinearColor(1.f, 1.f, 1.f, Alpha), BoxX + Pad, LineY, nullptr, TextScale);
+		LineY += LineH;
+	}
 }
 
 void AMMOHUD::DrawEnemyHealthBars()
