@@ -8,6 +8,7 @@
 
 class AMMOCharacter;
 class AMMOTalkerNPC;
+class AMMOHealerNPC;
 
 /**
  * Tikla-git / tikla-saldir kontrol semasi (klasik MMO tarzi).
@@ -44,6 +45,12 @@ protected:
 
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveNpcDialogue(const FString& SpeakerName, const FString& Text);
+
+	// --- Sifaci NPC (Sifaci Lyra) ---
+	// Istemci sifaciya tiklar -> sunucuya iyilestirme ister. Sunucu mesafeyi + altini dogrular,
+	// yeterliyse altini duser ve tam iyilestirir; sonucu ClientReceiveNpcDialogue balonuyla bildirir.
+	UFUNCTION(Server, Reliable)
+	void ServerRequestHeal(AMMOHealerNPC* Npc);
 
 	// Istemci-tarafi spam korumasi (yalnizca UX; ust uste tiklamada istek atmaz).
 	float LastNpcTalkRequestTime = -100.f;

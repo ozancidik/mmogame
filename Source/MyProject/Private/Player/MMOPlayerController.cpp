@@ -6,8 +6,10 @@
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
+#include "World/MMOHealerNPC.h"
 #include "AI/MMODialogueSubsystem.h"
 #include "Components/MMOStatsComponent.h"
+#include "Components/MMOInventoryComponent.h"
 #include "Engine/GameInstance.h"
 #include "Core/MMOTargeting.h"
 #include "UI/MMOHUD.h"
@@ -333,6 +335,21 @@ void AMMOPlayerController::DoLeftClickAction()
 		else if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("NPC'ye yaklas"));
+		}
+		return;
+	}
+
+	// Sifaciya tiklandi mi? (menzil icindeyse sunucudan iyilestirme iste — altin duser)
+	if (AMMOHealerNPC* Healer = Cast<AMMOHealerNPC>(Hit.GetActor()))
+	{
+		APawn* MyPawn = GetPawn();
+		if (MyPawn && FVector::Dist(MyPawn->GetActorLocation(), Healer->GetActorLocation()) <= 500.f)
+		{
+			ServerRequestHeal(Healer);
+		}
+		else if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("Sifaciya yaklas"));
 		}
 		return;
 	}
@@ -682,4 +699,66 @@ void AMMOPlayerController::ClientReceiveNpcDialogue_Implementation(const FString
 	{
 		H->ShowNpcDialogue(SpeakerName, Text);
 	}
+}
+
+void AMMOPlayerController::ServerRequestHeal_Implementation(AMMOHealerNPC* Npc)
+{
+	// Sunucu-otoriter: iyilestirme ve altin dususu YALNIZCA burada (authority) yapilir.
+	if (!Npc)
+	{
+		return;
+	}
+
+	// Mesafeyi sunucuda dogrula (hileli istemci uzaktan iyilestirme isteyemesin).
+	APawn* MyPawn = GetPawn();
+	if (!MyPawn || FVector::Dist(MyPawn->GetActorLocation(), Npc->GetActorLocation()) > 700.f)
+	{
+		return;
+	}
+
+	AMMOCharacter* C = Cast<AMMOCharacter>(MyPawn);
+	if (!C)
+	{
+		return;
+	}
+	UMMOStatsComponent* St = C->GetStats();
+	UMMOInventoryComponent* Inv = C->GetInventory();
+	if (!St || !Inv)
+	{
+		return;
+	}
+
+	const FString Speaker = Npc->HealerName;
+
+	// Zaten tam saglikliysa (olu degil, can ve mana dolu) altin alma; kibarca gonder.
+	const bool bFullHp = St->GetHealthPercent() >= 0.999f;
+	const bool bFullMp = St->GetManaPercent() >= 0.999f;
+	if (!St->bIsDead && bFullHp && bFullMp)
+	{
+		ClientReceiveNpcDialogue(Speaker, Npc->AlreadyHealedLine);
+		return;
+	}
+
+	// Yeterli altin var mi?
+	const int32 Cost = FMath::Max(0, Npc->HealCost);
+	if (Inv->Gold < Cost)
+	{
+		ClientReceiveNpcDialogue(Speaker, Npc->InsufficientGoldLine);
+		return;
+	}
+
+	// Altini dus ve tam iyilestir (Heal/RestoreMana clamp'li; olu ise dirilt).
+	Inv->AddGold(-Cost);
+	if (St->bIsDead)
+	{
+		St->Revive();
+	}
+	else
+	{
+		St->Heal(St->MaxHealth);
+		St->RestoreMana(St->MaxMana);
+	}
+
+	// Onay balonu: sifacinin sabit repliklerinden biri (istemciye ozel gonderilir).
+	ClientReceiveNpcDialogue(Speaker, Npc->PickGreeting());
 }

@@ -5,6 +5,7 @@
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
+#include "World/MMOHealerNPC.h"
 #include "UI/MMOHUD.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -96,4 +97,8 @@ void AMMOGameMode::SpawnMobArea()
 		};
 		UGameplayStatics::FinishSpawningActor(Kael, TalkerTM);
 	}
+
+	// Sifaci NPC: Sifaci Lyra (tam iyilestirme + altin dususu). Saticinin karsi yanina koy.
+	const FVector HealerLoc = Origin + FVector(-250.f, 200.f, 60.f);
+	World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(), HealerLoc, FRotator(0.f, 0.f, 0.f), NpcParams);
 }
