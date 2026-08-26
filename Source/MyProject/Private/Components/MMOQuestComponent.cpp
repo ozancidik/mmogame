@@ -4,6 +4,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Items/MMOItemDatabase.h"
 #include "Save/MMOSaveGame.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
@@ -239,6 +240,18 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		if (Owner->GetInventory() && Def->RewardGold > 0)
 		{
 			Owner->GetInventory()->AddGold(Def->RewardGold);
+		}
+		// Odul-esyalari (sadece otorite; ClaimReward zaten tek sefer calisir).
+		if (UMMOInventoryComponent* Inv = Owner->GetInventory())
+		{
+			if (!Def->RewardEquipmentId.IsNone() && FMMOItemDatabase::Find(Def->RewardEquipmentId))
+			{
+				Inv->AddEquipmentInstance(Def->RewardEquipmentId, 0);
+			}
+			if (!Def->RewardConsumableId.IsNone() && Def->RewardConsumableCount > 0)
+			{
+				Inv->AddItem(Def->RewardConsumableId, Def->RewardConsumableCount);
+			}
 		}
 	}
 

@@ -47,6 +47,17 @@ struct FMMOQuestDef
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
 	int32 RewardGold = 0;
 
+	// Odul ekipmani (FMMOItemDatabase'de tanimli item id). NAME_None = yok.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
+	FName RewardEquipmentId;
+
+	// Odul tuketilebilir (item id) ve adedi. Id NAME_None veya adet 0 = yok.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
+	FName RewardConsumableId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
+	int32 RewardConsumableCount = 0;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Quest")
 	int32 RequiredLevel = 1;
 

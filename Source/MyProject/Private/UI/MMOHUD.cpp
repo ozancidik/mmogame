@@ -1479,6 +1479,37 @@ void AMMOHUD::DrawQuestTracker(AMMOCharacter* PlayerChar)
 	}
 }
 
+// Gorev odul-esyasi etiketi (", +Ejder Kilici" / ", +3 Can Iksiri"). Yoksa bos.
+static FString BuildQuestRewardItemSuffix(const FMMOQuestDef& Def)
+{
+	FString S;
+	if (!Def.RewardEquipmentId.IsNone())
+	{
+		if (const FMMOItemDef* ID = FMMOItemDatabase::Find(Def.RewardEquipmentId))
+		{
+			S += FString::Printf(TEXT(", +%s"), *ID->Name);
+		}
+	}
+	if (!Def.RewardConsumableId.IsNone() && Def.RewardConsumableCount > 0)
+	{
+		FString CName;
+		if (const FMMOConsumableDef* CD = FMMOConsumableDatabase::Find(Def.RewardConsumableId))
+		{
+			CName = CD->Name;
+		}
+		else if (Def.RewardConsumableId == FName(TEXT("HealthPotion")))
+		{
+			CName = TEXT("Can Iksiri");
+		}
+		else
+		{
+			CName = Def.RewardConsumableId.ToString();
+		}
+		S += FString::Printf(TEXT(", +%d %s"), Def.RewardConsumableCount, *CName);
+	}
+	return S;
+}
+
 void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 {
 	QuestAcceptRegions.Reset();
@@ -1527,7 +1558,7 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 
 		DrawText(FString::Printf(TEXT("%s   [Lv%d gerekli]"), *Def.Name, Def.RequiredLevel),
 			FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.78f);
-		DrawText(FString::Printf(TEXT("%s   Odul: %d XP, %d altin"), *Def.Description, Def.RewardXP, Def.RewardGold),
+		DrawText(FString::Printf(TEXT("%s   Odul: %d XP, %d altin%s"), *Def.Description, Def.RewardXP, Def.RewardGold, *BuildQuestRewardItemSuffix(Def)),
 			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + 24.f, nullptr, 0.64f);
 		RowY += RowH;
 	}
@@ -1554,7 +1585,7 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 		}
 		DrawText(FString::Printf(TEXT("%s   %d/%d %s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
 			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")), FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.78f);
-		DrawText(FString::Printf(TEXT("Odul: %d XP, %d altin"), Def->RewardXP, Def->RewardGold),
+		DrawText(FString::Printf(TEXT("Odul: %d XP, %d altin%s"), Def->RewardXP, Def->RewardGold, *BuildQuestRewardItemSuffix(*Def)),
 			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + 24.f, nullptr, 0.64f);
 		RowY += RowH;
 	}
