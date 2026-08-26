@@ -15,6 +15,7 @@
 #include "Quests/MMOQuestTypes.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
+#include "World/MMOTalkerNPC.h"
 #include "Player/MMOPlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
@@ -145,6 +146,9 @@ void AMMOHUD::DrawHUD()
 				FLinearColor::White, W * 0.5f - 70.f, H * 0.42f + 58.f, nullptr, 1.4f);
 		}
 	}
+
+	// NPC diyalog balonu (varsa) — pencerelerin uzerinde ama imlecin altinda.
+	DrawNpcDialogue();
 
 	// Imleç EN SON çizilir ki tüm pencerelerin (görev/skill/envanter/dükkan) üstünde kalsin.
 	DrawPlayerCursor();
@@ -322,6 +326,50 @@ void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount)
 	FT.Amount = Amount;
 	FT.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	FloatingTexts.Add(FT);
+}
+
+void AMMOHUD::ShowNpcDialogue(const FString& SpeakerName, const FString& Text)
+{
+	NpcDialogueSpeaker = SpeakerName;
+	NpcDialogueText = Text;
+	NpcDialogueStartTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+}
+
+void AMMOHUD::DrawNpcDialogue()
+{
+	if (!Canvas || NpcDialogueStartTime < -900.f || NpcDialogueText.IsEmpty())
+	{
+		return;
+	}
+
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float Age = Now - NpcDialogueStartTime;
+	if (Age > NpcDialogueDuration)
+	{
+		NpcDialogueStartTime = -1000.f; // suresi doldu, gizle
+		return;
+	}
+
+	// Son 1 saniyede yumusakca solsun.
+	const float Alpha = FMath::Clamp(NpcDialogueDuration - Age, 0.f, 1.f);
+
+	const float W = (float)Canvas->SizeX;
+	const float H = (float)Canvas->SizeY;
+
+	// Alt-ortada bir kutu.
+	const float BoxW = FMath::Min(760.f, W * 0.6f);
+	const float BoxH = 96.f;
+	const float BoxX = (W - BoxW) * 0.5f;
+	const float BoxY = H - BoxH - 140.f;
+
+	// Zemin + cerceve.
+	DrawRect(FLinearColor(0.05f, 0.04f, 0.09f, 0.82f * Alpha), BoxX, BoxY, BoxW, BoxH);
+	DrawRect(FLinearColor(0.6f, 0.45f, 0.85f, 0.9f * Alpha), BoxX, BoxY, BoxW, 3.f);                 // ust cizgi
+	DrawRect(FLinearColor(0.6f, 0.45f, 0.85f, 0.9f * Alpha), BoxX, BoxY + BoxH - 3.f, BoxW, 3.f);    // alt cizgi
+
+	// Konusan adi (mor tonu) + replik (beyaz).
+	DrawText(NpcDialogueSpeaker, FLinearColor(0.78f, 0.6f, 1.f, Alpha), BoxX + 16.f, BoxY + 10.f, nullptr, 1.2f);
+	DrawText(NpcDialogueText, FLinearColor(1.f, 1.f, 1.f, Alpha), BoxX + 16.f, BoxY + 40.f, nullptr, 1.1f);
 }
 
 void AMMOHUD::DrawEnemyHealthBars()
@@ -1222,6 +1270,24 @@ void AMMOHUD::DrawVendorNameplates()
 		}
 		DrawText(FString::Printf(TEXT("! %s [tikla]"), *Npc->NpcName),
 			FLinearColor(1.f, 0.85f, 0.2f), Screen.X - 34.f, Screen.Y, nullptr, 0.8f);
+	}
+
+	// Konusan NPC'ler (mor): tiklaninca LLM diyalogu.
+	for (TActorIterator<AMMOTalkerNPC> It(World); It; ++It)
+	{
+		AMMOTalkerNPC* Npc = *It;
+		if (!Npc)
+		{
+			continue;
+		}
+		const FVector Head = Npc->GetActorLocation() + FVector(0.f, 0.f, 110.f);
+		const FVector Screen = Canvas->Project(Head);
+		if (Screen.Z <= 0.f)
+		{
+			continue;
+		}
+		DrawText(FString::Printf(TEXT("%s [konus]"), *Npc->NpcName),
+			FLinearColor(0.8f, 0.6f, 1.f), Screen.X - 34.f, Screen.Y, nullptr, 0.8f);
 	}
 }
 

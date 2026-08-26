@@ -7,6 +7,7 @@
 #include "MMOPlayerController.generated.h"
 
 class AMMOCharacter;
+class AMMOTalkerNPC;
 
 /**
  * Tikla-git / tikla-saldir kontrol semasi (klasik MMO tarzi).
@@ -34,6 +35,18 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaTime) override;
+
+	// --- Konusan NPC diyalogu (LLM) ---
+	// Istemci NPC'ye tiklar -> sunucuya sorar. Sunucu mesafeyi dogrular, LLM'den (veya yedek
+	// replikten) metin uretir, sonra sadece istekte bulunan istemciye ClientReceive... ile gonderir.
+	UFUNCTION(Server, Reliable)
+	void ServerRequestNpcDialogue(AMMOTalkerNPC* Npc);
+
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveNpcDialogue(const FString& SpeakerName, const FString& Text);
+
+	// Ayni NPC'ye tekrar tekrar spam'i engellemek icin son istek zamani.
+	float LastNpcTalkRequestTime = -100.f;
 
 	void OnLeftClickPressed();
 	void OnLeftClickReleased();

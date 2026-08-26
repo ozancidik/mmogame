@@ -4,6 +4,7 @@
 #include "Core/MMOMobSpawner.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
+#include "World/MMOTalkerNPC.h"
 #include "UI/MMOHUD.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -75,4 +76,24 @@ void AMMOGameMode::SpawnMobArea()
 	// Gorevli NPC (saticinin yaninda).
 	const FVector QuestLoc = Origin + FVector(250.f, -200.f, 60.f);
 	World->SpawnActor<AMMOQuestGiverNPC>(AMMOQuestGiverNPC::StaticClass(), QuestLoc, FRotator(0.f, 180.f, 0.f), NpcParams);
+
+	// Konusan NPC: Muhafiz Kael (kapi muhafizi) — tiklaninca LLM'den replik gelir.
+	// SpawnActorDeferred ile ad/rol/yedek replikleri sunucuda BeginPlay'den once ayarla.
+	const FVector TalkerLoc = Origin + FVector(400.f, 0.f, 60.f);
+	const FTransform TalkerTM(FRotator(0.f, 180.f, 0.f), TalkerLoc);
+	if (AMMOTalkerNPC* Kael = World->SpawnActorDeferred<AMMOTalkerNPC>(AMMOTalkerNPC::StaticClass(), TalkerTM))
+	{
+		Kael->NpcName = TEXT("Muhafiz Kael");
+		Kael->NpcRole = TEXT("kasaba kapisini tutan muhafiz; kisa, disiplinli konusur, tehlikeye karsi net uyarir");
+		// LLM devre disiyken kullanilacak yedek replikler (docs/NpcDialogue.md'den).
+		Kael->FallbackLines = {
+			TEXT("Dur. Adini ve derdini soyle, sonra gec."),
+			TEXT("Surlarin disi senin dostun degil; silahini hazir tut."),
+			TEXT("Su tepede kurt uludu butun gece. Uzagindan gec, tek basinaysan hic yaklasma."),
+			TEXT("Ork izleri gorduk doguda. Hafife alma, suruyle gezerler."),
+			TEXT("Haydutlar yollari kesti. Kervanla git, tek atliyi avlarlar."),
+			TEXT("Kapidan gecen cok, geri donen az. Sen donenlerden ol.")
+		};
+		UGameplayStatics::FinishSpawningActor(Kael, TalkerTM);
+	}
 }

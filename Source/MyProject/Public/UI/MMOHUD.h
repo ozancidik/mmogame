@@ -39,6 +39,10 @@ public:
 	// Bir karakter hasar aldiginda cagrilir; o dunya konumunda ucan hasar sayisi ekler.
 	void AddDamageNumber(const FVector& WorldLocation, float Amount);
 
+	// --- NPC diyalog balonu (konusan NPC'ye tiklaninca alt-ortada gosterilir) ---
+	// Pencere DEGILDIR: hareketi engellemez, sadece bir sure gorunur ve solar.
+	void ShowNpcDialogue(const FString& SpeakerName, const FString& Text);
+
 	// --- Skill kitabi (K ile ac/kapa) ---
 	void ToggleSkillBook();
 	bool IsSkillBookOpen() const { return bSkillBookOpen; }
@@ -150,6 +154,15 @@ protected:
 
 	// Diger oyuncularin tepesine isim + level + HP bari (MP).
 	void DrawPlayerNameplates();
+
+	// Aktif NPC diyalog balonunu alt-ortada cizer (suresi dolunca kaybolur).
+	void DrawNpcDialogue();
+
+	// Aktif diyalog balonu durumu.
+	FString NpcDialogueSpeaker;
+	FString NpcDialogueText;
+	float NpcDialogueStartTime = -1000.f;         // -1000 = gosterilecek diyalog yok
+	static constexpr float NpcDialogueDuration = 9.f;
 
 	bool bSkillBookOpen = false;
 	bool bInventoryOpen = false;

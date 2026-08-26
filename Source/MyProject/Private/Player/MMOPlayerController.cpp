@@ -5,7 +5,10 @@
 #include "Characters/MMOMob.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
+#include "World/MMOTalkerNPC.h"
+#include "AI/MMODialogueSubsystem.h"
 #include "Components/MMOStatsComponent.h"
+#include "Engine/GameInstance.h"
 #include "Core/MMOTargeting.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
@@ -302,6 +305,27 @@ void AMMOPlayerController::DoLeftClickAction()
 		return;
 	}
 
+	// Konusan NPC'ye tiklandi mi? (menzil icindeyse LLM'den replik iste)
+	if (AMMOTalkerNPC* Talker = Cast<AMMOTalkerNPC>(Hit.GetActor()))
+	{
+		APawn* MyPawn = GetPawn();
+		if (MyPawn && FVector::Dist(MyPawn->GetActorLocation(), Talker->GetActorLocation()) <= 500.f)
+		{
+			// Kisa spam korumasi (ust uste tiklamada yeni istek atma).
+			const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+			if (Now - LastNpcTalkRequestTime >= 1.5f)
+			{
+				LastNpcTalkRequestTime = Now;
+				ServerRequestNpcDialogue(Talker);
+			}
+		}
+		else if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("NPC'ye yaklas"));
+		}
+		return;
+	}
+
 	// Bir karaktere (mob veya diger oyuncu) tiklandi mi? Kendine tiklama sayilmaz.
 	// (Oyuncuya vurma PvP kontrolu sunucuda yapilir; NPC'ler AMMOCharacter degil, otomatik haric.)
 	AMMOCharacter* HitChar = Cast<AMMOCharacter>(Hit.GetActor());
@@ -579,5 +603,63 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 			bHasMoveTarget = false;
 			StopMovement();
 		}
+	}
+}
+
+void AMMOPlayerController::ServerRequestNpcDialogue_Implementation(AMMOTalkerNPC* Npc)
+{
+	if (!Npc)
+	{
+		return;
+	}
+
+	// Sunucu-otoriter mesafe dogrulamasi (istemciye guvenme).
+	APawn* MyPawn = GetPawn();
+	if (!MyPawn || FVector::Dist(MyPawn->GetActorLocation(), Npc->GetActorLocation()) > 700.f)
+	{
+		return;
+	}
+
+	// Oyuncu baglami (replige renk katsin).
+	FString PlayerInfo = TEXT("bir maceraci");
+	if (AMMOCharacter* C = Cast<AMMOCharacter>(MyPawn))
+	{
+		if (UMMOStatsComponent* St = C->GetStats())
+		{
+			PlayerInfo = FString::Printf(TEXT("seviye %d bir maceraci"), St->Level);
+		}
+	}
+
+	const FString SpeakerName = Npc->NpcName;
+	const FString FallbackLine = Npc->PickFallbackLine();
+
+	UGameInstance* GI = GetGameInstance();
+	UMMODialogueSubsystem* Dialogue = GI ? GI->GetSubsystem<UMMODialogueSubsystem>() : nullptr;
+	if (!Dialogue)
+	{
+		ClientReceiveNpcDialogue(SpeakerName, FallbackLine);
+		return;
+	}
+
+	// LLM cevabi asenkron gelir; basarisizsa (anahtar/kredi yok) NPC'ye ozgu yedek replige duser.
+	TWeakObjectPtr<AMMOPlayerController> WeakThis(this);
+	FMMOOnDialogueReady OnReady;
+	OnReady.BindLambda([WeakThis, SpeakerName, FallbackLine](bool bSuccess, const FString& Text)
+	{
+		if (!WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->ClientReceiveNpcDialogue(SpeakerName, bSuccess ? Text : FallbackLine);
+	});
+
+	Dialogue->RequestNpcLine(Npc->NpcName, Npc->NpcRole, PlayerInfo, OnReady);
+}
+
+void AMMOPlayerController::ClientReceiveNpcDialogue_Implementation(const FString& SpeakerName, const FString& Text)
+{
+	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
+	{
+		H->ShowNpcDialogue(SpeakerName, Text);
 	}
 }
