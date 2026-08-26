@@ -100,5 +100,5 @@ void AMMOGameMode::SpawnMobArea()
 
 	// Sifaci NPC: Sifaci Lyra (tam iyilestirme + altin dususu). Saticinin karsi yanina koy.
 	const FVector HealerLoc = Origin + FVector(-250.f, 200.f, 60.f);
-	World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(), HealerLoc, FRotator(0.f, 0.f, 0.f), NpcParams);
+	World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(), HealerLoc, FRotator(0.f, 180.f, 0.f), NpcParams);
 }

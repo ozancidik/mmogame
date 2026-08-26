@@ -732,7 +732,9 @@ void AMMOPlayerController::ServerRequestHeal_Implementation(AMMOHealerNPC* Npc)
 
 	// Zaten tam saglikliysa (olu degil, can ve mana dolu) altin alma; kibarca gonder.
 	const bool bFullHp = St->GetHealthPercent() >= 0.999f;
-	const bool bFullMp = St->GetManaPercent() >= 0.999f;
+	// MaxMana<=0 olan karakterde (mana havuzu yok) iyilestirilecek mana yoktur => "dolu" say.
+	// Aksi halde GetManaPercent 0 doner, tam canli oyuncu bedavaya altin kaptirir.
+	const bool bFullMp = (St->MaxMana <= 0.f) || (St->GetManaPercent() >= 0.999f);
 	if (!St->bIsDead && bFullHp && bFullMp)
 	{
 		ClientReceiveNpcDialogue(Speaker, Npc->AlreadyHealedLine);
