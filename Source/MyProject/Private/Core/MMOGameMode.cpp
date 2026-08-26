@@ -47,9 +47,15 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// Oyuncunun baktigi yonde biraz ilerisine spawner koy (test icin yakin).
+	// Ana spawner Lv1-5 normalleriyle sinirli (MaxMobLevel=5): yeni Lv6-7 moblar baslangic havuzuna sizmasin.
 	const FVector SpawnerLoc = Origin + Facing.Vector() * MobAreaDistance + FVector(0.f, 0.f, 50.f);
-
-	AMMOMobSpawner* Spawner = World->SpawnActor<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SpawnerLoc, FRotator::ZeroRotator);
+	const FTransform SpawnerTM(FRotator::ZeroRotator, SpawnerLoc);
+	AMMOMobSpawner* Spawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SpawnerTM);
+	if (Spawner)
+	{
+		Spawner->MaxMobLevel = 5;
+		UGameplayStatics::FinishSpawningActor(Spawner, SpawnerTM);
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("[MMODBG] SpawnMobArea: playerStart=%d origin=%s spawnerLoc=%s spawner=%s"),
 		bFoundStart ? 1 : 0, *Origin.ToCompactString(), *SpawnerLoc.ToCompactString(),
@@ -103,6 +109,22 @@ void AMMOGameMode::SpawnMobArea()
 		AssassinSpawner->TopUpInterval = 45.f;
 		AssassinSpawner->ForcedArchetypeId = FName(TEXT("ShadowAssassin"));
 		UGameplayStatics::FinishSpawningActor(AssassinSpawner, AssassinTM);
+	}
+
+	// --- IKINCI SAVAS BOLGESI (Lv6-7 NORMAL moblar) ---
+	// Baslangictan belirgin biçimde uzakta ve yana kaydirilmis ayri bir alan: eksende MobAreaDistance*4 (2800u)
+	// + sag yone 1600u. En yakin mevcut spawner (Golge Suikastci, eksende 3.2x) ile merkez arasi ~1695u (>600u).
+	// ForcedArchetypeId YOK; MinMobLevel=6/MaxMobLevel=7 ile banddan rastgele Lv6-7 normal secilir.
+	const FVector SecondZoneLoc = Origin + Facing.Vector() * (MobAreaDistance * 4.f) + RightDir * 1600.f + FVector(0.f, 0.f, 50.f);
+	const FTransform SecondZoneTM(FRotator::ZeroRotator, SecondZoneLoc);
+	if (AMMOMobSpawner* SecondZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SecondZoneTM))
+	{
+		SecondZone->MaxMobs = 5;
+		SecondZone->SpawnRadius = 500.f;
+		SecondZone->MinMobLevel = 6;
+		SecondZone->MaxMobLevel = 7;
+		UGameplayStatics::FinishSpawningActor(SecondZone, SecondZoneTM);
+		UE_LOG(LogTemp, Log, TEXT("[MMODBG] SecondZone spawner @ %s"), *SecondZoneLoc.ToCompactString());
 	}
 
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).

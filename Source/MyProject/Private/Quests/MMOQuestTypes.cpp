@@ -74,6 +74,10 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_Trolls"), TEXT("Trol Avi"), TEXT("Ormandaki trolleri sec: 3 Trol oldur."),
 			T::KillSpecificMob, TEXT("Troll"), 3, 550, 380, 5));
 
+		// Ikinci bolge yan gorevi: Kara Buyuculeri sec (Lv7 normal; band spawner'dan cikar).
+		Table.Add(MakeQuest(TEXT("Q_Warlocks"), TEXT("Kara Buyuculer"), TEXT("Ikinci bolgedeki kara buyuculeri devir: 4 Kara Buyucu oldur."),
+			T::KillSpecificMob, TEXT("Warlock"), 4, 800, 500, 6));
+
 		// Buyuk servet (bagimsiz altin biriktirme).
 		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("1000 altin biriktir."),
 			T::HaveGold, TEXT(""), 1000, 500, 0, 3));

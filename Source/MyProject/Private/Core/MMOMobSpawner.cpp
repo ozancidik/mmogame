@@ -2,6 +2,7 @@
 
 #include "Core/MMOMobSpawner.h"
 #include "Characters/MMOMob.h"
+#include "Characters/MMOMobArchetype.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Components/SceneComponent.h"
@@ -71,16 +72,26 @@ void AMMOMobSpawner::SpawnOne()
 
 	const FVector SpawnLoc = Base + Offset;
 
-	AMMOMob* Mob = nullptr;
-	if (!ForcedArchetypeId.IsNone())
+	// Spawn edilecek arketipi belirle:
+	//  - ForcedArchetypeId varsa onu kullan (world boss / elit).
+	//  - Yoksa ve seviye-bandi ayarliysa (Min>0 || Max>0) banddan sec.
+	//  - Hicbiri yoksa arketipi bos birak: mob kendi BeginPlay'inde rastgele secer (mevcut davranis).
+	FName ChosenArchetype = ForcedArchetypeId;
+	if (ChosenArchetype.IsNone() && (MinMobLevel > 0 || MaxMobLevel > 0))
 	{
-		// Sabit arketip (world boss): ArchetypeId'yi BeginPlay'den once atamak icin deferred spawn.
+		ChosenArchetype = FMMOMobDatabase::GetRandomInLevelRange(MinMobLevel, MaxMobLevel).ArchetypeId;
+	}
+
+	AMMOMob* Mob = nullptr;
+	if (!ChosenArchetype.IsNone())
+	{
+		// Sabit arketip: ArchetypeId'yi BeginPlay'den once atamak icin deferred spawn.
 		const FTransform SpawnTM(FRotator::ZeroRotator, SpawnLoc);
 		Mob = World->SpawnActorDeferred<AMMOMob>(MobClass, SpawnTM, nullptr, nullptr,
 			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (Mob)
 		{
-			Mob->ArchetypeId = ForcedArchetypeId;
+			Mob->ArchetypeId = ChosenArchetype;
 			UGameplayStatics::FinishSpawningActor(Mob, SpawnTM);
 		}
 	}

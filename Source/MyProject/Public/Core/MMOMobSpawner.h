@@ -32,6 +32,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	FName ForcedArchetypeId;
 
+	// Opsiyonel seviye-bandi filtresi (yalniz ForcedArchetypeId bosken rastgele secimde etkili).
+	// 0 = o yonde sinir yok (varsayilan; mevcut davranis aynen korunur). Ikisinden en az biri >0 ise
+	// GetRandomInLevelRange kullanilir.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	int32 MinMobLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	int32 MaxMobLevel = 0;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	float SpawnRadius = 500.f;
 

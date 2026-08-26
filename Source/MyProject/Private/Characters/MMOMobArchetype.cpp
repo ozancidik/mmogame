@@ -46,6 +46,24 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
+		// --- Ikinci bolge NORMAL moblari (Lv6-7; seviye-bandi spawner ile cikar, rastgele ana havuza band sayesinde sizmaz) ---
+		// Ork Savascisi: Trol'den guclu, disiplinli dovusur; vurusta yaralayip yavaslatir.
+		Table.Add(MakeMob(TEXT("OrcWarrior"), TEXT("Ork Savascisi"), 6, 18, 18, 22.f, 210, 35, 95, 300.f, 950.f, 1.2f, FLinearColor(0.55f, 0.15f, 0.05f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.3f;
+
+		// Korku Kurdu: cok hizli, genis aggro; isirip avini yavaslatir.
+		Table.Add(MakeMob(TEXT("DireWolf"), TEXT("Korku Kurdu"), 6, 19, 15, 23.f, 220, 30, 90, 470.f, 1250.f, 1.1f, FLinearColor(0.3f, 0.32f, 0.38f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		// Kara Buyucu: yuksek hasar, zehirli buyu; can azalinca ofkelenir.
+		Table.Add(MakeMob(TEXT("Warlock"), TEXT("Kara Buyucu"), 7, 20, 18, 26.f, 270, 45, 120, 300.f, 1150.f, 1.05f, FLinearColor(0.4f, 0.15f, 0.55f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.4f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.35f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -117,4 +135,35 @@ const FMMOMobArchetype& FMMOMobDatabase::GetRandom()
 		return All[FMath::RandRange(0, All.Num() - 1)];
 	}
 	return All[NormalIndices[FMath::RandRange(0, NormalIndices.Num() - 1)]];
+}
+
+const FMMOMobArchetype& FMMOMobDatabase::GetRandomInLevelRange(int32 MinLv, int32 MaxLv)
+{
+	// Non-elit + seviye bandina uyanlari topla (0 = o yonde sinir yok).
+	const TArray<FMMOMobArchetype>& All = GetAll();
+
+	TArray<int32> BandIndices;
+	for (int32 i = 0; i < All.Num(); ++i)
+	{
+		if (All[i].bIsElite)
+		{
+			continue;
+		}
+		if (MinLv > 0 && All[i].Level < MinLv)
+		{
+			continue;
+		}
+		if (MaxLv > 0 && All[i].Level > MaxLv)
+		{
+			continue;
+		}
+		BandIndices.Add(i);
+	}
+
+	// Banda uyan yoksa guvenli fallback: mevcut normal-havuz secimi.
+	if (BandIndices.Num() == 0)
+	{
+		return GetRandom();
+	}
+	return All[BandIndices[FMath::RandRange(0, BandIndices.Num() - 1)]];
 }
