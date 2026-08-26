@@ -28,6 +28,8 @@
 #include "Engine/LocalPlayer.h"
 #include "UI/MMOHUD.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "AI/MMODialogueSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
 #include "TimerManager.h"
@@ -740,6 +742,41 @@ void AMMOCharacter::ServerSpendStat_Implementation(FName StatName)
 void AMMOCharacter::MMOStat(const FString& StatName)
 {
 	RequestSpendStat(FName(*StatName));
+}
+
+void AMMOCharacter::MMONpcTalk()
+{
+	UGameInstance* GI = GetGameInstance();
+	UMMODialogueSubsystem* Dialogue = GI ? GI->GetSubsystem<UMMODialogueSubsystem>() : nullptr;
+	if (!Dialogue)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMONpcTalk] Dialogue subsystem yok."));
+		return;
+	}
+
+	// Oyuncu baglami (seviye) — replige renk katsin.
+	FString PlayerInfo = TEXT("bir maceraci");
+	if (Stats)
+	{
+		PlayerInfo = FString::Printf(TEXT("seviye %d bir maceraci"), Stats->Level);
+	}
+
+	FMMOOnDialogueReady OnReady;
+	OnReady.BindLambda([](bool bSuccess, const FString& Text)
+	{
+		UE_LOG(LogTemp, Display, TEXT("[NPC] %s"), *Text);
+		if (GEngine)
+		{
+			const FColor Col = bSuccess ? FColor::Green : FColor::Orange;
+			GEngine->AddOnScreenDebugMessage(-1, 8.f, Col, FString::Printf(TEXT("NPC: %s"), *Text));
+		}
+	});
+
+	Dialogue->RequestNpcLine(
+		TEXT("Satici Merek"),
+		TEXT("kasabanin aksi ama durust silah saticisi"),
+		PlayerInfo,
+		OnReady);
 }
 
 void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)

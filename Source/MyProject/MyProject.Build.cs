@@ -21,7 +21,11 @@ public class MyProject : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"NetCore"
+			"NetCore",
+			// Oyun ici LLM (NPC diyalogu) icin: HTTP istegi + JSON kur/coz.
+			"HTTP",
+			"Json",
+			"JsonUtilities"
 		});
 	}
 }

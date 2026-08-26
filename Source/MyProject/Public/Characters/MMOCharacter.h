@@ -187,6 +187,11 @@ public:
 	UFUNCTION(Exec)
 	void MMOStat(const FString& StatName);
 
+	// Konsol: "MMONpcTalk" — LLM'den ornek bir NPC replik ister, ekrana/loga basar.
+	// (Oyun ici LLM entegrasyonu testi. ANTHROPIC_API_KEY tanimli olmali.)
+	UFUNCTION(Exec)
+	void MMONpcTalk();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

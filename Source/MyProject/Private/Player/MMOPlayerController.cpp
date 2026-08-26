@@ -497,35 +497,42 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
-	// --- WASD klavye hareketi (KARAKTERIN baktigi yona gore, yonu degistirmeden) ---
+	// --- WASD klavye hareketi (KO tarzi: W/S ileri-geri, A/D yerinde DONUS) ---
 	// Enhanced Input mapping'lerini temizledigimiz icin WASD'yi burada C++ ile suruyoruz.
-	// W/S = karakterin baktigi yonde ileri/geri, A/D = yana kayma (strafe). Karakter DONMEZ.
+	// W/S = karakterin baktigi yonde ileri/geri. A/D = karakteri sola/saga dondur (yana KAYMAZ).
 	if (!bBookOpen)
 	{
 		float ForwardAxis = 0.f;
-		float RightAxis = 0.f;
+		float TurnAxis = 0.f;
 		if (IsInputKeyDown(EKeys::W)) { ForwardAxis += 1.f; }
 		if (IsInputKeyDown(EKeys::S)) { ForwardAxis -= 1.f; }
-		if (IsInputKeyDown(EKeys::D)) { RightAxis += 1.f; }
-		if (IsInputKeyDown(EKeys::A)) { RightAxis -= 1.f; }
+		if (IsInputKeyDown(EKeys::D)) { TurnAxis += 1.f; }  // saga don
+		if (IsInputKeyDown(EKeys::A)) { TurnAxis -= 1.f; }  // sola don
 
-		if (ForwardAxis != 0.f || RightAxis != 0.f)
+		if (ForwardAxis != 0.f || TurnAxis != 0.f)
 		{
-			// Karakterin mevcut bakis yonunu temel al (kamera degil).
-			const FRotator YawRot(0.f, P->GetActorRotation().Yaw, 0.f);
-			const FVector Forward = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
-			const FVector Right = FRotationMatrix(YawRot).GetUnitAxis(EAxis::Y);
-
-			// Hareket yonune donmeyi kapat ki bakis yonu sabit kalsin (yana kayarken de).
+			// Hareket yonune donmeyi kapat ki donusu biz kontrol edelim, ileri giderken kaymasin.
 			SetOrientToMovement(false);
 
-			// Klavye hareketi tikla-git yolunu ve hedefi iptal eder (manuel kontrol oncelikli).
+			// Klavye kontrolu tikla-git yolunu ve hedefi iptal eder (manuel kontrol oncelikli).
 			StopMovement();
 			bHasMoveTarget = false;
 			TargetEnemy.Reset();
 
-			P->AddMovementInput(Forward, ForwardAxis);
-			P->AddMovementInput(Right, RightAxis);
+			// A/D: karakteri yerinde dondur (yaw). Yana kayma yok.
+			if (TurnAxis != 0.f)
+			{
+				const float YawSpeed = 140.f; // derece/sn
+				P->AddActorWorldRotation(FRotator(0.f, TurnAxis * YawSpeed * DeltaTime, 0.f));
+			}
+
+			// W/S: karakterin (donmus) bakis yonunde ileri/geri.
+			if (ForwardAxis != 0.f)
+			{
+				const FRotator YawRot(0.f, P->GetActorRotation().Yaw, 0.f);
+				const FVector Forward = FRotationMatrix(YawRot).GetUnitAxis(EAxis::X);
+				P->AddMovementInput(Forward, ForwardAxis);
+			}
 			return;
 		}
 	}
