@@ -47,10 +47,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|AI")
 	FString Model = TEXT("claude-opus-5");
 
-	// Cikti uzunlugu tavani. DIKKAT: dusunme (thinking) + metin BIRLIKTE bu tavana sayilir,
-	// bu yuzden kisa replik icin bile bol birakiyoruz; yoksa cevap yarida kesilir.
+	// Cikti uzunlugu tavani. DIKKAT: Opus 5'te dusunme (thinking) varsayilan ACIK ve
+	// dusunme + metin BIRLIKTE bu tavana sayilir. Kisa replik icin bile bol birakiyoruz;
+	// yoksa dusunme butceyi yer, cevap kesilir (stop_reason=max_tokens) ve sessizce yedege duser.
 	UPROPERTY(EditAnywhere, Category = "MMO|AI")
-	int32 MaxTokens = 1024;
+	int32 MaxTokens = 2048;
 
 	// Dusuk gecikme icin effort=low. (Dusunmeyi tamamen KAPATMIYORUZ: kapaliyken
 	// model ara sira <thinking> etiketlerini gorunur metne sizdirabiliyor ki bu

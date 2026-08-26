@@ -631,6 +631,15 @@ void AMMOPlayerController::ServerRequestNpcDialogue_Implementation(AMMOTalkerNPC
 		return;
 	}
 
+	// Sunucu-otoriter hiz siniri: istemci throttle'ina guvenme (hileli istemci
+	// RPC'yi bombardiman edip her cagrida ucretli bir LLM istegi tetikleyebilir).
+	const float ServerNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	if (ServerNow - LastNpcTalkServerTime < NpcTalkServerCooldown)
+	{
+		return;
+	}
+	LastNpcTalkServerTime = ServerNow;
+
 	// Oyuncu baglami (replige renk katsin).
 	FString PlayerInfo = TEXT("bir maceraci");
 	if (AMMOCharacter* C = Cast<AMMOCharacter>(MyPawn))

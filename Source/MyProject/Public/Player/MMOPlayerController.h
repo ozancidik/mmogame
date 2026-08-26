@@ -45,8 +45,16 @@ protected:
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveNpcDialogue(const FString& SpeakerName, const FString& Text);
 
-	// Ayni NPC'ye tekrar tekrar spam'i engellemek icin son istek zamani.
+	// Istemci-tarafi spam korumasi (yalnizca UX; ust uste tiklamada istek atmaz).
 	float LastNpcTalkRequestTime = -100.f;
+
+	// SUNUCU-tarafi throttle (guvenlik): hileli istemci ServerRequestNpcDialogue'u
+	// bombardiman edip her cagrida gercek bir LLM istegi (para) tetikleyemesin diye.
+	// Host'ta (listen server) istemci+sunucu ayni obje oldugundan istemci damgasindan AYRI tutulur.
+	float LastNpcTalkServerTime = -100.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|AI")
+	float NpcTalkServerCooldown = 2.f;
 
 	void OnLeftClickPressed();
 	void OnLeftClickReleased();

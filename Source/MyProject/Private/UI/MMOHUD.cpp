@@ -393,10 +393,18 @@ void AMMOHUD::DrawNpcDialogue()
 		Lines.Add(NpcDialogueText);
 	}
 
+	// Model "en fazla 2 cumle" istegini asabilir; balon ekrandan tasmasin diye satiri klampla.
+	const int32 MaxLines = 5;
+	if (Lines.Num() > MaxLines)
+	{
+		Lines.SetNum(MaxLines);
+		Lines[MaxLines - 1] += TEXT(" ...");
+	}
+
 	const float LineH = 22.f;
 	const float BoxH = 44.f + Lines.Num() * LineH + 12.f; // ad satiri + replik satirlari + alt bosluk
 	const float BoxX = (W - BoxW) * 0.5f;
-	const float BoxY = H - BoxH - 140.f;
+	const float BoxY = FMath::Max(40.f, H - BoxH - 140.f);  // ekranin ustunden tasmasin
 
 	// Zemin + cerceve.
 	DrawRect(FLinearColor(0.05f, 0.04f, 0.09f, 0.82f * Alpha), BoxX, BoxY, BoxW, BoxH);

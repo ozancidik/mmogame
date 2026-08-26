@@ -108,6 +108,12 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 	Request->OnProcessRequestComplete().BindLambda(
 		[WeakThis, OnReady](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
 		{
+			// Subsystem yok olduysa (dunya kapandi vs.) hicbir sey yapma — niyet edilen omur korumasi.
+			if (!WeakThis.IsValid())
+			{
+				return;
+			}
+
 			if (!bConnectedOk || !Resp.IsValid())
 			{
 				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Baglanti/istek hatasi."));
