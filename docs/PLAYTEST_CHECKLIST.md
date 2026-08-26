@@ -19,6 +19,7 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 - [ ] Görev **Q_StoneGolem** ("Kadim Golem"): Orumcek Ana görevini (Q_SpiderQueen) bitirdikten sonra, Lv6+ iken görevliden alınabilmeli. Golem'i öldürünce tamamlanıp 1000 XP + 700 altın vermeli.
 - [ ] Görev **Q_ShadowAssassin** ("Golge Suikastci"): Q_StoneGolem'den sonra, Lv7 iken alınabilmeli. Suikastci'yi öldürünce 1100 XP + 750 altın vermeli.
 - [ ] Yeni ekipman satıcıda görünmeli: **Ejder Kilici** (Weapon, 38 atk, Lv7) ve **Ejder Kask** (Helmet, 9 def, Lv7). Kuşanınca stat bonusu doğru yansımalı.
+- [ ] **Satıcı paneli taşması (regresyon):** Satıcıyı aç (E). Satın alma sütunu artık 20 satır (1 iksir + 6 tüketilebilir + 13 ekipman). **Ejder Kask, Deri Bot, Demir Bot** panelin mavi çerçevesinin **altına taşıyor mu / çerçeve dışına mı düşüyor**? En alttaki item'lar hâlâ tıklanabiliyor mu? (Panelde kaydırma/kırpma yok — liste büyüdükçe alt satırlar panel dışına çıkabilir.)
 
 ### Konuşan NPC + LLM diyaloğu (Muhafız Kael)
 - [ ] Play bas. Satıcı (mavi) ve görevli (altın) NPC'lerin ilerisinde **mor** bir NPC olmalı: "Muhafiz Kael [konus]".

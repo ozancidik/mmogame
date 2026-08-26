@@ -1115,43 +1115,51 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 
 	// --- SATIN AL (sol sutun) ---
 	DrawText(TEXT("SATIN AL (sol tik)"), FLinearColor(0.6f, 0.9f, 0.6f), LeftX, PY + 68.f, nullptr, 0.95f);
-	float LY = PY + 90.f;
+	const float BuyStartY = PY + 90.f;
+	float LY = BuyStartY;
+
+	// Satin-al sutununu panele sigdir: satir sayisi (iksir + tuketilebilir + ekipman)
+	// arttikca satir yuksekligini kucultup tasmayi onle (kaydirma yok, hepsi gorunur kalir).
+	const int32 BuyRowCount = 1 + FMMOConsumableDatabase::GetAll().Num() + FMMOItemDatabase::GetAll().Num();
+	const float BuyAvailH = (PY + PH - 12.f) - BuyStartY;
+	const float BuyRowH = FMath::Min(RowH, BuyAvailH / (float)FMath::Max(1, BuyRowCount));
+	const float BuyCellH = FMath::Max(1.f, BuyRowH - 4.f);
 
 	// Iksir satiri.
 	{
-		DrawRect(FLinearColor(0.1f, 0.16f, 0.12f, 0.9f), LeftX, LY, ColW, RowH - 4.f);
+		DrawRect(FLinearColor(0.1f, 0.16f, 0.12f, 0.9f), LeftX, LY, ColW, BuyCellH);
 		FMMOClickRegion R;
 		R.SkillId = FName(TEXT("__POTION__"));
-		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + RowH - 4.f));
+		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("Can Iksiri  -  %d altin"), FMMOItemDatabase::PotionPrice),
 			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.78f);
-		LY += RowH;
+		LY += BuyRowH;
 	}
 
 	// Tuketilebilirler (mana iksiri, buff parsomenleri).
 	for (const FMMOConsumableDef& Def : FMMOConsumableDatabase::GetAll())
 	{
-		DrawRect(FLinearColor(0.1f, 0.16f, 0.18f, 0.9f), LeftX, LY, ColW, RowH - 4.f);
+		DrawRect(FLinearColor(0.1f, 0.16f, 0.18f, 0.9f), LeftX, LY, ColW, BuyCellH);
 		FMMOClickRegion R;
 		R.SkillId = Def.ItemId;
-		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + RowH - 4.f));
+		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("%s  -  %d altin"), *Def.Name, Def.Price),
 			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f);
-		LY += RowH;
+		LY += BuyRowH;
 	}
 
 	for (const FMMOItemDef& Def : FMMOItemDatabase::GetAll())
 	{
-		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), LeftX, LY, ColW, RowH - 4.f);
+		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), LeftX, LY, ColW, BuyCellH);
 		FMMOClickRegion R;
 		R.SkillId = Def.ItemId;
-		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + RowH - 4.f));
+		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("%s  -  %d altin (Lv%d)"), *Def.Name, FMMOItemDatabase::GetBuyPrice(Def), Def.RequiredLevel),
 			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f);
-		LY += RowH;
+		LY += BuyRowH;
 	}
 
 	// --- SAT (sag sutun) ---
