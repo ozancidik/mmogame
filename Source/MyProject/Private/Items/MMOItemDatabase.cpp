@@ -31,10 +31,12 @@ namespace
 		Table.Add(MakeItem(TEXT("ShortSword"), TEXT("Kisa Kilic"), S::Weapon, 8.f, 0.f, 1));
 		Table.Add(MakeItem(TEXT("LongSword"), TEXT("Uzun Kilic"), S::Weapon, 14.f, 0.f, 3));
 		Table.Add(MakeItem(TEXT("BattleAxe"), TEXT("Savas Baltasi"), S::Weapon, 22.f, 0.f, 5));
+		Table.Add(MakeItem(TEXT("GreatSword"), TEXT("Buyuk Kilic"), S::Weapon, 30.f, 0.f, 6));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
 		Table.Add(MakeItem(TEXT("ChainMail"), TEXT("Zincir Zirh"), S::Armor, 0.f, 10.f, 3));
+		Table.Add(MakeItem(TEXT("PlateArmor"), TEXT("Plaka Zirh"), S::Armor, 0.f, 15.f, 5));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));

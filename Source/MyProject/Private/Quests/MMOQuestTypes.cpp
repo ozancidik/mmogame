@@ -58,6 +58,18 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_Gold500"), TEXT("Tuccar Ruhu"), TEXT("500 altin biriktir."),
 			T::HaveGold, TEXT(""), 500, 300, 0, 1));
 
+		// Elit yan gorev: Orumcek Ana (bagimsiz — kurt surusunu bitirenlere acilir).
+		Table.Add(MakeQuest(TEXT("Q_SpiderQueen"), TEXT("Orumcek Ana"), TEXT("Magaranin dehsetini yok et: Orumcek Ana'yi oldur."),
+			T::KillSpecificMob, TEXT("SpiderQueen"), 1, 900, 600, 5, TEXT("Q_Wolves")));
+
+		// Trol avi (bagimsiz yan gorev).
+		Table.Add(MakeQuest(TEXT("Q_Trolls"), TEXT("Trol Avi"), TEXT("Ormandaki trolleri sec: 3 Trol oldur."),
+			T::KillSpecificMob, TEXT("Troll"), 3, 550, 380, 5));
+
+		// Buyuk servet (bagimsiz altin biriktirme).
+		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("1000 altin biriktir."),
+			T::HaveGold, TEXT(""), 1000, 500, 0, 3));
+
 		return Table;
 	}
 }

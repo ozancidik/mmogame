@@ -67,6 +67,20 @@ void AMMOGameMode::SpawnMobArea()
 		UGameplayStatics::FinishSpawningActor(BossSpawner, BossTM);
 	}
 
+	// Elit: Orumcek Ana — mob alaninin yan kosesine, tek bir elit tutan spawner (boss'tan ayri yerde).
+	// Facing yonunun saginda, mob alani mesafesinin biraz otesinde konumlandir.
+	const FVector RightDir = FRotator(0.f, Facing.Yaw + 90.f, 0.f).Vector();
+	const FVector EliteLoc = Origin + Facing.Vector() * (MobAreaDistance * 1.6f) + RightDir * 700.f + FVector(0.f, 0.f, 50.f);
+	const FTransform EliteTM(FRotator::ZeroRotator, EliteLoc);
+	if (AMMOMobSpawner* EliteSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), EliteTM))
+	{
+		EliteSpawner->MaxMobs = 1;
+		EliteSpawner->SpawnRadius = 150.f;
+		EliteSpawner->TopUpInterval = 45.f;
+		EliteSpawner->ForcedArchetypeId = FName(TEXT("SpiderQueen"));
+		UGameplayStatics::FinishSpawningActor(EliteSpawner, EliteTM);
+	}
+
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
 	FActorSpawnParameters NpcParams;
 	NpcParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
