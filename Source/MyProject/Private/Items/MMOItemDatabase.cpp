@@ -32,6 +32,7 @@ namespace
 		Table.Add(MakeItem(TEXT("LongSword"), TEXT("Uzun Kilic"), S::Weapon, 14.f, 0.f, 3));
 		Table.Add(MakeItem(TEXT("BattleAxe"), TEXT("Savas Baltasi"), S::Weapon, 22.f, 0.f, 5));
 		Table.Add(MakeItem(TEXT("GreatSword"), TEXT("Buyuk Kilic"), S::Weapon, 30.f, 0.f, 6));
+		Table.Add(MakeItem(TEXT("DragonBlade"), TEXT("Ejder Kilici"), S::Weapon, 38.f, 0.f, 7));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -41,6 +42,7 @@ namespace
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
 		Table.Add(MakeItem(TEXT("IronHelmet"), TEXT("Demir Kask"), S::Helmet, 0.f, 6.f, 3));
+		Table.Add(MakeItem(TEXT("DragonHelm"), TEXT("Ejder Kask"), S::Helmet, 0.f, 9.f, 7));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));

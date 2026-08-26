@@ -62,6 +62,14 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_SpiderQueen"), TEXT("Orumcek Ana"), TEXT("Magaranin dehsetini yok et: Orumcek Ana'yi oldur."),
 			T::KillSpecificMob, TEXT("SpiderQueen"), 1, 900, 600, 5, TEXT("Q_Wolves")));
 
+		// Kadim Golem (elit zinciri: Orumcek Ana'yi bitirenlere acilir).
+		Table.Add(MakeQuest(TEXT("Q_StoneGolem"), TEXT("Kadim Golem"), TEXT("Harabelerin bekcisini devir: Kadim Golem'i oldur."),
+			T::KillSpecificMob, TEXT("StoneGolem"), 1, 1000, 700, 6, TEXT("Q_SpiderQueen")));
+
+		// Golge Suikastci (elit zinciri: Kadim Golem'den sonra acilir).
+		Table.Add(MakeQuest(TEXT("Q_ShadowAssassin"), TEXT("Golge Suikastci"), TEXT("Golgelerdeki katili avla: Golge Suikastci'yi oldur."),
+			T::KillSpecificMob, TEXT("ShadowAssassin"), 1, 1100, 750, 7, TEXT("Q_StoneGolem")));
+
 		// Trol avi (bagimsiz yan gorev).
 		Table.Add(MakeQuest(TEXT("Q_Trolls"), TEXT("Trol Avi"), TEXT("Ormandaki trolleri sec: 3 Trol oldur."),
 			T::KillSpecificMob, TEXT("Troll"), 3, 550, 380, 5));

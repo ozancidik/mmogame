@@ -81,6 +81,30 @@ void AMMOGameMode::SpawnMobArea()
 		UGameplayStatics::FinishSpawningActor(EliteSpawner, EliteTM);
 	}
 
+	// Elit: Kadim Golem (tank) — mob alaninin SOL kosesine (Facing yonunun soluna), Orumcek Ana'nin karsi tarafi.
+	const FVector GolemLoc = Origin + Facing.Vector() * (MobAreaDistance * 1.6f) - RightDir * 700.f + FVector(0.f, 0.f, 50.f);
+	const FTransform GolemTM(FRotator::ZeroRotator, GolemLoc);
+	if (AMMOMobSpawner* GolemSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), GolemTM))
+	{
+		GolemSpawner->MaxMobs = 1;
+		GolemSpawner->SpawnRadius = 150.f;
+		GolemSpawner->TopUpInterval = 50.f;
+		GolemSpawner->ForcedArchetypeId = FName(TEXT("StoneGolem"));
+		UGameplayStatics::FinishSpawningActor(GolemSpawner, GolemTM);
+	}
+
+	// Elit: Golge Suikastci (assassin) — diger elit/boss'lardan daha ileride, eksende uzak nokta.
+	const FVector AssassinLoc = Origin + Facing.Vector() * (MobAreaDistance * 3.2f) + FVector(0.f, 0.f, 50.f);
+	const FTransform AssassinTM(FRotator::ZeroRotator, AssassinLoc);
+	if (AMMOMobSpawner* AssassinSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), AssassinTM))
+	{
+		AssassinSpawner->MaxMobs = 1;
+		AssassinSpawner->SpawnRadius = 150.f;
+		AssassinSpawner->TopUpInterval = 45.f;
+		AssassinSpawner->ForcedArchetypeId = FName(TEXT("ShadowAssassin"));
+		UGameplayStatics::FinishSpawningActor(AssassinSpawner, AssassinTM);
+	}
+
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
 	FActorSpawnParameters NpcParams;
 	NpcParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
