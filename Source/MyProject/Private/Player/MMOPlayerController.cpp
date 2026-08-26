@@ -278,6 +278,12 @@ void AMMOPlayerController::DoLeftClickAction()
 			if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 			{
 				H->OpenShop();
+				// Kisa karsilama replikleri (istemci-tarafi flourish; LLM gerektirmez).
+				const FString Greet = Vendor->PickGreeting();
+				if (!Greet.IsEmpty())
+				{
+					H->ShowNpcDialogue(Vendor->VendorName, Greet);
+				}
 			}
 		}
 		else if (GEngine)
@@ -296,6 +302,11 @@ void AMMOPlayerController::DoLeftClickAction()
 			if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 			{
 				H->OpenQuestWindow();
+				const FString Greet = QuestGiver->PickGreeting();
+				if (!Greet.IsEmpty())
+				{
+					H->ShowNpcDialogue(QuestGiver->NpcName, Greet);
+				}
 			}
 		}
 		else if (GEngine)

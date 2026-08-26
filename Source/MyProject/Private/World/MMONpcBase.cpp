@@ -37,6 +37,15 @@ AMMONpcBase::AMMONpcBase()
 	}
 }
 
+FString AMMONpcBase::PickGreeting() const
+{
+	if (GreetingLines.Num() == 0)
+	{
+		return FString();
+	}
+	return GreetingLines[FMath::RandRange(0, GreetingLines.Num() - 1)];
+}
+
 void AMMONpcBase::BeginPlay()
 {
 	Super::BeginPlay();
