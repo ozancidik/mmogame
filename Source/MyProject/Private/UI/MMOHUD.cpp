@@ -16,6 +16,7 @@
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
+#include "World/MMOHealerNPC.h"
 #include "Player/MMOPlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
@@ -1346,6 +1347,24 @@ void AMMOHUD::DrawVendorNameplates()
 		DrawText(FString::Printf(TEXT("%s [konus]"), *Npc->NpcName),
 			FLinearColor(0.8f, 0.6f, 1.f), Screen.X - 34.f, Screen.Y, nullptr, 0.8f);
 	}
+
+	// Sifaci NPC (yesil-teal): tiklaninca iyilesme.
+	for (TActorIterator<AMMOHealerNPC> It(World); It; ++It)
+	{
+		AMMOHealerNPC* Npc = *It;
+		if (!Npc)
+		{
+			continue;
+		}
+		const FVector Head = Npc->GetActorLocation() + FVector(0.f, 0.f, 110.f);
+		const FVector Screen = Canvas->Project(Head);
+		if (Screen.Z <= 0.f)
+		{
+			continue;
+		}
+		DrawText(FString::Printf(TEXT("+ %s [iyilesme]"), *Npc->HealerName),
+			FLinearColor(0.4f, 1.f, 0.7f), Screen.X - 34.f, Screen.Y, nullptr, 0.8f);
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -1430,6 +1449,22 @@ void AMMOHUD::DrawMinimap(AMMOCharacter* PlayerChar)
 			PlotDot((*It)->GetActorLocation(), FLinearColor(1.f, 0.82f, 0.2f), 5.f);
 		}
 	}
+	// Sifacilar (yesil-teal)
+	for (TActorIterator<AMMOHealerNPC> It(World); It; ++It)
+	{
+		if (*It)
+		{
+			PlotDot((*It)->GetActorLocation(), FLinearColor(0.4f, 1.f, 0.7f), 5.f);
+		}
+	}
+	// Konusan NPC'ler (mor)
+	for (TActorIterator<AMMOTalkerNPC> It(World); It; ++It)
+	{
+		if (*It)
+		{
+			PlotDot((*It)->GetActorLocation(), FLinearColor(0.75f, 0.55f, 1.f), 5.f);
+		}
+	}
 	// Diger oyuncular (yesil)
 	const APawn* LocalPawn = GetOwningPawn();
 	for (TActorIterator<AMMOCharacter> It(World); It; ++It)
@@ -1464,6 +1499,10 @@ void AMMOHUD::DrawQuestTracker(AMMOCharacter* PlayerChar)
 	DrawText(TEXT("-- Gorevler --"), FLinearColor(1.f, 0.85f, 0.3f), X, Y, nullptr, 0.9f);
 	Y += 20.f;
 
+	// Tracker'i minimap altindan asagi tasmaktan koru: gorunur satiri sinirla,
+	// artani "+N daha" ozetiyle goster (gorev sayisi arttikca ekrani doldurmasin).
+	const int32 MaxTrackerRows = 8;
+	int32 Shown = 0;
 	for (const FMMOQuestProgress& P : Q->ActiveQuests)
 	{
 		const FMMOQuestDef* Def = FMMOQuestDatabase::Find(P.QuestId);
@@ -1471,11 +1510,22 @@ void AMMOHUD::DrawQuestTracker(AMMOCharacter* PlayerChar)
 		{
 			continue;
 		}
+		if (Shown >= MaxTrackerRows)
+		{
+			const int32 Remaining = Q->ActiveQuests.Num() - Shown;
+			if (Remaining > 0)
+			{
+				DrawText(FString::Printf(TEXT("... +%d gorev daha (Gorevli'ye tikla)"), Remaining),
+					FLinearColor(0.7f, 0.7f, 0.5f), X, Y, nullptr, 0.68f);
+			}
+			break;
+		}
 		const bool bDone = Q->IsQuestComplete(*Def, P);
 		const FLinearColor Col = bDone ? FLinearColor(0.5f, 1.f, 0.5f) : FLinearColor(0.85f, 0.85f, 0.85f);
 		DrawText(FString::Printf(TEXT("%s  %d/%d%s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
 			bDone ? TEXT("  (tamam!)") : TEXT("")), Col, X, Y, nullptr, 0.72f);
 		Y += 16.f;
+		++Shown;
 	}
 }
 
@@ -1537,8 +1587,22 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 
 	const float RowX = PX + 14.f;
 	const float RowW = PW - 28.f;
-	const float RowH = 46.f;
 	float RowY = PY + 44.f;
+
+	// Iki bolumun (alinabilir + aktif) toplam satirini panele sigdir: gorev sayisi
+	// arttikca satir yuksekligini kucultup tasmayi + erisilemez "odul al" satirlarini onle.
+	int32 AvailCount = 0;
+	for (const FMMOQuestDef& Def : FMMOQuestDatabase::GetAll())
+	{
+		if (Q->IsQuestAvailable(Def.QuestId)) { ++AvailCount; }
+	}
+	const int32 ActiveCount = Q->ActiveQuests.Num();
+	const int32 TotalRows = AvailCount + ActiveCount;
+	// Sabit dikey masraf: iki bolum basligi (20+20) + aralarindaki bosluk (10).
+	const float RowSpace = (PY + PH - 12.f) - (PY + 44.f) - 50.f;
+	const float RowH = FMath::Clamp(RowSpace / (float)FMath::Max(1, TotalRows), 24.f, 46.f);
+	const float CellH = FMath::Max(1.f, RowH - 4.f);
+	const float Line2Y = FMath::Min(24.f, RowH * 0.5f);
 
 	DrawText(TEXT("Alinabilir gorevler (tikla = al)"), FLinearColor(0.6f, 0.9f, 0.6f), RowX, RowY, nullptr, 0.9f);
 	RowY += 20.f;
@@ -1550,16 +1614,16 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 		{
 			continue;
 		}
-		DrawRect(FLinearColor(0.1f, 0.15f, 0.2f, 0.9f), RowX, RowY, RowW, RowH - 4.f);
+		DrawRect(FLinearColor(0.1f, 0.15f, 0.2f, 0.9f), RowX, RowY, RowW, CellH);
 		FMMOClickRegion R;
 		R.SkillId = Def.QuestId;
-		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + RowH - 4.f));
+		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + CellH));
 		QuestAcceptRegions.Add(R);
 
 		DrawText(FString::Printf(TEXT("%s   [Lv%d gerekli]"), *Def.Name, Def.RequiredLevel),
-			FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.78f);
+			FLinearColor::White, RowX + 6.f, RowY + 3.f, nullptr, 0.78f);
 		DrawText(FString::Printf(TEXT("%s   Odul: %d XP, %d altin%s"), *Def.Description, Def.RewardXP, Def.RewardGold, *BuildQuestRewardItemSuffix(Def)),
-			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + 24.f, nullptr, 0.64f);
+			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + Line2Y, nullptr, 0.64f);
 		RowY += RowH;
 	}
 
@@ -1575,18 +1639,18 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 			continue;
 		}
 		const bool bDone = Q->IsQuestComplete(*Def, P);
-		DrawRect(bDone ? FLinearColor(0.1f, 0.22f, 0.1f, 0.9f) : FLinearColor(0.13f, 0.13f, 0.16f, 0.9f), RowX, RowY, RowW, RowH - 4.f);
+		DrawRect(bDone ? FLinearColor(0.1f, 0.22f, 0.1f, 0.9f) : FLinearColor(0.13f, 0.13f, 0.16f, 0.9f), RowX, RowY, RowW, CellH);
 		if (bDone)
 		{
 			FMMOClickRegion R;
 			R.SkillId = Def->QuestId;
-			R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + RowH - 4.f));
+			R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + CellH));
 			QuestClaimRegions.Add(R);
 		}
 		DrawText(FString::Printf(TEXT("%s   %d/%d %s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
-			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")), FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.78f);
+			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")), FLinearColor::White, RowX + 6.f, RowY + 3.f, nullptr, 0.78f);
 		DrawText(FString::Printf(TEXT("Odul: %d XP, %d altin%s"), Def->RewardXP, Def->RewardGold, *BuildQuestRewardItemSuffix(*Def)),
-			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + 24.f, nullptr, 0.64f);
+			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + Line2Y, nullptr, 0.64f);
 		RowY += RowH;
 	}
 }
