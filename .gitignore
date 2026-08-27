@@ -9,6 +9,8 @@
 *.sdf
 *.VC.db
 *.VC.opendb
+UpgradeLog.htm
+UpgradeLog*.htm
 
 # Unreal generated
 Binaries/
