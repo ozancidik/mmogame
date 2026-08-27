@@ -70,4 +70,7 @@ ekran baloncuğuna sığacak uzunluktadır. Her NPC'nin sesi belirgin biçimde f
 - Git artık sağ salim, ama unutma: her yara sana bir daha yaşadığını fısıldar.
 - Yorulunca dön bana, evlat. Kapımda ne yargı vardır, ne de bekleyiş.
 - Yaran derin ama umudun daha derin olsun; iyileşmek de bir cesarettir.
+- Kesen boş mu? Yaranı yine de sararım; ama şifa şişeleri altın ister, onu saklayamam.
+- İlacım tükenmek üzere, altınım da; azıcık bağış getir, hem sana hem sıradakine yeter.
+- Solgun Fısıltı ormanı sardıkça daha çok yaralı geliyor kapıma; sen sağ dön de yükümü hafiflet.
 - Tanrıçanın huzuru yolunu aydınlatsın; sen sağ ol yeter, gerisi gelir.
