@@ -38,6 +38,7 @@ namespace
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
 		Table.Add(MakeItem(TEXT("ChainMail"), TEXT("Zincir Zirh"), S::Armor, 0.f, 10.f, 3));
 		Table.Add(MakeItem(TEXT("PlateArmor"), TEXT("Plaka Zirh"), S::Armor, 0.f, 15.f, 5));
+		Table.Add(MakeItem(TEXT("DragonPlate"), TEXT("Ejder Zirh"), S::Armor, 0.f, 21.f, 7));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -47,6 +48,7 @@ namespace
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
 		Table.Add(MakeItem(TEXT("IronBoots"), TEXT("Demir Bot"), S::Boots, 0.f, 5.f, 3));
+		Table.Add(MakeItem(TEXT("DragonBoots"), TEXT("Ejder Bot"), S::Boots, 0.f, 12.f, 7));
 
 		return Table;
 	}
