@@ -132,5 +132,11 @@ protected:
 	float EnrageHealthPct = 0.f;
 	bool bEnraged = false;
 
+	// --- Elit ganimet (arketipten kopyalanir; sunucu tarafi). Default => normal loot davranisi.
+	float EliteEquipDropChance = 0.f;
+	int32 EliteEquipDropCount = 1;
+	int32 EliteMinPlus = 0;
+	int32 EliteMaxPlus = 0;
+
 	void DestroySelf();
 };

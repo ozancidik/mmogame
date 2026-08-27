@@ -168,6 +168,12 @@ void AMMOMob::ApplyArchetype(const FMMOMobArchetype& Arch)
 	EnrageHealthPct = Arch.EnrageHealthPct;
 	bEnraged = false;
 
+	// Elit ganimet ayarlari (default = normal loot).
+	EliteEquipDropChance = Arch.EliteEquipDropChance;
+	EliteEquipDropCount = Arch.EliteEquipDropCount;
+	EliteMinPlus = Arch.EliteMinItemPlus;
+	EliteMaxPlus = Arch.EliteMaxItemPlus;
+
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->MaxWalkSpeed = Arch.MoveSpeed;
@@ -485,32 +491,83 @@ void AMMOMob::HandleDeath()
 			}
 		}
 
-		// Sansa bagli EKIPMAN (item veritabanindan rastgele; kucuk ihtimalle +1 dusebilir).
-		if (FMath::FRand() < EquipDropChance)
+		// Sansa bagli EKIPMAN. Normal mob: mevcut davranis (rastgele item, kucuk sansla +1).
+		// Elit (EliteEquipDropChance>0): garantili/yuksek sans, seviyeye uygun ust-tier havuz,
+		// arketip +N araligi ve (elit oldugu icin) iki nadirlik zarindan iyisi. Boss birden fazla dusurebilir.
+		const bool bEliteLoot = bIsElite && EliteEquipDropChance > 0.f;
+		const float EquipChance = bEliteLoot ? EliteEquipDropChance : EquipDropChance;
+		const int32 EquipDropCount = bEliteLoot ? FMath::Max(1, EliteEquipDropCount) : 1;
+
+		const TArray<FMMOItemDef>& AllItems = FMMOItemDatabase::GetAll();
+
+		for (int32 DropIdx = 0; DropIdx < EquipDropCount; ++DropIdx)
 		{
-			const TArray<FMMOItemDef>& AllItems = FMMOItemDatabase::GetAll();
-			if (AllItems.Num() > 0)
+			if (AllItems.Num() == 0 || FMath::FRand() >= EquipChance)
 			{
-				const FMMOItemDef& Picked = AllItems[FMath::RandRange(0, AllItems.Num() - 1)];
-				const int32 Plus = (FMath::FRand() < 0.15f) ? 1 : 0;
-				// Nadirlik zar at (elit/boss daha iyi loot: bir kez daha atip iyisini sec).
-				EMMOItemRarity Rarity = FMMOItemDatabase::RollRarity();
-				if (bIsElite)
+				continue;
+			}
+
+			// Item sec: elit ise mob seviyesine uygun (RequiredLevel <= MobLevel) ust-tier bandindan,
+			// aksi halde tum havuzdan rastgele (mevcut davranis).
+			const FMMOItemDef* Picked = nullptr;
+			if (bEliteLoot)
+			{
+				int32 MaxReq = 0;
+				for (const FMMOItemDef& It : AllItems)
 				{
-					const EMMOItemRarity Second = FMMOItemDatabase::RollRarity();
-					if ((uint8)Second > (uint8)Rarity)
+					if (It.RequiredLevel <= MobLevel)
 					{
-						Rarity = Second;
+						MaxReq = FMath::Max(MaxReq, It.RequiredLevel);
 					}
 				}
-
-				const FVector Loc = Base + FVector(FMath::FRandRange(-60.f, 60.f), FMath::FRandRange(-60.f, 60.f), -40.f);
-				const FTransform SpawnTM(FRotator::ZeroRotator, Loc);
-				if (AMMOLootPickup* P = World->SpawnActorDeferred<AMMOLootPickup>(LootClass, SpawnTM))
+				TArray<const FMMOItemDef*> TopTier;
+				for (const FMMOItemDef& It : AllItems)
 				{
-					P->SetupAsEquipment(Picked.ItemId, Plus, Rarity);
-					UGameplayStatics::FinishSpawningActor(P, SpawnTM);
+					if (It.RequiredLevel <= MobLevel && It.RequiredLevel >= MaxReq - 2)
+					{
+						TopTier.Add(&It);
+					}
 				}
+				if (TopTier.Num() > 0)
+				{
+					Picked = TopTier[FMath::RandRange(0, TopTier.Num() - 1)];
+				}
+			}
+			if (!Picked)
+			{
+				Picked = &AllItems[FMath::RandRange(0, AllItems.Num() - 1)];
+			}
+
+			// Plus: elitse arketip araligindan, degilse mevcut kucuk sans (+1).
+			int32 Plus;
+			if (bEliteLoot)
+			{
+				const int32 MinP = FMath::Max(0, EliteMinPlus);
+				const int32 MaxP = FMath::Clamp(FMath::Max(MinP, EliteMaxPlus), MinP, FMMOItemDatabase::MaxPlus);
+				Plus = FMath::RandRange(MinP, MaxP);
+			}
+			else
+			{
+				Plus = (FMath::FRand() < 0.15f) ? 1 : 0;
+			}
+
+			// Nadirlik zar at (elit/boss daha iyi loot: bir kez daha atip iyisini sec).
+			EMMOItemRarity Rarity = FMMOItemDatabase::RollRarity();
+			if (bIsElite)
+			{
+				const EMMOItemRarity Second = FMMOItemDatabase::RollRarity();
+				if ((uint8)Second > (uint8)Rarity)
+				{
+					Rarity = Second;
+				}
+			}
+
+			const FVector Loc = Base + FVector(FMath::FRandRange(-60.f, 60.f), FMath::FRandRange(-60.f, 60.f), -40.f);
+			const FTransform SpawnTM(FRotator::ZeroRotator, Loc);
+			if (AMMOLootPickup* P = World->SpawnActorDeferred<AMMOLootPickup>(LootClass, SpawnTM))
+			{
+				P->SetupAsEquipment(Picked->ItemId, Plus, Rarity);
+				UGameplayStatics::FinishSpawningActor(P, SpawnTM);
 			}
 		}
 	}

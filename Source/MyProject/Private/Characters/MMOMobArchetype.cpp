@@ -70,6 +70,11 @@ namespace
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.6f;
+		// Garantili ekipman, +1..+2.
+		Table.Last().EliteEquipDropChance = 1.0f;
+		Table.Last().EliteEquipDropCount = 1;
+		Table.Last().EliteMinItemPlus = 1;
+		Table.Last().EliteMaxItemPlus = 2;
 
 		// Ork Reisi (boss): guclu, zehir tukurur ve dusuk canda ofkelenir.
 		Table.Add(MakeMob(TEXT("OrcWarlord"), TEXT("Ork Reisi"), 6, 22, 28, 24.f, 420, 80, 200, 300.f, 1200.f, 1.7f, FLinearColor(0.6f, 0.05f, 0.05f)));
@@ -78,18 +83,33 @@ namespace
 		Table.Last().OnHitEffectChance = 0.4f;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.5f;
+		// Boss: en comert loot. 2 garantili ekipman, +2..+3.
+		Table.Last().EliteEquipDropChance = 1.0f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 2;
+		Table.Last().EliteMaxItemPlus = 3;
 
 		// Kadim Golem (tank elit): cok yavas ama devasa canli; can azalinca ofkelenir.
 		Table.Add(MakeMob(TEXT("StoneGolem"), TEXT("Kadim Golem"), 7, 24, 40, 26.f, 410, 90, 210, 180.f, 850.f, 2.1f, FLinearColor(0.42f, 0.44f, 0.5f)));
 		Table.Last().bIsElite = true;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.45f;
+		// Garantili ekipman, +1..+3.
+		Table.Last().EliteEquipDropChance = 1.0f;
+		Table.Last().EliteEquipDropCount = 1;
+		Table.Last().EliteMinItemPlus = 1;
+		Table.Last().EliteMaxItemPlus = 3;
 
 		// Golge Suikastci (assassin elit): cok hizli, ince canli; vurusta yuksek sansla zehirler.
 		Table.Add(MakeMob(TEXT("ShadowAssassin"), TEXT("Golge Suikastci"), 7, 28, 16, 25.f, 400, 70, 180, 480.f, 1300.f, 1.35f, FLinearColor(0.12f, 0.1f, 0.18f)));
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.5f;
+		// Garantili ekipman, +1..+3.
+		Table.Last().EliteEquipDropChance = 1.0f;
+		Table.Last().EliteEquipDropCount = 1;
+		Table.Last().EliteMinItemPlus = 1;
+		Table.Last().EliteMaxItemPlus = 3;
 
 		return Table;
 	}

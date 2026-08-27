@@ -72,6 +72,22 @@ struct FMMOMobArchetype
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")
 	float EnrageHealthPct = 0.f;
 
+	// --- Elit ganimet (yalnizca bIsElite icin anlamli; hepsi default => normal loot davranisi DEGISMEZ) ---
+	// >0 ise elitin ekipman dusurme sansi (1.0 = garantili). 0 = kullanilmaz (normal EquipDropChance gecerli).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Loot")
+	float EliteEquipDropChance = 0.f;
+
+	// Elit kac ekipman dusurur (boss icin 2 vb.). En az 1 uygulanir.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Loot")
+	int32 EliteEquipDropCount = 1;
+
+	// Elit dropunun +N araligi (yuksek plus daha degerli). Default 0..0 = +0.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Loot")
+	int32 EliteMinItemPlus = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Loot")
+	int32 EliteMaxItemPlus = 0;
+
 	bool IsValidArchetype() const { return !ArchetypeId.IsNone(); }
 };
 
