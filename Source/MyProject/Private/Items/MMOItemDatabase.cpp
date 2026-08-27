@@ -43,11 +43,13 @@ namespace
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
 		Table.Add(MakeItem(TEXT("IronHelmet"), TEXT("Demir Kask"), S::Helmet, 0.f, 6.f, 3));
+		Table.Add(MakeItem(TEXT("SteelHelmet"), TEXT("Celik Kask"), S::Helmet, 0.f, 7.f, 5));
 		Table.Add(MakeItem(TEXT("DragonHelm"), TEXT("Ejder Kask"), S::Helmet, 0.f, 9.f, 7));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
 		Table.Add(MakeItem(TEXT("IronBoots"), TEXT("Demir Bot"), S::Boots, 0.f, 5.f, 3));
+		Table.Add(MakeItem(TEXT("SteelBoots"), TEXT("Celik Bot"), S::Boots, 0.f, 8.f, 5));
 		Table.Add(MakeItem(TEXT("DragonBoots"), TEXT("Ejder Bot"), S::Boots, 0.f, 12.f, 7));
 
 		return Table;
