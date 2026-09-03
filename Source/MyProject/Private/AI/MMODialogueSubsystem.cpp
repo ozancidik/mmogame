@@ -12,16 +12,22 @@
 
 namespace
 {
-	// Anahtar SADECE ortam degiskeninden okunur; koda gomulmez, .ini'ye yazilmaz.
-	FString GetAnthropicApiKey()
+	// Saglayiciya gore anahtarin okunacagi ortam degiskeninin adi.
+	const TCHAR* ApiKeyEnvVar(EMMOLLMProvider Provider)
 	{
-		return FPlatformMisc::GetEnvironmentVariable(TEXT("ANTHROPIC_API_KEY"));
+		return Provider == EMMOLLMProvider::NVIDIA ? TEXT("NVIDIA_API_KEY") : TEXT("ANTHROPIC_API_KEY");
+	}
+
+	// Anahtar SADECE ortam degiskeninden okunur; koda gomulmez, .ini'ye yazilmaz.
+	FString GetApiKeyFor(EMMOLLMProvider Provider)
+	{
+		return FPlatformMisc::GetEnvironmentVariable(ApiKeyEnvVar(Provider));
 	}
 }
 
 bool UMMODialogueSubsystem::HasApiKey() const
 {
-	return !GetAnthropicApiKey().IsEmpty();
+	return !GetApiKeyFor(Provider).IsEmpty();
 }
 
 void UMMODialogueSubsystem::RequestNpcLine(const FString& NpcName, const FString& NpcRole,
@@ -52,53 +58,88 @@ void UMMODialogueSubsystem::RequestRaw(const FString& SystemPrompt, const FStrin
 void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FString& UserPrompt,
 	FMMOOnDialogueReady OnReady)
 {
-	const FString ApiKey = GetAnthropicApiKey();
+	const FString ApiKey = GetApiKeyFor(Provider);
 	if (ApiKey.IsEmpty())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] ANTHROPIC_API_KEY tanimli degil; istek atlaniyor."));
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] %s tanimli degil; istek atlaniyor."), ApiKeyEnvVar(Provider));
 		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		return;
 	}
 
-	// --- Istek govdesini kur (Messages API) ---
-	// {
-	//   "model": "...", "max_tokens": N,
-	//   "system": "<sistem promptu>",
-	//   "output_config": { "effort": "low" },      // dusuk gecikme
-	//   "messages": [ { "role": "user", "content": "<oyuncu>" } ]
-	// }
-	// NOT: thinking parametresini GONDERMIYORUZ. Opus 5'te dusunme varsayilan
-	// olarak ACIK ve adaptif; kapatmak yerine effort=low ile hizli+ucuz tutuyoruz.
-	const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
-	Root->SetStringField(TEXT("model"), Model);
-	Root->SetNumberField(TEXT("max_tokens"), MaxTokens);
-	Root->SetStringField(TEXT("system"), SystemPrompt);
+	const bool bNvidia = (Provider == EMMOLLMProvider::NVIDIA);
 
-	const TSharedRef<FJsonObject> OutputConfig = MakeShared<FJsonObject>();
-	OutputConfig->SetStringField(TEXT("effort"), Effort);
-	Root->SetObjectField(TEXT("output_config"), OutputConfig);
-
-	const TSharedRef<FJsonObject> UserMsg = MakeShared<FJsonObject>();
-	UserMsg->SetStringField(TEXT("role"), TEXT("user"));
-	UserMsg->SetStringField(TEXT("content"), UserPrompt);
-
-	TArray<TSharedPtr<FJsonValue>> Messages;
-	Messages.Add(MakeShared<FJsonValueObject>(UserMsg));
-	Root->SetArrayField(TEXT("messages"), Messages);
-
+	// --- Istek govdesini saglayiciya gore kur ---
 	FString Body;
-	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Body);
-	FJsonSerializer::Serialize(Root, Writer);
+	FString Url;
+	if (bNvidia)
+	{
+		// NVIDIA NIM = OpenAI-uyumlu /chat/completions:
+		// { "model", "max_tokens", "temperature",
+		//   "messages": [ {role:system,...}, {role:user,...} ] }
+		const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+		Root->SetStringField(TEXT("model"), NvidiaModel);
+		Root->SetNumberField(TEXT("max_tokens"), MaxTokens);
+		Root->SetNumberField(TEXT("temperature"), Temperature);
+
+		const TSharedRef<FJsonObject> SysMsg = MakeShared<FJsonObject>();
+		SysMsg->SetStringField(TEXT("role"), TEXT("system"));
+		SysMsg->SetStringField(TEXT("content"), SystemPrompt);
+		const TSharedRef<FJsonObject> UsrMsg = MakeShared<FJsonObject>();
+		UsrMsg->SetStringField(TEXT("role"), TEXT("user"));
+		UsrMsg->SetStringField(TEXT("content"), UserPrompt);
+
+		TArray<TSharedPtr<FJsonValue>> Messages;
+		Messages.Add(MakeShared<FJsonValueObject>(SysMsg));
+		Messages.Add(MakeShared<FJsonValueObject>(UsrMsg));
+		Root->SetArrayField(TEXT("messages"), Messages);
+
+		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Body);
+		FJsonSerializer::Serialize(Root, Writer);
+		Url = TEXT("https://integrate.api.nvidia.com/v1/chat/completions");
+	}
+	else
+	{
+		// Anthropic Messages API:
+		// { "model", "max_tokens", "system", "output_config":{effort}, "messages":[{user}] }
+		// NOT: thinking parametresini GONDERMIYORUZ; effort=low ile hizli+ucuz tutuyoruz.
+		const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+		Root->SetStringField(TEXT("model"), Model);
+		Root->SetNumberField(TEXT("max_tokens"), MaxTokens);
+		Root->SetStringField(TEXT("system"), SystemPrompt);
+
+		const TSharedRef<FJsonObject> OutputConfig = MakeShared<FJsonObject>();
+		OutputConfig->SetStringField(TEXT("effort"), Effort);
+		Root->SetObjectField(TEXT("output_config"), OutputConfig);
+
+		const TSharedRef<FJsonObject> UserMsg = MakeShared<FJsonObject>();
+		UserMsg->SetStringField(TEXT("role"), TEXT("user"));
+		UserMsg->SetStringField(TEXT("content"), UserPrompt);
+
+		TArray<TSharedPtr<FJsonValue>> Messages;
+		Messages.Add(MakeShared<FJsonValueObject>(UserMsg));
+		Root->SetArrayField(TEXT("messages"), Messages);
+
+		const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Body);
+		FJsonSerializer::Serialize(Root, Writer);
+		Url = TEXT("https://api.anthropic.com/v1/messages");
+	}
 
 	// --- HTTP istegini kur ---
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
-	Request->SetURL(TEXT("https://api.anthropic.com/v1/messages"));
+	Request->SetURL(Url);
 	Request->SetVerb(TEXT("POST"));
-
-	// Zorunlu header'lar: kimlik (x-api-key) + API surumu + icerik tipi.
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-	Request->SetHeader(TEXT("x-api-key"), ApiKey);
-	Request->SetHeader(TEXT("anthropic-version"), TEXT("2023-06-01"));
+	if (bNvidia)
+	{
+		// OpenAI-uyumlu kimlik: Bearer token.
+		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *ApiKey));
+		Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+	}
+	else
+	{
+		Request->SetHeader(TEXT("x-api-key"), ApiKey);
+		Request->SetHeader(TEXT("anthropic-version"), TEXT("2023-06-01"));
+	}
 
 	Request->SetContentAsString(Body);
 	Request->SetTimeout(TimeoutSeconds);
@@ -106,7 +147,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 	// Yanit callback'i. TWeakObjectPtr ile subsystem yok olduysa guvenli kal.
 	TWeakObjectPtr<UMMODialogueSubsystem> WeakThis(this);
 	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, OnReady](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
+		[WeakThis, OnReady, bNvidia](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
 		{
 			// Subsystem yok olduysa (dunya kapandi vs.) hicbir sey yapma — niyet edilen omur korumasi.
 			if (!WeakThis.IsValid())
@@ -132,7 +173,9 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			}
 
 			FString Text, Error;
-			if (ParseResponse(RespBody, Text, Error))
+			const bool bOk = bNvidia ? ParseOpenAIResponse(RespBody, Text, Error)
+			                         : ParseAnthropicResponse(RespBody, Text, Error);
+			if (bOk)
 			{
 				OnReady.ExecuteIfBound(true, Text);
 			}
@@ -146,7 +189,52 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 	Request->ProcessRequest();
 }
 
-bool UMMODialogueSubsystem::ParseResponse(const FString& Body, FString& OutText, FString& OutError)
+bool UMMODialogueSubsystem::ParseOpenAIResponse(const FString& Body, FString& OutText, FString& OutError)
+{
+	// OpenAI/NVIDIA /chat/completions basarili yaniti:
+	// { "choices": [ { "message": { "role":"assistant", "content":"..." },
+	//                  "finish_reason":"stop" } ] }
+	TSharedPtr<FJsonObject> Root;
+	const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	{
+		OutError = TEXT("JSON cozulemedi");
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* Choices = nullptr;
+	if (!Root->TryGetArrayField(TEXT("choices"), Choices) || Choices->Num() == 0)
+	{
+		OutError = TEXT("choices bos");
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject> First = (*Choices)[0]->AsObject();
+	if (!First.IsValid())
+	{
+		OutError = TEXT("choice[0] gecersiz");
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* MsgObj = nullptr;
+	if (!First->TryGetObjectField(TEXT("message"), MsgObj) || !MsgObj->IsValid())
+	{
+		OutError = TEXT("message yok");
+		return false;
+	}
+
+	FString Content;
+	if ((*MsgObj)->TryGetStringField(TEXT("content"), Content) && !Content.TrimStartAndEnd().IsEmpty())
+	{
+		OutText = Content.TrimStartAndEnd();
+		return true;
+	}
+
+	OutError = TEXT("content bos");
+	return false;
+}
+
+bool UMMODialogueSubsystem::ParseAnthropicResponse(const FString& Body, FString& OutText, FString& OutError)
 {
 	// Basarili yanit sekli:
 	// {

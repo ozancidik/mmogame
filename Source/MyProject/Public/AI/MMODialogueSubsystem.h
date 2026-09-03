@@ -9,14 +9,26 @@
 /** LLM cevabi hazir oldugunda cagrilir. bSuccess=false ise Text hata/yedek metindir. */
 DECLARE_DELEGATE_TwoParams(FMMOOnDialogueReady, bool /*bSuccess*/, const FString& /*Text*/);
 
+/** Hangi LLM saglayicisi kullanilacak. */
+UENUM(BlueprintType)
+enum class EMMOLLMProvider : uint8
+{
+	// NVIDIA NIM (build.nvidia.com) - OpenAI uyumlu, ucretsiz katman. Anahtar: NVIDIA_API_KEY.
+	NVIDIA UMETA(DisplayName = "NVIDIA NIM (build.nvidia.com)"),
+	// Anthropic Messages API. Anahtar: ANTHROPIC_API_KEY.
+	Anthropic UMETA(DisplayName = "Anthropic")
+};
+
 /**
- * Oyun ici NPC diyalogu icin Anthropic Messages API istemcisi.
+ * Oyun ici NPC diyalogu icin LLM istemcisi (NVIDIA NIM veya Anthropic).
  *
  * Tasarim:
  *  - SADECE SUNUCUDA calisir. API anahtari istemciye asla gitmez; uretilen metin
  *    Client RPC ile sadece istegi yapan oyuncuya replike edilir.
- *  - Anahtar ANTHROPIC_API_KEY ortam degiskeninden okunur (koda gomulmez, kaydedilmez).
- *  - C++ icin resmi Anthropic SDK'si yok; Unreal'in HTTP modulu ile ham istek atilir.
+ *  - Anahtar ortam degiskeninden okunur (koda gomulmez, kaydedilmez): saglayiciya gore
+ *    NVIDIA_API_KEY veya ANTHROPIC_API_KEY.
+ *  - Resmi C++ SDK yok; Unreal'in HTTP modulu ile ham istek atilir. NVIDIA endpoint'i
+ *    OpenAI /chat/completions formatiyla uyumludur.
  */
 UCLASS()
 class MYPROJECT_API UMMODialogueSubsystem : public UGameInstanceSubsystem
@@ -37,15 +49,30 @@ public:
 	/** Serbest bir soru sorar (test/konsol icin). */
 	void RequestRaw(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady);
 
-	/** ANTHROPIC_API_KEY tanimli mi? (tanimli degilse istek atmayiz) */
+	/** Secili saglayicinin API anahtari tanimli mi? (tanimli degilse istek atmayiz) */
 	bool HasApiKey() const;
 
 	// --- Ayarlar ---
 
-	// Kullanilacak model. Oyun ici diyalogda gecikme onemliyse daha kucuk bir modele
-	// gecmek OYUNCUNUN karari; varsayilan en yetenekli model.
+	// Hangi LLM saglayicisi. Varsayilan NVIDIA NIM (ucretsiz katman). Anthropic'e
+	// gecmek icin NVIDIA yerine Anthropic sec ve ANTHROPIC_API_KEY tanimla.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI")
+	EMMOLLMProvider Provider = EMMOLLMProvider::NVIDIA;
+
+	// Anthropic modeli (Provider=Anthropic iken). Oyun ici gecikme onemliyse daha
+	// kucuk bir modele gecmek OYUNCUNUN karari; varsayilan en yetenekli model.
 	UPROPERTY(EditAnywhere, Category = "MMO|AI")
 	FString Model = TEXT("claude-opus-5");
+
+	// NVIDIA NIM modeli (Provider=NVIDIA iken). OpenAI-uyumlu id. Ucretsiz katman ornekleri:
+	// meta/llama-3.1-8b-instruct (hizli), meta/llama-3.3-70b-instruct (daha kaliteli),
+	// nvidia/llama-3.1-nemotron-70b-instruct. Gecikme oyun ici onemli oldugu icin 8B varsayilan.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI")
+	FString NvidiaModel = TEXT("meta/llama-3.1-8b-instruct");
+
+	// NVIDIA (OpenAI) icin ornekleme sicakligi. Replikleri cesitli ama tutarli tutar.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI")
+	float Temperature = 0.7f;
 
 	// Cikti uzunlugu tavani. DIKKAT: Opus 5'te dusunme (thinking) varsayilan ACIK ve
 	// dusunme + metin BIRLIKTE bu tavana sayilir. Kisa replik icin bile bol birakiyoruz;
@@ -67,6 +94,9 @@ protected:
 	/** Istegi kurar ve gonderir. */
 	void SendRequest(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady);
 
-	/** Yanit govdesinden gorunur metni cikarir. Basarisizsa OutError doldurulur. */
-	static bool ParseResponse(const FString& Body, FString& OutText, FString& OutError);
+	/** Anthropic Messages yanitindan gorunur metni cikarir. Basarisizsa OutError doldurulur. */
+	static bool ParseAnthropicResponse(const FString& Body, FString& OutText, FString& OutError);
+
+	/** NVIDIA/OpenAI /chat/completions yanitindan gorunur metni cikarir. */
+	static bool ParseOpenAIResponse(const FString& Body, FString& OutText, FString& OutError);
 };
