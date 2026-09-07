@@ -52,10 +52,40 @@ struct FMMOMobArchetype
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	FLinearColor Tint = FLinearColor(0.7f, 0.08f, 0.08f);
 
-	// true ise bu mob, tint'li Manny yerine Mixamo "Warrok" ork mesh'ini + kendi
-	// animasyonlarini (idle/kosu/saldiri/olum) kullanir. (Orc/OrcWarrior/OrcWarlord icin.)
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
-	bool bUseWarrokMesh = false;
+	// --- Veri-odakli ozel gorsel (arketip-basina ayarlanabilir) ---
+	// MeshPath bos ise => varsayilan davranis: tint'li Manny (yukaridaki Tint kullanilir).
+	// Doluysa => bu mesh yuklenir, AnimBP yerine single-node ile durum animasyonu oynatilir,
+	// tint UYGULANMAZ. Anim path'leri bos birakilirsa o durum animasyonu atlanir (guvenli).
+	// Yeni yaratik = bu alanlari dolduran SAF VERI satiri (kod degismeden).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	FString MeshPath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	FString AnimIdlePath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	FString AnimRunPath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	FString AnimAttackPath;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	FString AnimDeathPath;
+
+	// Ayak hizasi ofseti (mesh'in dikeyde nereye oturacagi). Mixamo modelde farkli olabilir.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	float MeshOffsetZ = -89.f;
+
+	// Bakis yonu duzeltmesi (mesh yaw offset).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	float MeshYaw = -90.f;
+
+	// Ozel mesh'e uygulanan ek olcek carpani (Scale * MeshScaleMultiplier). Warrok zaten buyuk.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Visual")
+	float MeshScaleMultiplier = 1.f;
+
+	// Bu arketip ozel mesh mi kullaniyor? (MeshPath doluysa true).
+	bool UsesCustomMesh() const { return !MeshPath.IsEmpty(); }
 
 	// --- Yetenekler (buff/debuff sistemi) ---
 	// Elit/boss mu? (daha guclu; ozel muamele/gorsel vurgu icin).

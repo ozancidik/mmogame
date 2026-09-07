@@ -65,20 +65,9 @@ AMMOMob::AMMOMob()
 		MeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	}
 
-	// Warrok (Mixamo ork) mesh + animasyonlarini yukle (orc arketipleri kullanir).
-	// AnimBP yok; single-node ile duruma gore oynatilir.
-	{
-		static ConstructorHelpers::FObjectFinder<USkeletalMesh> WarrokMeshRef(TEXT("/Game/Mixamo/Warrok/Warrok.Warrok"));
-		if (WarrokMeshRef.Succeeded()) { WarrokMesh = WarrokMeshRef.Object; }
-		static ConstructorHelpers::FObjectFinder<UAnimSequence> WIdle(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Idle.Warrok_Idle"));
-		if (WIdle.Succeeded()) { WarrokIdle = WIdle.Object; }
-		static ConstructorHelpers::FObjectFinder<UAnimSequence> WRun(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Run.Warrok_Run"));
-		if (WRun.Succeeded()) { WarrokRun = WRun.Object; }
-		static ConstructorHelpers::FObjectFinder<UAnimSequence> WAtk(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Attack.Warrok_Attack"));
-		if (WAtk.Succeeded()) { WarrokAttack = WAtk.Object; }
-		static ConstructorHelpers::FObjectFinder<UAnimSequence> WDeath(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Death.Warrok_Death"));
-		if (WDeath.Succeeded()) { WarrokDeath = WDeath.Object; }
-	}
+	// Ozel yaratik mesh'i + animasyonlari artik SABIT degil: arketip verisinden (MeshPath /
+	// Anim*Path) ApplyArchetypeVisuals icinde on-demand yuklenir. Boylece yeni yaratik saf
+	// veri satiri olarak eklenebilir (kod degismeden).
 
 	// Moblar oyuncudan biraz daha zayif olsun (stat bileseni temel sinifta olusturuldu).
 	if (Stats)
@@ -207,35 +196,55 @@ void AMMOMob::ApplyArchetype(const FMMOMobArchetype& Arch)
 
 void AMMOMob::ApplyArchetypeVisuals(const FMMOMobArchetype& Arch)
 {
-	SetActorScale3D(FVector(Arch.Scale));
+	// Olcek: temel Scale * ozel-mesh carpani (Manny/tint icin carpan default 1 => degismez).
+	SetActorScale3D(FVector(Arch.Scale * Arch.MeshScaleMultiplier));
 
-	if (Arch.bUseWarrokMesh && WarrokMesh)
+	if (Arch.UsesCustomMesh())
 	{
-		// Ork mesh'ine cevir: kendi materyalini kullan (tint YOK) + AnimBP'yi birak,
-		// single-node animasyona gec. Durum animasyonu Tick/UpdateWarrokAnimation ile surer.
-		bWarrokVisual = true;
-		if (USkeletalMeshComponent* MeshComp = GetMesh())
+		// Mesh'i arketip verisinden on-demand yukle (statik C++ tabloda asset ref tutulmaz).
+		USkeletalMesh* LoadedMesh = LoadObject<USkeletalMesh>(nullptr, *Arch.MeshPath);
+		if (LoadedMesh)
 		{
-			MeshComp->SetSkeletalMesh(WarrokMesh);
-			MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-			CurrentWarrokAnim = nullptr;
-			if (WarrokIdle)
+			// Ozel mesh'e cevir: kendi materyalini kullan (tint YOK) + AnimBP'yi birak,
+			// single-node animasyona gec. Durum animasyonu Tick/UpdateCreatureAnimation ile surer.
+			bCustomMeshVisual = true;
+
+			// Anim setini arketip verisinden yukle (bos path => o durum atlanir, guvenli).
+			AnimIdle = Arch.AnimIdlePath.IsEmpty() ? nullptr : LoadObject<UAnimSequence>(nullptr, *Arch.AnimIdlePath);
+			AnimRun = Arch.AnimRunPath.IsEmpty() ? nullptr : LoadObject<UAnimSequence>(nullptr, *Arch.AnimRunPath);
+			AnimAttack = Arch.AnimAttackPath.IsEmpty() ? nullptr : LoadObject<UAnimSequence>(nullptr, *Arch.AnimAttackPath);
+			AnimDeath = Arch.AnimDeathPath.IsEmpty() ? nullptr : LoadObject<UAnimSequence>(nullptr, *Arch.AnimDeathPath);
+
+			if (USkeletalMeshComponent* MeshComp = GetMesh())
 			{
-				MeshComp->PlayAnimation(WarrokIdle, /*bLooping=*/true);
-				CurrentWarrokAnim = WarrokIdle;
+				MeshComp->SetSkeletalMesh(LoadedMesh);
+				// Arketip-basina ayarlanabilir hizalama (ayak ofseti + bakis yonu duzeltmesi).
+				MeshComp->SetRelativeLocation(FVector(0.f, 0.f, Arch.MeshOffsetZ));
+				MeshComp->SetRelativeRotation(FRotator(0.f, Arch.MeshYaw, 0.f));
+				MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+				CurrentAnim = nullptr;
+				if (AnimIdle)
+				{
+					MeshComp->PlayAnimation(AnimIdle, /*bLooping=*/true);
+					CurrentAnim = AnimIdle;
+				}
 			}
+			return;
 		}
-		return;
+
+		// Yukleme basarisiz (path yanlis/asset yok): guvenle tint'li Manny'ye dus.
+		UE_LOG(LogTemp, Warning, TEXT("AMMOMob: '%s' mesh yuklenemedi (%s), tint'li Manny'ye dusuluyor."),
+			*Arch.Name, *Arch.MeshPath);
 	}
 
 	// Varsayilan: tint'li Manny.
-	bWarrokVisual = false;
+	bCustomMeshVisual = false;
 	ApplyTint(Arch.Tint);
 }
 
-void AMMOMob::UpdateWarrokAnimation()
+void AMMOMob::UpdateCreatureAnimation()
 {
-	if (!bWarrokVisual)
+	if (!bCustomMeshVisual)
 	{
 		return;
 	}
@@ -251,34 +260,34 @@ void AMMOMob::UpdateWarrokAnimation()
 	// Olum her seyi ezer (tek sefer, dongusuz; son karede kalir).
 	if (bDead)
 	{
-		if (WarrokDeath && CurrentWarrokAnim != WarrokDeath)
+		if (AnimDeath && CurrentAnim != AnimDeath)
 		{
-			CurrentWarrokAnim = WarrokDeath;
+			CurrentAnim = AnimDeath;
 			MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-			MeshComp->PlayAnimation(WarrokDeath, /*bLooping=*/false);
+			MeshComp->PlayAnimation(AnimDeath, /*bLooping=*/false);
 		}
 		return;
 	}
 
 	// Saldiri animasyonu oynuyorsa bitene kadar durum animasyonunu ezme.
-	if (Now < WarrokAttackAnimUntil)
+	if (Now < AttackAnimUntil)
 	{
 		return;
 	}
 
 	// Hiz'a gore idle/kosu (hareket tum makinelerde replike; yerel velocity yeterli).
-	UAnimSequence* Desired = (GetVelocity().Size2D() > 12.f) ? WarrokRun : WarrokIdle;
-	if (Desired && Desired != CurrentWarrokAnim)
+	UAnimSequence* Desired = (GetVelocity().Size2D() > 12.f) ? AnimRun : AnimIdle;
+	if (Desired && Desired != CurrentAnim)
 	{
-		CurrentWarrokAnim = Desired;
+		CurrentAnim = Desired;
 		MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 		MeshComp->PlayAnimation(Desired, /*bLooping=*/true);
 	}
 }
 
-void AMMOMob::MulticastPlayWarrokAttack_Implementation()
+void AMMOMob::MulticastPlayCreatureAttack_Implementation()
 {
-	if (!bWarrokVisual || !WarrokAttack)
+	if (!bCustomMeshVisual || !AnimAttack)
 	{
 		return;
 	}
@@ -288,10 +297,10 @@ void AMMOMob::MulticastPlayWarrokAttack_Implementation()
 		return;
 	}
 	MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
-	MeshComp->PlayAnimation(WarrokAttack, /*bLooping=*/false);
-	CurrentWarrokAnim = nullptr; // saldiri bitince durum animasyonu yeniden secilsin
-	const float Len = WarrokAttack->GetPlayLength();
-	WarrokAttackAnimUntil = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) + Len;
+	MeshComp->PlayAnimation(AnimAttack, /*bLooping=*/false);
+	CurrentAnim = nullptr; // saldiri bitince durum animasyonu yeniden secilsin
+	const float Len = AnimAttack->GetPlayLength();
+	AttackAnimUntil = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) + Len;
 }
 
 void AMMOMob::ApplyTint(const FLinearColor& Color)
@@ -314,8 +323,8 @@ void AMMOMob::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	// Warrok animasyonu tum makinelerde (istemci dahil) ve olu iken de guncellenmeli.
-	UpdateWarrokAnimation();
+	// Ozel yaratik animasyonu tum makinelerde (istemci dahil) ve olu iken de guncellenmeli.
+	UpdateCreatureAnimation();
 
 	if (!HasAuthority() || !Stats || Stats->bIsDead)
 	{
@@ -472,8 +481,8 @@ void AMMOMob::Tick(float DeltaSeconds)
 
 			// Mob da vururken animasyon oynatsin (oyuncuyla ayni Mannequin animasyon seti).
 			MulticastMeleeFX(Player->GetActorLocation() + FVector(0.f, 0.f, 40.f), FMath::RandRange(0, 2));
-			// Warrok mob'lari (ork) icin kendi saldiri animasyonu (single-node, tum makinelerde).
-			MulticastPlayWarrokAttack();
+			// Ozel mesh'li mob'lar (or. Warrok ork) icin kendi saldiri animasyonu (single-node, tum makinelerde).
+			MulticastPlayCreatureAttack();
 
 			// Vurusta sansa bagli debuff uygula (or. zehir tukuren mob, yavaslatan orumcek).
 			if (!OnHitEffectId.IsNone() && OnHitEffectChance > 0.f && FMath::FRand() < OnHitEffectChance)
@@ -688,9 +697,9 @@ void AMMOMob::HandleDeath()
 	}
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		// Warrok (ork) mob'lari: mesh'i gizleme; olum animasyonu yok edilene kadar (2sn)
-		// gorunsun. Digerleri (Manny) eskisi gibi aninda gizlenir.
-		if (!bWarrokVisual)
+		// Ozel mesh'li mob'lar (or. Warrok ork): mesh'i gizleme; olum animasyonu yok
+		// edilene kadar (2sn) gorunsun. Digerleri (Manny) eskisi gibi aninda gizlenir.
+		if (!bCustomMeshVisual)
 		{
 			MeshComp->SetVisibility(false);
 		}

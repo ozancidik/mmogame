@@ -106,39 +106,38 @@ protected:
 	UFUNCTION()
 	void OnRep_Archetype();
 
-	// --- Warrok (Mixamo ork) gorseli + AnimBP'siz single-node animasyon ---
-	// Arketip bUseWarrokMesh=true ise mesh Warrok'a cevrilir ve durum (idle/kosu/
-	// saldiri/olum) her makinede tek-dugum animasyonla oynatilir (AnimBP gerekmez).
-	bool bWarrokVisual = false;
+	// --- Veri-odakli ozel yaratik gorseli + AnimBP'siz single-node animasyon ---
+	// Arketipin MeshPath'i doluysa mesh o arketipin verisinden yuklenir ve durum
+	// (idle/kosu/saldiri/olum) her makinede tek-dugum animasyonla oynatilir (AnimBP gerekmez).
+	// MeshPath bos ise varsayilan tint'li Manny davranisi surer.
+	bool bCustomMeshVisual = false;
+
+	// O an yuklenmis olan animasyon seti (arketipten degil, ApplyArchetypeVisuals'ta yuklenir).
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> AnimIdle = nullptr;
 
 	UPROPERTY()
-	TObjectPtr<USkeletalMesh> WarrokMesh = nullptr;
+	TObjectPtr<UAnimSequence> AnimRun = nullptr;
 
 	UPROPERTY()
-	TObjectPtr<UAnimSequence> WarrokIdle = nullptr;
+	TObjectPtr<UAnimSequence> AnimAttack = nullptr;
 
 	UPROPERTY()
-	TObjectPtr<UAnimSequence> WarrokRun = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UAnimSequence> WarrokAttack = nullptr;
-
-	UPROPERTY()
-	TObjectPtr<UAnimSequence> WarrokDeath = nullptr;
+	TObjectPtr<UAnimSequence> AnimDeath = nullptr;
 
 	// O an oynayan durum animasyonu (tekrar tetiklememek icin).
 	UPROPERTY()
-	TObjectPtr<UAnimSequence> CurrentWarrokAnim = nullptr;
+	TObjectPtr<UAnimSequence> CurrentAnim = nullptr;
 
 	// Saldiri animasyonu su ana kadar durum animasyonunu ezmesin (oynayip bitsin).
-	float WarrokAttackAnimUntil = -1.f;
+	float AttackAnimUntil = -1.f;
 
 	// Durum -> animasyon secip (degistiyse) oynatir. Tum makinelerde cagirilir.
-	void UpdateWarrokAnimation();
+	void UpdateCreatureAnimation();
 
 	// Mob vururken saldiri animasyonunu tum makinelerde oynat (server tetikler).
 	UFUNCTION(NetMulticast, Unreliable)
-	void MulticastPlayWarrokAttack();
+	void MulticastPlayCreatureAttack();
 
 	float LastMobAttackTime = -100.f;
 	float LastRepathTime = -100.f;
