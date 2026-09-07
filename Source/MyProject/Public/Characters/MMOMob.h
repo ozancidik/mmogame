@@ -7,6 +7,8 @@
 #include "MMOMob.generated.h"
 
 class AMMOLootPickup;
+class USkeletalMesh;
+class UAnimSequence;
 
 /**
  * Basit dusman NPC'si. MMOCharacter'dan (dolayisiyla stat sisteminden) turer.
@@ -103,6 +105,40 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Archetype();
+
+	// --- Warrok (Mixamo ork) gorseli + AnimBP'siz single-node animasyon ---
+	// Arketip bUseWarrokMesh=true ise mesh Warrok'a cevrilir ve durum (idle/kosu/
+	// saldiri/olum) her makinede tek-dugum animasyonla oynatilir (AnimBP gerekmez).
+	bool bWarrokVisual = false;
+
+	UPROPERTY()
+	TObjectPtr<USkeletalMesh> WarrokMesh = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> WarrokIdle = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> WarrokRun = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> WarrokAttack = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> WarrokDeath = nullptr;
+
+	// O an oynayan durum animasyonu (tekrar tetiklememek icin).
+	UPROPERTY()
+	TObjectPtr<UAnimSequence> CurrentWarrokAnim = nullptr;
+
+	// Saldiri animasyonu su ana kadar durum animasyonunu ezmesin (oynayip bitsin).
+	float WarrokAttackAnimUntil = -1.f;
+
+	// Durum -> animasyon secip (degistiyse) oynatir. Tum makinelerde cagirilir.
+	void UpdateWarrokAnimation();
+
+	// Mob vururken saldiri animasyonunu tum makinelerde oynat (server tetikler).
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayWarrokAttack();
 
 	float LastMobAttackTime = -100.f;
 	float LastRepathTime = -100.f;

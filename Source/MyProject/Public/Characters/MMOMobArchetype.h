@@ -52,6 +52,11 @@ struct FMMOMobArchetype
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	FLinearColor Tint = FLinearColor(0.7f, 0.08f, 0.08f);
 
+	// true ise bu mob, tint'li Manny yerine Mixamo "Warrok" ork mesh'ini + kendi
+	// animasyonlarini (idle/kosu/saldiri/olum) kullanir. (Orc/OrcWarrior/OrcWarlord icin.)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
+	bool bUseWarrokMesh = false;
+
 	// --- Yetenekler (buff/debuff sistemi) ---
 	// Elit/boss mu? (daha guclu; ozel muamele/gorsel vurgu icin).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Ability")

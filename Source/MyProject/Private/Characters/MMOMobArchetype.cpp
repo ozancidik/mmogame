@@ -36,6 +36,7 @@ namespace
 		Table.Add(MakeMob(TEXT("Goblin"),  TEXT("Goblin"),  1,  6,  4,  6.f,  30,  3,  12, 340.f, 900.f, 0.85f, FLinearColor(0.25f, 0.6f, 0.2f)));
 		Table.Add(MakeMob(TEXT("WolfPup"), TEXT("Kurt"),    2,  9,  4,  9.f,  45,  2,  10, 430.f, 1150.f, 0.8f, FLinearColor(0.5f, 0.5f, 0.55f)));
 		Table.Add(MakeMob(TEXT("Orc"),     TEXT("Ork"),     3, 12,  8, 12.f,  75, 10,  30, 300.f, 950.f, 1.05f, FLinearColor(0.7f, 0.1f, 0.1f)));
+		Table.Last().bUseWarrokMesh = true; // Mixamo Warrok ork mesh'i + animasyonlari
 		Table.Add(MakeMob(TEXT("Bandit"),  TEXT("Haydut"),  4, 14,  7, 14.f,  95, 15,  45, 350.f, 1000.f, 1.0f, FLinearColor(0.45f, 0.3f, 0.15f)));
 		// Haydut zehirli hancer kullanir: vurusta %35 sansla zehir.
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
@@ -49,6 +50,7 @@ namespace
 		// --- Ikinci bolge NORMAL moblari (Lv6-7; seviye-bandi spawner ile cikar, rastgele ana havuza band sayesinde sizmaz) ---
 		// Ork Savascisi: Trol'den guclu, disiplinli dovusur; vurusta yaralayip yavaslatir.
 		Table.Add(MakeMob(TEXT("OrcWarrior"), TEXT("Ork Savascisi"), 6, 18, 18, 22.f, 210, 35, 95, 300.f, 950.f, 1.2f, FLinearColor(0.55f, 0.15f, 0.05f)));
+		Table.Last().bUseWarrokMesh = true; // Mixamo Warrok ork mesh'i + animasyonlari
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.3f;
 
@@ -78,6 +80,7 @@ namespace
 
 		// Ork Reisi (boss): guclu, zehir tukurur ve dusuk canda ofkelenir.
 		Table.Add(MakeMob(TEXT("OrcWarlord"), TEXT("Ork Reisi"), 6, 22, 28, 24.f, 420, 80, 200, 300.f, 1200.f, 1.7f, FLinearColor(0.6f, 0.05f, 0.05f)));
+		Table.Last().bUseWarrokMesh = true; // Mixamo Warrok ork mesh'i + animasyonlari
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.4f;

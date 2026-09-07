@@ -18,6 +18,7 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimSequence.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -62,6 +63,21 @@ AMMOMob::AMMOMob()
 		MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 		MeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
 		MeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	}
+
+	// Warrok (Mixamo ork) mesh + animasyonlarini yukle (orc arketipleri kullanir).
+	// AnimBP yok; single-node ile duruma gore oynatilir.
+	{
+		static ConstructorHelpers::FObjectFinder<USkeletalMesh> WarrokMeshRef(TEXT("/Game/Mixamo/Warrok/Warrok.Warrok"));
+		if (WarrokMeshRef.Succeeded()) { WarrokMesh = WarrokMeshRef.Object; }
+		static ConstructorHelpers::FObjectFinder<UAnimSequence> WIdle(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Idle.Warrok_Idle"));
+		if (WIdle.Succeeded()) { WarrokIdle = WIdle.Object; }
+		static ConstructorHelpers::FObjectFinder<UAnimSequence> WRun(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Run.Warrok_Run"));
+		if (WRun.Succeeded()) { WarrokRun = WRun.Object; }
+		static ConstructorHelpers::FObjectFinder<UAnimSequence> WAtk(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Attack.Warrok_Attack"));
+		if (WAtk.Succeeded()) { WarrokAttack = WAtk.Object; }
+		static ConstructorHelpers::FObjectFinder<UAnimSequence> WDeath(TEXT("/Game/Mixamo/Warrok/Anims/Warrok_Death.Warrok_Death"));
+		if (WDeath.Succeeded()) { WarrokDeath = WDeath.Object; }
 	}
 
 	// Moblar oyuncudan biraz daha zayif olsun (stat bileseni temel sinifta olusturuldu).
@@ -192,7 +208,90 @@ void AMMOMob::ApplyArchetype(const FMMOMobArchetype& Arch)
 void AMMOMob::ApplyArchetypeVisuals(const FMMOMobArchetype& Arch)
 {
 	SetActorScale3D(FVector(Arch.Scale));
+
+	if (Arch.bUseWarrokMesh && WarrokMesh)
+	{
+		// Ork mesh'ine cevir: kendi materyalini kullan (tint YOK) + AnimBP'yi birak,
+		// single-node animasyona gec. Durum animasyonu Tick/UpdateWarrokAnimation ile surer.
+		bWarrokVisual = true;
+		if (USkeletalMeshComponent* MeshComp = GetMesh())
+		{
+			MeshComp->SetSkeletalMesh(WarrokMesh);
+			MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			CurrentWarrokAnim = nullptr;
+			if (WarrokIdle)
+			{
+				MeshComp->PlayAnimation(WarrokIdle, /*bLooping=*/true);
+				CurrentWarrokAnim = WarrokIdle;
+			}
+		}
+		return;
+	}
+
+	// Varsayilan: tint'li Manny.
+	bWarrokVisual = false;
 	ApplyTint(Arch.Tint);
+}
+
+void AMMOMob::UpdateWarrokAnimation()
+{
+	if (!bWarrokVisual)
+	{
+		return;
+	}
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+	{
+		return;
+	}
+
+	const bool bDead = (Stats && Stats->bIsDead);
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+
+	// Olum her seyi ezer (tek sefer, dongusuz; son karede kalir).
+	if (bDead)
+	{
+		if (WarrokDeath && CurrentWarrokAnim != WarrokDeath)
+		{
+			CurrentWarrokAnim = WarrokDeath;
+			MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+			MeshComp->PlayAnimation(WarrokDeath, /*bLooping=*/false);
+		}
+		return;
+	}
+
+	// Saldiri animasyonu oynuyorsa bitene kadar durum animasyonunu ezme.
+	if (Now < WarrokAttackAnimUntil)
+	{
+		return;
+	}
+
+	// Hiz'a gore idle/kosu (hareket tum makinelerde replike; yerel velocity yeterli).
+	UAnimSequence* Desired = (GetVelocity().Size2D() > 12.f) ? WarrokRun : WarrokIdle;
+	if (Desired && Desired != CurrentWarrokAnim)
+	{
+		CurrentWarrokAnim = Desired;
+		MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		MeshComp->PlayAnimation(Desired, /*bLooping=*/true);
+	}
+}
+
+void AMMOMob::MulticastPlayWarrokAttack_Implementation()
+{
+	if (!bWarrokVisual || !WarrokAttack)
+	{
+		return;
+	}
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
+	{
+		return;
+	}
+	MeshComp->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	MeshComp->PlayAnimation(WarrokAttack, /*bLooping=*/false);
+	CurrentWarrokAnim = nullptr; // saldiri bitince durum animasyonu yeniden secilsin
+	const float Len = WarrokAttack->GetPlayLength();
+	WarrokAttackAnimUntil = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) + Len;
 }
 
 void AMMOMob::ApplyTint(const FLinearColor& Color)
@@ -214,6 +313,9 @@ void AMMOMob::ApplyTint(const FLinearColor& Color)
 void AMMOMob::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Warrok animasyonu tum makinelerde (istemci dahil) ve olu iken de guncellenmeli.
+	UpdateWarrokAnimation();
 
 	if (!HasAuthority() || !Stats || Stats->bIsDead)
 	{
@@ -370,6 +472,8 @@ void AMMOMob::Tick(float DeltaSeconds)
 
 			// Mob da vururken animasyon oynatsin (oyuncuyla ayni Mannequin animasyon seti).
 			MulticastMeleeFX(Player->GetActorLocation() + FVector(0.f, 0.f, 40.f), FMath::RandRange(0, 2));
+			// Warrok mob'lari (ork) icin kendi saldiri animasyonu (single-node, tum makinelerde).
+			MulticastPlayWarrokAttack();
 
 			// Vurusta sansa bagli debuff uygula (or. zehir tukuren mob, yavaslatan orumcek).
 			if (!OnHitEffectId.IsNone() && OnHitEffectChance > 0.f && FMath::FRand() < OnHitEffectChance)
@@ -584,7 +688,12 @@ void AMMOMob::HandleDeath()
 	}
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		MeshComp->SetVisibility(false);
+		// Warrok (ork) mob'lari: mesh'i gizleme; olum animasyonu yok edilene kadar (2sn)
+		// gorunsun. Digerleri (Manny) eskisi gibi aninda gizlenir.
+		if (!bWarrokVisual)
+		{
+			MeshComp->SetVisibility(false);
+		}
 	}
 
 	// Kisa gecikmeyle yok et; spawner top-up ile yerine yenisini uretir.

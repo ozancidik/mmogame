@@ -29,6 +29,9 @@ Build/
 Plugins/*/Binaries/
 Plugins/*/Intermediate/
 
+# Raw DCC source (FBX staging) - imported .uasset lives in Content/, so raw is redundant
+Art/
+
 # Compiled source
 *.pyc
 
