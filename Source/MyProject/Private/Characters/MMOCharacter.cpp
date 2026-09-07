@@ -592,8 +592,19 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 
 void AMMOCharacter::ServerAttackTarget_Implementation(AMMOCharacter* Target)
 {
-	// Sunucudaki kopyada cooldown'u bu cagri icin bosa al (istemci kapisi zaten uyguladi).
-	LastMeleeTime = -100.f;
+	// Sunucu-OTORITER cooldown: istemcinin dogru cadence'te gonderdigine GUVENME.
+	// (Eskiden LastMeleeTime=-100 yapiliyordu => kapi hic tetiklenmiyor, hilelı/
+	// laglı istemci sinirsiz DPS atabiliyordu.) Ag jitter'i icin %10 tolerans birak;
+	// cok erken gelen istegi sessizce reddet.
+	const UWorld* W = GetWorld();
+	const float Now = W ? W->GetTimeSeconds() : 0.f;
+	if (Now - LastMeleeTime < MeleeCooldown * 0.9f)
+	{
+		return;
+	}
+	// AttackTarget kendi kapisini (Now - LastMeleeTime < MeleeCooldown) yeniden uygular;
+	// tam gecmesi icin LastMeleeTime'i bir cooldown geriye al, o da LastMeleeTime=Now yapar.
+	LastMeleeTime = Now - MeleeCooldown;
 	AttackTarget(Target);
 }
 

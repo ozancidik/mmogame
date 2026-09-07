@@ -539,7 +539,12 @@ void AMMOMob::HandleDeath()
 	}
 	bDeathHandled = true;
 
+	// XP/loot/yok-etme YALNIZCA sunucuda. Bu fonksiyon istemcide de calisir
+	// (bIsDead replike -> OnRep_IsDead -> OnDeath.Broadcast -> HandleDeath), o yuzden
+	// authority guard'i olmadan uzak istemcide hayalet loot ve istemci-Destroy olusur.
+
 	// Olduren oyuncuya (ve partisi varsa menzildeki uyelere) XP + gorev ilerlemesi ver.
+	if (HasAuthority())
 	if (AMMOCharacter* Killer = Cast<AMMOCharacter>(LastDamageInstigator.Get()))
 	{
 		const float PartyXPShareRange = 3000.f;
@@ -571,7 +576,8 @@ void AMMOMob::HandleDeath()
 		}
 	}
 
-	// Loot dusur (altin + sansa bagli item).
+	// Loot dusur (altin + sansa bagli item) — YALNIZCA sunucuda (hayalet istemci loot'u olmasin).
+	if (HasAuthority())
 	if (UWorld* World = GetWorld())
 	{
 		TSubclassOf<AMMOLootPickup> LootClass = LootPickupClass;
@@ -705,9 +711,13 @@ void AMMOMob::HandleDeath()
 		}
 	}
 
-	// Kisa gecikmeyle yok et; spawner top-up ile yerine yenisini uretir.
-	FTimerHandle DestroyTimer;
-	GetWorldTimerManager().SetTimer(DestroyTimer, this, &AMMOMob::DestroySelf, 2.0f, false);
+	// Kisa gecikmeyle yok et; spawner top-up ile yerine yenisini uretir. YALNIZCA sunucuda:
+	// aktoru sunucu yok eder, replikasyon istemcilerde de siler (istemci Destroy'u yanlis).
+	if (HasAuthority())
+	{
+		FTimerHandle DestroyTimer;
+		GetWorldTimerManager().SetTimer(DestroyTimer, this, &AMMOMob::DestroySelf, 2.0f, false);
+	}
 }
 
 void AMMOMob::DestroySelf()

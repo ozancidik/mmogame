@@ -383,8 +383,21 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 
 void UMMOSkillComponent::ServerUseSkill_Implementation(FName SkillId)
 {
-	// Istemci kapilari gecti; sunucu kendi cooldown kopyasini bu istek icin sifirlar
-	// (saat farki yuzunden mesru istegin reddedilmemesi icin) ve dogrulamayi yapar.
+	// Sunucu-OTORITER cooldown: istemcinin dogru cadence'te gonderdigine GUVENME.
+	// (Eskiden kosulsuz Remove yapiliyordu => sunucuda cooldown yok, sadece mana
+	// sinirliyordu; hilelı istemci skill spamlayabiliyordu.) Saat farki/jitter icin
+	// kucuk grace (0.1s) birak; cooldown hala doluysa istegi sessizce reddet.
+	UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (const float* End = CooldownEndTimes.Find(SkillId))
+	{
+		if (Now < *End - 0.1f)
+		{
+			return; // cooldown dolmadi (otorite reddi)
+		}
+	}
+	// UseSkill kendi kapisini yeniden uygular; cakismamasi icin kaydi temizle,
+	// UseSkill mana harcayip etkiyi calistirir ve cooldown'u yeniden yazar.
 	CooldownEndTimes.Remove(SkillId);
 	UseSkill(SkillId);
 }
