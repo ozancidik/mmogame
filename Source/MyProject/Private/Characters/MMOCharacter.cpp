@@ -757,6 +757,16 @@ void AMMOCharacter::MMOStat(const FString& StatName)
 
 void AMMOCharacter::MMONpcTalk()
 {
+	// Bu Exec komutu client-side calisir (RPC degil), o yuzden kendi cooldown'unu
+	// tutar — yoksa konsoldan spamlanirsa sinirsiz eszamanli/ucretli LLM istegi atilir.
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (Now - LastNpcTalkDebugTime < NpcTalkDebugCooldown)
+	{
+		return;
+	}
+	LastNpcTalkDebugTime = Now;
+
 	UGameInstance* GI = GetGameInstance();
 	UMMODialogueSubsystem* Dialogue = GI ? GI->GetSubsystem<UMMODialogueSubsystem>() : nullptr;
 	if (!Dialogue)

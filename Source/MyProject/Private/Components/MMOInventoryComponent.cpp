@@ -560,9 +560,19 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	EquipmentBag = In.EquipmentBag;
 	NextInstanceId = FMath::Max(1, In.NextInstanceId);
 
-	// Kusanilan dizi her zaman 4 slot olmali.
+	// Kusanilan dizi her zaman MAX (4) slot olmali. Kayittaki dizi daha uzunsa (bozuk/
+	// eski-surum kayit), fazla girdileri sessizce ATMA — gecerliyse cantaya geri koy
+	// (aksi halde SetNum onlari kirpip kalici item kaybina yol acardi).
 	EquippedItems = In.EquippedItems;
-	EquippedItems.SetNum((int32)EMMOEquipSlot::MAX);
+	const int32 MaxSlots = (int32)EMMOEquipSlot::MAX;
+	for (int32 i = MaxSlots; i < EquippedItems.Num(); ++i)
+	{
+		if (EquippedItems[i].IsValidInstance())
+		{
+			EquipmentBag.Add(EquippedItems[i]);
+		}
+	}
+	EquippedItems.SetNum(MaxSlots);
 
 	RecomputeEquipmentBonuses();
 	OnGoldChanged.Broadcast(Gold);

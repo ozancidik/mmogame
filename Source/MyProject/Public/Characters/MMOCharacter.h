@@ -188,11 +188,18 @@ public:
 	void MMOStat(const FString& StatName);
 
 	// Konsol: "MMONpcTalk" — LLM'den ornek bir NPC replik ister, ekrana/loga basar.
-	// (Oyun ici LLM entegrasyonu testi. ANTHROPIC_API_KEY tanimli olmali.)
+	// (Oyun ici LLM entegrasyonu testi. NVIDIA_API_KEY/ANTHROPIC_API_KEY tanimli olmali.)
+	// NOT: bu Exec komutu client-side calisir (RPC degil, HasAuthority kontrolu yok) —
+	// spam'i onlemek icin kendi cooldown'unu tutar (bkz. LastNpcTalkDebugTime).
 	UFUNCTION(Exec)
 	void MMONpcTalk();
 
 protected:
+	// "MMONpcTalk" debug komutunun spam korumasi (client-side, RPC olmadigi icin
+	// sunucu-tarafi mesafe/cooldown guard'lari devreye girmiyor — bkz. MMONpcTalk).
+	float LastNpcTalkDebugTime = -100.f;
+	static constexpr float NpcTalkDebugCooldown = 2.f;
+
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
