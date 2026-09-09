@@ -142,6 +142,18 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 		return;
 	}
 
+	// Tek-sefer guard: Destroy() ayni frame'de senkron degil; grant'tan ONCE isaretle ve
+	// bir daha overlap event'i uretmesin diye collision'i kapat (dupe onlemi).
+	if (bCollected)
+	{
+		return;
+	}
+	bCollected = true;
+	if (Collision)
+	{
+		Collision->SetGenerateOverlapEvents(false);
+	}
+
 	if (bIsGold)
 	{
 		Inv->AddGold(GoldAmount);

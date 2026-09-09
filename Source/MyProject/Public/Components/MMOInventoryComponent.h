@@ -130,6 +130,10 @@ protected:
 	bool HasAuthorityInternal() const;
 	bool IsLocallyControlledOwner() const;
 
+	// Sahip, MaxDist icinde bir satici NPC'ye yakin mi? Satin-al/sat RPC'lerinin
+	// sunucu-tarafi dogrulamasi (client satici olmadan her yerden alisveris yapamasin).
+	bool IsOwnerNearVendor(float MaxDist = 800.f) const;
+
 	// Kusanilanlarin toplam bonusunu stat bilesenine isler (sunucu).
 	void RecomputeEquipmentBonuses();
 

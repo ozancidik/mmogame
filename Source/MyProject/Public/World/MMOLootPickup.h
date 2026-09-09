@@ -75,4 +75,9 @@ protected:
 	void ApplyVisual();
 
 	float BobTime = 0.f;
+
+	// Tek-sefer toplama guard'i: Destroy() ayni frame'de senkron olmadigindan, ayni
+	// frame'de gelen ikinci bir overlap (iki oyuncu veya cok-govde) lootu DUPE edebilir.
+	// grant'tan ONCE set edilir; ikinci overlap erken doner. (Sunucu-tarafi.)
+	bool bCollected = false;
 };

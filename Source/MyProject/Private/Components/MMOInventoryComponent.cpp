@@ -10,6 +10,9 @@
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "World/MMOVendorNPC.h"
 
 UMMOInventoryComponent::UMMOInventoryComponent()
 {
@@ -328,6 +331,26 @@ void UMMOInventoryComponent::ServerTryUpgrade_Implementation(int32 BagIndex)
 	TryUpgrade(BagIndex);
 }
 
+bool UMMOInventoryComponent::IsOwnerNearVendor(float MaxDist) const
+{
+	const AActor* OwnerActor = GetOwner();
+	const UWorld* World = GetWorld();
+	if (!OwnerActor || !World)
+	{
+		return false;
+	}
+	const FVector Loc = OwnerActor->GetActorLocation();
+	const float MaxDistSq = MaxDist * MaxDist;
+	for (TActorIterator<AMMOVendorNPC> It(World); It; ++It)
+	{
+		if (*It && FVector::DistSquared(Loc, (*It)->GetActorLocation()) <= MaxDistSq)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 {
 	const FMMOItemDef* Def = FMMOItemDatabase::Find(ItemId);
@@ -339,6 +362,17 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	if (!HasAuthorityInternal())
 	{
 		ServerBuyEquipment(ItemId);
+		return;
+	}
+
+	// Sunucu-otoriter dogrulama: alisveris ancak bir saticinin yakininda yapilabilir
+	// (hileli istemci satici olmadan her yerden alisveris RPC'si atmasin).
+	if (!IsOwnerNearVendor())
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
+		}
 		return;
 	}
 
@@ -376,6 +410,15 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 		return;
 	}
 
+	if (!IsOwnerNearVendor())
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
+		}
+		return;
+	}
+
 	const int32 Price = FMMOItemDatabase::PotionPrice * Count;
 	if (Gold < Price)
 	{
@@ -407,6 +450,15 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 	if (!HasAuthorityInternal())
 	{
 		ServerBuyConsumable(ItemId, Count);
+		return;
+	}
+
+	if (!IsOwnerNearVendor())
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
+		}
 		return;
 	}
 
@@ -450,6 +502,15 @@ void UMMOInventoryComponent::SellEquipment(int32 BagIndex)
 	if (!HasAuthorityInternal())
 	{
 		ServerSellEquipment(BagIndex);
+		return;
+	}
+
+	if (!IsOwnerNearVendor())
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
+		}
 		return;
 	}
 
