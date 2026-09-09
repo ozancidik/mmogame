@@ -46,14 +46,16 @@ void AMMOGameMode::SpawnMobArea()
 		break;
 	}
 
-	// Oyuncunun baktigi yonde biraz ilerisine spawner koy (test icin yakin).
+	// Ana mob alani: NPC hub'inin (Kael +400u) belirgin disinda kalsin diye 1.5x mesafede
+	// ve dar yaricapla (350) — moblar meydanda/NPC'lerin arasinda degil, disarida cikar.
 	// Ana spawner Lv1-5 normalleriyle sinirli (MaxMobLevel=5): yeni Lv6-7 moblar baslangic havuzuna sizmasin.
-	const FVector SpawnerLoc = Origin + Facing.Vector() * MobAreaDistance + FVector(0.f, 0.f, 50.f);
+	const FVector SpawnerLoc = Origin + Facing.Vector() * (MobAreaDistance * 1.5f) + FVector(0.f, 0.f, 50.f);
 	const FTransform SpawnerTM(FRotator::ZeroRotator, SpawnerLoc);
 	AMMOMobSpawner* Spawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SpawnerTM);
 	if (Spawner)
 	{
 		Spawner->MaxMobLevel = 5;
+		Spawner->SpawnRadius = 350.f;
 		UGameplayStatics::FinishSpawningActor(Spawner, SpawnerTM);
 	}
 
