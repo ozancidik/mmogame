@@ -10,111 +10,8 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
-#include "Engine/StaticMesh.h"
-#include "Engine/StaticMeshActor.h"
-#include "Components/StaticMeshComponent.h"
-#include "Materials/MaterialInterface.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
-#include "CollisionQueryParams.h"
-
-namespace
-{
-	// Greybox prototip kasaba icin tek bir kutu blok spawn eder: olcekli, carpisan, renkli.
-	// Runtime (StaticMeshActor Movable). NOT: yalnizca sunucuda (GameMode) spawn olur; listen
-	// server host'unda ve tek-oyunculuda gorunur. Tam MP icin gercek harita LEVEL'a baked olacak.
-	void SpawnTownBlock(UWorld* World, UStaticMesh* Cube, UMaterialInterface* BaseMat,
-		const FVector& Center, const FVector& Scale, const FLinearColor& Color)
-	{
-		if (!World || !Cube)
-		{
-			return;
-		}
-		AStaticMeshActor* A = World->SpawnActor<AStaticMeshActor>(
-			AStaticMeshActor::StaticClass(), FTransform(FRotator::ZeroRotator, Center));
-		if (!A)
-		{
-			return;
-		}
-		A->SetMobility(EComponentMobility::Movable);
-		if (UStaticMeshComponent* MC = A->GetStaticMeshComponent())
-		{
-			MC->SetStaticMesh(Cube);
-			MC->SetWorldScale3D(Scale);
-			MC->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-			MC->SetCollisionProfileName(TEXT("BlockAll"));
-			if (BaseMat)
-			{
-				if (UMaterialInstanceDynamic* MID = MC->CreateAndSetMaterialInstanceDynamic(0))
-				{
-					MID->SetVectorParameterValue(TEXT("Color"), Color);
-				}
-			}
-		}
-	}
-
-	// PlayerStart cevresine greybox prototip kasaba: surlar + kapi (mob yonune, +X) + bina bloklari.
-	// Zemin Z'si asagi line-trace ile bulunur (float/gomulme olmasin). Konumlar Origin'e goredir;
-	// NPC hub'i (X in [-250,400], Y in [-200,200]) ve kapi koridoru (+X, |Y|<260) bos birakilir.
-	void SpawnTownGeometry(UWorld* World, const FVector& Origin)
-	{
-		if (!World)
-		{
-			return;
-		}
-		UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-		if (!Cube)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[MMODBG] Town: Cube mesh yuklenemedi, greybox atlaniyor"));
-			return;
-		}
-
-		// Zemin Z: Origin'den asagi trace. Bulunamazsa Origin.Z kullan.
-		float GroundZ = Origin.Z;
-		FHitResult Hit;
-		FCollisionQueryParams Params(SCENE_QUERY_STAT(MMOTownGround), false);
-		if (World->LineTraceSingleByChannel(Hit, Origin + FVector(0.f, 0.f, 300.f),
-			Origin - FVector(0.f, 0.f, 3000.f), ECC_WorldStatic, Params))
-		{
-			GroundZ = Hit.Location.Z;
-		}
-
-		// Yardimci: (X,Y) Origin-goreli, olcek (Sx,Sy,Sz) => boyut 100*S; blok zemine oturur.
-		auto Block = [&](float X, float Y, float Sx, float Sy, float Sz, const FLinearColor& C)
-		{
-			const float SizeZ = 100.f * Sz;
-			const FVector Center(Origin.X + X, Origin.Y + Y, GroundZ + SizeZ * 0.5f);
-			SpawnTownBlock(World, Cube, Mat, Center, FVector(Sx, Sy, Sz), C);
-		};
-
-		const FLinearColor WallCol(0.42f, 0.42f, 0.46f);
-		const FLinearColor PostCol(0.28f, 0.26f, 0.24f);
-		const FLinearColor House1(0.55f, 0.42f, 0.30f);
-		const FLinearColor House2(0.48f, 0.40f, 0.34f);
-
-		// --- Surlar: 2800x2800 kare (kalinlik 80, yukseklik 400) ---
-		Block(0.f,     1400.f, 28.8f, 0.8f, 4.f, WallCol);  // kuzey (+Y)
-		Block(0.f,    -1400.f, 28.8f, 0.8f, 4.f, WallCol);  // guney (-Y)
-		Block(-1400.f, 0.f,    0.8f, 28.8f, 4.f, WallCol);  // bati (-X)
-		// Dogu duvari (+X, mob yonu) kapi bosluklu: iki segment (bosluk Y in [-260,260]).
-		Block(1400.f,  830.f,  0.8f, 11.4f, 4.f, WallCol);  // dogu-kuzey (Y 260..1400)
-		Block(1400.f, -830.f,  0.8f, 11.4f, 4.f, WallCol);  // dogu-guney (Y -1400..-260)
-		// Kapi direkleri (bosluk kenarlari), daha yuksek + koyu.
-		Block(1400.f,  270.f,  1.2f, 1.2f, 6.5f, PostCol);
-		Block(1400.f, -270.f,  1.2f, 1.2f, 6.5f, PostCol);
-
-		// --- Bina bloklari (NPC hub'i ve kapi koridoru disinda) ---
-		Block(-1050.f,  850.f, 6.f, 5.f, 5.f, House1);
-		Block(-1050.f, -850.f, 6.f, 5.f, 6.f, House2);
-		Block(-1050.f,    0.f, 5.f, 7.f, 5.f, House1);  // bati buyuk ev
-		Block(  150.f, 1050.f, 7.f, 5.f, 5.f, House2);  // kuzey ev (NPC hub Y<=200'un uzerinde)
-		Block(  150.f,-1050.f, 7.f, 5.f, 6.f, House1);  // guney ev
-		Block(  950.f,  950.f, 5.f, 5.f, 7.f, House2);  // KD kule
-		Block(  950.f, -950.f, 5.f, 5.f, 5.f, House1);  // GD ev
-	}
-}
 
 AMMOGameMode::AMMOGameMode()
 {
@@ -148,9 +45,6 @@ void AMMOGameMode::SpawnMobArea()
 		bFoundStart = true;
 		break;
 	}
-
-	// Greybox prototip kasaba (surlar + kapi + binalar) — gercek harita gelene kadar iskelet.
-	SpawnTownGeometry(World, Origin);
 
 	// Oyuncunun baktigi yonde biraz ilerisine spawner koy (test icin yakin).
 	// Ana spawner Lv1-5 normalleriyle sinirli (MaxMobLevel=5): yeni Lv6-7 moblar baslangic havuzuna sizmasin.
