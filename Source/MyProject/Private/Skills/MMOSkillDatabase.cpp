@@ -48,6 +48,9 @@ namespace
 			E::AoESelf, 16.f, 6.f, 28.f, 0.f, 320.f));
 		Table.Add(MakeDef(TEXT("War_MortalBlow"), TEXT("Olumcul Darbe"), C::Warrior, T::Special0, 5, 2, TEXT("War_Cleave"),
 			E::MeleeDamage, 22.f, 8.f, 75.f, 240.f, 0.f));
+		// Kan Firtinasi: Olumcul Darbe zincirinin devami, etrafindaki herkesi bicer.
+		Table.Add(MakeDef(TEXT("War_BloodStorm"), TEXT("Kan Firtinasi"), C::Warrior, T::Special0, 7, 2, TEXT("War_MortalBlow"),
+			E::AoESelf, 30.f, 14.f, 55.f, 0.f, 340.f));
 		Table.Add(MakeDef(TEXT("War_BloodDrain"), TEXT("Kan Emme"), C::Warrior, T::Special1, 4, 1, TEXT(""),
 			E::HealSelf, 10.f, 10.f, 50.f, 0.f, 0.f));
 		// Buff: saldiri gucu artisi (Ofke).
@@ -67,6 +70,9 @@ namespace
 			E::RangedDamage, 14.f, 5.f, 60.f, 1600.f, 0.f, TEXT("Poison")));
 		Table.Add(MakeDef(TEXT("Arc_ArrowRain"), TEXT("Ok Yagmuru"), C::Archer, T::Special0, 5, 2, TEXT("Arc_PoisonArrow"),
 			E::AoETarget, 22.f, 10.f, 40.f, 1600.f, 360.f));
+		// Delici Atis: tek hedefe agir hasar, vurdugu hedefi yavaslatir (Slow).
+		Table.Add(MakeDef(TEXT("Arc_PiercingShot"), TEXT("Delici Atis"), C::Archer, T::Special0, 7, 2, TEXT("Arc_ArrowRain"),
+			E::RangedDamage, 26.f, 9.f, 95.f, 1700.f, 0.f, TEXT("Slow")));
 		// Buff: hareket hizi (Hiz).
 		Table.Add(MakeDef(TEXT("Arc_Sprint"), TEXT("Kosu"), C::Archer, T::Special1, 3, 1, TEXT(""),
 			E::BuffSelf, 12.f, 16.f, 0.f, 0.f, 0.f, TEXT("Haste")));
@@ -81,6 +87,9 @@ namespace
 			E::AoESelf, 20.f, 6.f, 45.f, 0.f, 360.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Mag_Meteor"), TEXT("Meteor"), C::Mage, T::Special0, 6, 2, TEXT("Mag_Fireball"),
 			E::AoETarget, 38.f, 12.f, 95.f, 1500.f, 420.f));
+		// Zincir Yildirim: tek hedefe buyucunun en agir vurusu, carptigi hedefi felce ugratir (Slow).
+		Table.Add(MakeDef(TEXT("Mag_ChainLightning"), TEXT("Zincir Yildirim"), C::Mage, T::Special0, 8, 2, TEXT("Mag_Meteor"),
+			E::RangedDamage, 42.f, 10.f, 130.f, 1600.f, 0.f, TEXT("Slow")));
 
 		// --- PRIEST ---
 		Table.Add(MakeDef(TEXT("Pri_HolyLight"), TEXT("Kutsal Isik"), C::Priest, T::Basic, 1, 1, TEXT(""),
@@ -91,6 +100,9 @@ namespace
 			E::AoESelf, 25.f, 8.f, 48.f, 0.f, 320.f));
 		Table.Add(MakeDef(TEXT("Pri_GreaterHeal"), TEXT("Buyuk Sifa"), C::Priest, T::Special1, 5, 2, TEXT("Pri_HolyLight"),
 			E::HealSelf, 40.f, 12.f, 150.f, 0.f, 0.f));
+		// Ilahi Sifa: Buyuk Sifa'nin ustu; aninda buyuk iyilestirme + uzerine Yenilenme HoT.
+		Table.Add(MakeDef(TEXT("Pri_DivineRestoration"), TEXT("Ilahi Sifa"), C::Priest, T::Special1, 7, 2, TEXT("Pri_GreaterHeal"),
+			E::HealSelf, 55.f, 20.f, 180.f, 0.f, 0.f, TEXT("Regen")));
 		// Buff: zamanla iyilesme (Yenilenme HoT).
 		Table.Add(MakeDef(TEXT("Pri_Renew"), TEXT("Yenilenme"), C::Priest, T::Special0, 3, 1, TEXT(""),
 			E::BuffSelf, 18.f, 12.f, 0.f, 0.f, 0.f, TEXT("Regen")));
