@@ -952,8 +952,14 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 	DrawText(FString::Printf(TEXT("CANTA (%d)"), Inv->EquipmentBag.Num()), FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
 	RowY += 20.f;
 
-	const int32 MaxRows = 8;
-	const int32 ShowCount = FMath::Min(Inv->EquipmentBag.Num(), MaxRows);
+	// TUM canta icerigini goster (artik AddEquipmentInstance sunucu tarafinda MaxBagSize'a
+	// sinirli oldugu icin guvenli); satir yuksekligini kalan alana gore kucult — eski sabit
+	// MaxRows=8 kirpmasi, siniri asan itemleri hicbir UI eyleminden erisilemez birakiyordu
+	// (bug-hunt). Shop/quest penceresindeki "tasma yok" deseniyle ayni.
+	const int32 ShowCount = Inv->EquipmentBag.Num();
+	const float BagAvailH = (PY + PH - 12.f) - RowY;
+	const float BagRowH = FMath::Min(RowH, BagAvailH / (float)FMath::Max(1, ShowCount));
+	const float BagCellH = FMath::Max(1.f, BagRowH - 4.f);
 	for (int32 i = 0; i < ShowCount; ++i)
 	{
 		const FMMOEquipmentInstance& Inst = Inv->EquipmentBag[i];
@@ -964,11 +970,11 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		}
 
 		const bool bMaxed = Inst.Plus >= FMMOItemDatabase::MaxPlus;
-		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), RowX, RowY, RowW, RowH - 4.f);
+		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), RowX, RowY, RowW, BagCellH);
 
 		FMMOClickRegion R;
 		R.Slot = i;
-		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + RowH - 4.f));
+		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + BagCellH));
 		InvBagRegions.Add(R);
 
 		const float RM = FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity);
@@ -992,15 +998,10 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		}
 
 		DrawText(Line, RowColor, RowX + 6.f, RowY + 4.f, nullptr, 0.72f);
-		RowY += RowH;
+		RowY += BagRowH;
 	}
 
-	if (Inv->EquipmentBag.Num() > MaxRows)
-	{
-		DrawText(FString::Printf(TEXT("... ve %d daha"), Inv->EquipmentBag.Num() - MaxRows),
-			FLinearColor(0.6f, 0.6f, 0.6f), RowX, RowY, nullptr, 0.75f);
-	}
-	else if (Inv->EquipmentBag.Num() == 0)
+	if (Inv->EquipmentBag.Num() == 0)
 	{
 		DrawText(TEXT("(canta bos - moblardan yesil kureler dusur)"), FLinearColor(0.6f, 0.6f, 0.6f), RowX, RowY, nullptr, 0.75f);
 	}

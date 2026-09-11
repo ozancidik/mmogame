@@ -156,6 +156,18 @@ void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMO
 		return;
 	}
 
+	// Canta dolu (bug-hunt: HUD zaten TUM cantayi gosterecek sekilde MaxBagSize'a
+	// gore boyutlaniyor — bunu asmak eski "gorunmez/erisilemez item" bug'ini geri
+	// getirir). Loot/odul/satin-alma sessizce kaybolur; oyuncu once bosaltmali.
+	if (EquipmentBag.Num() >= MaxBagSize)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Canta dolu!"));
+		}
+		return;
+	}
+
 	FMMOEquipmentInstance Inst;
 	Inst.InstanceId = NextInstanceId++;
 	Inst.ItemId = ItemId;

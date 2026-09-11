@@ -75,6 +75,15 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Items, Category = "MMO|Equipment")
 	TArray<FMMOEquipmentInstance> EquipmentBag;
 
+	// Canta kapasitesi (bug-hunt): HUD envanter penceresi eskiden CANTA'yi ilk 8 satirla
+	// SESSIZCE kirpiyordu (MaxRows=8) ama EquipmentBag'in kendisi sinirsiz buyuyebiliyordu —
+	// normal oynanista (loot dusme oranlariyla) 8'i asan oyuncularin fazla itemleri hicbir
+	// UI eyleminden (goster/sat/kusan/yukselt) erisilemez oluyordu. Artik AddEquipmentInstance
+	// bu sinirda dolulukta yeni item EKLEMİYOR (var olan itemler asla silinmez); HUD da
+	// TUM canta icerigini (<=MaxBagSize) her zaman gosterecek sekilde satir yuksekligini
+	// dinamik kucultuyor (shop/quest penceresindeki "tasma yok" deseniyle ayni).
+	static constexpr int32 MaxBagSize = 12;
+
 	// Kusanilan ekipman; index = (int)EMMOEquipSlot (4 slot). InstanceId=0 -> bos.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Items, Category = "MMO|Equipment")
 	TArray<FMMOEquipmentInstance> EquippedItems;
