@@ -28,6 +28,10 @@ namespace
 		//                       Id               Ad                    Fiyat Heal Mana Effect
 		Table.Add(MakeConsumable(TEXT("ManaPotion"),    TEXT("Mana Iksiri"),        20, 0.f,  60.f, TEXT("")));
 		Table.Add(MakeConsumable(TEXT("GreaterManaPotion"), TEXT("Buyuk Mana Iksiri"), 40, 0.f, 120.f, TEXT("")));
+		// Base "HealthPotion" (F tusu, ayri item-DB yolu) 75 heal / 20 altin idi; mana
+		// tarafindaki 2x-heal/2x-fiyat oranini (ManaPotion->GreaterManaPotion) aynen
+		// yansitan bir "buyuk" can iksiri eksikti — simetri icin eklendi.
+		Table.Add(MakeConsumable(TEXT("GreaterHealthPotion"), TEXT("Buyuk Can Iksiri"), 40, 150.f, 0.f, TEXT("")));
 		Table.Add(MakeConsumable(TEXT("ScrollRage"),    TEXT("Ofke Parsomeni"),     60, 0.f,   0.f, TEXT("Rage")));
 		Table.Add(MakeConsumable(TEXT("ScrollHaste"),   TEXT("Hiz Parsomeni"),      50, 0.f,   0.f, TEXT("Haste")));
 		Table.Add(MakeConsumable(TEXT("ScrollIronSkin"),TEXT("Koruma Parsomeni"),   60, 0.f,   0.f, TEXT("IronSkin")));
