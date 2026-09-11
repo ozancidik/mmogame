@@ -345,7 +345,15 @@ void AMMOPlayerController::DoLeftClickAction()
 		APawn* MyPawn = GetPawn();
 		if (MyPawn && FVector::Dist(MyPawn->GetActorLocation(), Healer->GetActorLocation()) <= 500.f)
 		{
-			ServerRequestHeal(Healer);
+			// Kisa spam korumasi (talker'daki desenin ayni si): sol tus basili tutulurken
+			// DoLeftClickAction her karede calisiyor; throttle olmadan DoT ile tam-can
+			// arasinda gidip gelen oyuncu her karede tekrar altin dusurebiliyordu.
+			const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+			if (Now - LastHealRequestTime >= 1.5f)
+			{
+				LastHealRequestTime = Now;
+				ServerRequestHeal(Healer);
+			}
 		}
 		else if (GEngine)
 		{
@@ -715,6 +723,17 @@ void AMMOPlayerController::ServerRequestHeal_Implementation(AMMOHealerNPC* Npc)
 	{
 		return;
 	}
+
+	// SUNUCU-tarafi throttle (guvenlik, talker'daki desenle ayni): istemci-tarafi kapiya
+	// guvenme — hileli istemci bu RPC'yi bombardiman edip her cagrida gercek altin
+	// dususu/iyilestirme tetikleyemesin.
+	const UWorld* World = GetWorld();
+	const float ServerNow = World ? World->GetTimeSeconds() : 0.f;
+	if (ServerNow - LastHealServerTime < HealServerCooldown)
+	{
+		return;
+	}
+	LastHealServerTime = ServerNow;
 
 	AMMOCharacter* C = Cast<AMMOCharacter>(MyPawn);
 	if (!C)

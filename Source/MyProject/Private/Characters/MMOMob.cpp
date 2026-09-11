@@ -120,6 +120,15 @@ void AMMOMob::BeginPlay()
 float AMMOMob::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
 	AController* EventInstigator, AActor* DamageCauser)
 {
+	// Leash sirasinda (eve donerken) hasara baglisiklik: mob vurulup can kaybedebiliyordu
+	// ama saldirganini hic hedeflemiyordu (!bReturningHome guard'i asagida) — risksiz
+	// "bedava hasar" penceresi aciyordu (menzilli sinif uzaktan vurup mob eve varana kadar
+	// bedava DPS alabiliyordu). Standart MMO leash-reset davranisi: eve donerken dokunulmazlik.
+	if (bReturningHome)
+	{
+		return 0.f;
+	}
+
 	const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	// Saldirgan bir oyuncuysa onu zorla hedefle (uzaktan vurulunca da mob tepki versin).
@@ -362,6 +371,11 @@ void AMMOMob::Tick(float DeltaSeconds)
 			bEnraged = false;
 			Stats->ClearAllEffects();
 			Stats->Heal(Stats->MaxHealth);
+			// Zorla-hedefleme'yi de temizle: yoksa ForcedAggroDuration (8sn) dolmadiysa
+			// (donus yolu genelde daha kisa surdugu icin) mob eve varir varmaz kalan
+			// sure boyunca AggroRange'i yok sayip oyuncuya tekrar kosuyordu (yo-yo).
+			ForcedTarget.Reset();
+			ForcedAggroUntil = -1.f;
 		}
 		else if (bHasNavmesh)
 		{

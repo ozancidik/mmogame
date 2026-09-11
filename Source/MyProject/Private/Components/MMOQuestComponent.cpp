@@ -9,6 +9,9 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "World/MMOQuestGiverNPC.h"
 
 UMMOQuestComponent::UMMOQuestComponent()
 {
@@ -33,6 +36,26 @@ bool UMMOQuestComponent::IsLocallyControlledOwner() const
 {
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	return OwnerPawn ? OwnerPawn->IsLocallyControlled() : false;
+}
+
+bool UMMOQuestComponent::IsOwnerNearQuestGiver(float MaxDist) const
+{
+	const AActor* OwnerActor = GetOwner();
+	const UWorld* World = GetWorld();
+	if (!OwnerActor || !World)
+	{
+		return false;
+	}
+	const FVector Loc = OwnerActor->GetActorLocation();
+	const float MaxDistSq = MaxDist * MaxDist;
+	for (TActorIterator<AMMOQuestGiverNPC> It(World); It; ++It)
+	{
+		if (*It && FVector::DistSquared(Loc, (*It)->GetActorLocation()) <= MaxDistSq)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 FMMOQuestProgress* UMMOQuestComponent::FindActive(FName QuestId)
@@ -129,6 +152,17 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 		return;
 	}
 
+	// Sunucu-otoriter dogrulama: vendor/healer/talker'in aksine bu akista mesafe kontrolu
+	// yoktu — hileli istemci gorevliye hic yaklasmadan gorev kabul edebiliyordu (bug-hunt).
+	if (!IsOwnerNearQuestGiver())
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Gorevli yakininda degilsin"));
+		}
+		return;
+	}
+
 	if (IsQuestActive(QuestId) || IsCompleted(QuestId))
 	{
 		return;
@@ -221,6 +255,16 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	if (!HasAuthorityInternal())
 	{
 		ServerClaimReward(QuestId);
+		return;
+	}
+
+	// Sunucu-otoriter dogrulama: odul alma da gorevliye yakinlik istemeli (bug-hunt).
+	if (!IsOwnerNearQuestGiver())
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Gorevli yakininda degilsin"));
+		}
 		return;
 	}
 

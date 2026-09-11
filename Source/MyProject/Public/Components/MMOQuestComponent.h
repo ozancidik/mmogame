@@ -63,6 +63,11 @@ protected:
 	bool HasAuthorityInternal() const;
 	bool IsLocallyControlledOwner() const;
 
+	// Sahip, MaxDist icinde bir gorevli NPC'ye yakin mi? AcceptQuest/ClaimReward RPC'lerinin
+	// sunucu-tarafi dogrulamasi (client, gorevliye hic yaklasmadan gorev kabul/odul-alma
+	// yapamasin — vendor'daki IsOwnerNearVendor ile ayni desen, digerinde eksikti).
+	bool IsOwnerNearQuestGiver(float MaxDist = 800.f) const;
+
 	UFUNCTION(Server, Reliable)
 	void ServerAcceptQuest(FName QuestId);
 

@@ -63,6 +63,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|AI")
 	float NpcTalkServerCooldown = 2.f;
 
+	// Sifaci icin ayni cift-katman throttle (talker'daki desenin ayni si). Bug-hunt bulgusu:
+	// sol tus basili tutulunca DoLeftClickAction HER KAREDE calisiyor; sifacida hic throttle
+	// yoktu -> DoT ile tam-can arasinda gidip gelen oyuncu her karede 100 altin dusurebiliyordu
+	// (+ reliable RPC'yi kare basina bombardimana tutuyordu).
+	float LastHealRequestTime = -100.f;
+	float LastHealServerTime = -100.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|AI")
+	float HealServerCooldown = 1.f;
+
 	void OnLeftClickPressed();
 	void OnLeftClickReleased();
 

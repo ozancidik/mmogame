@@ -1600,7 +1600,12 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 	const int32 TotalRows = AvailCount + ActiveCount;
 	// Sabit dikey masraf: iki bolum basligi (20+20) + aralarindaki bosluk (10).
 	const float RowSpace = (PY + PH - 12.f) - (PY + 44.f) - 50.f;
-	const float RowH = FMath::Clamp(RowSpace / (float)FMath::Max(1, TotalRows), 24.f, 46.f);
+	// Alt sinir (eski: 24) KALDIRILDI: 15+ satirda (16. görev eklendiginde) alt sinira
+	// carpip panelin disina tasiyor, tasan gorevlerin "odul al" satiri tiklanamaz hale
+	// geliyordu (bug-hunt, latent — su an 14 görevle henuz tetiklenmiyor ama sonraki
+	// icerik eklemesinde patlardi). Shop'taki BuyRowH ile ayni felsefe: sikisik ama
+	// erisilebilir, tasan-ve-kilitli degil.
+	const float RowH = FMath::Min(46.f, RowSpace / (float)FMath::Max(1, TotalRows));
 	const float CellH = FMath::Max(1.f, RowH - 4.f);
 	const float Line2Y = FMath::Min(24.f, RowH * 0.5f);
 
@@ -1821,6 +1826,22 @@ bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)
 	{
 		if (SkillBookCloseRect.IsInside(Pos)) { bSkillBookOpen = false; PendingAssignSkill = NAME_None; } else { HandleSkillBookClick(Pos); }
 		return true;
+	}
+	// Kitap acikken hotbar'a tiklama (atama/temizleme icin) SkillBookRect'in DISINDA
+	// kalabiliyor (panel hotbar cizgisinin ustunde bitiyor, cogu cozunurlukte hotbar
+	// disarida kalir) — bu yuzden "skil sec -> hotbar'a tikla = ata" akisi hic
+	// tetiklenmiyordu (bug-hunt). HandleSkillBookClick zaten HotbarRegions'i kontrol
+	// ediyor; SkillBookRect sartindan BAGIMSIZ olarak da dene.
+	if (bSkillBookOpen)
+	{
+		for (const FMMOClickRegion& R : HotbarRegions)
+		{
+			if (R.Slot >= 0 && R.Rect.IsInside(Pos))
+			{
+				HandleSkillBookClick(Pos);
+				return true;
+			}
+		}
 	}
 	if (bQuestWindowOpen && QuestRect.IsInside(Pos))
 	{
