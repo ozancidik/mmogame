@@ -112,6 +112,17 @@ void UMMOStatsComponent::BeginPlay()
 	}
 }
 
+void UMMOStatsComponent::RefreshBaseWalkSpeed()
+{
+	if (const ACharacter* Ch = Cast<ACharacter>(GetOwner()))
+	{
+		if (const UCharacterMovementComponent* Move = Ch->GetCharacterMovement())
+		{
+			BaseWalkSpeed = Move->MaxWalkSpeed;
+		}
+	}
+}
+
 bool UMMOStatsComponent::HasAuthorityInternal() const
 {
 	const AActor* Owner = GetOwner();

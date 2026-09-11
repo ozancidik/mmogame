@@ -142,6 +142,16 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 		return;
 	}
 
+	// Sunucu-otoriter davet spam korumasi: art arda cagrilirsa hedefin ekranini
+	// bildirimle doldurup oyunu oynanmaz hale getirebiliyordu (throttle yoktu).
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (Now - LastInviteTime < InviteCooldown)
+	{
+		return;
+	}
+	LastInviteTime = Now;
+
 	AMMOCharacter* Target = FindNearestOtherPlayer(1600.f);
 	if (!Target)
 	{
@@ -159,6 +169,7 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 	}
 
 	TP->PendingInviteFrom = Inviter;
+	TP->PendingInviteTime = Now;
 	TP->ClientNotifyInvited(Inviter);
 
 	if (GEngine && Inviter->IsLocallyControlled())
@@ -171,12 +182,37 @@ void UMMOPartyComponent::ServerAccept_Implementation()
 {
 	AMMOCharacter* Invitee = GetOwnerCharacter();
 	AMMOCharacter* Inviter = PendingInviteFrom.Get();
+	const float InviteTime = PendingInviteTime;
 	PendingInviteFrom = nullptr;
+	PendingInviteTime = -1.f;
 
 	if (!Invitee || !Inviter || Invitee == Inviter)
 	{
 		return;
 	}
+
+	// Sunucu-otoriter dogrulama: davet SURESIZ bekleyip her zaman kabul edilebiliyordu
+	// (davet eden cok uzaklassa/uzun sure gecse bile parti kuruluyordu). Sure + mesafe
+	// kontrolu ekle; biri saglanmazsa daveti sessizce dusur.
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (InviteTime < 0.f || Now - InviteTime > InviteExpirySeconds)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Davetin suresi doldu"));
+		}
+		return;
+	}
+	if (FVector::Dist(Invitee->GetActorLocation(), Inviter->GetActorLocation()) > InviteAcceptMaxDistance)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Davet eden cok uzakta"));
+		}
+		return;
+	}
+
 	FormOrJoin(Inviter, Invitee);
 }
 

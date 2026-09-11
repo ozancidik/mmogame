@@ -186,6 +186,13 @@ void AMMOMob::ApplyArchetype(const FMMOMobArchetype& Arch)
 
 	if (Stats)
 	{
+		// KRITIK: MaxWalkSpeed'i az once arketipe gore degistirdik; Stats bunu
+		// yeniden cache'lemezse (BeginPlay'de ONCEKI/varsayilan hizi cache'lemisti)
+		// bir sonraki hiz-efekti (Slow/Haste) devreye girip biterken mob hizi bu
+		// arketipe-ozgu degeri degil, eski varsayilani taban alir (gozle gorulur
+		// hiz sicramasi/kalici yavaslama bug'i).
+		Stats->RefreshBaseWalkSpeed();
+
 		Stats->Level = Arch.Level;
 		// Seviye/ana statlari uygula ve turetilmisleri (MaxHealth vb.) tam canla hesapla.
 		Stats->InitializePrimaryStats(Arch.Strength, 10, 6, Arch.Vitality);

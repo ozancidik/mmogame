@@ -33,6 +33,13 @@ public:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	// Sahibin "buff'siz" yurume hizini SIMDIKI MaxWalkSpeed'den yeniden cache'ler.
+	// BeginPlay'de otomatik cache'lenir (varsayilan hiz icin); ama BeginPlay SONRASI
+	// (or. AMMOMob::ApplyArchetype ile arketipe ozgu MoveSpeed atanirken) MaxWalkSpeed
+	// degistirilirse bunu MUTLAKA cagir — yoksa bir sonraki hiz-efekti (Slow/Haste)
+	// devreye girdiginde/bittiginde hiz yanlis (eski/varsayilan) taban degere sicrar.
+	void RefreshBaseWalkSpeed();
+
 	// ------------------------------------------------------------------
 	// Delegate'ler (Blueprint'ten bind edilebilir)
 	// ------------------------------------------------------------------

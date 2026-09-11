@@ -47,6 +47,10 @@ public:
 	// Bekleyen daveti (sadece sunucu) ve daveti gonderen.
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
 
+	// Davetin gonderildigi zaman (sunucu World time) — kabul aninda susre/mesafe
+	// dogrulamasi icin (davet edenin cok uzaklasmis veya cok eski bir davet olmasi).
+	float PendingInviteTime = -1.f;
+
 protected:
 	UFUNCTION()
 	void OnRep_Members();
@@ -56,6 +60,17 @@ protected:
 
 	AMMOCharacter* GetOwnerCharacter() const;
 	AMMOCharacter* FindNearestOtherPlayer(float MaxRange) const;
+
+	// Davet spam korumasi (sunucu-otoriter): art arda MMOInvite cagrisinin hedefin
+	// ekranini bildirimle doldurmasini engeller.
+	float LastInviteTime = -100.f;
+	static constexpr float InviteCooldown = 3.f;
+
+	// Bekleyen bir davetin gecerlilik suresi (kabul aninda kontrol edilir).
+	static constexpr float InviteExpirySeconds = 60.f;
+	// Kabul aninda davet edenle aralarindaki izin verilen azami mesafe (davet menzilinden
+	// (1600) biraz genis tutulur ki dogal hareket reddi tetiklemesin).
+	static constexpr float InviteAcceptMaxDistance = 3000.f;
 
 	// Sunucu tarafi parti islemleri.
 	void FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invitee);

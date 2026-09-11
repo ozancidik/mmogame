@@ -5,6 +5,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
 #include "Core/MMOTargeting.h"
+#include "Player/MMOPlayerController.h"
 #include "Components/MMOStatsComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
@@ -365,6 +366,22 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 		return true;
 	}
 
+	// Hedef gerektiren skiller (Melee/Ranged/AoETarget) icin ONCE hedef var mi kontrol et —
+	// yoksa ExecuteSkill zaten "Menzilde hedef yok" deyip hicbir sey yapmiyordu ama mana
+	// harcanip cooldown baslatiliyordu (bosa harcanan kaynak bug'i). Kendine-etki skiller
+	// (HealSelf/BuffSelf/AoESelf) hedef gerektirmez, her zaman devam eder.
+	const bool bNeedsTarget = (Def->Effect == EMMOSkillEffect::MeleeDamage
+		|| Def->Effect == EMMOSkillEffect::RangedDamage
+		|| Def->Effect == EMMOSkillEffect::AoETarget);
+	if (bNeedsTarget && !FindNearestEnemy(Def->Range))
+	{
+		if (GEngine && bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Menzilde hedef yok"));
+		}
+		return false;
+	}
+
 	// Sunucu: kesin mana harcamasi + etki.
 	if (!Owner->GetStats()->ConsumeMana(Def->ManaCost))
 	{
@@ -433,6 +450,25 @@ AMMOCharacter* UMMOSkillComponent::FindNearestEnemy(float Range) const
 	{
 		return nullptr;
 	}
+
+	// Oyuncunun Z/tikla ile kilitledigi hedef (SelectedTarget) varsa ve gecerliyse
+	// (mob, canli, menzilde) ONA oncelik ver. Aksi halde skill'ler normal saldiridan
+	// (AttackTarget, secili hedefi kullanir) FARKLI davranip yakindaki BASKA bir moba
+	// gidebiliyordu — oyuncu "su moba" nisan alip skill basinca baskasina vurma bug'i.
+	// Cast<AMMOMob> ile PvP-kapali invariant'i korunur: oyuncu baska bir OYUNCUYU
+	// secmisse bu yol atlanir, asagidaki mob-only fallback'e duser.
+	if (const AMMOPlayerController* MMOPc = Cast<AMMOPlayerController>(Self->GetController()))
+	{
+		if (AMMOMob* Selected = Cast<AMMOMob>(MMOPc->GetSelectedTarget()))
+		{
+			if (Selected->GetStats() && !Selected->GetStats()->bIsDead
+				&& FVector::Dist(Self->GetActorLocation(), Selected->GetActorLocation()) <= Range)
+			{
+				return Selected;
+			}
+		}
+	}
+
 	// Sadece moblari hedefle (PvP simdilik kapali).
 	return MMOTargeting::FindNearestMob(Self, Self->GetActorLocation(), Range);
 }

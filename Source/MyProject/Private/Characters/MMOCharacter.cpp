@@ -188,6 +188,15 @@ void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (HasAuthority() && IsPlayerControlled())
 	{
 		SaveCharacter();
+
+		// Partideyse hemen ayril: yoksa kalan uyelerin Members listesi, bu aktor GC ile
+		// null'lanana kadar gecerliligini yitirmis (pending-kill) bir isaretci tutar ve
+		// "PARTI" HUD'u/uye sayisi/paylasilan XP kisa sure (ya da GC tetiklenene kadar)
+		// yanlis/eksik gorunur.
+		if (PartyComponent)
+		{
+			PartyComponent->RequestLeave();
+		}
 	}
 	Super::EndPlay(EndPlayReason);
 }
