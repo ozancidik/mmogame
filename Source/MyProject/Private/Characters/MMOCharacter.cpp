@@ -180,6 +180,10 @@ void AMMOCharacter::PossessedBy(AController* NewController)
 void AMMOCharacter::AutoLoadDeferred()
 {
 	LoadCharacter();
+	// Yukleme denemesi (basarili/basarisiz/kayit-yok fark etmez) TAMAMLANDI — artik
+	// component'lerin durumu ya diskten geldi ya da gercekten yeni-karakter varsayilani.
+	// Bundan SONRA SaveCharacter guvenle calisabilir.
+	bInitialLoadComplete = true;
 }
 
 void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -187,12 +191,20 @@ void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// Oyundan cikis/level bitiminde otomatik kaydet (otorite + oyuncu).
 	if (HasAuthority() && IsPlayerControlled())
 	{
-		SaveCharacter();
+		// bInitialLoadComplete SART: yukleme (0.6sn gecikmeli AutoLoadDeferred) henuz
+		// calismadiysa component'ler hala varsayilan/bos durumda — bu haliyle kaydetmek
+		// gercek kayit dosyasini bos bir karakterle EZER (bkz. bInitialLoadComplete yorumu,
+		// bug-hunt bulgusu: possess sonrasi ~0.6sn icinde disconnect = ilerlemenin silinmesi).
+		if (bInitialLoadComplete)
+		{
+			SaveCharacter();
+		}
 
 		// Partideyse hemen ayril: yoksa kalan uyelerin Members listesi, bu aktor GC ile
 		// null'lanana kadar gecerliligini yitirmis (pending-kill) bir isaretci tutar ve
 		// "PARTI" HUD'u/uye sayisi/paylasilan XP kisa sure (ya da GC tetiklenene kadar)
-		// yanlis/eksik gorunur.
+		// yanlis/eksik gorunur. Yukleme tamamlanmamis olsa bile parti temizligi guvenlidir
+		// (yeni-possess bir karakter zaten partide olamaz), o yuzden bagimsiz calisir.
 		if (PartyComponent)
 		{
 			PartyComponent->RequestLeave();

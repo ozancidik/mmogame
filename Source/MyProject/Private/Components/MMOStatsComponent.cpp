@@ -152,6 +152,11 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill)
 	// Negatif buff'lar statlari 0'in altina indirmesin.
 	AttackPower = FMath::Max(0.f, AttackPower);
 	Defense = FMath::Max(0.f, Defense);
+	// Bozuk/eski-surum bir kayittan negatif Level/Vitality/Intelligence gelirse (ApplySaveData
+	// hicbir dogrulama yapmadan kopyaliyor) MaxHealth/MaxMana negatife dusup bRefill ile
+	// Health/Mana'yi da negatif baslatabilirdi (bug-hunt, savunma amacli sinirlama).
+	MaxHealth = FMath::Max(1.f, MaxHealth);
+	MaxMana = FMath::Max(0.f, MaxMana);
 
 	if (bRefill)
 	{
