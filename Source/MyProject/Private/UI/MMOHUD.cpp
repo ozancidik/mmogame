@@ -1840,7 +1840,12 @@ void AMMOHUD::DrawStatWindow(AMMOCharacter* PlayerChar)
 	StatRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
 	StatCloseRect = DrawCloseButton(PX, PY, PW);
 
-	DrawText(TEXT("KARAKTER"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.15f);
+	FString CharTitle = TEXT("KARAKTER");
+	if (const UMMOSkillComponent* SkillComp = PlayerChar->GetSkillComponent())
+	{
+		CharTitle += FString::Printf(TEXT(" - %s"), *GetMMOClassDisplayName(SkillComp->CharacterClass));
+	}
+	DrawText(CharTitle, FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.15f);
 
 	DrawText(FString::Printf(TEXT("Seviye %d     Dagitilacak puan: %d"), S->Level, S->UnspentStatPoints),
 		S->UnspentStatPoints > 0 ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.7f, 0.75f, 0.8f),
