@@ -491,6 +491,19 @@ regresyondur.
 
 ---
 
+# Tuketilebilirler artik envanterden kullanilabiliyor — commit fe2ab44 (2026-09-12)
+
+> ONEMLI bulgu: satici Buyuk Can/Mana Iksiri ve 4 parsomeni satiyordu ama BUNLARI kullanmanin (hotbar dahil) hicbir yolu yoktu — satin alinip sonsuza dek envanterde kilitli kaliyorlardi. Envanter penceresine yeni bir "TUKETILEBILIRLER" bolumu eklendi. Derleme temiz ama gorsel olarak HENUZ test edilmedi (bu oturumda editor acilamiyor) — asagidaki adimlar oncelikli.
+
+- [ ] **Gorunum:** Envanteri ac (I) → CANTA bolumunun altinda yeni "TUKETILEBILIRLER (N) - sol tik: kullan" basligi ve altinda sahip oldugun her tuketilebilir turu icin bir satir (isim x adet) gorunmeli. Metin okunabilir olmali, panelin altindan tasmamali.
+- [ ] **Buyuk Can Iksiri:** Saticidan Buyuk Can Iksiri satin al, envanterde goruns�n, uzerine sol tikla → can yenilenmeli, adet 1 azalmali, ekranda "+150 HP" turu bir mesaj gorunmeli.
+- [ ] **Parsomen (or. Ofke Parsomeni):** Satin al, envanterde tikla → Rage buff'i uygulanmali (AttackPower artmali, ekranda sure/etki mesaji).
+- [ ] **Can Iksiri (F ile ayni yol):** Envanterdeki Can Iksiri satirina tikla → F tusuyla aynen ayni sekilde calismali (can yenile, adet azalt).
+- [ ] **Regresyon - Canta bolumu:** Ekipman cantasi hala eskisi gibi calismali (sol tik kusan, sag tik yukselt), yeni bolum eklenmesi bunu bozmamali.
+- [ ] **Bos durumlar:** Hem canta hem tuketilebilirler bosken pencere duzgun gorunmeli (canta icin mevcut "canta bos" mesaji, tuketilebilirler icin bolum hic gorunmemeli).
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
