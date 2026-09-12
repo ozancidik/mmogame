@@ -398,6 +398,19 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 		return;
 	}
 
+	// Canta doluysa AddEquipmentInstance sessizce hicbir sey eklemeden cikar (bilerek
+	// kabul edilen loot/odul davranisi) - ama SATIN ALMADA bu, oyuncunun altinini
+	// karsiliginda HICBIR SEY vermeden alir (bug-hunt). Odul/lootun aksine burada
+	// oyuncu gercekten para harciyor; parayi dusmeden ONCE kontrol et.
+	if (EquipmentBag.Num() >= MaxBagSize)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Canta dolu!"));
+		}
+		return;
+	}
+
 	AddGold(-Price);
 	AddEquipmentInstance(ItemId, 0);
 	if (GEngine && IsLocallyControlledOwner())
