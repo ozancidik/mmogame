@@ -472,6 +472,16 @@ regresyondur.
 
 ---
 
+# MMOPvP artik sadece host tarafindan acilabiliyor — commit 9247873 (2026-09-12)
+
+> QA notu: onceki Exec-komut denetimi sadece "sunucu otoritesine dogru yonlendiriliyor mu" kontrol etmisti, "bu sunucu-genelindeki kurali kim degistirebilir" sorusunu degil. MMOPvP bu ikinci eksende gercek bir aciktı: herhangi bir uzak istemci, host'un onayi olmadan TUM oyuncular icin PvP'yi acabiliyordu. Derleme temiz; test icin en az 2 makine/istemci (host + misafir) gerekiyor.
+
+- [ ] **Ana senaryo (aciktan tekrar edilebiliyor mu):** Misafir (host olmayan) istemciden konsola `MMOPvP 1` yaz → PvP **ACILMAMALI** (duzeltme oncesi acilirdi, host mesaji bile gormezdi).
+- [ ] **Host hala calisabiliyor mu (regresyon):** Host'un kendi konsolundan `MMOPvP 1` yaz → PvP **ACILMALI** ("PvP ACIK" mesaji host ekraninda gorunmeli), sonra `MMOPvP 0` ile tekrar kapat.
+- [ ] **PvP acikken hasar gercekten calisiyor mu:** Host PvP'yi actiktan sonra iki oyuncu birbirine saldirabilmeli (bu zaten var olan davranis, sadece kimin actigini kontrol ediyoruz).
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
