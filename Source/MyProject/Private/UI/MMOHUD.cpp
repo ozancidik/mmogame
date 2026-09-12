@@ -289,7 +289,16 @@ void AMMOHUD::DrawParty(AMMOCharacter* PlayerChar, float StartX, float StartY)
 			Name = PS->GetPlayerName();
 		}
 
-		DrawText(FString::Printf(TEXT("%s  Lv%d"), *Name, S->Level),
+		// Sinif adi da goster (CharacterClass tum istemcilere replike edilir, sadece
+		// sahibine degil) - ayni tutarlilik gecisinin bir parcasi: heal-target skili
+		// kullanirken parti listesinde kimin Priest oldugunu gormek faydali.
+		FString ClassSuffix;
+		if (const UMMOSkillComponent* MSkill = M->GetSkillComponent())
+		{
+			ClassSuffix = FString::Printf(TEXT("  %s"), *GetMMOClassDisplayName(MSkill->CharacterClass));
+		}
+
+		DrawText(FString::Printf(TEXT("%s  Lv%d%s"), *Name, S->Level, *ClassSuffix),
 			S->bIsDead ? FLinearColor(0.7f, 0.3f, 0.3f) : FLinearColor::White, StartX, Y, nullptr, 0.75f);
 		Y += 14.f;
 
