@@ -179,11 +179,8 @@ void AMMOCharacter::PossessedBy(AController* NewController)
 
 void AMMOCharacter::AutoLoadDeferred()
 {
+	// bInitialLoadComplete artik LoadCharacter() icinde (her cagiran yoldan) set edilir.
 	LoadCharacter();
-	// Yukleme denemesi (basarili/basarisiz/kayit-yok fark etmez) TAMAMLANDI — artik
-	// component'lerin durumu ya diskten geldi ya da gercekten yeni-karakter varsayilani.
-	// Bundan SONRA SaveCharacter guvenle calisabilir.
-	bInitialLoadComplete = true;
 }
 
 void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -277,6 +274,14 @@ bool AMMOCharacter::LoadCharacter()
 	{
 		return false;
 	}
+
+	// Bu noktadan sonra (bulunsun/bulunmasin) bir yukleme DENEMESI otoritede gerceklesti —
+	// component'ler ya diskten geldi ya da (kayit yoksa) zaten dogru varsayilanda. Bayragi
+	// burada (AutoLoadDeferred'a ozel degil) set etmek, manuel "MMOLoad" exec komutunun
+	// (0.6sn'lik gecikmeli otomatik yuklemeden ONCE calisabilir) de bInitialLoadComplete'i
+	// dogru isaretlemesini saglar — yoksa o yoldan yuklenen GERCEK veri, hemen ardindan
+	// disconnect olunca EndPlay'in save-guard'i tarafindan YANLISLIKLA atlanirdi.
+	bInitialLoadComplete = true;
 
 	const FString Slot = GetSaveSlotName();
 	if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))
