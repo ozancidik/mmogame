@@ -89,6 +89,19 @@ namespace
 			T::KillSpecificMob, TEXT("Warlock"), 4, 800, 500, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("BattleAxe"));
 
+		// Ikinci bolge yan gorevi: Ork Savascilarini sec (Lv6 normal; band spawner'dan cikar).
+		// Q_Warlocks ile ayni bagimsiz-yan-gorev deseni; SteelHelmet o zamana kadar hicbir
+		// gorevde odul olarak kullanilmamisti (sadece elit loot/dukkanda vardi).
+		Table.Add(MakeQuest(TEXT("Q_OrcWarriors"), TEXT("Ork Savascilari"), TEXT("Ikinci bolgedeki ork savascilarini devir: 4 Ork Savascisi oldur."),
+			T::KillSpecificMob, TEXT("OrcWarrior"), 4, 750, 480, 6));
+		Table.Last().RewardEquipmentId = FName(TEXT("SteelHelmet"));
+
+		// Ikinci bolge yan gorevi: Korku Kurtlarini sec (Lv6 normal; band spawner'dan cikar).
+		// SteelBoots de ayni sekilde hicbir gorevde odul olarak kullanilmamisti.
+		Table.Add(MakeQuest(TEXT("Q_DireWolves"), TEXT("Korku Kurtlari"), TEXT("Ikinci bolgedeki korku kurtlarini devir: 4 Korku Kurdu oldur."),
+			T::KillSpecificMob, TEXT("DireWolf"), 4, 750, 480, 6));
+		Table.Last().RewardEquipmentId = FName(TEXT("SteelBoots"));
+
 		// Buyuk servet (bagimsiz altin biriktirme).
 		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("1000 altin biriktir."),
 			T::HaveGold, TEXT(""), 1000, 500, 0, 3));
