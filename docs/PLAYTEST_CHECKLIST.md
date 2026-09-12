@@ -504,6 +504,16 @@ regresyondur.
 
 ---
 
+# Elit mob'lar artik [ELIT] etiketiyle isaretleniyor — commit f9d92ed (2026-09-12)
+
+> Icerik eksikligi: elit mob'lar (Orumcek Ana, Kadim Golem, Golge Suikastci, Ork Reisi) normal moblarla ayni gorunuyordu. Derleme temiz, GORSEL OLARAK TEST EDILMEDI (editor bu oturumda acilamiyor).
+
+- [ ] **Nameplate:** Bir elit mob'a yaklas (or. Kadim Golem) → basinin ustunde turuncu "[ELIT] Kadim Golem Lv6" yazisi gorunmeli (normal mob'larda bu etiket olmamali).
+- [ ] **Target bar:** Elit mob'u Z ile hedefle → ekran ustu orta hedef panelinde de "[ELIT] ..." yazisi turuncu renkte gorunmeli.
+- [ ] **Regresyon:** Normal (elit olmayan) moblarin nameplate/target bar'i eskisi gibi (etiketsiz, eski renk) kalmali.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
