@@ -541,6 +541,7 @@ regresyondur.
 - [ ] **Gorunum:** Oyuna gir → sol ust "Lv N" yazisinin yaninda sinifin (or. "Lv 3  Savasci") gorunmeli, K basmadan.
 - [ ] **Regresyon:** Skill kitabini ac (K) → basliktaki "SKILL KITABI - Savasci" yazisi eskisi gibi dogru gorunmeli (ayni isim kaynagini paylasiyorlar).
 - [ ] **Karakter penceresi (commit 95fb138):** Karakter/stat penceresini ac (C) → baslik "KARAKTER - Savasci" seklinde sinif adini da gostermeli.
+- [ ] **Parti listesi (commit dc57d88):** Bir partiye gir → her uyenin satirinda "Isim LvN Sinif" gorunmeli (kendi sinifi DEGIL, o uyenin GERCEK sinifi - baska bir istemciden de dogru gorunmeli).
 
 ---
 
