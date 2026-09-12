@@ -188,6 +188,11 @@ protected:
 	// Envanter tiklama bolgeleri: kusanilan slotlar (Slot=(int)EMMOEquipSlot) ve canta satirlari (Slot=canta index).
 	TArray<FMMOClickRegion> InvEquippedRegions;
 	TArray<FMMOClickRegion> InvBagRegions;
+	// Tuketilebilir istif satirlari (SkillId=ItemId) - bag-hunt: satici Mana/Can iksirleri
+	// disindaki tum tuketilebilirleri (Buyuk iksirler, parsomenler) satiyordu ama hicbir
+	// UI/tus yolu onlari KULLANMAYA izin vermiyordu (satin alinip sonsuza dek kullanilamaz
+	// kaliyorlardi). Envanter penceresi artik Items istifini de gosterip tiklamayla kullaniyor.
+	TArray<FMMOClickRegion> InvConsumableRegions;
 
 	// Dukkan tiklama bolgeleri: satin alma (SkillId=ItemId veya "__POTION__") ve satma (Slot=canta index).
 	TArray<FMMOClickRegion> ShopBuyRegions;

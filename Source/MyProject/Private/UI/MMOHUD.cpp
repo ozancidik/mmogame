@@ -897,6 +897,7 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 {
 	InvEquippedRegions.Reset();
 	InvBagRegions.Reset();
+	InvConsumableRegions.Reset();
 	if (!Canvas || !PlayerChar)
 	{
 		return;
@@ -971,19 +972,26 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 
 	RowY += 8.f;
 
-	// --- Canta ---
-	DrawText(FString::Printf(TEXT("CANTA (%d)"), Inv->EquipmentBag.Num()), FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
-	RowY += 20.f;
+	// --- Canta + Tuketilebilirler: ortak alan payi ---
+	// Iki degisken-uzunluklu liste ayni sabit-yukseklikli panelde: satir yuksekligini
+	// TOPLAM satir sayisina gore ortaklasa kucult (skill book'taki agac-toplami deseniyle
+	// ayni) - yoksa ikisinden biri buyudukce panel disina tasabilirdi.
+	const int32 BagCount = Inv->EquipmentBag.Num();
+	const int32 ConsumableCount = Inv->Items.Num();
+	const int32 SectionHeaderCount = (BagCount > 0 ? 1 : 0) + (ConsumableCount > 0 ? 1 : 0);
+	const float SectionHeaderH = 20.f;
+	const float SharedAvailH = FMath::Max(0.f, (PY + PH - 12.f) - RowY - SectionHeaderCount * SectionHeaderH);
+	const float SharedRowH = FMath::Min(RowH, SharedAvailH / (float)FMath::Max(1, BagCount + ConsumableCount));
+	const float SharedCellH = FMath::Max(1.f, SharedRowH - 4.f);
 
-	// TUM canta icerigini goster (artik AddEquipmentInstance sunucu tarafinda MaxBagSize'a
-	// sinirli oldugu icin guvenli); satir yuksekligini kalan alana gore kucult — eski sabit
-	// MaxRows=8 kirpmasi, siniri asan itemleri hicbir UI eyleminden erisilemez birakiyordu
-	// (bug-hunt). Shop/quest penceresindeki "tasma yok" deseniyle ayni.
-	const int32 ShowCount = Inv->EquipmentBag.Num();
-	const float BagAvailH = (PY + PH - 12.f) - RowY;
-	const float BagRowH = FMath::Min(RowH, BagAvailH / (float)FMath::Max(1, ShowCount));
-	const float BagCellH = FMath::Max(1.f, BagRowH - 4.f);
-	for (int32 i = 0; i < ShowCount; ++i)
+	// --- Canta ---
+	if (BagCount > 0)
+	{
+		DrawText(FString::Printf(TEXT("CANTA (%d)"), BagCount), FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
+		RowY += SectionHeaderH;
+	}
+
+	for (int32 i = 0; i < BagCount; ++i)
 	{
 		const FMMOEquipmentInstance& Inst = Inv->EquipmentBag[i];
 		const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
@@ -993,11 +1001,11 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		}
 
 		const bool bMaxed = Inst.Plus >= FMMOItemDatabase::MaxPlus;
-		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), RowX, RowY, RowW, BagCellH);
+		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), RowX, RowY, RowW, SharedCellH);
 
 		FMMOClickRegion R;
 		R.Slot = i;
-		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + BagCellH));
+		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + SharedCellH));
 		InvBagRegions.Add(R);
 
 		const float RM = FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity);
@@ -1021,12 +1029,52 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		}
 
 		DrawText(Line, RowColor, RowX + 6.f, RowY + 4.f, nullptr, 0.72f);
-		RowY += BagRowH;
+		RowY += SharedRowH;
 	}
 
-	if (Inv->EquipmentBag.Num() == 0)
+	if (BagCount == 0)
 	{
 		DrawText(TEXT("(canta bos - moblardan yesil kureler dusur)"), FLinearColor(0.6f, 0.6f, 0.6f), RowX, RowY, nullptr, 0.75f);
+		RowY += SharedRowH;
+	}
+
+	// --- Tuketilebilirler (Can/Mana iksirleri, buyuk iksirler, parsomenler) ---
+	// bug-hunt: satici bunlarin hepsini satiyordu ama Can Iksiri (F) / Mana Iksiri (G)
+	// disindakileri kullanmanin HICBIR yolu yoktu (satin alinip sonsuza dek envanterde
+	// kullanilmadan kalirlardi). Sol tik = kullan (UseHealthPotion/UseConsumable).
+	if (ConsumableCount > 0)
+	{
+		DrawText(FString::Printf(TEXT("TUKETILEBILIRLER (%d) - sol tik: kullan"), ConsumableCount),
+			FLinearColor(0.6f, 1.f, 0.7f), RowX, RowY, nullptr, 0.95f);
+		RowY += SectionHeaderH;
+
+		for (const FMMOItemStack& Stack : Inv->Items)
+		{
+			DrawRect(FLinearColor(0.12f, 0.18f, 0.12f, 0.9f), RowX, RowY, RowW, SharedCellH);
+
+			FMMOClickRegion R;
+			R.SkillId = Stack.ItemId;
+			R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + SharedCellH));
+			InvConsumableRegions.Add(R);
+
+			FString DisplayName;
+			if (const FMMOConsumableDef* CDef = FMMOConsumableDatabase::Find(Stack.ItemId))
+			{
+				DisplayName = CDef->Name;
+			}
+			else if (Stack.ItemId == FName(TEXT("HealthPotion")))
+			{
+				DisplayName = TEXT("Can Iksiri");
+			}
+			else
+			{
+				DisplayName = Stack.ItemId.ToString();
+			}
+
+			DrawText(FString::Printf(TEXT("%s  x%d"), *DisplayName, Stack.Count),
+				FLinearColor::White, RowX + 6.f, RowY + 4.f, nullptr, 0.78f);
+			RowY += SharedRowH;
+		}
 	}
 }
 
@@ -1058,6 +1106,25 @@ bool AMMOHUD::HandleInventoryClick(const FVector2D& Pos)
 		if (R.Slot >= 0 && R.Rect.IsInside(Pos))
 		{
 			Inv->EquipFromBag(R.Slot);
+			return true;
+		}
+	}
+
+	for (const FMMOClickRegion& R : InvConsumableRegions)
+	{
+		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
+		{
+			// Can Iksiri (HealthPotion) ayri, eski bir sistem uzerinden calisir (F tusuyla
+			// ayni yol); geri kalan tum tuketilebilirler (Mana/Buyuk iksirler, parsomenler)
+			// genel UseConsumable yoluna gider.
+			if (R.SkillId == FName(TEXT("HealthPotion")))
+			{
+				Char->UseHealthPotion();
+			}
+			else
+			{
+				Char->UseConsumable(R.SkillId);
+			}
 			return true;
 		}
 	}
