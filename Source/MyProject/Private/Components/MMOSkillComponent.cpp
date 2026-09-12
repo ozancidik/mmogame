@@ -507,6 +507,35 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		break;
 	}
 
+	case EMMOSkillEffect::HealTarget:
+	{
+		// Secili hedef canli bir MUTTEFIK (baska oyuncu, mob degil) ise onu iyilestir;
+		// aksi halde HealSelf ile ayni sekilde kendini iyilestir (self-fallback).
+		AMMOCharacter* Ally = nullptr;
+		if (const AMMOPlayerController* PC = Cast<AMMOPlayerController>(Caster->GetController()))
+		{
+			if (AMMOCharacter* Sel = PC->GetSelectedTarget())
+			{
+				if (Sel != Caster && !Cast<AMMOMob>(Sel) && Sel->GetStats())
+				{
+					Ally = Sel;
+				}
+			}
+		}
+
+		AMMOCharacter* Recipient = Ally ? Ally : Caster;
+		if (Recipient->GetStats())
+		{
+			Recipient->GetStats()->Heal(Def.Power);
+			if (!Def.AppliedEffectId.IsNone())
+			{
+				Recipient->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
+			}
+		}
+		MulticastSkillFX(EMMOSkillEffect::HealSelf, Recipient->GetActorLocation(), Recipient->GetActorLocation(), 90.f, AnimIndex);
+		break;
+	}
+
 	case EMMOSkillEffect::BuffSelf:
 	{
 		// Sadece buff uygula (hasar yok). FX icin sifa halkasini kullan.

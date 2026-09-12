@@ -98,8 +98,10 @@ namespace
 			E::RangedDamage, 10.f, 2.f, 35.f, 1200.f, 0.f));
 		Table.Add(MakeDef(TEXT("Pri_HolyBurst"), TEXT("Kutsal Patlama"), C::Priest, T::Special0, 4, 1, TEXT("Pri_Smite"),
 			E::AoESelf, 25.f, 8.f, 48.f, 0.f, 320.f));
+		// Buyuk Sifa: secili bir parti uyesi hedefteyse ONU iyilestirir (Priest'in asil
+		// "sifaci" araci); hedef yoksa/kendine tikladiysa eskisi gibi kendini iyilestirir.
 		Table.Add(MakeDef(TEXT("Pri_GreaterHeal"), TEXT("Buyuk Sifa"), C::Priest, T::Special1, 5, 2, TEXT("Pri_HolyLight"),
-			E::HealSelf, 40.f, 12.f, 150.f, 0.f, 0.f));
+			E::HealTarget, 40.f, 12.f, 150.f, 0.f, 0.f));
 		// Ilahi Sifa: Buyuk Sifa'nin ustu; aninda buyuk iyilestirme + uzerine Yenilenme HoT.
 		Table.Add(MakeDef(TEXT("Pri_DivineRestoration"), TEXT("Ilahi Sifa"), C::Priest, T::Special1, 7, 2, TEXT("Pri_GreaterHeal"),
 			E::HealSelf, 55.f, 20.f, 180.f, 0.f, 0.f, TEXT("Regen")));

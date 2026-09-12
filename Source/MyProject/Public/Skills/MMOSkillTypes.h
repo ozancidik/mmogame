@@ -36,7 +36,13 @@ enum class EMMOSkillEffect : uint8
 	AoESelf      UMETA(DisplayName = "Etrafina Alan Hasar"),
 	AoETarget    UMETA(DisplayName = "Hedefte Alan Hasar"),
 	HealSelf     UMETA(DisplayName = "Kendini Iyilestir"),
-	BuffSelf     UMETA(DisplayName = "Kendine Buff")        // AppliedEffectId'yi kastere uygular (hasar yok)
+	BuffSelf     UMETA(DisplayName = "Kendine Buff"),       // AppliedEffectId'yi kastere uygular (hasar yok)
+	// Secili hedef canli bir MUTTEFIK (baska oyuncu, mob DEGIL) ise ONU iyilestirir;
+	// hedef yoksa/gecersizse kendini iyilestirir (bug-hunt: Priest'in TUM iyilestirme
+	// skilleri HealSelf idi - parti icinde BASKA kimseyi iyilestirmenin hicbir yolu
+	// yoktu, "sifaci" sinifinin asil islevi eksikti). Hedef gerektirmedigi icin
+	// (self-fallback'i sayesinde) UseSkill'in bNeedsTarget kontrolune eklenmedi.
+	HealTarget   UMETA(DisplayName = "Hedefi Iyilestir (yoksa kendini)")
 };
 
 /**
