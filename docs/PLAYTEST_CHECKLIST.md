@@ -525,6 +525,15 @@ regresyondur.
 
 ---
 
+# Yeni karaktere sinif secimi ipucu + minimap'te elit noktalari — commit 362889c (2026-09-12)
+
+> Derleme temiz, gorsel test edilmedi.
+
+- [ ] **Sinif ipucu:** Hic kaydı olmayan YENI bir karakterle oyuna gir → ekranda "Yeni karaktersin (varsayilan: Savasci)... MMOClass warrior|archer|mage|priest" mesaji gorunmeli. Var olan (kayitli) bir karakterle girince bu mesaj CIKMAMALI.
+- [ ] **Minimap elit noktalari:** Minimap'i ac, elit bir mob'un (or. Kadim Golem) menziline gir → onun noktasi turuncu ve normal mob noktalarindan biraz daha buyuk gorunmeli.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
