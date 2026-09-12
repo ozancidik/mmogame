@@ -992,7 +992,12 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 	// ayni) - yoksa ikisinden biri buyudukce panel disina tasabilirdi.
 	const int32 BagCount = Inv->EquipmentBag.Num();
 	const int32 ConsumableCount = Inv->Items.Num();
-	const int32 SectionHeaderCount = (BagCount > 0 ? 1 : 0) + (ConsumableCount > 0 ? 1 : 0);
+	// Canta alani HER ZAMAN tam bir baslik satiri kullanir: doluysa "CANTA (N)" basligi,
+	// bosken ayni yukseklikte bir ipucu metni - ikisi karsilikli dislayici oldugu icin tek
+	// satir olarak butceye dahil edilir (bug-hunt: bos-canta ipucu daha once bu butcenin
+	// DISINDA cizilip SharedRowH kadar ekstra yer kapliyordu - az sayida tuketilebilirle
+	// birlikte panelin altindan hafifce tasmaya sebep olabilirdi).
+	const int32 SectionHeaderCount = 1 + (ConsumableCount > 0 ? 1 : 0);
 	const float SectionHeaderH = 20.f;
 	const float SharedAvailH = FMath::Max(0.f, (PY + PH - 12.f) - RowY - SectionHeaderCount * SectionHeaderH);
 	const float SharedRowH = FMath::Min(RowH, SharedAvailH / (float)FMath::Max(1, BagCount + ConsumableCount));
@@ -1002,8 +1007,12 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 	if (BagCount > 0)
 	{
 		DrawText(FString::Printf(TEXT("CANTA (%d)"), BagCount), FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
-		RowY += SectionHeaderH;
 	}
+	else
+	{
+		DrawText(TEXT("(canta bos - moblardan yesil kureler dusur)"), FLinearColor(0.6f, 0.6f, 0.6f), RowX, RowY, nullptr, 0.75f);
+	}
+	RowY += SectionHeaderH;
 
 	for (int32 i = 0; i < BagCount; ++i)
 	{
@@ -1043,12 +1052,6 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 		}
 
 		DrawText(Line, RowColor, RowX + 6.f, RowY + 4.f, nullptr, 0.72f);
-		RowY += SharedRowH;
-	}
-
-	if (BagCount == 0)
-	{
-		DrawText(TEXT("(canta bos - moblardan yesil kureler dusur)"), FLinearColor(0.6f, 0.6f, 0.6f), RowX, RowY, nullptr, 0.75f);
 		RowY += SharedRowH;
 	}
 
