@@ -514,6 +514,17 @@ regresyondur.
 
 ---
 
+# Priest artik parti uyesini iyilestirebiliyor (Buyuk Sifa) — commit cbe38e2 (2026-09-12)
+
+> ONEMLI tasarim eksikligi kapatildi: Priest'in TUM iyilestirme skilleri sadece kendine etki ediyordu, parti icinde baskasini iyilestirmenin hicbir yolu yoktu. Bu 2 oyuncu (biri Priest) ve editor gerektirir — bu oturumda test edilemedi, ONCELIKLI test maddesi.
+
+- [ ] **Ana senaryo:** Priest ile baska bir oyuncuya (dusuk canli) tikla (hedef sec), Buyuk Sifa'yi kullan (hotbar) → hedef aldigin oyuncunun canı yenilenmeli (KENDI canın degil).
+- [ ] **Self-fallback:** Hicbir hedef secili degilken (veya kendine tiklayip) Buyuk Sifa kullan → eskisi gibi KENDI canın yenilenmeli (regresyon yok).
+- [ ] **Mob hedefteyken:** Bir moba tikla (hedef sec), Buyuk Sifa kullan → mob DEGIL, kendin iyilesmelisin (moba "iyilestirme" uygulanmamali).
+- [ ] **Diger Priest skilleri degismedi:** Kutsal Isik ve Ilahi Sifa/Yenilenme hala eskisi gibi SADECE kendine etki etmeli (bu skiller kasitli olarak degistirilmedi).
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
