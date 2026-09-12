@@ -290,10 +290,19 @@ void UMMOPartyComponent::FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invit
 		for (AMMOCharacter* M : VP->Members) { AddUniqueChar(M); }
 	}
 
+	// Iki (kalabalik) parti birlesip MaxParty'yi asarsa: SetNum ile sessizce kirpmak
+	// disaridaki uyeleri ApplyPartySet'in disinda birakirdi - onlarin KENDI Members
+	// dizisi hic dokunulmadan eski (artik yanlis/asimetrik) haliyle kalirdi (hayalet
+	// parti: A hala B'yi partili saniyor ama B'nin listesinde A yok). Kirpma yerine
+	// birlesmeyi tumden reddet; hicbir tarafin mevcut partisi bozulmasin.
 	const int32 MaxParty = 8;
 	if (Set.Num() > MaxParty)
 	{
-		Set.SetNum(MaxParty);
+		if (GEngine && Inviter->IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Parti dolu (maksimum 8)"));
+		}
+		return;
 	}
 
 	ApplyPartySet(Set);
