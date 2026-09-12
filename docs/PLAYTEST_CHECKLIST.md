@@ -534,6 +534,15 @@ regresyondur.
 
 ---
 
+# Sinif adi artik ana HUD'da surekli gorunuyor — commit 0df5a32 (2026-09-13)
+
+> Derleme temiz, gorsel test edilmedi.
+
+- [ ] **Gorunum:** Oyuna gir → sol ust "Lv N" yazisinin yaninda sinifin (or. "Lv 3  Savasci") gorunmeli, K basmadan.
+- [ ] **Regresyon:** Skill kitabini ac (K) → basliktaki "SKILL KITABI - Savasci" yazisi eskisi gibi dogru gorunmeli (ayni isim kaynagini paylasiyorlar).
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
