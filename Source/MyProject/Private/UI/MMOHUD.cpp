@@ -3,6 +3,7 @@
 #include "UI/MMOHUD.h"
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
+#include "Characters/MMOMobArchetype.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Effects/MMOEffectDatabase.h"
@@ -459,11 +460,20 @@ void AMMOHUD::DrawEnemyHealthBars()
 		const float BX = Screen.X - BarW * 0.5f;
 		const float BY = Screen.Y;
 
-		// Isim + seviye plakasi (bar ustunde).
+		// Isim + seviye plakasi (bar ustunde). Elit mob'lar (arketip DB'den, istemcide de
+		// erisilebilir - ArchetypeId zaten replike) bug-hunt: bIsElite'in kendisi replike
+		// DEGIL ama buna gerek yok, ArchetypeId + statik DB istemcide de ayni cevabi verir.
+		// Oncesinde elit mob'lar (Orumcek Ana, Kadim Golem vb.) normal moblarla AYNI
+		// gorunuyordu - oyuncunun tehlikeyi onceden anlamasinin hicbir yolu yoktu.
 		if (const AMMOMob* Mob = Cast<AMMOMob>(C))
 		{
-			const FString Plate = FString::Printf(TEXT("%s Lv%d"), *Mob->GetMobName(), Mob->GetMobLevel());
-			DrawText(Plate, FLinearColor(1.f, 0.75f, 0.7f), BX, BY - 15.f, nullptr, 0.72f);
+			const FMMOMobArchetype* Arch = FMMOMobDatabase::Find(Mob->ArchetypeId);
+			const bool bElite = Arch && Arch->bIsElite;
+			const FString Plate = bElite
+				? FString::Printf(TEXT("[ELIT] %s Lv%d"), *Mob->GetMobName(), Mob->GetMobLevel())
+				: FString::Printf(TEXT("%s Lv%d"), *Mob->GetMobName(), Mob->GetMobLevel());
+			DrawText(Plate, bElite ? FLinearColor(1.f, 0.55f, 0.15f) : FLinearColor(1.f, 0.75f, 0.7f),
+				BX, BY - 15.f, nullptr, bElite ? 0.8f : 0.72f);
 		}
 
 		DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.85f), BX - 1.f, BY - 1.f, BarW + 2.f, BarH + 2.f);
@@ -498,13 +508,17 @@ void AMMOHUD::DrawTargetBar()
 	const float BX = ((float)Canvas->SizeX - BarW) * 0.5f;
 	const float BY = 26.f;
 
-	// Ad + seviye (dusman kirmizisi — KO hedef rengi).
+	// Ad + seviye (dusman kirmizisi — KO hedef rengi). Elit isareti nameplate'le tutarli.
 	FString TargetName = TEXT("Canavar");
+	bool bTargetElite = false;
 	if (const AMMOMob* Mob = Cast<AMMOMob>(Target))
 	{
 		TargetName = Mob->GetMobName();
+		const FMMOMobArchetype* Arch = FMMOMobDatabase::Find(Mob->ArchetypeId);
+		bTargetElite = Arch && Arch->bIsElite;
 	}
-	DrawText(FString::Printf(TEXT("%s  Lv %d"), *TargetName, S->Level), FLinearColor(1.f, 0.35f, 0.3f),
+	const FString TargetPlate = FString::Printf(TEXT("%s%s  Lv %d"), bTargetElite ? TEXT("[ELIT] ") : TEXT(""), *TargetName, S->Level);
+	DrawText(TargetPlate, bTargetElite ? FLinearColor(1.f, 0.6f, 0.15f) : FLinearColor(1.f, 0.35f, 0.3f),
 		BX, BY - 18.f, nullptr, 1.f);
 
 	DrawRect(FLinearColor(0.02f, 0.02f, 0.02f, 0.9f), BX - 2.f, BY - 2.f, BarW + 4.f, BarH + 4.f);
