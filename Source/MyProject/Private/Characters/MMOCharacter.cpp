@@ -675,6 +675,19 @@ void AMMOCharacter::MMOPvP(int32 bOn)
 
 void AMMOCharacter::ServerSetPvP_Implementation(bool bOn)
 {
+	// GUVENLIK: bAllowPvP TUM sunucu icin gecerli paylasilan bir kuraldir, kisisel
+	// bir ayar degil. Bu kontrol olmadan HERHANGI BIR uzak istemci kendi konsoluna
+	// "MMOPvP 1" yazip ev sahibinin onayi olmadan butun oyuncular icin PvP'yi
+	// acabiliyordu (PvP'nin kasitli olarak kapali tutulmasi tasarim kararini bypass
+	// eden ciddi bir acik). Sadece HOST'un (listen server'i baslatan oyuncunun)
+	// karakteri bu RPC'yi kendi yerel controller'i uzerinden cagirabilir; uzak bir
+	// istemcinin karakterinin sunucudaki controller'i asla "local" degildir.
+	const AController* C = GetController();
+	if (!C || !C->IsLocalController())
+	{
+		return;
+	}
+
 	if (AMMOGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMMOGameMode>() : nullptr)
 	{
 		GM->bAllowPvP = bOn;
