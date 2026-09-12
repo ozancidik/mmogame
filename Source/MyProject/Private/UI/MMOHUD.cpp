@@ -684,28 +684,51 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 	const EMMOSkillTree Trees[5] = { EMMOSkillTree::Basic, EMMOSkillTree::Special0, EMMOSkillTree::Special1, EMMOSkillTree::Special2, EMMOSkillTree::Special3 };
 	const TCHAR* TreeNames[5] = { TEXT("Temel"), TEXT("Ustalik 1"), TEXT("Ustalik 2"), TEXT("Ustalik 3"), TEXT("Ustalik 4") };
 
-	float RowY = PY + 82.f;
-	const float RowX = PX + 14.f;
-	const float RowW = PW - 28.f;
-	const float RowH = 32.f;
-
+	// Skilleri agaclara onceden dagit (hem sayim hem cizim ayni veriyi kullansin).
+	TArray<TArray<const FMMOSkillDef*>> TreeSkills;
+	TreeSkills.SetNum(5);
+	int32 ActiveTreeCount = 0;
+	int32 TotalSkillCount = 0;
 	for (int32 t = 0; t < 5; ++t)
 	{
-		TArray<const FMMOSkillDef*> InTree;
 		for (const FMMOSkillDef& D : ClassSkills)
 		{
 			if (D.Tree == Trees[t])
 			{
-				InTree.Add(&D);
+				TreeSkills[t].Add(&D);
 			}
 		}
+		if (TreeSkills[t].Num() > 0)
+		{
+			++ActiveTreeCount;
+			TotalSkillCount += TreeSkills[t].Num();
+		}
+	}
+
+	const float HeaderH = 22.f;
+	const float TreeGapH = 6.f;
+	const float RowX = PX + 14.f;
+	const float RowW = PW - 28.f;
+
+	// Satir yuksekligini mevcut alana gore daralt (shop/quest/inventory ile ayni felsefe —
+	// sabit RowH=32 varsayimi kalabalik bir agac zincirinde panel disina tasabilirdi;
+	// mastery agaclarina ileride skill eklendikce bu artik otomatik uyum saglar, asla tasmaz).
+	const float AvailableH = (PY + PH - 40.f) - (PY + 82.f); // altta "hotbara ata" mesaji icin pay birak
+	const float OverheadH = ActiveTreeCount * (HeaderH + TreeGapH);
+	const float RowH = FMath::Clamp((AvailableH - OverheadH) / (float)FMath::Max(1, TotalSkillCount), 20.f, 32.f);
+
+	float RowY = PY + 82.f;
+
+	for (int32 t = 0; t < 5; ++t)
+	{
+		const TArray<const FMMOSkillDef*>& InTree = TreeSkills[t];
 		if (InTree.Num() == 0)
 		{
 			continue;
 		}
 
 		DrawText(TreeNames[t], FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
-		RowY += 22.f;
+		RowY += HeaderH;
 
 		for (const FMMOSkillDef* D : InTree)
 		{
@@ -733,7 +756,7 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 
 			RowY += RowH;
 		}
-		RowY += 6.f;
+		RowY += TreeGapH;
 	}
 
 	if (!PendingAssignSkill.IsNone())
