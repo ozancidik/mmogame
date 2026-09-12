@@ -294,6 +294,16 @@ bool AMMOCharacter::LoadCharacter()
 	const FString Slot = GetSaveSlotName();
 	if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))
 	{
+		// Yeni karakter: hicbir kayit olmadigi icin PossessedBy'daki SetupForClass
+		// varsayilan (Warrior) sinifi sessizce uygulamis durumda. Oyuncunun bunu
+		// degistirmenin tek yolunun gizli bir konsol komutu oldugunu bilmesinin
+		// hicbir yolu yoktu (icerik-erisilebilirligi eksigi, "PVP acik/kapali" gibi
+		// diger konsol-yonlendirmeli bildirimlerle ayni desen kullanildi).
+		if (GEngine && IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor(120, 200, 255),
+				TEXT("Yeni karaktersin (varsayilan: Savasci). Sinif secmek icin konsola yaz: MMOClass warrior|archer|mage|priest"));
+		}
 		return false; // yeni karakter
 	}
 

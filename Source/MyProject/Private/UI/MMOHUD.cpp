@@ -1530,12 +1530,15 @@ void AMMOHUD::DrawMinimap(AMMOCharacter* PlayerChar)
 		DrawRect(Color, CX + dx - DotSize * 0.5f, CY + dy - DotSize * 0.5f, DotSize, DotSize);
 	};
 
-	// Moblar (kirmizi)
+	// Moblar (kirmizi; elit/boss'lar turuncu ve biraz daha buyuk nokta - nameplate'teki
+	// [ELIT] etiketiyle tutarli, oyuncu haritada da tehlikeyi onceden secebilsin).
 	for (TActorIterator<AMMOMob> It(World); It; ++It)
 	{
 		if (*It && (*It)->GetStats() && !(*It)->GetStats()->bIsDead)
 		{
-			PlotDot((*It)->GetActorLocation(), FLinearColor(0.9f, 0.2f, 0.2f), 4.f);
+			const FMMOMobArchetype* Arch = FMMOMobDatabase::Find((*It)->ArchetypeId);
+			const bool bElite = Arch && Arch->bIsElite;
+			PlotDot((*It)->GetActorLocation(), bElite ? FLinearColor(1.f, 0.55f, 0.15f) : FLinearColor(0.9f, 0.2f, 0.2f), bElite ? 6.f : 4.f);
 		}
 	}
 	// Saticilar (mavi)
