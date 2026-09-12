@@ -24,6 +24,21 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerState.h"
 
+// Sinif adini goruntule (Turkce). Skill kitabinda zaten vardi, ana HUD'a da eklendi -
+// oyuncunun hangi sinifta oldugunu skill kitabini acmadan (bug-hunt: HICBIR yerde surekli
+// gorunmuyordu, sadece K basinca) her an gormesi icin tek yerde tanimli.
+static FString GetMMOClassDisplayName(EMMOClass Class)
+{
+	switch (Class)
+	{
+	case EMMOClass::Warrior: return TEXT("Savasci");
+	case EMMOClass::Archer:  return TEXT("Okcu");
+	case EMMOClass::Mage:    return TEXT("Buyucu");
+	case EMMOClass::Priest:  return TEXT("Priest");
+	}
+	return TEXT("?");
+}
+
 void AMMOHUD::DrawStatBar(float X, float Y, float Width, float Height, float Percent, const FLinearColor& FillColor)
 {
 	Percent = FMath::Clamp(Percent, 0.f, 1.f);
@@ -72,8 +87,14 @@ void AMMOHUD::DrawHUD()
 	const float X = BarOriginX;
 	const float Y = BarOriginY;
 
-	// Seviye yaz�s� (barlar�n �st�nde).
-	DrawText(FString::Printf(TEXT("Lv %d"), S->Level), FLinearColor::White, X, Y - 26.f, nullptr, 1.3f);
+	// Seviye + sinif yazisi (barlarin ustunde). Sinif adi eskiden sadece skill kitabinda
+	// (K) goruluyordu; artik her an ana HUD'da da gorunur.
+	FString LevelClassLine = FString::Printf(TEXT("Lv %d"), S->Level);
+	if (const UMMOSkillComponent* SkillComp = MMOChar->GetSkillComponent())
+	{
+		LevelClassLine += FString::Printf(TEXT("  %s"), *GetMMOClassDisplayName(SkillComp->CharacterClass));
+	}
+	DrawText(LevelClassLine, FLinearColor::White, X, Y - 26.f, nullptr, 1.3f);
 
 	// HP bar� (k�rm�z�).
 	DrawStatBar(X, Y, BarWidth, 26.f, S->GetHealthPercent(), FLinearColor(0.78f, 0.12f, 0.12f, 1.f));
@@ -678,14 +699,7 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 	SkillBookRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
 	SkillBookCloseRect = DrawCloseButton(PX, PY, PW);
 
-	FString ClassName;
-	switch (SkillComp->CharacterClass)
-	{
-	case EMMOClass::Warrior: ClassName = TEXT("Savasci"); break;
-	case EMMOClass::Archer:  ClassName = TEXT("Okcu");    break;
-	case EMMOClass::Mage:    ClassName = TEXT("Buyucu");  break;
-	case EMMOClass::Priest:  ClassName = TEXT("Priest");  break;
-	}
+	const FString ClassName = GetMMOClassDisplayName(SkillComp->CharacterClass);
 
 	DrawText(FString::Printf(TEXT("SKILL KITABI - %s"), *ClassName), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.3f);
 	DrawText(FString::Printf(TEXT("Skill Puani: %d     Level: %d"), Stats->UnspentSkillPoints, Stats->Level),
