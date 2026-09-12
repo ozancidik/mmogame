@@ -482,6 +482,15 @@ regresyondur.
 
 ---
 
+# Canta doluyken satin alma artik altin kaybettirmiyor — commit d5ccde9 (2026-09-12)
+
+> QA notu: BuyEquipment altini once dusup ekipmani sonra eklemeye calisiyordu; canta doluysa ekleme sessizce basarisiz oluyor ama altin geri verilmiyordu. Artik canta kontrolu altin dususunden ONCE yapiliyor. Derleme temiz.
+
+- [ ] **Ana senaryo:** Cantani tam 12 esyaya kadar doldur (satin alarak veya loot toplayarak), sonra saticidan bir ekipman daha almaya calis → **altin dusmemeli**, "Canta dolu!" mesaji gorunmeli.
+- [ ] **Regresyon:** Cantada yer varken normal satin alma yap → eskisi gibi altin dusup esya cantaya girmeli.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
