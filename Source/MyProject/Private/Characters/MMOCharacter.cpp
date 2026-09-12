@@ -156,6 +156,14 @@ void AMMOCharacter::HandleRevived()
 			Move->SetMovementMode(MOVE_Walking);
 		}
 	}
+
+	// Bu diriltme sifaci NPC'den (erken, bedelli) geldiyse HandleDeath'in kurdugu
+	// respawn zamanlayicisi hala bekliyor olabilir; temizlenmezse birkac saniye sonra
+	// zaten dirilmis/oynayan karakteri zorla baslangic noktasina isinlar. Zamanlayici
+	// zaten dogal respawn'dan geldiyse (RespawnAtStart calismis) bu cagri zaten bosa
+	// giden bir temizlik (handle gecersiz), zararsiz. Sadece sunucuda anlamli, ama
+	// istemcide bos bir handle'i temizlemek de zararsiz.
+	GetWorldTimerManager().ClearTimer(RespawnTimerHandle);
 }
 
 void AMMOCharacter::PossessedBy(AController* NewController)
