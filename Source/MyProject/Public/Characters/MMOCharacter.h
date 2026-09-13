@@ -71,6 +71,16 @@ public:
 	UFUNCTION(Exec)
 	void MMOLoad();
 
+	// Kayit dosyasi adi PlayerState'in adina dayanir (GetSaveSlotName). Bu proje
+	// login/kimlik sistemi kullanmiyor: motor varsayilaninda oyuncu adi baglanti
+	// sirasina gore "Player0"/"Player1".. olur - AYNI ISIMDIR farkli gecelerde farkli
+	// kisilerin ayni kayit dosyasini paylasip birbirinin karakterini EZMESI riski var
+	// (host her zaman Player0 oldugu icin guvenli, ama misafirler degil). Kalici bir
+	// kimlik sistemi olmadan tam duzeltilemez, ama oyuncuya EN AZINDAN kendi adini
+	// sabitleyecek bir arac ver - MMOSave/MMOLoad'dan ONCE cagrilmali.
+	UFUNCTION(Exec)
+	void MMOSetName(const FString& NewName);
+
 	// Karakteri diske yazar / diskten yukler (sadece otorite; istemciden Exec cagrilirsa sunucuya yonlenir).
 	void SaveCharacter();
 	bool LoadCharacter();
@@ -226,6 +236,9 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerLoadCharacter();
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetName(const FString& NewName);
 
 	FTimerHandle AutoLoadTimerHandle;
 	FTimerHandle AutoSaveTimerHandle;

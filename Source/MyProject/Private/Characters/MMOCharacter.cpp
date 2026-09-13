@@ -377,6 +377,36 @@ void AMMOCharacter::ServerLoadCharacter_Implementation()
 	LoadCharacter();
 }
 
+void AMMOCharacter::MMOSetName(const FString& NewName)
+{
+	if (HasAuthority())
+	{
+		ServerSetName_Implementation(NewName);
+	}
+	else
+	{
+		ServerSetName(NewName);
+	}
+}
+
+void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
+{
+	const FString Trimmed = NewName.TrimStartAndEnd();
+	if (Trimmed.IsEmpty())
+	{
+		return;
+	}
+	if (APlayerState* PS = GetPlayerState())
+	{
+		PS->SetPlayerName(Trimmed);
+	}
+	if (GEngine && IsLocallyControlled())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor(120, 200, 255),
+			FString::Printf(TEXT("Adin '%s' olarak ayarlandi. Kalici kayit icin simdi MMOSave/MMOLoad kullan."), *Trimmed));
+	}
+}
+
 void AMMOCharacter::PawnClientRestart()
 {
 	Super::PawnClientRestart();
