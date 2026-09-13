@@ -545,6 +545,17 @@ regresyondur.
 
 ---
 
+# ONEMLI BULGU: misafir oyuncular arasinda save-dosyasi cakismasi + MMOSetName araci — commit 07d0749 (2026-09-13)
+
+> Bu bir "gorsel test edilecek" degil, **oyun tasarimi/mimari** bulgusu — okuman lazim. Save dosyasi adi PlayerState'in adina dayaniyor; bu proje login/kimlik sistemi kullanmadigi icin motor varsayilaninda oyuncu adi baglanti SIRASINA gore "Player0/Player1/..." oluyor. Host her zaman Player0 oldugu icin guvenli, ama MISAFIRLER degil: farkli gecelerde "ikinci baglanan" farkli arkadaslarin HEPSI ayni "MMOSave_Player1" dosyasini paylasip birbirinin karakterini SESSIZCE EZEBILIR. Gercek arkadaslarinla coklu-oyunculu test etmeye basladiginda bunu bil.
+>
+> Tam duzeltme icin gercek bir kimlik sistemi (platform login veya yerel profil dosyasi) gerekir — bunu sen istemeden kurmadim. Bunun yerine her oyuncunun kendi adini sabitlemesini saglayan bir arac ekledim: `MMOSetName <isim>` konsol komutu.
+
+- [ ] **MMOSetName testi:** Misafir istemciden konsola `MMOSetName Ahmet` yaz → ekranda onay mesaji gorunmeli. Sonra `MMOSave` ile kaydet, cik, tekrar gir, `MMOSetName Ahmet` + `MMOLoad` yap → karakterin (level/altin/ekipman) korunmus olmali.
+- [ ] **Cakisma senaryosu (bilgi amacli, muhtemelen test etmeyeceksin):** Iki farkli "misafir" ile ayri gecelerde, hicbiri MMOSetName kullanmadan baglanip ilerleme kaydet → sonraki gece FARKLI bir kisi ikinci baglanirsa onceki misafirin kaydini gorebilir/ezebilir. Bunu gormek istersen bilerek tetikleyebilirsin, ama gercek bir tehlike oldugu icin oncelik MMOSetName'i alistirmak.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
