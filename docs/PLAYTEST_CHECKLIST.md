@@ -981,7 +981,7 @@ Oneri (kod bana ait degil): ya gorevin `RequiredLevel`'ini 10 yap, ya odulu Ejde
       cantaya gelmeli ama kusanmaya calisinca **"Level 10 gerekli"** reddi almalisin. Odul
       KAYBOLMAMALI — Lv10 olunca kusanilabilmeli.
 
-## LOW — Dukkan satin-alma sutununda yazi artik satir kutusuna sigmiyor
+## LOW — Dukkan satin-alma sutununda yazi artik satir kutusuna sigmiyor — FIXED (bkz. altta yeni commit)
 
 Panel TASMIYOR (otomatik kuculme calisiyor, liste tam sigiyor) — ama **yazi boyutu satirla birlikte
 kuculmuyor**. Hesap (`MMOHUD.cpp:1308-1311`): satir sayisi 24 → **29** oldu (21 ekipman + 7

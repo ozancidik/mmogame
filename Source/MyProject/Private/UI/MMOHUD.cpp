@@ -1309,6 +1309,10 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	const float BuyAvailH = (PY + PH - 12.f) - BuyStartY;
 	const float BuyRowH = FMath::Min(RowH, BuyAvailH / (float)FMath::Max(1, BuyRowCount));
 	const float BuyCellH = FMath::Max(1.f, BuyRowH - 4.f);
+	// QA denetimi (2026-09-14, Lv8-15/Lv16-24 icerik dilimleri sonrasi): satir yuksekligi
+	// kalabalik listede kuculuyordu ama yazi boyutu SABIT kaliyordu - satir kutusundan tasan
+	// yazi olusuyordu. Yaziyi da ayni oranda kucult (RowH=26 -> tam boy, daha kucukse orantili).
+	const float BuyTextScale = FMath::Clamp(BuyRowH / RowH, 0.45f, 1.f);
 
 	// Iksir satiri.
 	{
@@ -1318,7 +1322,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("Can Iksiri  -  %d altin"), FMMOItemDatabase::PotionPrice),
-			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.78f);
+			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.78f * BuyTextScale);
 		LY += BuyRowH;
 	}
 
@@ -1331,7 +1335,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("%s  -  %d altin"), *Def.Name, Def.Price),
-			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f);
+			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f * BuyTextScale);
 		LY += BuyRowH;
 	}
 
@@ -1343,7 +1347,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
 		ShopBuyRegions.Add(R);
 		DrawText(FString::Printf(TEXT("%s  -  %d altin (Lv%d)"), *Def.Name, FMMOItemDatabase::GetBuyPrice(Def), Def.RequiredLevel),
-			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f);
+			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f * BuyTextScale);
 		LY += BuyRowH;
 	}
 
