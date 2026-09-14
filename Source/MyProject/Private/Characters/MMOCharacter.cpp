@@ -1135,9 +1135,16 @@ void AMMOCharacter::MMOGiveItem(const FString& ItemId, int32 Count)
 
 void AMMOCharacter::ServerGiveItem_Implementation(FName ItemId, int32 Count)
 {
+	// GUVENLIK (qa-kontrolcu bulgusu): Count sadece MMOGiveItem'in istemci-tarafi
+	// yolunda clamp'leniyordu (FMath::Max(1,Count)) - bu RPC gövdesi ise ham geleni
+	// dogrudan kullaniyordu. Hileli bir istemci ServerGiveItem'i DOGRUDAN (istemci
+	// fonksiyonunu hic cagirmadan) devasa/negatif bir Count ile cagirabilirdi:
+	// Items dizisindeki Stack.Count int32'yi tasip negatife donerdi, o item o
+	// oyuncu icin KALICI OLARAK harcanamaz hale gelirdi. Ustten de sinirla
+	// (BuyPotion/BuyConsumable'daki ayni desen).
 	if (Inventory)
 	{
-		Inventory->AddItem(ItemId, Count);
+		Inventory->AddItem(ItemId, FMath::Clamp(Count, 1, 999));
 	}
 }
 
