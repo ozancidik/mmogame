@@ -139,6 +139,13 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastPlayCreatureAttack();
 
+	// Elit/boss oldugunde TUM sunucuya duyuru yap (bug-hunt: dunya boss'u/elit dustugunde
+	// hicbir sunucu-genelinde bildirim yoktu - sadece olduren ve menzildeki parti uyeleri
+	// gorurdu, herkes icin onemli bir olay olmasina ragmen). Reliable: nadir/dusuk frekansli
+	// bir olay, kaybolmamasi onemli.
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastEliteDeathAnnounce(const FString& MobDisplayName, const FString& KillerDisplayName);
+
 	float LastMobAttackTime = -100.f;
 	float LastRepathTime = -100.f;
 	bool bDeathHandled = false;

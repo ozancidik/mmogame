@@ -18,6 +18,7 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Animation/AnimInstance.h"
+#include "GameFramework/PlayerState.h"
 #include "Animation/AnimSequence.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -319,6 +320,15 @@ void AMMOMob::MulticastPlayCreatureAttack_Implementation()
 	AttackAnimUntil = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) + Len;
 }
 
+void AMMOMob::MulticastEliteDeathAnnounce_Implementation(const FString& MobDisplayName, const FString& KillerDisplayName)
+{
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor(255, 160, 40),
+			FString::Printf(TEXT("[DUNYA] %s, %s tarafindan devrildi!"), *MobDisplayName, *KillerDisplayName));
+	}
+}
+
 void AMMOMob::ApplyTint(const FLinearColor& Color)
 {
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
@@ -594,6 +604,19 @@ void AMMOMob::HandleDeath()
 			{
 				R->GetQuestComponent()->NotifyMobKilled(ArchetypeId);
 			}
+		}
+
+		// Elit/dunya boss'u dustugunde TUM sunucuya duyur (bug-hunt: onceden sadece
+		// olduren ve menzildeki parti uyeleri gorurdu - onemli bir sunucu-genelinde
+		// olay hic bildirilmiyordu).
+		if (bIsElite)
+		{
+			FString KillerName = TEXT("bilinmeyen bir maceraci");
+			if (const APlayerState* KillerPS = Killer->GetPlayerState())
+			{
+				KillerName = KillerPS->GetPlayerName();
+			}
+			MulticastEliteDeathAnnounce(MobName, KillerName);
 		}
 	}
 
