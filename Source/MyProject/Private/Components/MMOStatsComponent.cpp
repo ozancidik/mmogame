@@ -669,8 +669,13 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		return;
 	}
 
-	Level = In.Level;
-	Experience = In.Experience;
+	// GUVENLIK/BUG-HUNT (qa-kontrolcu bulgusu): once hicbir dogrulama yapmadan
+	// kopyalaniyordu. Bozuk/elle-duzenlenmis bir kayitta Level MaxLevel'i asarsa
+	// dogrudan ComputeExperienceForLevel'in tasma bolgesine duserdi (o fonksiyon artik
+	// kendi icinde kirpiyor ama burada da makul araliga sikistirmak ikinci bir savunma
+	// katmani), Experience de negatif olamaz.
+	Level = FMath::Clamp(In.Level, 1, MaxLevel);
+	Experience = FMath::Max(0, In.Experience);
 	UnspentStatPoints = In.UnspentStatPoints;
 	UnspentSkillPoints = In.UnspentSkillPoints;
 	Strength = In.Strength;
