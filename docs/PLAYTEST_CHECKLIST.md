@@ -1263,3 +1263,237 @@ kademeli degil sicramali oluyor. Kod degisikligi gerektirmez.
 
 - [ ] **Gozlem:** Dorduncu bolgede 10-15 mob'un nameplate'ine bak -> sadece Lv16/18/20/22 gorunmeli;
       araya Lv17/19/21 veya **Lv13 ve alti** bir mob KARISMAMALI (band sizintisi kontrolu).
+
+---
+
+# QA denetimi 2026-09-15 - yeni kilometre tasi gorevleri (5f92908) + 32 yeni skill (2e401c2, 0cb5744)
+
+Kapsam: `EMMOQuestType::ReachLevel` / `HaveGold` tamamlanma akisi (client-authority / cift-odul),
+yeni skillerin overflow / mastery-rutbe / dizi-sinir taramasi, bu turda eklenen tum Server RPC'leri.
+**Derleme:** `Build.bat MyProjectEditor Win64 Development` -> **Result: Succeeded**, 0 uyari.
+(Ilk cagri "Target is up to date" dedi; 3 cpp'nin zaman damgasi guncellenip GERCEK derleme
+zorlandi - link + `UnrealEditor-MyProject.dll` uretildi.)
+
+## HIGH - FIXED (commit e57a472) - Warrior ve Archer'in Lv80 nihai skilleri MATEMATIKSEL OLARAK kullanilamaz (mana tavani < mana maliyeti)
+
+Bu, daha onceki "BULGU #2" duzeltmesinin (`ManaPerLevel = 4.f` eklenmesi, `MMOStatsComponent.h:162`)
+**yetersiz kaldigi** durum - sorun kapandi saniliyor ama iki sinif icin hala acik.
+
+Formul (`MMOStatsComponent.cpp:159`): `MaxMana = 25 + Intelligence*5 + Level*4`.
+Ekipman **mana/INT vermiyor** - `SetEquipmentBonuses` sadece Attack/Defense aliyor
+(`MMOStatsComponent.cpp:415`, `MMOInventoryComponent.cpp:212`). Yani mana tavani SADECE INT ve seviyeye bagli.
+
+Sinif baslangic INT'leri (`MMOSkillComponent.cpp:156-159`): Warrior 6, Archer 8, Priest 18, Mage 22.
+**INT'ye hic yatirim yapmayan** (yani sinifin tasarlandigi build'i oynayan) bir Lv80 karakter icin:
+
+| Sinif | Lv80 MaxMana | Lv80 capstone | Maliyet | Sonuc |
+|---|---|---|---|---|
+| Warrior | 25+30+320 = **375** | `War_DoomsdayBlow` | **400** | **ASLA kullanilamaz** (-25) |
+| Archer  | 25+40+320 = **385** | `Arc_HuntersReckoning` | **400** | **ASLA kullanilamaz** (-15) |
+| Priest  | 25+90+320 = **435** | `Pri_HandOfHeaven` | 420 | ancak %96.5 mana ile, tek sefer |
+| Mage    | 25+110+320 = **455** | `Mag_AbsoluteAnnihilation` | 420 | ancak %92 mana ile |
+
+Warrior'in Lv70 capstone'u da sinirda: `War_TitanWrath` 320 mana, Lv70 MaxMana = 25+30+280 = **335**
+(%4.5 pay). Mana rejeni 7/sn oldugu icin 320 mana ~46 saniyede doluyor ama skilin CD'si 20sn -
+skill fiilen CD ile degil mana ile kilitli.
+
+Neden onemli: `CanLearn` mana kontrolu YAPMIYOR - oyuncu 3 skill puanini harcayip skili ogrenebiliyor,
+sonra kullanmaya calisinca `UseSkill` (`MMOSkillComponent.cpp:452`) "Yeterli mana yok!" deyip her
+seferinde reddediyor. Yani **geri alinamayan bir puan harcamasi + calismayan bir icerik**.
+Duzeltme yonu (mmo-developer karar verir): `ManaPerLevel` 4 -> ~5, veya capstone mana maliyetlerini
+dusurmek, veya ekipmana INT/MaxMana bonusu eklemek. Hangisi olursa olsun **INT'si 6 olan bir Lv80
+Warrior kendi nihai skilini atabilmeli.**
+
+- [ ] **Warrior dogrulama (asil test):** Yeni Warrior ac -> `MMOGainXP` ile Lv80'e cik ->
+      **stat puanlarinin HICBIRINI INT'ye verme** -> HUD'da `MP  x / y` satirina bak: ikinci sayi (MaxMana)
+      **375** mi? Ise bulgu ONAYLANDI.
+- [ ] Ayni karakterde Ustalik 4 agacina 2 rutbe yatirip `Kiyamet Darbesi`ni ogren -> hotbara at ->
+      **tam mana ile** tusa bas. Ekranda "Yeterli mana yok!" cikiyorsa skill **hic kullanilamiyor** demektir.
+- [ ] **Archer dogrulama:** Ayni akisi Archer'da tekrarla -> MaxMana **385**, `Avcinin Sonu` (400 mana)
+      basilamamali.
+- [ ] **Kontrol grubu (fix dogru mu):** Ayni Warrior'da STR/VIT yerine **INT'ye 5 puan** ver ->
+      MaxMana 400'e cikmali ve skill **tam mana iken tam olarak 1 kez** atilabilmeli.
+- [ ] **Priest/Mage regresyon:** Priest'te `Cennetin Eli` (420) ve Mage'de `Mutlak Yikim` (420) tam mana
+      ile atilabiliyor mu? Atilabiliyorsa bulgu sadece Warrior/Archer'a ozel demektir.
+
+## HIGH - FIXED (commit e57a472, egri Lv25+ icin dogrusala donusturuldu) - Lv45+ yeni skiller ve Q_Level40 XP egrisi yuzunden pratikte ULASILAMAZ
+
+32 yeni skilin buyuk kismi Lv45 / Lv58 / Lv70 / Lv80 kapilarinin arkasinda, ama XP egrisi
+(`MMOStatsComponent.cpp:145-149`: `100 * 1.25^(Level-1)`) ile **oyundaki en yuksek XP kaynagi**
+(Magma Tirani eliti, **6800 XP**, `MMOMobArchetype.cpp:213`; en iyi normal mob InfernalWraith **3700 XP**)
+arasinda kapanmayacak bir ucurum var. Mob XP'si seviye farkina gore **olceklenmiyor** -
+`MMOMob.cpp:601` duz `GainExperience(XPReward)` cagiriyor, yani Lv70'te de Lv24 elitinden 6800 aliniyor.
+
+Kumulatif XP (`400 * (1.25^(N-1) - 1)`) ve 6800 XP'lik elit kille karsiligi:
+
+| Hedef | Gereken toplam XP | ~Elit kill |
+|---|---|---|
+| Lv24 (mevcut icerik tavani) | 67.000 | 10 |
+| Lv30 (`Q_Level30`) | 258.000 | 38 |
+| **Lv40 (`Q_Level40`)** | **2.4 milyon** | **354** |
+| **Lv45** (War_WarCyclone / Arc_SpikeTrap / Mag_ArcaneBurst / Pri_AngelicBlade / Pri_HolyShield) | **7.3 milyon** | **1.080** |
+| **Lv58** (WarDeluge / PoisonCloud / ManaStorm / AngelicStorm / Unbreakable / ResiliencePrayer) | **133 milyon** | **19.600** |
+| **Lv70** (4 capstone) | **1,95 milyar** | **287.000** |
+| **Lv80** (4 nihai skill) | **18 milyar** | **2,66 milyon** |
+
+Yani commit `2e401c2` + `0cb5744` ile eklenen skillerin **yarisindan fazlasi** (Lv45 ve uzeri, 20 skil)
+ve `Q_Level40` gorevi, mevcut icerikle oynanarak **hicbir zaman acilamaz**. Bu bir denge/zevk
+karari degil, aritmetik: gerekli kill sayisi Lv70'te alti haneye, Lv80'de yedi haneye cikiyor.
+Ayrica Lv77'den itibaren tek seviyenin XP'si `MAX_int32`'ye kirpiliyor (`ComputeExperienceForLevel`
+icindeki onceki duzeltme), yani son 4 seviye tek basina ~8,6 milyar XP.
+
+Not (ilgili, yeni degil): parti XP'si **bolunmuyor** - `MMOMob.cpp:598-606` menzildeki HER uyeye TAM
+`XPReward` veriyor. 8 kisilik parti = 8x XP. Yukaridaki rakamlar tek oyuncu icin.
+
+Duzeltme yonu (mmo-developer/kullanici karari): XP egrisinin buyume katsayisini seviyeye gore
+kademelendirmek (or. Lv30+ icin 1.25 -> 1.10), ve/veya Lv25-80 araligina gercek mob/XP icerigi
+eklemek. **Simdilik en azindan bilinmesi gereken: Lv45+ skiller test edilemez, sadece `MMOGainXP`
+debug komutuyla dogrulanabilir.**
+
+- [ ] **Egriyi dogrula:** `MMOGainXP` ile Lv30'a cik -> stat penceresinde "sonraki seviye icin gereken XP"
+      **~65.000** civari mi? Lv40'ta ayni degere bak -> **~600.000** olmali.
+- [ ] **Gercek kazanim olcumu:** Lv24 bir karakterle Magma Tirani'ni oldur -> tek kille **6800 XP**
+      geliyor mu (HUD XP bari)? Geliyorsa tablodaki kill sayilari gecerli demektir.
+- [ ] **Seviye farki cezasi var mi:** `MMOGainXP` ile Lv40'a cik, sonra bir **Lv1 Goblin** oldur ->
+      hala **30 XP** mi aliyorsun? Aliyorsan "mob XP'si olceklenmiyor" ONAYLANDI.
+- [ ] **Yeni skiller calisiyor mu (debug yoluyla):** `MMOGainXP` ile Lv58'e cik -> her sinifta Lv45 ve
+      Lv58 skillerini ogren -> hepsi hasar/buff veriyor mu? (Bu, "ulasilamaz ama BOZUK DA degil"i ayirir.)
+- [ ] **Parti XP kontrolu:** 2 oyuncuyla parti kur, menzilde dur, 1 mob oldur -> **ikisi de TAM XP** mi
+      aldi? Aldilarsa bolunmeme ONAYLANDI (notu yukaridaki tabloyla birlikte degerlendir).
+
+## MEDIUM - FIXED (commit e57a472, QuestTextScale) - Gorev paneli 13+ satirda yaziyi kutunun disina tasiriyor (panel tasmiyor, YAZI tasiyor)
+
+`MMOHUD.cpp:1793-1801`. Panel yuksekligi adaptif oldugu icin satirlar **panelin disina cikmiyor**
+(bu kisim saglam), ama satir yuksekligi kuculunce iki metin satiri birbirine giriyor:
+
+- `RowSpace = 466 - 12 - 44 - 50 = 360px`, `RowH = min(46, 360 / ToplamSatir)`, `CellH = RowH - 4`
+- 1. satir `RowY+3`'te (olcek 0.78, ~12.5px), 2. satir `RowY + min(24, RowH*0.5)`'te (olcek 0.64, ~10px)
+- 2. satirin kutu icinde kalmasi icin `RowH*0.5 + 10 <= RowH - 4`, yani **`RowH >= 28`**
+- `RowH >= 28` sarti **ToplamSatir <= 12** demek. **13. satirda** 2. satir (odul yazisi) kutunun
+  alt kenarini asiyor ve 1. satirla cakismaya basliyor.
+
+"ToplamSatir" = o an **alinabilir** gorev sayisi + **aktif** gorev sayisi. Gorev tanimi 20'den
+**25**'e cikti (5f92908), yani bu esige yaklastik. Lv16+ bir oyuncuda ayni anda alinabilir olan
+on-kosulsuz/zinciri acilmis gorevler + kabul edilmis ama teslim edilmemis gorevler 12-14 bandina
+rahatca girebilir. **Su an tetiklenip tetiklenmedigi PIE'de DOGRULANMALI** - hesap esige cok yakin
+oldugunu gosteriyor ama gercek sayiyi oyun akisi belirliyor.
+
+Tiklama bolgeleri (`QuestAcceptRegions` / `QuestClaimRegions`) `CellH` ile hesaplandigi icin
+**tiklama dogru kalir**; sorun sadece okunabilirlik. Duzeltme yonu: dukkan panelindeki gibi
+olcegi satirla orantili kucultmek ya da 2 sutuna bolmek.
+
+- [ ] **Satir sayisini say:** Lv16+ bir karakterle gorevliye git, `J` (gorev penceresi) ac ->
+      "Alinabilir" + "Aktif" bolumlerindeki **toplam satiri say**. **13 veya uzeriyse** bulgu tetikleniyor.
+- [ ] **Gozle dogrula:** Toplam 13+ satirda odul yazisi ("Odul: ... XP, ... altin") kendi koyu
+      kutusunun **disina tasiyor** mu / gorev adiyla **ust uste biniyor** mu?
+- [ ] **Tiklama hala dogru mu (onemli):** En alttaki TAMAM olmus goreve tikla -> **tam o gorevin**
+      odulu gelmeli. Yanlis gorev teslim oluyorsa bulgu HIGH'a cikar.
+- [ ] **Esigi zorla:** Alinabilir tum gorevleri kabul et (hicbirini teslim etme) -> satir sayisi
+      maksimuma ciksin, ayni kontrolu tekrarla.
+
+## LOW - "Altin biriktir" gorevleri aslinda "su an cebinde X altin olsun" demek; altin harcayinca geri bozuluyor
+
+`MMOQuestComponent.cpp:135-137` - `HaveGold` tamamlanma kosulu `Inventory->Gold >= TargetCount`.
+Altin **dusulmuyor** ve bir kere tamamlandi diye **isaretlenmiyor**: gorev ancak `ClaimReward` ile
+`CompletedQuests`'e giriyor. Sonuclari:
+
+1. `Q_Gold5000` "TAMAM" gorunurken oyuncu dukkandan alisveris yapip 5000'in altina duserse gorev
+   sessizce **tekrar tamamlanmamis** hale doner. HUD'daki "- TAMAM, tikla!" yazisi bir sonraki
+   cizime kadar yanlis kalir.
+2. Oyuncu "TAMAM" gorup tiklarken arada altini harcamissa sunucu istegi **hicbir mesaj vermeden**
+   reddeder (`ClaimReward` 272. satir `return`). Oyuncu neden olmadigini anlayamaz.
+3. `Q_Level20/30/40` oduleri (5500 / 10000 / 15000 altin) `Q_Gold5000` ve `Q_Gold15000`'i **aninda**
+   tamamliyor. Tasarim boyleyse sorun yok, ama "biriktirme" hissi kayboluyor - not olarak burada.
+
+**Cift-odul riski YOK** (asagidaki "saglam" bolumune bak) - bu sadece bir davranis/UX bulgusu.
+
+- [ ] **Geri bozulma:** 5000 altina ulas, `Q_Gold5000`'i al, gorev panelinde "TAMAM" gorundugunu dogrula ->
+      **pencereyi kapatmadan** dukkana gidip 1000 altinlik bir sey al -> gorev panelini tekrar ac ->
+      satir artik "4000/5000" gostermeli, "TAMAM" **kaybolmali**.
+- [ ] **Sessiz red:** Ayni durumda (altin 5000'in altinda) "TAMAM" satiri hala ekrandayken tikla ->
+      hicbir sey olmuyor ve **hicbir mesaj cikmiyor** mu? Cikmiyorsa bulgu ONAYLANDI.
+- [ ] **Zincir dogrulama:** `Q_Level20`'yi teslim et (+5500 altin) -> `Q_Gold5000` aninda TAMAM oluyor mu?
+
+## LOW - `ServerAcceptQuest` / `ServerClaimReward` her cagrida tum dunyayi tariyor (spam edilebilir)
+
+`MMOQuestComponent.cpp:51` - `IsOwnerNearQuestGiver()` her cagrida `TActorIterator<AMMOQuestGiverNPC>`
+ile **tum seviyeyi** dolasiyor. Bu iki Server RPC **Reliable** ve istemciden **kisitlamasiz**
+cagrilabiliyor; hileli bir istemci saniyede yuzlerce `ServerClaimReward` gonderip sunucuda bos yere
+dunya taramasi yaptirabilir. Su an haritada cok az gorevli NPC oldugu icin etkisi kucuk, bu yuzden
+LOW - ama NPC sayisi artarsa buyur. (Ayni desenin vendor tarafinda da oldugunu not edelim.)
+Duzeltme yonu: gorevli NPC listesini bir kez cache'lemek ve/veya RPC'ye kisa bir cooldown koymak.
+
+- [ ] **Gozlem (opsiyonel, profil gerektirir):** `stat unit` acikken gorev penceresini acip odul-al
+      satirina hizlica 20-30 kez tikla -> `Game` suresi gozle gorulur sekilde ziplyor mu?
+
+## LOW - Olu alan: `FMMOQuestProgress::bClaimed` hicbir yerde okunmuyor
+
+`MMOQuestTypes.h:85`'te tanimli ve `AcceptQuest`'te `false` atanip kaydediliyor (`SaveGame` isaretli),
+ama hicbir kod **okumuyor**. Cift-odul korumasi aslinda "odul alinca `ActiveQuests`'ten silinir +
+`CompletedQuests`'e eklenir" mekanigiyle saglaniyor, `bClaimed` ile degil. Zararsiz ama yaniltici;
+ileride biri "cift-odul korumasi bClaimed'de" diye varsayarsa hataya yol acar. Kod degisikligi
+aciliyeti yok, temizlik notu.
+
+- [ ] (Test adimi gerekmiyor - kod okuma notu.)
+
+## LOW (latent) - Lv77+ `Experience += Amount` int32 tasmasina karsi korumasiz
+
+`MMOStatsComponent.cpp:295`. Onceki turda `ComputeExperienceForLevel` `MAX_int32`'ye kirpildi, ama
+`Experience` birikimi kirpilmadi. Lv77'den itibaren `ExperienceToNextLevel = 2.147.483.647` oldugu
+icin `Experience` seviye atlamadan bu degere kadar birikebilir; ~2,1 milyar XP biriktikten sonra
+gelen her XP **isaretli tamsayi tasmasi** (UB) yapip `Experience`'i negatife dondurur.
+**Pratikte ulasilamaz** (yukaridaki HIGH bulgusuna gore Lv77'ye ulasmak zaten milyonlarca kill
+gerektiriyor), bu yuzden LOW - ama XP egrisi duzeltilirse bu kapi acilir, birlikte ele alinmali.
+
+- [ ] (Normal oynanisla test edilemez. XP egrisi duzeltilirse `Experience` birikimine `FMath::Min`
+      koruması eklendigini kod incelemesiyle dogrula.)
+
+## SAGLAM - denetlenip TEMIZ cikanlar (regresyon icin burada duruyor)
+
+Asagidakiler bu turda tek tek kontrol edildi ve **sorun bulunmadi**; ileride biri ayni yerden
+supheye duserse tekrar bastan incelemesin diye kayda geciyor.
+
+1. **`ReachLevel` / `HaveGold` gorevlerinde client-authority acigi YOK.**
+   `IsQuestComplete` (`MMOQuestComponent.cpp:125-139`) degeri **sunucunun kendi** `Stats->Level` ve
+   `Inventory->Gold` alanlarindan okuyor. Istemci RPC ile sadece bir `FName QuestId` gonderiyor -
+   gonderebilecegi **hicbir ilerleme/seviye/altin degeri yok**. Sahte tamamlama imkansiz.
+2. **Cift-odul (double-claim) mumkun degil.** `ClaimReward` odulu verdikten sonra `CompletedQuests.Add`
+   + `ActiveQuests.RemoveAll` yapiyor; ikinci cagri `FindActive` null dondugu icin cikiyor, `AcceptQuest`
+   da `IsCompleted` ile yeniden almayi engelliyor. Iki RPC ayni karede gelse bile sunucu onlari
+   **sirayla** isledigi icin yaris kosulu yok.
+3. **`ClaimReward` odul yollari dogru:** `RewardXP` -> `GainExperience` (kirpilmis egri),
+   `RewardGold` -> `AddGold` (onceki turda tasmaya karsi sertlestirildi), `RewardConsumableCount`
+   pozitif kontrollu, `RewardEquipmentId` item tablosunda dogrulaniyor.
+4. **Yeni skillerde int32 tasmasi YOK.** `ManaCost` / `Power` / `Cooldown` hepsi `float`
+   (`MMOSkillTypes.h:93-106`); hasar `ApplyDamage(float)` ile akiyor. `int32`'ye donusen tek yer
+   HUD'daki `FMath::RoundToInt` cagrilari (en buyuk deger 1725) - tasma mesafesinde degil.
+5. **`MasteryRankArray` dizi sinir asimi YOK.** Dizi **agac** ile indeksleniyor (5 eleman), **rutbe**
+   ile degil. Warrior Special0'in rutbe 7'ye cikmasi sadece `MasteryRankArray[1]`'in degerini
+   buyutur. `RequestInvestMastery` hileli bir enum degeri gelse bile `IsValidIndex` ile eliyor
+   (`MMOSkillComponent.cpp:300-307`).
+6. **Mastery rutbeleri kesintisiz - ogrenme kilitlenmesi YOK.** `CanLearn` `RequiredMasteryRank > Rank+1`
+   ise reddettigi icin her agacta rutbelerin **1,2,3...** diye bosluksuz gitmesi sart. Dort sinifin
+   bes agacinin hepsi kontrol edildi: Warrior Special0 1-7, Special1 1-3, Special2 1-3, Special3 1-2;
+   Archer/Mage/Priest de bosluksuz. Ulasilamayan skill yok.
+7. **Yeni buff/debuff id'lerinin hepsi tanimli.** `RageII`, `IronSkinII`, `IronSkinIII`, `HasteII`,
+   `HasteIII`, `RegenII` -> hepsi `MMOEffectDatabase.cpp:49-54`'te var. (Tanimsiz olsaydi 120-150
+   mana'lik buff skilleri sessizce hicbir sey yapmayacakti.)
+8. **Skill kitabi paneli 18 skile ragmen tasmiyor.** En kalabalik sinif Warrior (18 skil / 5 agac).
+   Iki sutunlu dagitim sonrasi Col0 = 9 skil / 3 agac -> `RowH = 31.1`, toplam yukseklik 364px;
+   kullanilabilir alan 364px; alt mesaj satirina (PY+460) carpmiyor. Col1 = 9 skil / 2 agac -> `RowH`
+   32'de tavanliyor, 344px. **Sinirda ama iciride** - bir sonraki skill eklemesinde tekrar hesaplanmali.
+9. **Bu turda yeni/denetlenmemis Server RPC yok.** `git diff 966283a..HEAD` ile tarandi: tek RPC
+   degisikligi `ServerLearnSkill` -> **`ServerInvestMastery`** donusumu. Denetlendi: sunucu tarafi
+   skill puanini, `rutbe+1 <= Level` kuralini ve dizi sinirini yeniden dogruluyor; istemci tarafi
+   `CanLearn` sadece on-kontrol. `ServerAssignToSlot` / `ServerClearSlot` de slot indeksini ve
+   `IsLearned`'i sunucuda tekrar kontrol ediyor. Client-authority ihlali yok.
+   - Tek kucuk not: `ServerInvestMastery` yatirimin **o sinifta skili olan** bir agaca yapilip
+     yapilmadigini kontrol etmiyor - oyuncu puanini bos bir agaca gomebilir. Sadece kendine zarar,
+     istismar degil; yine de HUD zaten bos agaci cizmiyor, bu yuzden normal oynanista tetiklenmez.
+10. **`GetLifetimeReplicatedProps` eksiksiz.** Yeni `MasteryRankArray` `DOREPLIFETIME` listesinde
+    (`MMOSkillComponent.cpp:31`); gorev bileseninin `ActiveQuests`/`CompletedQuests` de kayitli.
+
+- [ ] **Regresyon (bu bolum icin tek test):** Play -> `K` ile skill kitabini ac -> Ustalik agacina
+      1 rutbe yatir -> **istemci HUD'inda** rutbe ve yeni skil aninda gorunuyor mu (replikasyon calisiyor)?
+      Sonra `J` ile gorev penceresinden bir gorev alip teslim et -> XP/altin/esya odulunun **ucunun de**
+      geldigini envanter + stat penceresinden dogrula.
