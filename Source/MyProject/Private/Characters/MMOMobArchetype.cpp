@@ -88,7 +88,14 @@ namespace
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.6f;
 		// Garantili ekipman, +1..+2.
-		Table.Last().EliteEquipDropChance = 1.0f;
+		// Ekonomi denge raporu (2026-09-14): bu elitler MMOMobSpawner uzerinden 30-50sn'de
+		// bir respawn ediyor (kalici bir dunya-boss/elit degil, tekrar farm edilebilir).
+		// %100 garantili dusus, tek bir OrcWarlord olduruslunde bile ~1000+ altin likit
+		// degerinde 2 esya demek - tekrarlanabilir oldugunda bu, projenin tek ciddi
+		// gold-sink'i olan +4-ustu upgrade kumarindan bile daha buyuk bir altin/esya
+		// kaynagi haline geliyordu. Sansa cevirmek (hala YUKSEK, ama garanti degil)
+		// bu farm dongusunu yumusatir; bir sonraki playtest turunde ayarlanabilir.
+		Table.Last().EliteEquipDropChance = 0.5f;
 		Table.Last().EliteEquipDropCount = 1;
 		Table.Last().EliteMinItemPlus = 1;
 		Table.Last().EliteMaxItemPlus = 2;
@@ -101,8 +108,8 @@ namespace
 		Table.Last().OnHitEffectChance = 0.4f;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.5f;
-		// Boss: en comert loot. 2 garantili ekipman, +2..+3.
-		Table.Last().EliteEquipDropChance = 1.0f;
+		// Boss: en comert loot. 2 garantili ekipman, +2..+3. Sans orani gerekcesi icin yukarida SpiderQueen yorumuna bak.
+		Table.Last().EliteEquipDropChance = 0.5f;
 		Table.Last().EliteEquipDropCount = 2;
 		Table.Last().EliteMinItemPlus = 2;
 		Table.Last().EliteMaxItemPlus = 3;
@@ -112,8 +119,8 @@ namespace
 		Table.Last().bIsElite = true;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.45f;
-		// Garantili ekipman, +1..+3.
-		Table.Last().EliteEquipDropChance = 1.0f;
+		// Garantili ekipman, +1..+3. Sans orani gerekcesi icin yukarida SpiderQueen yorumuna bak.
+		Table.Last().EliteEquipDropChance = 0.5f;
 		Table.Last().EliteEquipDropCount = 1;
 		Table.Last().EliteMinItemPlus = 1;
 		Table.Last().EliteMaxItemPlus = 3;
@@ -123,8 +130,8 @@ namespace
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.5f;
-		// Garantili ekipman, +1..+3.
-		Table.Last().EliteEquipDropChance = 1.0f;
+		// Garantili ekipman, +1..+3. Sans orani gerekcesi icin yukarida SpiderQueen yorumuna bak.
+		Table.Last().EliteEquipDropChance = 0.5f;
 		Table.Last().EliteEquipDropCount = 1;
 		Table.Last().EliteMinItemPlus = 1;
 		Table.Last().EliteMaxItemPlus = 3;

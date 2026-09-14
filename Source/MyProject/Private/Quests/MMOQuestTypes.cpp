@@ -85,21 +85,29 @@ namespace
 			T::KillSpecificMob, TEXT("Troll"), 3, 550, 380, 5));
 
 		// Ikinci bolge yan gorevi: Kara Buyuculeri sec (Lv7 normal; band spawner'dan cikar).
+		// Altin odulu ekonomi denge raporunda (2026-09-14) bulunan bir tutarsizlik yuzunden
+		// 500->650 cekildi: erken zincir gorevleri (Goblins/Wolves/Orcs) mob-grinding'e gore
+		// 3.2x-5.3x altin verirken bu ve asagidaki 2 yan gorev sadece 1.5x-2.0x veriyordu -
+		// zorluk arttikca odul-carpaninin DUSMESI ters bir tesvikti. Tam 3x'e degil, orta bir
+		// yukseltmeye gidildi (genel ekonomi zaten "altin cabuk anlamsizlasiyor" bulgusuna
+		// sahip - fazladan altin enjekte etmek yerine sadece tersine tutarsizligi kapatildi).
 		Table.Add(MakeQuest(TEXT("Q_Warlocks"), TEXT("Kara Buyuculer"), TEXT("Ikinci bolgedeki kara buyuculeri devir: 4 Kara Buyucu oldur."),
-			T::KillSpecificMob, TEXT("Warlock"), 4, 800, 500, 6));
+			T::KillSpecificMob, TEXT("Warlock"), 4, 800, 650, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("BattleAxe"));
 
 		// Ikinci bolge yan gorevi: Ork Savascilarini sec (Lv6 normal; band spawner'dan cikar).
 		// Q_Warlocks ile ayni bagimsiz-yan-gorev deseni; SteelHelmet o zamana kadar hicbir
-		// gorevde odul olarak kullanilmamisti (sadece elit loot/dukkanda vardi).
+		// gorevde odul olarak kullanilmamisti (sadece elit loot/dukkanda vardi). Altin
+		// odulu 480->620 (bkz. Q_Warlocks yorumu).
 		Table.Add(MakeQuest(TEXT("Q_OrcWarriors"), TEXT("Ork Savascilari"), TEXT("Ikinci bolgedeki ork savascilarini devir: 4 Ork Savascisi oldur."),
-			T::KillSpecificMob, TEXT("OrcWarrior"), 4, 750, 480, 6));
+			T::KillSpecificMob, TEXT("OrcWarrior"), 4, 750, 620, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("SteelHelmet"));
 
 		// Ikinci bolge yan gorevi: Korku Kurtlarini sec (Lv6 normal; band spawner'dan cikar).
-		// SteelBoots de ayni sekilde hicbir gorevde odul olarak kullanilmamisti.
+		// SteelBoots de ayni sekilde hicbir gorevde odul olarak kullanilmamisti. Altin odulu
+		// 480->600 (bkz. Q_Warlocks yorumu).
 		Table.Add(MakeQuest(TEXT("Q_DireWolves"), TEXT("Korku Kurtlari"), TEXT("Ikinci bolgedeki korku kurtlarini devir: 4 Korku Kurdu oldur."),
-			T::KillSpecificMob, TEXT("DireWolf"), 4, 750, 480, 6));
+			T::KillSpecificMob, TEXT("DireWolf"), 4, 750, 600, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("SteelBoots"));
 
 		// Buyuk servet (bagimsiz altin biriktirme).
