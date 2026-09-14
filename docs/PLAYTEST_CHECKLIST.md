@@ -7,6 +7,23 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
+# Skill agaci Lv80'e genisletildi: 4 sinifa 8'er yeni skill (2026-09-14)
+
+> MaxLevel 80'e cikarildiktan sonra Lv9-80 arasinda ogrenilecek yeni skill yoktu (en yuksek RequiredLevel=8'di).
+> Her sinifa (Warrior/Archer/Mage/Priest) `Source/MyProject/Private/Skills/MMOSkillDatabase.cpp` icine 8'er yeni
+> skill eklendi (Lv10/16/24/33/45/58/70/80), toplam 25 -> 57 skill. **ONEMLI:** bu isimler/degerler Knight Online'dan
+> literal import DEGIL — KO'nun sadece mastery-rutbe YAPISI uyarlandi, isimler/sayilar KO-STYLE uydurma icerik
+> (bkz. commit mesaji). Derleme temiz.
+
+- [ ] **Yeni skiller ogrenilebiliyor:** Herhangi bir siniftan bir karakteri `MMOGainXP` ile Lv10, Lv16, Lv24 gibi esik seviyelere getir → Skill (K) ekraninda o sinifin ilgili agacinda (Special0/1/2) yeni skill SP ile acilabilir olmali (once o agacin rutbesini bir yukseltmen gerekebilir — mevcut mastery-rutbe kurali degismedi).
+- [ ] **Special3 (yeni agac) ilk kez kullaniliyor:** Bir karakteri Lv70 ve Lv80'e getir → her sinifin "Ustalik 4" (Special3) agacinda iki capstone skill gorunmeli ve rutbe yatirilinca acilmali: Warrior "Kiyamet Darbesi", Archer "Avcinin Sonu", Mage "Mutlak Yikim", Priest "Cennetin Eli".
+- [ ] **Capstone hasar/sifa hissi:** Lv70-80 capstone skillerinden birini kullan (ornegin Mag_AbsoluteAnnihilation veya Pri_HandOfHeaven) → hasar/sifa miktari Lv8 civari eski skillerden (orn. Zincir Yildirim Power=130) belirgin sekilde daha yuksek hissettirmeli (kaba egri, hassas balans ayri bir geciste yapilacak).
+- [ ] **Priest ikili capstone kimligi:** Priest'in Lv70 skilli (Tanrisal Yargi) saldiri, Lv80 skilli (Cennetin Eli) ise HealTarget (secili muttefigi iyilestirir, hedef yoksa kendini) olmali — Priest'in hem savasci hem sifaci ucu bu iki skille test edilebilir.
+- [ ] **Yeni AoE/debuff skilleri (Arc_SpikeTrap, Arc_PoisonCloud) Zehir uyguluyor:** Bu iki skil bir hedefe/alana isabet ettiginde hedefte "Zehir" (Poison) periyodik hasar debuff'i gorunmeli (mevcut Zehirli Ok ile ayni efekt, yeni bir efekt ID'si eklenmedi).
+- [ ] **Regresyon:** Mevcut 25 eski skill (Lv1-8) davranisi, mastery-rutbe kurali (`RequestInvestMastery`, rutbe asla karakter seviyesini gecemez) ve HUD skill listesi (K ekrani) degismemis olmali.
+
+---
+
 # Kademeli yanma riski + MaxPlus 8 + MaxLevel 80 — commit 170f87c (2026-09-14)
 
 > Derleme temiz. Bir alt sectiondaki (commit 8532890) yanma-esigi ve MaxLevel=20

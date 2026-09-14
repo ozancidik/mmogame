@@ -67,6 +67,28 @@ namespace
 		Table.Add(MakeDef(TEXT("War_IronSkin"), TEXT("Demir Deri"), C::Warrior, T::Special2, 1, 4, 1, TEXT(""),
 			E::BuffSelf, 15.f, 18.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
 
+		// Lv10-80 genisletmesi (KO tarzi uydurma icerik, bkz. commit mesaji): Special0 fiziksel
+		// zincirin devami, Special1 kan/ofke hatti, Special2 savunma hatti, Special3 = gec oyun
+		// "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80).
+		Table.Add(MakeDef(TEXT("War_ShatterBlow"), TEXT("Parcalayici Darbe"), C::Warrior, T::Special0, 4, 10, 2, TEXT("War_BloodStorm"),
+			E::MeleeDamage, 45.f, 10.f, 150.f, 240.f, 0.f, TEXT("Slow")));
+		Table.Add(MakeDef(TEXT("War_TempestSlash"), TEXT("Savas Firtinasi"), C::Warrior, T::Special0, 5, 24, 2, TEXT("War_ShatterBlow"),
+			E::AoESelf, 95.f, 12.f, 270.f, 0.f, 440.f));
+		Table.Add(MakeDef(TEXT("War_LifeReap"), TEXT("Yasam Cali"), C::Warrior, T::Special1, 2, 16, 2, TEXT("War_BloodDrain"),
+			E::HealSelf, 70.f, 16.f, 310.f, 0.f, 0.f));
+		Table.Add(MakeDef(TEXT("War_BloodLord"), TEXT("Kan Efendisi"), C::Warrior, T::Special1, 3, 33, 2, TEXT("War_LifeReap"),
+			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("Rage")));
+		Table.Add(MakeDef(TEXT("War_SteelArmor"), TEXT("Celik Zirh"), C::Warrior, T::Special2, 2, 45, 2, TEXT("War_IronSkin"),
+			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
+		Table.Add(MakeDef(TEXT("War_Unbreakable"), TEXT("Yikilmaz"), C::Warrior, T::Special2, 3, 58, 3, TEXT("War_SteelArmor"),
+			E::BuffSelf, 150.f, 26.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
+		// Capstone 1/2: Titan Ofkesi.
+		Table.Add(MakeDef(TEXT("War_TitanWrath"), TEXT("Titan Ofkesi"), C::Warrior, T::Special3, 1, 70, 3, TEXT(""),
+			E::MeleeDamage, 320.f, 20.f, 1150.f, 260.f, 0.f));
+		// Capstone 2/2: Kiyamet Darbesi (Savascinin nihai skilli).
+		Table.Add(MakeDef(TEXT("War_DoomsdayBlow"), TEXT("Kiyamet Darbesi"), C::Warrior, T::Special3, 2, 80, 3, TEXT("War_TitanWrath"),
+			E::AoESelf, 400.f, 26.f, 1200.f, 0.f, 650.f));
+
 		// --- OKCU ---
 		Table.Add(MakeDef(TEXT("Arc_QuickShot"), TEXT("Cabuk Atis"), C::Archer, T::Basic, 1, 1, 1, TEXT(""),
 			E::RangedDamage, 6.f, 1.f, 25.f, 1400.f, 0.f));
@@ -84,6 +106,29 @@ namespace
 		Table.Add(MakeDef(TEXT("Arc_Sprint"), TEXT("Kosu"), C::Archer, T::Special1, 1, 3, 1, TEXT(""),
 			E::BuffSelf, 12.f, 16.f, 0.f, 0.f, 0.f, TEXT("Haste")));
 
+		// Lv10-80 genisletmesi (KO tarzi uydurma icerik, bkz. commit mesaji): Special0 menzilli
+		// hasar zincirinin devami, Special1 hiz/kacis hatti, Special2 yeni tuzak/zehir hatti,
+		// Special3 = gec oyun "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80).
+		Table.Add(MakeDef(TEXT("Arc_EagleEye"), TEXT("Kartal Gozu"), C::Archer, T::Special0, 4, 10, 2, TEXT("Arc_PiercingShot"),
+			E::RangedDamage, 45.f, 10.f, 150.f, 1800.f, 0.f));
+		Table.Add(MakeDef(TEXT("Arc_DragonArrow"), TEXT("Ejder Oku"), C::Archer, T::Special0, 5, 24, 2, TEXT("Arc_EagleEye"),
+			E::RangedDamage, 105.f, 13.f, 360.f, 1900.f, 0.f, TEXT("Slow")));
+		Table.Add(MakeDef(TEXT("Arc_ShadowStep"), TEXT("Golge Adimi"), C::Archer, T::Special1, 2, 16, 2, TEXT("Arc_Sprint"),
+			E::BuffSelf, 70.f, 18.f, 0.f, 0.f, 0.f, TEXT("Haste")));
+		Table.Add(MakeDef(TEXT("Arc_WindsBreath"), TEXT("Ruzgarin Nefesi"), C::Archer, T::Special1, 3, 33, 2, TEXT("Arc_ShadowStep"),
+			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("Haste")));
+		// Civili Tuzak: alandaki hedeflere zehir birakan yeni okcu hatti.
+		Table.Add(MakeDef(TEXT("Arc_SpikeTrap"), TEXT("Civili Tuzak"), C::Archer, T::Special2, 1, 45, 2, TEXT(""),
+			E::AoETarget, 195.f, 18.f, 510.f, 1900.f, 480.f, TEXT("Poison")));
+		Table.Add(MakeDef(TEXT("Arc_PoisonCloud"), TEXT("Zehir Bulutu"), C::Archer, T::Special2, 2, 58, 3, TEXT("Arc_SpikeTrap"),
+			E::AoETarget, 250.f, 20.f, 660.f, 2000.f, 560.f, TEXT("Poison")));
+		// Capstone 1/2: Ok Firtinasi.
+		Table.Add(MakeDef(TEXT("Arc_ArrowTempest"), TEXT("Ok Firtinasi"), C::Archer, T::Special3, 1, 70, 3, TEXT(""),
+			E::AoETarget, 320.f, 22.f, 860.f, 2100.f, 620.f));
+		// Capstone 2/2: Avcinin Sonu (Okcunun nihai skilli - tek hedefe en agir atis).
+		Table.Add(MakeDef(TEXT("Arc_HuntersReckoning"), TEXT("Avcinin Sonu"), C::Archer, T::Special3, 2, 80, 3, TEXT("Arc_ArrowTempest"),
+			E::RangedDamage, 400.f, 22.f, 1600.f, 2200.f, 0.f));
+
 		// --- BUYUCU ---
 		Table.Add(MakeDef(TEXT("Mag_IceBolt"), TEXT("Buz Oku"), C::Mage, T::Basic, 1, 1, 1, TEXT(""),
 			E::RangedDamage, 10.f, 1.5f, 40.f, 1400.f, 0.f));
@@ -97,6 +142,29 @@ namespace
 		// Zincir Yildirim: tek hedefe buyucunun en agir vurusu, carptigi hedefi felce ugratir (Slow).
 		Table.Add(MakeDef(TEXT("Mag_ChainLightning"), TEXT("Zincir Yildirim"), C::Mage, T::Special0, 3, 8, 2, TEXT("Mag_Meteor"),
 			E::RangedDamage, 42.f, 10.f, 130.f, 1600.f, 0.f, TEXT("Slow")));
+
+		// Lv10-80 genisletmesi (KO tarzi uydurma icerik, bkz. commit mesaji): Special0 ates/yildirim
+		// zincirinin devami, Special1 buz hattinin devami, Special2 yeni arkane hatti, Special3 =
+		// gec oyun "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80).
+		Table.Add(MakeDef(TEXT("Mag_FlameStorm"), TEXT("Alev Firtinasi"), C::Mage, T::Special0, 4, 10, 2, TEXT("Mag_ChainLightning"),
+			E::AoETarget, 45.f, 11.f, 115.f, 1800.f, 400.f));
+		Table.Add(MakeDef(TEXT("Mag_Thunderclap"), TEXT("Gok Gurlemesi"), C::Mage, T::Special0, 5, 24, 2, TEXT("Mag_FlameStorm"),
+			E::RangedDamage, 105.f, 13.f, 380.f, 1900.f, 0.f, TEXT("Slow")));
+		Table.Add(MakeDef(TEXT("Mag_IceChain"), TEXT("Buz Zinciri"), C::Mage, T::Special1, 2, 16, 2, TEXT("Mag_FrostNova"),
+			E::RangedDamage, 70.f, 12.f, 245.f, 1800.f, 0.f, TEXT("Slow")));
+		Table.Add(MakeDef(TEXT("Mag_FreezingTempest"), TEXT("Donduran Firtinasi"), C::Mage, T::Special1, 3, 33, 2, TEXT("Mag_IceChain"),
+			E::AoESelf, 145.f, 16.f, 380.f, 0.f, 480.f, TEXT("Slow")));
+		// Arcane Patlama: buyucunun yeni arkane hatti, elementsiz saf mana hasari.
+		Table.Add(MakeDef(TEXT("Mag_ArcaneBurst"), TEXT("Arcane Patlama"), C::Mage, T::Special2, 1, 45, 2, TEXT(""),
+			E::AoETarget, 195.f, 16.f, 520.f, 1900.f, 500.f));
+		Table.Add(MakeDef(TEXT("Mag_ManaStorm"), TEXT("Mana Firtinasi"), C::Mage, T::Special2, 2, 58, 3, TEXT("Mag_ArcaneBurst"),
+			E::AoETarget, 250.f, 18.f, 680.f, 2000.f, 560.f));
+		// Capstone 1/2: Meteor Yagmuru.
+		Table.Add(MakeDef(TEXT("Mag_MeteorShower"), TEXT("Meteor Yagmuru"), C::Mage, T::Special3, 1, 70, 3, TEXT(""),
+			E::AoETarget, 320.f, 20.f, 900.f, 2000.f, 640.f));
+		// Capstone 2/2: Mutlak Yikim (Buyucunun nihai skilli - oyundaki en yuksek alan hasari).
+		Table.Add(MakeDef(TEXT("Mag_AbsoluteAnnihilation"), TEXT("Mutlak Yikim"), C::Mage, T::Special3, 2, 80, 3, TEXT("Mag_MeteorShower"),
+			E::AoETarget, 420.f, 26.f, 1350.f, 2100.f, 700.f));
 
 		// --- PRIEST ---
 		Table.Add(MakeDef(TEXT("Pri_HolyLight"), TEXT("Kutsal Isik"), C::Priest, T::Basic, 1, 1, 1, TEXT(""),
@@ -115,6 +183,31 @@ namespace
 		// Buff: zamanla iyilesme (Yenilenme HoT).
 		Table.Add(MakeDef(TEXT("Pri_Renew"), TEXT("Yenilenme"), C::Priest, T::Special0, 1, 3, 1, TEXT(""),
 			E::BuffSelf, 18.f, 12.f, 0.f, 0.f, 0.f, TEXT("Regen")));
+
+		// Lv10-80 genisletmesi (KO tarzi uydurma icerik, bkz. commit mesaji): Special0 kutsal hasar
+		// hattinin devami, Special1 sifa zincirinin devami, Special2 yeni koruma hatti, Special3 =
+		// gec oyun "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80 - biri hasar biri sifa, priestin
+		// hem savasci hem sifaci kimligini yansitir).
+		Table.Add(MakeDef(TEXT("Pri_HolyFlame"), TEXT("Kutsal Alev"), C::Priest, T::Special0, 2, 10, 2, TEXT("Pri_HolyBurst"),
+			E::RangedDamage, 45.f, 10.f, 150.f, 1500.f, 0.f));
+		Table.Add(MakeDef(TEXT("Pri_WrathOfAngels"), TEXT("Meleklerin Ofkesi"), C::Priest, T::Special0, 3, 24, 2, TEXT("Pri_HolyFlame"),
+			E::AoETarget, 105.f, 13.f, 290.f, 1500.f, 420.f));
+		// Kutsal Yagmur: Buyuk Sifa'nin devami, secili muttefigi iyilestirir (yoksa kendini).
+		Table.Add(MakeDef(TEXT("Pri_HolyRain"), TEXT("Kutsal Yagmur"), C::Priest, T::Special1, 3, 16, 2, TEXT("Pri_DivineRestoration"),
+			E::HealTarget, 110.f, 16.f, 380.f, 0.f, 0.f));
+		Table.Add(MakeDef(TEXT("Pri_LifeBond"), TEXT("Yasam Bagi"), C::Priest, T::Special1, 4, 33, 3, TEXT("Pri_HolyRain"),
+			E::HealTarget, 210.f, 20.f, 750.f, 0.f, 0.f, TEXT("Regen")));
+		// Kutsal Kalkan: Priestin yeni koruma hatti (Special2, ilk defa kullaniliyor).
+		Table.Add(MakeDef(TEXT("Pri_HolyShield"), TEXT("Kutsal Kalkan"), C::Priest, T::Special2, 1, 45, 2, TEXT(""),
+			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
+		Table.Add(MakeDef(TEXT("Pri_ResiliencePrayer"), TEXT("Direnc Duasi"), C::Priest, T::Special2, 2, 58, 3, TEXT("Pri_HolyShield"),
+			E::BuffSelf, 150.f, 24.f, 0.f, 0.f, 0.f, TEXT("Regen")));
+		// Capstone 1/2: Tanrisal Yargi (saldiri).
+		Table.Add(MakeDef(TEXT("Pri_DivineJudgment"), TEXT("Tanrisal Yargi"), C::Priest, T::Special3, 1, 70, 3, TEXT(""),
+			E::AoETarget, 320.f, 22.f, 950.f, 1600.f, 600.f));
+		// Capstone 2/2: Cennetin Eli (Priestin nihai skilli - oyundaki en buyuk tekil sifa).
+		Table.Add(MakeDef(TEXT("Pri_HandOfHeaven"), TEXT("Cennetin Eli"), C::Priest, T::Special3, 2, 80, 3, TEXT("Pri_DivineJudgment"),
+			E::HealTarget, 420.f, 24.f, 1650.f, 0.f, 0.f, TEXT("Regen")));
 
 		return Table;
 	}
