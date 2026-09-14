@@ -13,6 +13,7 @@ struct FMMOFloatingText
 	FVector WorldLocation = FVector::ZeroVector;
 	float Amount = 0.f;
 	float SpawnTime = 0.f;
+	bool bIsHeal = false;
 };
 
 /** HUD uzerinde tiklanabilir bir bolge (skill kitabi satiri veya hotbar slotu). */
@@ -36,8 +37,10 @@ class MYPROJECT_API AMMOHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 
-	// Bir karakter hasar aldiginda cagrilir; o dunya konumunda ucan hasar sayisi ekler.
-	void AddDamageNumber(const FVector& WorldLocation, float Amount);
+	// Bir karakter hasar aldiginda/iyilestiginde cagrilir; o dunya konumunda ucan sayi ekler
+	// (hasar=kirmizimsi altin, iyilesme=yesil +N). bIsHeal=false varsayilan - eski cagri
+	// yerleri (sadece hasar biliyordu) degismeden calismaya devam eder.
+	void AddDamageNumber(const FVector& WorldLocation, float Amount, bool bIsHeal = false);
 
 	// --- NPC diyalog balonu (konusan NPC'ye tiklaninca alt-ortada gosterilir) ---
 	// Pencere DEGILDIR: hareketi engellemez, sadece bir sure gorunur ve solar.

@@ -218,8 +218,31 @@ void UMMOStatsComponent::Heal(float Amount)
 		return;
 	}
 
+	const float OldHealth = Health;
 	Health = FMath::Clamp(Health + Amount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(Health, MaxHealth);
+
+	// Ucan "+N" iyilesme sayisi (hasar sayisinin ayni yontemi - TakeDamage'deki host-yerel
+	// bildirimle simetrik). BILEREK sadece burada (Heal() cagrilarinda - potion/skill/NPC
+	// sifaci): TickComponent'teki pasif yenilenme dogrudan Health'i mutasyona ugratir, BU
+	// yolu KULLANMAZ - yoksa her saniye "+2" gibi surekli spam olurdu.
+	const float ActualHeal = Health - OldHealth;
+	if (ActualHeal > 0.f)
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			if (const APlayerController* PC = World->GetFirstPlayerController())
+			{
+				if (AMMOHUD* HUD = Cast<AMMOHUD>(PC->GetHUD()))
+				{
+					if (const AActor* Owner = GetOwner())
+					{
+						HUD->AddDamageNumber(Owner->GetActorLocation() + FVector(0.f, 0.f, 90.f), ActualHeal, /*bIsHeal=*/true);
+					}
+				}
+			}
+		}
+	}
 }
 
 void UMMOStatsComponent::RestoreMana(float Amount)

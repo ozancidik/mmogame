@@ -351,12 +351,13 @@ void AMMOHUD::DrawMouseCursor(float X, float Y, bool bAttackMode)
 	}
 }
 
-void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount)
+void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount, bool bIsHeal)
 {
 	FMMOFloatingText FT;
 	FT.WorldLocation = WorldLocation;
 	FT.Amount = Amount;
 	FT.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	FT.bIsHeal = bIsHeal;
 	FloatingTexts.Add(FT);
 }
 
@@ -602,8 +603,11 @@ void AMMOHUD::DrawFloatingTexts()
 			continue;
 		}
 
-		const FString Txt = FString::Printf(TEXT("%d"), FMath::RoundToInt(FT.Amount));
-		DrawText(Txt, FLinearColor(1.f, 0.85f, 0.2f, Alpha), Screen.X - 8.f, Screen.Y, nullptr, 1.4f);
+		const FString Txt = FT.bIsHeal
+			? FString::Printf(TEXT("+%d"), FMath::RoundToInt(FT.Amount))
+			: FString::Printf(TEXT("%d"), FMath::RoundToInt(FT.Amount));
+		const FLinearColor Col = FT.bIsHeal ? FLinearColor(0.35f, 0.95f, 0.4f, Alpha) : FLinearColor(1.f, 0.85f, 0.2f, Alpha);
+		DrawText(Txt, Col, Screen.X - 8.f, Screen.Y, nullptr, 1.4f);
 	}
 }
 
