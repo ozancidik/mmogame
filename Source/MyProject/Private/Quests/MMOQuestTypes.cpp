@@ -167,6 +167,40 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("1000 altin biriktir."),
 			T::HaveGold, TEXT(""), 1000, 500, 0, 3));
 
+		// --- Lv16-40 kilometre tasi gorevleri (SPAWNER/MOB GEREKTIRMEZ) ---
+		// Bu blok bilerek sadece ReachLevel/HaveGold tipinde: ikisi de oyuncunun mevcut
+		// durumunu (seviye/altin) anlik kontrol eder, hicbir yeni mob arketipi veya
+		// spawner yerlesimi istemez. Son iki tier'de eklenen elit spawner'lar
+		// PlayerStart'tan 4200-5600 birim uzaga konuldu ve o mesafede gercek zemin/navmesh
+		// olup olmadigi henuz PIE'de dogrulanmadi; icerigi bu riski buyutmeden derinlestirmek
+		// icin Lv16-40 araligi once mob gerektirmeyen gorevlerle dolduruluyor.
+		// Oduller mevcut tavanin (Q_MagmaTyrant: 12000XP/8000g, Lv24) etrafinda kademeli
+		// ilerler: Lv20 milestone'u tavanin altinda, Lv30/Lv40 uzerinde kalir.
+		// Altin gorevleri mevcut desene uyup altin DEGIL sadece XP oduller (bkz. Q_Gold500/1000).
+
+		// Seviye kilometre taslari zinciri: Q_Level5 -> Q_Level20 -> Q_Level30 -> Q_Level40.
+		Table.Add(MakeQuest(TEXT("Q_Level20"), TEXT("Kidemli Savasci"), TEXT("Deneyimini kanitla: 20. seviyeye ulas."),
+			T::ReachLevel, TEXT(""), 20, 9000, 5500, 16, TEXT("Q_Level5")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_Level30"), TEXT("Usta Savasci"), TEXT("Ustaligini taclandir: 30. seviyeye ulas."),
+			T::ReachLevel, TEXT(""), 30, 16000, 10000, 24, TEXT("Q_Level20")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_Level40"), TEXT("Efsanevi Sovalye"), TEXT("Adini efsanelere yaz: 40. seviyeye ulas."),
+			T::ReachLevel, TEXT(""), 40, 24000, 15000, 30, TEXT("Q_Level30")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 8;
+
+		// Altin biriktirme zinciri devami: Q_Gold1000 -> Q_Gold5000 -> Q_Gold15000.
+		Table.Add(MakeQuest(TEXT("Q_Gold5000"), TEXT("Vadinin Tuccari"), TEXT("5000 altin biriktir."),
+			T::HaveGold, TEXT(""), 5000, 6000, 0, 16, TEXT("Q_Gold1000")));
+
+		Table.Add(MakeQuest(TEXT("Q_Gold15000"), TEXT("Efsanevi Servet"), TEXT("15000 altin biriktir."),
+			T::HaveGold, TEXT(""), 15000, 14000, 0, 28, TEXT("Q_Gold5000")));
+
 		return Table;
 	}
 }

@@ -1023,3 +1023,95 @@ gerekir) ama **satilabilir**: Mithril Kilic satis ~350 altin, onceki tavan Ejder
 
 - [ ] **Olcum:** Baslangic alaninda (Lv1-5) ~20 mob oldur → kac tanesinden **Mithril** parcasi dustu?
       2-3'ten fazlaysa erken oyun altin akisi beklenenden hizli demektir, not al.
+
+---
+
+# Lv16-40 kilometre tasi gorevleri (5 gorev, SPAWNER/MOB GEREKTIRMEZ) — 2026-09-15
+
+> Derleme temiz (`Result: Succeeded`), oynanis test EDILMEDI. **Kapsam notu:** bu dilim bilerek
+> **hicbir yeni mob, spawner veya harita yerlesimi icermiyor** — sadece `MMOQuestTypes.cpp`'ye
+> 5 gorev tanimi eklendi. Sebep: son iki icerik diliminde eklenen elit spawner'lar PlayerStart'tan
+> 4200-5600 birim uzaga konuldu ve o mesafede gercek zemin/navmesh olup olmadigi henuz PIE'de
+> dogrulanmadi (bkz. yukaridaki "MEDIUM — Buz Lordu haritanin disinda/navmesh disinda kalabilir"
+> bulgusu). Bu risk buyutulmeden icerigi derinlestirmek icin sadece oyuncunun mevcut durumunu
+> (seviye/altin) kontrol eden gorev tipleri kullanildi.
+>
+> Yeni gorevler — seviye zinciri: `Q_Level5` → **Q_Level20** (Kidemli Savasci, Lv16'da alinir,
+> 9000XP/5500g + Buyuk Can Iksiri x5) → **Q_Level30** (Usta Savasci, Lv24, 16000XP/10000g +
+> Buyuk Mana Iksiri x5) → **Q_Level40** (Efsanevi Sovalye, Lv30, 24000XP/15000g + Buyuk Can
+> Iksiri x8). Altin zinciri: `Q_Gold1000` → **Q_Gold5000** (Vadinin Tuccari, Lv16, 6000XP) →
+> **Q_Gold15000** (Efsanevi Servet, Lv28, 14000XP). Altin gorevleri mevcut desene uyup
+> altin odulu VERMEZ (sadece XP) — `Q_Gold500`/`Q_Gold1000` de boyle.
+>
+> Hizli seviye atlamak icin `MMOGainXP`, altin icin mevcut debug/satis yollari kullanilabilir.
+
+- [ ] **Zincir kilidi (seviye):** `Q_Level5` bitmeden gorevli NPC'de **Kidemli Savasci** GORUNMEMELI.
+      Q_Level5 bitip Lv16 olunca listede belirmeli. Ayni sekilde Usta Savasci sadece Kidemli
+      Savasci bitince (ve Lv24'te), Efsanevi Sovalye sadece Usta Savasci bitince (ve Lv30'da) cikmali.
+- [ ] **Zincir kilidi (altin):** `Q_Gold1000` bitmeden **Vadinin Tuccari** gorunmemeli; Vadinin
+      Tuccari bitmeden **Efsanevi Servet** gorunmemeli (ve Lv28 gerekmeli).
+- [ ] **Anlik tamamlanma (seviye):** Kidemli Savasci'yi Lv16'da al → panelde ilerleme `16/20`
+      gibi gorunmeli. `MMOGainXP` ile Lv20'ye cik → **hicbir mob oldurmeden** gorev tamamlanmis
+      olmali ve "odul al" satiri aktiflesmeli.
+- [ ] **Anlik tamamlanma (altin):** Vadinin Tuccari aktifken 5000 altina ulas → gorev aninda
+      tamamlanmali. **ONEMLI:** bu gorev altini HARCAMAZ ve mevcut bakiyeye bakar — odulu almadan
+      once altini 5000'in altina harcarsan gorev tekrar "tamamlanmadi"ya donmeli (bu kasitli,
+      mevcut `HaveGold` davranisi).
+- [ ] **Oduller dogru geliyor:** Kidemli Savasci → 9000XP + 5500 altin + Buyuk Can Iksiri x5;
+      Usta Savasci → 16000XP + 10000 altin + Buyuk Mana Iksiri x5; Efsanevi Sovalye → 24000XP +
+      15000 altin + Buyuk Can Iksiri x8. Altin gorevleri (Vadinin Tuccari 6000XP / Efsanevi Servet
+      14000XP) **altin VERMEMELI** — bu kasitli, bug degil.
+- [ ] **Gorev paneli tasmiyor (en olasi gorsel sorun):** Gorev tanimi sayisi 20 → **25** oldu.
+      Gorevli NPC panelini ac (ozellikle Lv16+ bir karakterle, yeni gorevlerin hepsi acikken) →
+      tum alinabilir gorevler ekrana sigmali, "odul al" satirlari tiklanabilir olmali. Daha once
+      bu panelde iki kez overflow duzeltmesi yapilmisti; 5 gorev daha eklendigi icin TEKRAR bak.
+      Satirlar okunamayacak kadar kuculuyorsa veya alttakiler ekran disinda kaliyorsa bildir.
+- [ ] **Denge sorusu (sana ait karar):** Lv30/Lv40 gorevleri su an mob icerigi olmayan bir aralikta
+      (en yuksek mob Lv24 Magma Tirani). Yani bu iki gorev simdilik uzun bir grind demek. Odul
+      egrisi (9000 → 16000 → 24000 XP) sana mantikli geliyor mu, yoksa Lv30/Lv40'i mob icerigi
+      gelene kadar geri mi cekelim?
+- [ ] **REGRESYON — eski milestone gorevleri:** `Q_Level5` (Guclen) ve `Q_Gold500`/`Q_Gold1000`
+      eskisi gibi calismali: Q_Level5 hala Lv1'de alinabilmeli ve Lv5'te tamamlanmali; altin
+      gorevleri hala altin odulu vermemeli.
+
+## BULGU #6 duzeltmesi — Warrior/Priest Special0 hasar zinciri Lv45/58'e uzatildi
+
+Onceki denetimde tespit edilen bulgu: Warrior ve Priest'in Special0 (fiziksel / kutsal hasar)
+zinciri Lv24'te tikaniyordu (`War_TempestSlash`, `Pri_WrathOfAngels`) — Lv70 capstone'a kadar
+46 seviye boyunca bu iki sinifa YENI hicbir hasar skili gelmiyordu (Special1/Special2'deki
+Lv45/58 eklemeleri sadece buff, Power=0). Archer ve Mage ayni aralikta (Special2: SpikeTrap/
+PoisonCloud, ArcaneBurst/ManaStorm) yeni hasar skilleri kazandigi icin bu iki sinif "dolu"
+kalirken Warrior/Priest "bos" kaliyordu. Duzeltme olarak her iki sinifin Special0 zincirine
+Lv45 ve Lv58'de birer yeni hasar skili eklendi (`MMOSkillDatabase.cpp`):
+
+- **Warrior** — `War_WarCyclone` "Savas Kasirgasi" (rutbe 6, Lv45, MeleeDamage, Power 510,
+  Mana 195, CD 18s) ve `War_WarDeluge` "Savas Tufani" (rutbe 7, Lv58, AoESelf, Power 660,
+  Radius 560, Mana 250, CD 20s). `War_TempestSlash`'tan (rutbe 5) devam eden zincir.
+- **Priest** — `Pri_AngelicBlade` "Meleklerin Kilici" (rutbe 4, Lv45, RangedDamage, Power 510,
+  Range 1500, Mana 195, CD 18s) ve `Pri_AngelicStorm` "Meleklerin Firtinasi" (rutbe 5, Lv58,
+  AoETarget, Power 660, Range 1600, Radius 560, Mana 250, CD 20s). `Pri_WrathOfAngels`'tan
+  (rutbe 3) devam eden zincir.
+
+Power/Mana/CD degerleri Archer'in `Arc_SpikeTrap`/`Arc_PoisonCloud` ve Mage'in
+`Mag_ArcaneBurst`/`Mag_ManaStorm` skilleriyle (ayni seviyedeki hasar skilleri) ayni olcekte
+tutuldu. NOT: gorev talimatinda bu referans skillerin "Power"i 195/250 olarak anildi, ancak
+gercek deger bu (Mana=195/250, Power=510-520/660-680) — dolayisiyla yeni skiller gercek Power
+olcegine (510/660) hizalandi, boylece Warrior/Priest'in DPS'i Archer/Mage'den kopuk kalmadi.
+`RequiredMasteryRank` her iki sinifta da onceki zincir halkasindan buyuk (6>5, 7>6, 4>3, 5>4)
+ve karakter seviyesini asmiyor (`RequiredMasteryRank <= RequiredLevel`), bu yuzden BULGU #5/#6
+tarzi bir rutbe-seviye ihlali yok. `AppliedEffectId` bos birakildi (saf hasar skili, buff degil).
+
+- [ ] **Ogrenme sirasi dogrulama:** Bir Warrior'i Lv45'e getir, Special0 rutbesini 6'ya
+      yatirmayi dene → **basarili olmali**. Ayni karakteri Lv44'te dene → **basarisiz olmali**
+      ("Level 45 gerekli" / rutbe hatasi).
+- [ ] **Zincir kirilmiyor mu:** `War_WarCyclone`'u rutbe 5 (TempestSlash acilmadan) yatirmaya
+      calis → mastery sistemi rutbeleri sirali actigindan rutbe 6'ya once rutbe 1-5'in
+      yatirilmis olmasi gerekir, atlama olmamali.
+      Ayni kontrolu Priest'te `Pri_AngelicBlade` (rutbe 4) icin tekrarla.
+- [ ] **Hasar gozle dogrulama:** Lv45+ bir Warrior ile Savas Kasirgasi'ni bir mob'a kullan →
+      hasar sayisi diger Lv45 hasar skilleriyle (~500-520 bandi) ayni buyuklukte gorunmeli,
+      asiri dusuk/yuksek olmamali. Lv58'de Savas Tufani icin de ayni kontrol (~650-680 bandi).
+      Priest'te Meleklerin Kilici/Firtinasi icin ayni kontrolu tekrarla.
+- [ ] **UI:** Skill agacinda (HUD skill paneli) Warrior/Priest Special0 sutununda artik 7 (Warrior)
+      / 5 (Priest) satir gorunmeli, isimler ("Savas Kasirgasi", "Savas Tufani", "Meleklerin
+      Kilici", "Meleklerin Firtinasi") kesilmeden/tasmadan okunabilir olmali.
