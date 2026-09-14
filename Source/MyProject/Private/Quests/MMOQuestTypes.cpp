@@ -53,6 +53,32 @@ namespace
 			T::KillSpecificMob, TEXT("OrcWarlord"), 1, 1500, 1000, 5, TEXT("Q_Bandits")));
 		Table.Last().RewardEquipmentId = FName(TEXT("GreatSword"));
 
+		// --- Ucuncu bolge zinciri (Lv8-15): Q_Boss'tan SONRA baslar ---
+		// Q_Boss (1500XP/1000g) oyuncuyu ~Lv15-16'da birakip icerigi bitiriyordu; bu zincir
+		// Lv8-13 mob'lariyla o boslugun ilk kademesini doldurur. Oduller Q_Boss'un uzerine
+		// kademeli cikar (1800 -> 4500 XP). NOT: Lv16-80 hala bos, bilerek boyle.
+		Table.Add(MakeQuest(TEXT("Q_FrostWraiths"), TEXT("Buz Hayaletleri"), TEXT("Ucuncu bolgenin buzul sisini dagit: 5 Buz Hayaleti oldur."),
+			T::KillSpecificMob, TEXT("FrostWraith"), 5, 1800, 1200, 8, TEXT("Q_Boss")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 3;
+
+		Table.Add(MakeQuest(TEXT("Q_CursedKnights"), TEXT("Lanetli Sovalyeler"), TEXT("Harabelerin lanetli muhafizlarini devir: 5 Lanetli Sovalye oldur."),
+			T::KillSpecificMob, TEXT("CursedKnight"), 5, 2200, 1450, 9, TEXT("Q_FrostWraiths")));
+		Table.Last().RewardEquipmentId = FName(TEXT("MithrilBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_VenomSpiders"), TEXT("Zehir Orumcekleri"), TEXT("Yuvayi zehirden temizle: 6 Zehir Orumcegi oldur."),
+			T::KillSpecificMob, TEXT("VenomSpider"), 6, 2700, 1750, 10, TEXT("Q_CursedKnights")));
+		Table.Last().RewardEquipmentId = FName(TEXT("MithrilHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_OrcBerserkers"), TEXT("Ork Berserkleri"), TEXT("Kuzey kampindaki cilgin orklari kir: 5 Ork Berserk oldur."),
+			T::KillSpecificMob, TEXT("OrcBerserker"), 5, 3400, 2200, 12, TEXT("Q_VenomSpiders")));
+		Table.Last().RewardEquipmentId = FName(TEXT("MithrilPlate"));
+
+		// Zincirin sonu: ucuncu bolge eliti (Lv13).
+		Table.Add(MakeQuest(TEXT("Q_FrostLich"), TEXT("Buz Lordu"), TEXT("Buzul tahtindaki lordu devir: Buz Lordu'nu oldur."),
+			T::KillSpecificMob, TEXT("FrostLich"), 1, 4500, 3000, 13, TEXT("Q_OrcBerserkers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("MithrilBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));

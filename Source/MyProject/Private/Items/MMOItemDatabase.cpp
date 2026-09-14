@@ -33,24 +33,31 @@ namespace
 		Table.Add(MakeItem(TEXT("BattleAxe"), TEXT("Savas Baltasi"), S::Weapon, 22.f, 0.f, 5));
 		Table.Add(MakeItem(TEXT("GreatSword"), TEXT("Buyuk Kilic"), S::Weapon, 30.f, 0.f, 6));
 		Table.Add(MakeItem(TEXT("DragonBlade"), TEXT("Ejder Kilici"), S::Weapon, 38.f, 0.f, 7));
+		// Mithril tier (Lv10): ucuncu bolge (Lv8-15) kademesinin ust-tier'i. Ejder setinin
+		// uzerine mevcut egriyle devam eder. Elit loot havuzu "RequiredLevel <= MobLevel &&
+		// >= MaxReq-2" ile secildigi icin mevcut Lv5-7 elitleri bu tier'i DUSURMEZ (MaxReq=7).
+		Table.Add(MakeItem(TEXT("MithrilBlade"), TEXT("Mithril Kilic"), S::Weapon, 48.f, 0.f, 10));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
 		Table.Add(MakeItem(TEXT("ChainMail"), TEXT("Zincir Zirh"), S::Armor, 0.f, 10.f, 3));
 		Table.Add(MakeItem(TEXT("PlateArmor"), TEXT("Plaka Zirh"), S::Armor, 0.f, 15.f, 5));
 		Table.Add(MakeItem(TEXT("DragonPlate"), TEXT("Ejder Zirh"), S::Armor, 0.f, 21.f, 7));
+		Table.Add(MakeItem(TEXT("MithrilPlate"), TEXT("Mithril Zirh"), S::Armor, 0.f, 28.f, 10));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
 		Table.Add(MakeItem(TEXT("IronHelmet"), TEXT("Demir Kask"), S::Helmet, 0.f, 6.f, 3));
 		Table.Add(MakeItem(TEXT("SteelHelmet"), TEXT("Celik Kask"), S::Helmet, 0.f, 7.f, 5));
 		Table.Add(MakeItem(TEXT("DragonHelm"), TEXT("Ejder Kask"), S::Helmet, 0.f, 9.f, 7));
+		Table.Add(MakeItem(TEXT("MithrilHelm"), TEXT("Mithril Kask"), S::Helmet, 0.f, 12.f, 10));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
 		Table.Add(MakeItem(TEXT("IronBoots"), TEXT("Demir Bot"), S::Boots, 0.f, 5.f, 3));
 		Table.Add(MakeItem(TEXT("SteelBoots"), TEXT("Celik Bot"), S::Boots, 0.f, 8.f, 5));
 		Table.Add(MakeItem(TEXT("DragonBoots"), TEXT("Ejder Bot"), S::Boots, 0.f, 12.f, 7));
+		Table.Add(MakeItem(TEXT("MithrilBoots"), TEXT("Mithril Bot"), S::Boots, 0.f, 16.f, 10));
 
 		return Table;
 	}

@@ -129,6 +129,41 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Log, TEXT("[MMODBG] SecondZone spawner @ %s"), *SecondZoneLoc.ToCompactString());
 	}
 
+	// --- UCUNCU SAVAS BOLGESI (Lv8-12 NORMAL moblar) ---
+	// Ikinci bolgenin AYNASI: eksende MobAreaDistance*4 (2800u) + SOL yone 1600u.
+	// Mevcut spawner'lara merkez-merkez mesafeler (MobAreaDistance=700, F=Facing, R=RightDir):
+	//   Ikinci bolge (F*2800 + R*1600) : 3200u
+	//   Golge Suikastci (F*2240)       : ~1695u
+	//   Kadim Golem (F*1120 - R*700)   : ~1906u
+	//   Ork Reisi (F*1540)             : ~2037u
+	//   Ana alan (F*1050)              : ~2371u
+	//   Orumcek Ana (F*1120 + R*700)   : ~2848u
+	// Hepsi >700u (QA kurali). ForcedArchetypeId YOK; band Lv8-12 normalleri secer.
+	const FVector ThirdZoneLoc = Origin + Facing.Vector() * (MobAreaDistance * 4.f) - RightDir * 1600.f + FVector(0.f, 0.f, 50.f);
+	const FTransform ThirdZoneTM(FRotator::ZeroRotator, ThirdZoneLoc);
+	if (AMMOMobSpawner* ThirdZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThirdZoneTM))
+	{
+		ThirdZone->MaxMobs = 5;
+		ThirdZone->SpawnRadius = 500.f;
+		ThirdZone->MinMobLevel = 8;
+		ThirdZone->MaxMobLevel = 12;
+		UGameplayStatics::FinishSpawningActor(ThirdZone, ThirdZoneTM);
+		UE_LOG(LogTemp, Log, TEXT("[MMODBG] ThirdZone spawner @ %s"), *ThirdZoneLoc.ToCompactString());
+	}
+
+	// Elit: Buz Lordu (Lv13, ucuncu bolge kademe-sonu) — eksende en uzak nokta (MobAreaDistance*6 = 4200u).
+	// En yakin spawner'lara mesafe: Golge Suikastci ~1960u, Ikinci/Ucuncu bolge ~2126u (>700u).
+	const FVector LichLoc = Origin + Facing.Vector() * (MobAreaDistance * 6.f) + FVector(0.f, 0.f, 50.f);
+	const FTransform LichTM(FRotator::ZeroRotator, LichLoc);
+	if (AMMOMobSpawner* LichSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), LichTM))
+	{
+		LichSpawner->MaxMobs = 1;
+		LichSpawner->SpawnRadius = 150.f;
+		LichSpawner->TopUpInterval = 60.f;
+		LichSpawner->ForcedArchetypeId = FName(TEXT("FrostLich"));
+		UGameplayStatics::FinishSpawningActor(LichSpawner, LichTM);
+	}
+
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
 	FActorSpawnParameters NpcParams;
 	NpcParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;

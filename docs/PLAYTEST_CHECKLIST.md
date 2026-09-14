@@ -727,6 +727,51 @@ regresyondur.
 
 ---
 
+# Ucuncu bolge: Lv8-15 icerik dilimi (4 normal mob + 1 elit + 5 gorev + Mithril tier) — 2026-09-14
+
+> Derleme temiz (`Result: Succeeded`), oynanis test EDILMEDI. **Kapsam notu:** bu, Lv80 hedefinin sadece **Lv8-15** kismini doldurur; Lv16-80 hala bos ve bu bilerek boyle (tum bosluk tek seferde doldurulmuyor).
+>
+> Yeni icerik: normal moblar `FrostWraith` (Buz Hayaleti, Lv8), `CursedKnight` (Lanetli Sovalye, Lv9), `VenomSpider` (Zehir Orumcegi, Lv10), `OrcBerserker` (Ork Berserk, Lv12); elit `FrostLich` (Buz Lordu, Lv13). Gorev zinciri: `Q_Boss` → Q_FrostWraiths → Q_CursedKnights → Q_VenomSpiders → Q_OrcBerserkers → Q_FrostLich. Yeni esya tier'i: Mithril (Lv10, 4 parca).
+>
+> Hizli seviye atlamak icin `MMOGainXP` konsol komutu kullanilabilir (zincirin ilk gorevi Lv8 istiyor).
+
+## Spawner yerlesimi / cakisma
+
+- [ ] **Ucuncu bolge yerinde mi:** Oyuna gir, PlayerStart'in baktigi yonde ilerle ve SOLA kay (eksende ~2800u, sola ~1600u). 5 mob'luk bir grup olmali ve **sadece** Buz Hayaleti / Lanetli Sovalye / Zehir Orumcegi / Ork Berserk cikmali.
+- [ ] **Band sizintisi yok (onemli):** Baslangictaki ANA mob alaninda (PlayerStart'in ~1050u onunde) hicbir Lv8+ mob cikmamali — orasi hala Lv1-5. Ikinci bolgede (eksende ~2800u, SAGA ~1600u) hala sadece Lv6-7 (Ork Savascisi / Korku Kurdu / Kara Buyucu) cikmali.
+- [ ] **Bolgeler ust uste binmiyor:** Ucuncu bolge ile ikinci bolge arasinda 3200u, en yakin elite (Golge Suikastci) ~1695u mesafe var. Ucuncu bolge moblari ile ikinci bolge/Golge Suikastci moblarinin ayni yigin icinde karismadigini gozle dogrula (spawn yaricapi 500u).
+- [ ] **Buz Lordu tek ve uzakta:** Eksende en uzak nokta (~4200u). Tek bir Buz Lordu olmali, yaninda baska spawner mob'u olmamali. Oldurunce ~60sn sonra tekrar dogmali.
+
+## Mob davranisi / olcekleme
+
+- [ ] **Guc egrisi mantikli mi:** Lv7 Kara Buyucu'yu rahat oldurebilen bir karakter Lv8 Buz Hayaleti'ni biraz daha zor, Lv12 Ork Berserk'i belirgin sekilde zor oldurmeli. Hicbiri "tek vurusta olen" veya "hic olmeyen" hissi vermemeli.
+- [ ] **Efektler calisiyor:** Buz Hayaleti ve Ork Berserk vurusta **Slow**, Zehir Orumcegi **Poison** uygulayabilmeli (HUD'da debuff ikonu). Lanetli Sovalye ve Ork Berserk cani %40-50 altina dusunce **Rage** ile ofkelenmeli (hasari artmali).
+- [ ] **Ork Berserk gorseli:** Warrok (ork) mesh'i ve animasyonlariyla cikmali — mor/gri Manny degil. Yurume/saldiri/olum animasyonlari oynamali.
+- [ ] **Buz Lordu elit muamelesi:** Oldurunce **tum sunucuya** "elit dustu" duyurusu gitmeli (mevcut elit duyuru sistemi).
+
+## Elit loot orani (ekonomi kurali)
+
+- [ ] **%50 — garantili DEGIL:** Buz Lordu'nu **en az 6-8 kez** oldur ve kac seferinde ekipman dustugunu say. Yaklasik yarisinda dusmeli; her seferinde dusuyorsa `EliteEquipDropChance` yanlis okunuyor demektir (0.5 olmali, 1.0 degil).
+- [ ] **Dustugunde 2 parca, +2..+4:** Dusus oldugunda **2 ekipman** birden dusmeli ve arti seviyeleri +2 ile +4 arasinda olmali.
+- [ ] **Mithril tier dusuyor:** Buz Lordu Lv13 oldugu icin loot havuzu Lv8-10 bandindan seciliyor → dusen esyalar **Mithril** parcalari olmali (Ejder degil).
+- [ ] **REGRESYON — eski elitler degismedi:** Orumcek Ana / Ork Reisi / Kadim Golem / Golge Suikastci hala **Ejder/Celik** tier dusurmeli, Mithril DEGIL (onlarin seviyesi <= 7). Dusus oranlari da eskisi gibi ~%50 kalmali.
+
+## Gorev zinciri
+
+- [ ] **Zincir kilidi:** Lv8 olmadan / `Q_Boss` bitmeden gorevli NPC'de "Buz Hayaletleri" GORUNMEMELI. Q_Boss bitip Lv8 olunca listede belirmeli.
+- [ ] **Sirali acilis:** Her gorev bir oncekini gerektirmeli: Q_FrostWraiths → Q_CursedKnights (Lv9) → Q_VenomSpiders (Lv10) → Q_OrcBerserkers (Lv12) → Q_FrostLich (Lv13). Bir ara halkayi atlayip sonrakini alabiliyorsan prereq bozuk demektir.
+- [ ] **Sayac dogru mob'u sayiyor:** Ornegin Q_VenomSpiders aktifken Buz Hayaleti oldur → sayac ARTMAMALI; Zehir Orumcegi oldur → artmali.
+- [ ] **Oduller:** Sirasiyla Buyuk Can Iksiri x3, Mithril Bot, Mithril Kask, Mithril Zirh, Mithril Kilic gelmeli; XP/altin 1800/1200'den 4500/3000'e kademeli artmali (hepsi Q_Boss'un 1500/1000'inin uzerinde).
+- [ ] **Gorev paneli tasmiyor:** Zincir acikken gorevli NPC panelinde tum alinabilir gorevler ekrana sigmali, "odul al" satirlari erisilebilir olmali (daha once overflow duzeltmesi yapilmisti — 5 yeni gorev sonrasi tekrar bak).
+
+## Mithril tier (yeni esya kademesi)
+
+- [ ] **Dukkan listesi tasmiyor (onemli):** Saticiyi ac — satin-alma sutununda artik 4 esya daha var (toplam 21 ekipman + 7 tuketilebilir). Tum satirlar panele sigmali ve tiklanabilir olmali; satir yuksekligi okunamayacak kadar kuculmemeli. Kucultuyorsa HUD'da kaydirma/sutun bolme gerekebilir.
+- [ ] **Statlar ve fiyat:** Mithril Kilic 48 atak, Mithril Zirh 28 def, Mithril Kask 12 def, Mithril Bot 16 def; hepsi Lv10 gerektirmeli. Lv10 altinda kusanmayi dene → reddedilmeli.
+- [ ] **Upgrade calisiyor:** Bir Mithril parcasini +1/+2'ye yukselt → mevcut upgrade maliyeti/sansi/yanma kurallari aynen islemeli (yeni tier ozel bir durum degil).
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->

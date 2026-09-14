@@ -81,6 +81,32 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.35f;
 
+		// --- Ucuncu bolge NORMAL moblari (Lv8-12; MinMobLevel=8/MaxMobLevel=12 bandli spawner ile cikar) ---
+		// Olcekleme Lv5-7 egrisini surdurur: seviye basina kabaca +2 Str, +2 Vit, +3 hasar,
+		// +%20-25 XP ve altin. Hassas ekonomi balansi degil, tutarli bir kademe.
+		// Buz Hayaleti: hizli, dondurucu; vurusta yavaslatir.
+		Table.Add(MakeMob(TEXT("FrostWraith"), TEXT("Buz Hayaleti"), 8, 22, 18, 29.f, 330, 55, 145, 420.f, 1200.f, 1.1f, FLinearColor(0.35f, 0.6f, 0.8f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		// Lanetli Sovalye: agir zirhli, yavas ama dayanikli; can azalinca ofkelenir.
+		Table.Add(MakeMob(TEXT("CursedKnight"), TEXT("Lanetli Sovalye"), 9, 24, 26, 31.f, 400, 65, 170, 260.f, 1000.f, 1.25f, FLinearColor(0.3f, 0.32f, 0.4f)));
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
+		// Zehir Orumcegi: cok hizli, genis aggro; vurusta yuksek sansla zehirler.
+		Table.Add(MakeMob(TEXT("VenomSpider"), TEXT("Zehir Orumcegi"), 10, 26, 22, 36.f, 480, 80, 200, 440.f, 1250.f, 1.15f, FLinearColor(0.3f, 0.45f, 0.2f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.45f;
+
+		// Ork Berserk: bandin en guclu normali; hem yavaslatir hem ofkelenir.
+		Table.Add(MakeMob(TEXT("OrcBerserker"), TEXT("Ork Berserk"), 12, 31, 30, 44.f, 660, 110, 270, 340.f, 1200.f, 1.35f, FLinearColor(0.65f, 0.2f, 0.08f)));
+		SetWarrokVisual(Table.Last()); // Mixamo Warrok ork mesh'i + animasyonlari (veri satiri)
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.25f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.5f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -135,6 +161,22 @@ namespace
 		Table.Last().EliteEquipDropCount = 1;
 		Table.Last().EliteMinItemPlus = 1;
 		Table.Last().EliteMaxItemPlus = 3;
+
+		// Buz Lordu (ucuncu bolge eliti, Lv13): bandin (Lv8-12) ustunde duran kademe-sonu elit.
+		// Cok dayanikli, agir vurur; vurusta yuksek sansla yavaslatir ve dusuk canda ofkelenir.
+		Table.Add(MakeMob(TEXT("FrostLich"), TEXT("Buz Lordu"), 13, 34, 44, 46.f, 900, 200, 420, 280.f, 1300.f, 1.8f, FLinearColor(0.45f, 0.75f, 0.95f)));
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.55f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		// 2 ekipman, +2..+4. Dusus sansi bilerek 0.5 (garantili DEGIL): ekonomi denge raporu
+		// (2026-09-14) %100 garantili elit loot'u tekrar-farm edilebilir bir altin/esya
+		// muslugu olarak isaretlemisti — yeni elit de ayni oranla baslar. Bkz. SpiderQueen yorumu.
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 2;
+		Table.Last().EliteMaxItemPlus = 4;
 
 		return Table;
 	}
