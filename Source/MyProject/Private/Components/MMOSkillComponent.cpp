@@ -28,6 +28,7 @@ void UMMOSkillComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(UMMOSkillComponent, CharacterClass);
 	DOREPLIFETIME(UMMOSkillComponent, LearnedSkills);
 	DOREPLIFETIME(UMMOSkillComponent, Hotbar);
+	DOREPLIFETIME(UMMOSkillComponent, MasteryRankArray);
 }
 
 void UMMOSkillComponent::BeginPlay()
@@ -39,6 +40,29 @@ void UMMOSkillComponent::BeginPlay()
 	if (Hotbar.Num() != HotbarSize)
 	{
 		Hotbar.Init(NAME_None, HotbarSize);
+	}
+	if (MasteryRankArray.Num() != MasteryTreeCount)
+	{
+		MasteryRankArray.Init(0, MasteryTreeCount);
+	}
+
+	// Seviye atlayinca mastery senkronu (RequiredLevel'i sonradan karsilanan skiller icin).
+	if (AMMOCharacter* OwnerChar = Cast<AMMOCharacter>(GetOwner()))
+	{
+		if (UMMOStatsComponent* S = OwnerChar->GetStats())
+		{
+			S->OnLevelUp.AddDynamic(this, &UMMOSkillComponent::HandleLevelUpMasterySync);
+		}
+	}
+}
+
+void UMMOSkillComponent::HandleLevelUpMasterySync(int32 /*NewLevel*/)
+{
+	// OnLevelUp hem sunucuda hem istemcide (OnRep_Level) tetiklenir; LearnedSkills replike
+	// oldugu icin sadece otorite yazmali.
+	if (HasAuthorityInternal())
+	{
+		SyncLearnedFromMastery();
 	}
 }
 
@@ -117,6 +141,7 @@ void UMMOSkillComponent::SetupForClass(EMMOClass NewClass)
 
 	LearnedSkills.Reset();
 	Hotbar.Init(NAME_None, HotbarSize);
+	MasteryRankArray.Init(0, MasteryTreeCount);
 	CooldownEndTimes.Reset();
 
 	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
@@ -160,6 +185,43 @@ bool UMMOSkillComponent::IsLearned(FName SkillId) const
 	return LearnedSkills.Contains(SkillId);
 }
 
+int32 UMMOSkillComponent::GetMasteryRank(EMMOSkillTree Tree) const
+{
+	const int32 Idx = (int32)Tree;
+	return MasteryRankArray.IsValidIndex(Idx) ? MasteryRankArray[Idx] : 0;
+}
+
+void UMMOSkillComponent::SyncLearnedFromMastery()
+{
+	if (!HasAuthorityInternal())
+	{
+		return;
+	}
+
+	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	const UMMOStatsComponent* S = Owner ? Owner->GetStats() : nullptr;
+
+	for (const FMMOSkillDef& D : FMMOSkillDatabase::GetAll())
+	{
+		if (D.RequiredClass != CharacterClass)
+		{
+			continue;
+		}
+		if (D.RequiredMasteryRank > GetMasteryRank(D.Tree))
+		{
+			continue;
+		}
+		// Rutbe <= seviye kurali tek basina Lv7 bir skili Lv3'te acabilirdi; skill
+		// tablosundaki RequiredLevel dengesi bozulmasin diye ayrica kontrol ediliyor
+		// (seviye gelince OnLevelUp senkronu bu skili otomatik acar).
+		if (S && S->Level < D.RequiredLevel)
+		{
+			continue;
+		}
+		LearnedSkills.AddUnique(D.SkillId);
+	}
+}
+
 bool UMMOSkillComponent::CanLearn(FName SkillId, FString& OutReason) const
 {
 	const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
@@ -191,20 +253,89 @@ bool UMMOSkillComponent::CanLearn(FName SkillId, FString& OutReason) const
 		OutReason = FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel);
 		return false;
 	}
-	if (!Def->PrereqSkillId.IsNone() && !IsLearned(Def->PrereqSkillId))
+
+	// KO mastery: bu skil, agacinin rutbesi RequiredMasteryRank'e ulasinca acilir.
+	// Tek tiklamayla ancak BIR rutbe yatirilabilir, o yuzden "bir yatirim uzakta" degilse
+	// kullaniciya kac rutbe gerektigini soyle.
+	const int32 Rank = GetMasteryRank(Def->Tree);
+	if (Def->RequiredMasteryRank > Rank + 1)
 	{
-		const FMMOSkillDef* Pre = FMMOSkillDatabase::Find(Def->PrereqSkillId);
-		OutReason = FString::Printf(TEXT("Once '%s' gerekli"), Pre ? *Pre->Name : TEXT("?"));
+		OutReason = FString::Printf(TEXT("Rutbe %d gerekli"), Def->RequiredMasteryRank);
 		return false;
 	}
-	if (S->UnspentSkillPoints < Def->SkillPointCost)
+	// Rutbe zaten yeterliyse skill acilmis olmaliydi (IsLearned yukarida elendi) — bu
+	// durumda blokaj RequiredLevel'dir, onu yukarida bildirdik; yine de guvenli davran.
+	if (Def->RequiredMasteryRank <= Rank)
 	{
-		OutReason = FString::Printf(TEXT("%d skill puani gerekli"), Def->SkillPointCost);
+		OutReason = FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel);
+		return false;
+	}
+	// KO kurali: bir gruptaki rutbe karakter seviyesini asamaz.
+	if (Rank + 1 > S->Level)
+	{
+		OutReason = FString::Printf(TEXT("Level %d gerekli"), Rank + 1);
+		return false;
+	}
+	if (S->UnspentSkillPoints < 1)
+	{
+		OutReason = TEXT("1 skill puani gerekli");
 		return false;
 	}
 
 	OutReason.Reset();
 	return true;
+}
+
+bool UMMOSkillComponent::RequestInvestMastery(EMMOSkillTree Tree)
+{
+	const int32 Idx = (int32)Tree;
+
+	// Istemci: sunucuya istek gonder (rutbe/puan sunucuda degisir, geri replike olur).
+	if (!HasAuthorityInternal())
+	{
+		ServerInvestMastery(Tree);
+		return true;
+	}
+
+	if (!MasteryRankArray.IsValidIndex(Idx))
+	{
+		MasteryRankArray.SetNum(MasteryTreeCount);
+		if (!MasteryRankArray.IsValidIndex(Idx))
+		{
+			return false;
+		}
+	}
+
+	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	UMMOStatsComponent* S = Owner ? Owner->GetStats() : nullptr;
+	if (!S || S->UnspentSkillPoints < 1)
+	{
+		return false;
+	}
+	// KO: (rutbe + 1) > karakter seviyesi ise yatirim yapilamaz.
+	if (MasteryRankArray[Idx] + 1 > S->Level)
+	{
+		return false;
+	}
+	if (!S->SpendSkillPoints(1))
+	{
+		return false;
+	}
+
+	MasteryRankArray[Idx] += 1;
+	SyncLearnedFromMastery();
+
+	if (GEngine && IsLocallyControlledOwner())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120),
+			FString::Printf(TEXT("Ustalik rutbesi: %d"), MasteryRankArray[Idx]));
+	}
+	return true;
+}
+
+void UMMOSkillComponent::ServerInvestMastery_Implementation(EMMOSkillTree Tree)
+{
+	RequestInvestMastery(Tree);
 }
 
 bool UMMOSkillComponent::LearnSkill(FName SkillId)
@@ -219,37 +350,10 @@ bool UMMOSkillComponent::LearnSkill(FName SkillId)
 		return false;
 	}
 
-	// Istemci: sunucuya istek gonder (LearnedSkills/puan sunucuda degisir, geri replike olur).
-	if (!HasAuthorityInternal())
-	{
-		ServerLearnSkill(SkillId);
-		return true;
-	}
-
+	// Artik tek skill ogrenilmiyor: skilin AGACINA 1 rutbe yatiriliyor, o rutbede acilan
+	// tum skiller birlikte geliyor (KO mastery mantigi).
 	const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
-	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
-	if (!Def || !Owner || !Owner->GetStats())
-	{
-		return false;
-	}
-
-	if (!Owner->GetStats()->SpendSkillPoints(Def->SkillPointCost))
-	{
-		return false;
-	}
-
-	LearnedSkills.Add(SkillId);
-
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120), FString::Printf(TEXT("Ogrenildi: %s"), *Def->Name));
-	}
-	return true;
-}
-
-void UMMOSkillComponent::ServerLearnSkill_Implementation(FName SkillId)
-{
-	LearnSkill(SkillId);
+	return Def ? RequestInvestMastery(Def->Tree) : false;
 }
 
 void UMMOSkillComponent::AssignToSlot(int32 Slot, FName SkillId)
@@ -424,6 +528,7 @@ void UMMOSkillComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 	Out.CharacterClass = CharacterClass;
 	Out.LearnedSkills = LearnedSkills;
 	Out.Hotbar = Hotbar;
+	Out.MasteryRanks = MasteryRankArray;
 }
 
 void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
@@ -439,6 +544,13 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	if (Hotbar.Num() != HotbarSize)
 	{
 		Hotbar.SetNum(HotbarSize);
+	}
+	// Mastery rutbeleri: eski kayitlarda bu alan bos gelir (hepsi 0) — ogrenilmis skiller
+	// zaten LearnedSkills'ten dogrudan yuklendigi icin eski kayitlar bozulmaz.
+	MasteryRankArray = In.MasteryRanks;
+	if (MasteryRankArray.Num() != MasteryTreeCount)
+	{
+		MasteryRankArray.SetNum(MasteryTreeCount);
 	}
 	CooldownEndTimes.Reset();
 }

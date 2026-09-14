@@ -27,12 +27,21 @@ public:
 
 	static constexpr int32 HotbarSize = 10;
 
+	// EMMOSkillTree eleman sayisi (Basic + Special0..3).
+	static constexpr int32 MasteryTreeCount = 5;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "MMO|Skill")
 	EMMOClass CharacterClass = EMMOClass::Warrior;
 
 	// Ogrenilmis skill id'leri (sunucu yazar, istemcilere replike olur).
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "MMO|Skill")
 	TArray<FName> LearnedSkills;
+
+	// KO mastery rutbeleri: index = (int32)EMMOSkillTree, deger = o agactaki rutbe.
+	// Skill puani tek tek skillere degil buraya yatirilir; rutbe yukseldikce o agactaki
+	// RequiredMasteryRank'i saglayan skiller otomatik acilir (LearnedSkills'e eklenir).
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "MMO|Skill")
+	TArray<int32> MasteryRankArray;
 
 	// 10 slotluk hotbar (index 0-9). Bos slot = NAME_None.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "MMO|Skill")
@@ -49,10 +58,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MMO|Skill")
 	bool IsLearned(FName SkillId) const;
 
-	// Ogrenilebilir mi? Degilse OutReason sebebi verir.
+	/** Bir mastery agacindaki guncel rutbe (0 = hic yatirim yok). */
+	UFUNCTION(BlueprintPure, Category = "MMO|Skill")
+	int32 GetMasteryRank(EMMOSkillTree Tree) const;
+
+	// Bu skill, SIMDI 1 skill puani yatirarak acilabilir mi? Degilse OutReason sebebi verir.
 	bool CanLearn(FName SkillId, FString& OutReason) const;
 
-	/** Skill ogrenir (kosullari saglarsa skill puani harcar). */
+	/**
+	 * KO mastery yatirimi: 1 skill puani harcar, Tree'nin rutbesini +1 yapar ve o agacta
+	 * artik acilan skilleri ogretir. Istemcide Server RPC'ye dallanir. Kural (KO): rutbe
+	 * karakter seviyesini gecemez.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Skill")
+	bool RequestInvestMastery(EMMOSkillTree Tree);
+
+	/**
+	 * Geriye donuk uyumlu giris noktasi (HUD "skile tikla" akisi buraya baglidir):
+	 * ARTIK tek bir skill ogretmez, o skilin AGACINA 1 rutbe yatirir.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Skill")
 	bool LearnSkill(FName SkillId);
 
@@ -88,6 +112,14 @@ protected:
 	AMMOCharacter* FindNearestEnemy(float Range) const;
 	void ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef& Def);
 
+	/** Mevcut rutbelere gore acilmis olmasi gereken tum skilleri LearnedSkills'e yazar (sadece otorite). */
+	void SyncLearnedFromMastery();
+
+	// Seviye atlayinca tekrar senkronize et: rutbesi yeterli ama RequiredLevel'i o an
+	// karsilanmayan skiller (or. Kan Firtinasi Lv7) seviye gelince otomatik acilsin.
+	UFUNCTION()
+	void HandleLevelUpMasterySync(int32 NewLevel);
+
 	bool HasAuthorityInternal() const;
 	bool IsLocallyControlledOwner() const;
 
@@ -96,7 +128,7 @@ protected:
 	void ServerUseSkill(FName SkillId);
 
 	UFUNCTION(Server, Reliable)
-	void ServerLearnSkill(FName SkillId);
+	void ServerInvestMastery(EMMOSkillTree Tree);
 
 	UFUNCTION(Server, Reliable)
 	void ServerAssignToSlot(int32 Slot, FName SkillId);

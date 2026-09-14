@@ -74,6 +74,10 @@ struct FMMOCharacterSaveData
 	UPROPERTY(SaveGame)
 	TArray<FName> Hotbar;
 
+	// KO mastery rutbeleri (index = EMMOSkillTree). Eski kayitlarda bos gelir.
+	UPROPERTY(SaveGame)
+	TArray<int32> MasteryRanks;
+
 	// Gorevler
 	UPROPERTY(SaveGame)
 	TArray<FMMOQuestProgress> ActiveQuests;

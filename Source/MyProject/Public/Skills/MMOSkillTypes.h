@@ -74,7 +74,14 @@ struct FMMOSkillDef : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Skill")
 	int32 SkillPointCost = 1;
 
-	// Ogrenmek icin once ogrenilmesi gereken skill (bos = yok).
+	// KO mastery rutbesi: bu skilin acilmasi icin karakterin kendi Tree'sinde sahip olmasi
+	// gereken rutbe (KO: m_bstrSkill[modulator] >= skill.bSkillLevel). Skill puani tek tek
+	// skillere degil, agacin rutbesine yatirilir; rutbe yukseldikce o agactaki skiller acilir.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Skill")
+	int32 RequiredMasteryRank = 1;
+
+	// ESKI sistemin prereq zinciri. Artik gating'de KULLANILMIYOR (yerini RequiredMasteryRank aldi);
+	// eski kayit verisi/geri uyumluluk ve tasarim referansi icin duruyor.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Skill")
 	FName PrereqSkillId;
 

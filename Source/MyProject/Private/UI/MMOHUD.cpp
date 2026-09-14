@@ -721,7 +721,7 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 	DrawText(FString::Printf(TEXT("SKILL KITABI - %s"), *ClassName), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.3f);
 	DrawText(FString::Printf(TEXT("Skill Puani: %d     Level: %d"), Stats->UnspentSkillPoints, Stats->Level),
 		FLinearColor(1.f, 0.85f, 0.2f), PX + 14.f, PY + 36.f, nullptr, 1.f);
-	DrawText(TEXT("Skile tikla = ogren / ele al.  Sonra bir hotbar slotuna tikla = ata."),
+	DrawText(TEXT("Skile tikla = agacina 1 rutbe yatir.  Ogrenilene tikla = ele al, hotbar slotuna tikla = ata."),
 		FLinearColor(0.7f, 0.75f, 0.8f), PX + 14.f, PY + 58.f, nullptr, 0.75f);
 
 	const TArray<FMMOSkillDef> ClassSkills = FMMOSkillDatabase::GetForClass(SkillComp->CharacterClass);
@@ -772,7 +772,9 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 			continue;
 		}
 
-		DrawText(TreeNames[t], FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
+		// Agac basliginda o agacin guncel mastery rutbesi (KO: skill puani agaca yatirilir).
+		DrawText(FString::Printf(TEXT("%s (Rutbe: %d)"), TreeNames[t], SkillComp->GetMasteryRank(Trees[t])),
+			FLinearColor(0.6f, 0.8f, 1.f), RowX, RowY, nullptr, 0.95f);
 		RowY += HeaderH;
 
 		for (const FMMOSkillDef* D : InTree)
@@ -794,9 +796,10 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 			R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + RowH - 4.f));
 			SkillBookRegions.Add(R);
 
+			// Kilitli skillerde CanLearn zaten "Rutbe X gerekli" sebebini uretir (KO mastery gating).
 			const FString Status = bLearned ? TEXT("[Ogrenildi]") : (bCanLearn ? TEXT("[Ogren]") : FString::Printf(TEXT("[%s]"), *Reason));
 			DrawText(FString::Printf(TEXT("%s   %s"), *D->Name, *Status), FLinearColor::White, RowX + 6.f, RowY + 3.f, nullptr, 0.82f);
-			DrawText(FString::Printf(TEXT("Lv%d  SP%d  Mana%d"), D->RequiredLevel, D->SkillPointCost, FMath::RoundToInt(D->ManaCost)),
+			DrawText(FString::Printf(TEXT("Lv%d  Rutbe%d  Mana%d"), D->RequiredLevel, D->RequiredMasteryRank, FMath::RoundToInt(D->ManaCost)),
 				FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + 16.f, nullptr, 0.68f);
 
 			RowY += RowH;
