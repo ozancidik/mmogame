@@ -86,8 +86,12 @@ namespace
 		Table.Add(MakeDef(TEXT("War_TitanWrath"), TEXT("Titan Ofkesi"), C::Warrior, T::Special3, 1, 70, 3, TEXT(""),
 			E::MeleeDamage, 320.f, 20.f, 1150.f, 260.f, 0.f));
 		// Capstone 2/2: Kiyamet Darbesi (Savascinin nihai skilli).
+		// QA BULGU #5 duzeltmesi (2026-09-14): eskiden Power=1200 idi, Titan Ofkesi'nden
+		// (1150) sadece +%4.3 gucluydu ve uzayan CD (20->26s) yuzunden saniye-basina hasar
+		// fiilen DUSUYORDU (57.5->46). Diger 3 sinifin Lv70->80 sicramasi +%50-86 arasindaydi;
+		// bu da Mage'in +%50'siyle tutarli olacak sekilde 1725'e cikarildi (~1150*1.5).
 		Table.Add(MakeDef(TEXT("War_DoomsdayBlow"), TEXT("Kiyamet Darbesi"), C::Warrior, T::Special3, 2, 80, 3, TEXT("War_TitanWrath"),
-			E::AoESelf, 400.f, 26.f, 1200.f, 0.f, 650.f));
+			E::AoESelf, 400.f, 26.f, 1725.f, 0.f, 650.f));
 
 		// --- OKCU ---
 		Table.Add(MakeDef(TEXT("Arc_QuickShot"), TEXT("Cabuk Atis"), C::Archer, T::Basic, 1, 1, 1, TEXT(""),
