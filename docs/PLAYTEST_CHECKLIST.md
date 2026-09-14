@@ -565,6 +565,16 @@ regresyondur.
 
 ---
 
+# Ucan "+N" iyilesme sayilari eklendi — commit 7a118f5 (2026-09-14)
+
+> Derleme temiz, gorsel test edilmedi. BILINEN SINIRLAMA: su an sadece HOST'un kendi ekraninda calisir (misafir istemciler henuz gormez) - hasar sayilarinin misafirlerde nasil calistigindan (OnRep_Health) farkli bir yol kullaniyor, kasitli olarak (pasif can yenilenmesiyle spam olmasin diye).
+
+- [ ] **Ana senaryo (HOST ekraninda):** Can Iksiri ic (F) veya bir iyilestirme skili kullan → yesil "+75"/"+150" gibi bir sayi yukari dogru yukselerek gorunmeli (hasar sayisiyla ayni animasyon, farkli renk).
+- [ ] **Spam kontrolu:** Dusuk canla bekleyip pasif can yenilenmesinin (regen) calismasini izle → hicbir "+N" sayisi CIKMAMALI (bu kasitli, regen ayri bir yoldan gecer).
+- [ ] **Misafir istemci (bilinen sinirlama, dogrulamak icin):** Misafir istemciden bir potion ickinde/iyilestirildiginde HENUZ yesil sayi gormemesi bekleniyor — bu bir bug degil, dokumante edilmis bir sonraki-adim.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
