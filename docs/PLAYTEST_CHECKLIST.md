@@ -7,6 +7,20 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
+# ÖNCE BUNLARI TEST ET (2026-09-15 durumu — dosya 1500+ satır oldu, en kritik/en riskli 5 madde)
+
+Bu dosyada biriken onlarca maddeden bugün gerçekten önemli olan, sırayla test edilmesi gereken 5 madde:
+
+1. **[EN ÖNEMLİ] Spawner'lar artık haritanın içinde mi?** Haritanın (Summer_scene) gerçek zemini sadece 4000x4000u — 10 spawner'dan 6'sı bunun DIŞINDAYDI (oynanamaz içerik). İKİ kez düzeltildi (commit `2ca4d7a` + `0353f01`, matematiksel olarak doğrulandı ama PIE'de HİÇ görülmedi). Oyuna gir, sırayla Golge Suikastçı/İkinci-Üçüncü-Dördüncü bölge/Buz Lordu/Magma Tiranı spawner'larına yürü → hepsi zemin ÜZERİNDE, boşluğa düşmeden görünmeli. Biri bile boşluktaysa o zincirin tüm görevleri kilitli demektir.
+2. **Lv80 capstone skilleri artık atılabiliyor mu?** Warrior/Archer'ın Lv80 nihai skilleri (400 mana) matematiksel olarak atılamıyordu (mana tavanı yetersizdi) — `ManaPerLevel` 5.5'e çıkarıldı. Yüksek seviyeye çık (`MMOGainXP`), capstone'u öğren, kullan → "Yeterli mana yok" almamalı.
+3. **XP eğrisi artık makul mü?** Eskiden Lv80'e ulaşmak ~2.66 MİLYON kill gerektiriyordu (imkansız). Artık Lv25'e kadar aynı, sonrası doğrusal (~8.264 kill toplam). Birkaç canavar öldürüp XP barının makul hızda ilerlediğini gözle kontrol et; ölüm cezasının (Lv25+ karakterlerde) aşırı ağır hissettirmediğini doğrula.
+4. **Kademeli yanma + MaxPlus 8 doğru hissettiriyor mu?** +0-+2 güvenli, +3'ten itibaren yanma riski artıyor, +8 tavan. Bir item'ı upgrade ederek dene.
+5. **Skill kitabı artık 2 sütunlu — okunabilir mi?** 57 skil'e çıkınca eski tek-sütun tasıyordu, artık ağaçlar 2 sütuna dengeli dağıtılıyor. `K` ile aç, taşma/üst üste binme var mı bak.
+
+Aşağıdaki tarihli bölümlerin çoğu bunlardan ÖNCEKİ, daha küçük özellikler için — bu 5 madde onaylanmadan diğerlerine geçmene gerek yok.
+
+---
+
 # QA DENETIMI: kademeli yanma (170f87c) + 57 skill (2e401c2) — 6 bulgu (2026-09-14)
 
 > QA gecisi. Derleme ZORLA yeniden dogrulandi (4 degisen .cpp dosyasinin zaman damgasi
