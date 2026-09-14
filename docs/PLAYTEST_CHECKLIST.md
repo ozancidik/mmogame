@@ -655,6 +655,27 @@ regresyondur.
 
 ---
 
+# KO mastery-rutbe skill sistemi — commit f2f3139 (2026-09-14)
+
+> Derleme temiz, gorsel test edilmedi. **Bu, skill sisteminin ogrenme mekanigini degistiren buyuk bir davranis degisikligi** — hotbar/cooldown/UseSkill yollari kasitli olarak HIC degistirilmedi, o yuzden asagidaki regresyon maddeleri en az yeni ozellik kadar onemli. Skill kitabi: `K` (veya mevcut skill kitabi tusu). Seviye atlamak icin `MMOGainXP` konsol komutu kullanilabilir.
+>
+> Yeni kural (KO): skill puani tek tek skillere degil AGACA (Temel / Ustalik 1-4) yatirilir. Bir agactaki rutbe karakter seviyesini gecemez. Rutbe yukselince o agacta rutbesi yeten TUM skiller birlikte acilir.
+
+- [ ] **Ana senaryo (rutbe yatirma):** Yeni bir Savasci ile basla, skill kitabini ac. Agac basliklarinda "Temel (Rutbe: 0)", "Ustalik 1 (Rutbe: 0)" gibi yazmali. "Ustalik 1" altindaki **Savurma**'ya tikla → 1 skill puani dusmeli, baslik "Ustalik 1 (Rutbe: 1)" olmali ve Savurma `[Ogrenildi]` olmali.
+- [ ] **Toplu acilma:** Ayni rutbeyi paylasan skiller BIRLIKTE acilmali. Priest ile "Temel" agacina 1 rutbe yatir → hem **Kutsal Isik** hem **Ceza** ayni anda `[Ogrenildi]` olmali (ikisi de rutbe 1). Bu kasitli, bug degil.
+- [ ] **Kilitli skill metni:** Savasci'da hic yatirim yapmadan "Ustalik 1" altindaki **Olumcul Darbe**'ye bak → durumu `[Rutbe 2 gerekli]` yazmali (eski `[Once 'Savurma' gerekli]` degil). **Kan Firtinasi** icin `[Rutbe 3 gerekli]` yazmali.
+- [ ] **Rutbe seviyeyi gecemez (KO kurali):** Level 1 bir karakterle bir agaca 1 rutbe yatir (rutbe 1 olur). AYNI agaca tekrar yatirmayi dene (o agactaki bir sonraki skile tikla) → **reddedilmeli**, "Level 2 gerekli" benzeri bir mesaj cikmali, skill puani DUSMEMELI. Level 2'ye cik, tekrar dene → simdi calismali.
+- [ ] **Skill puani yoksa:** Puani biten bir karakterde bir skile tikla → "1 skill puani gerekli" mesaji cikmali, rutbe ARTMAMALI.
+- [ ] **Seviye gelince otomatik acilma:** Savasci ile "Ustalik 1" agacini rutbe 3'e cikar ama karakter Level 7'nin ALTINDA olsun → **Kan Firtinasi** (Lv7) HENUZ acilmamali. Sonra `MMOGainXP` ile Level 7'ye cik → **kitaba tekrar tiklamadan, hicbir sey yatirmadan** Kan Firtinasi kendiliginden `[Ogrenildi]` olmali. (Bu, rutbe-yeterli-ama-seviye-yetersiz skiller icin eklenen otomatik senkron.)
+- [ ] **REGRESYON — hotbar atama:** Ogrenilmis bir skile tikla → sari "ele alindi" durumu + "Bir hotbar slotuna tikla" mesaji cikmali; bir hotbar slotuna tikla → skill oraya atanmali. Suruklemeyle (basili tutup birakma) atama da eskisi gibi calismali.
+- [ ] **REGRESYON — skill kullanimi:** Hotbar'daki skilleri numara tuslariyla kullan → mana dusmeli, cooldown calismali, hasar/iyilestirme/buff eskisi gibi olmali. Ozellikle hedef gerektiren skillerde (Guclu Vurus, Ok Yagmuru) "Menzilde hedef yok" davranisi degismemeli.
+- [ ] **REGRESYON — baslangic skili:** Yeni karakter olustur → sinifin ilk Temel skili BEDAVA gelmeli ve hotbar slot 0'da olmali (rutbe 0 iken bile). Bu eski davranis korundu.
+- [ ] **REGRESYON — kayit/yukleme:** Birkac rutbe yatir, kaydet, oyunu kapat/ac, yukle → hem ogrenilmis skiller hem de agac basliklarindaki rutbe sayilari AYNEN geri gelmeli.
+- [ ] **ESKI KAYIT UYUMU (onemli):** Bu degisiklikten ONCE olusturulmus bir kayit dosyasi varsa onu yukle → ogrenilmis skiller ve hotbar eskisi gibi gelmeli, sadece agac rutbeleri "(Rutbe: 0)" gorunmeli. Skiller KAYBOLMAMALI. (Rutbeler 0 oldugu icin o karakter yeni yatirimlarda bastan baslar — kabul edilebilir bir gecis davranisi, ama gorup onaylaman lazim.)
+- [ ] **Cok oyunculu (misafir istemci):** Misafir istemciden skill kitabini ac ve bir skile tikla → rutbe ve ogrenilen skiller MISAFIRIN ekraninda da guncellenmeli (sunucuda islenip replike olmasi gerekiyor). Misafirin hotbar'a atayip skili kullanabilmesi lazim.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
