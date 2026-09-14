@@ -201,6 +201,26 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_Gold15000"), TEXT("Efsanevi Servet"), TEXT("15000 altin biriktir."),
 			T::HaveGold, TEXT(""), 15000, 14000, 0, 28, TEXT("Q_Gold5000")));
 
+		// 2026-09-15: kademeli icerik genisletmesinin devami - spawner/mob GEREKTIRMEYEN
+		// (harita zaten dolu, bkz. MMOGameMode.cpp'deki kritik spawner duzeltmesi) ilerleme
+		// gorevleri. Seviye zinciri artik gercek MaxLevel'a (80) kadar uzaniyor - Q_Level80
+		// oyuncunun karakterini tamamen doldurdugunda alacagi bir "bitis cizgisi" gorevi.
+		Table.Add(MakeQuest(TEXT("Q_Level50"), TEXT("Savas Ustasi"), TEXT("Gucunu pekistir: 50. seviyeye ulas."),
+			T::ReachLevel, TEXT(""), 50, 35000, 20000, 40, TEXT("Q_Level40")));
+
+		Table.Add(MakeQuest(TEXT("Q_Level65"), TEXT("Kahraman"), TEXT("Kahramanlik cagina gir: 65. seviyeye ulas."),
+			T::ReachLevel, TEXT(""), 65, 55000, 30000, 50, TEXT("Q_Level50")));
+
+		Table.Add(MakeQuest(TEXT("Q_Level80"), TEXT("Zirve"), TEXT("Yolculugunun zirvesine ulas: 80. seviyeye ulas."),
+			T::ReachLevel, TEXT(""), 80, 90000, 50000, 65, TEXT("Q_Level65")));
+
+		// Altin biriktirme zinciri devami: Q_Gold15000 -> Q_Gold30000 -> Q_Gold50000.
+		Table.Add(MakeQuest(TEXT("Q_Gold30000"), TEXT("Bolge Tuccari"), TEXT("30000 altin biriktir."),
+			T::HaveGold, TEXT(""), 30000, 28000, 0, 28, TEXT("Q_Gold15000")));
+
+		Table.Add(MakeQuest(TEXT("Q_Gold50000"), TEXT("Altin Cagin Efendisi"), TEXT("50000 altin biriktir."),
+			T::HaveGold, TEXT(""), 50000, 45000, 0, 40, TEXT("Q_Gold30000")));
+
 		return Table;
 	}
 }
