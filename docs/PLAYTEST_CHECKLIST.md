@@ -1158,7 +1158,14 @@ tarzi bir rutbe-seviye ihlali yok. `AppliedEffectId` bos birakildi (saf hasar sk
 >   efekt id'leri (`Poison`/`Slow`/`Rage`) efekt veritabaninda mevcut. Ekipman kusanma seviye kontrolu
 >   sunucu tarafinda (`MMOInventoryComponent.cpp:240`) - Adamantin icin de gecerli.
 
-## CRITICAL - FIXED (bkz. altta yeni commit) - Haritanin zemini sadece 4000x4000u: 10 spawner'in 6'si (YENI IKISI DAHIL) bosluga konuyor
+## CRITICAL - FIXED, IKI ASAMADA (commit 2ca4d7a + 0353f01) - Haritanin zemini sadece 4000x4000u: 10 spawner'in 6'si (YENI IKISI DAHIL) bosluga konuyor
+
+> Ek not: ilk duzeltme (2ca4d7a) sadece spawner MERKEZ noktalarini sinira aldi, SpawnRadius'u
+> (bolge spawner'larinda 500u) hesaba katmamisti - kendi bagimsiz python dogrulamamda 6
+> spawner'in hala tastigini buldum. 0353f01 ile hem merkez HEM SpawnRadius sinir icine alindi,
+> tum 45 ikili mesafe (sadece degismemis eski "Ana alan-Ork Reisi" haric) dogrulandi. Asagidaki
+> orijinal bulgu metni tarihi kayit olarak birakildi, guncel koordinatlar icin MMOGameMode.cpp'yi
+> (commit 0353f01) esas al.
 
 Onceki turda "dogrulanamadi" diye MEDIUM birakilan Buz Lordu off-map riski, `Content/__ExternalActors__`
 ikili verisi cozulerek **olculdu** ve risk gerceklesiyor gorunuyor:
