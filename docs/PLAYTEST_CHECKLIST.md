@@ -7,6 +7,16 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
+# Ekonomi denge duzeltmeleri (elit loot sansi + yan gorev altini) — commit beee9f9 (2026-09-14)
+
+> Bir ekonomi-denge inceleme ajaninin raporuna dayanarak 2 sayisal degisiklik yapildi. Derleme temiz, oynanarak dogrulanmasi gerekiyor.
+
+- [ ] **Elit/boss loot artik garanti degil:** Bir elit/boss'u (or. Kadim Golem, Ork Reisi) birkac kez oldur → ekipman dusmeyen olumler de OLMALI (once her zaman dusuyordu, simdi ~%50 sans). Altin/XP hala her olumde gelmeli, sadece ekipman garantisi kalkti.
+- [ ] **Yan gorev altini arttı:** Q_Warlocks/Q_OrcWarriors/Q_DireWolves gorevlerini tamamla → altin odulu eskisinden (500/480/480) daha yuksek (650/620/600) gelmeli.
+- [ ] **Regresyon:** Diger gorevlerin ve elit-olmayan mob'larin altin/loot davranisi degismemis olmali.
+
+---
+
 # QA taramasi: "istemci int32 -> carpma/birikim, ust sinir yok" hata sinifi — TUM 4 BULGU DUZELTILDI (2026-09-14)
 
 > QA notu: `3e35942`'deki BuyPotion/BuyConsumable int32-tasma acigi emsal alinarak TUM `UFUNCTION(Server, ...)` ve `UFUNCTION(Exec)` fonksiyonlari tarandi (Inventory, Stats, Skill, Party, Quest, Character, Mob, PlayerController, LootPickup, ItemDatabase). **Ikinci bir "bedava altin" acigi BULUNAMADI** — fiyat hesaplarina giren tek istemci-kontrollu sayi `Count`'tu ve o artik clamp'li. Ayni sinifta bulunan 4 madde de duzeltildi: Bulgu 1 → `72b9b63`, Bulgu 2 (XP egrisi) → `2a590f1`, Bulgu 3 (AddGold) → `50fd9c0`, Bulgu 4 (ApplySaveData) → `f39da5f`. Asagidaki test maddeleri artik gecerli/test edilebilir durumda (host-guard onerisi (Bulgu 1'in "b" maddesi) BILEREK uygulanmadi — MMOGainXP/MMODamage/MMOBuff/MMOSpawnMob gibi diger tum debug komutlariyla ayni "kendine-ozel hile, herkese acik" tutarliligini korumak icin; asil veri-bozulma riski olan tasma zaten kapatildi).
