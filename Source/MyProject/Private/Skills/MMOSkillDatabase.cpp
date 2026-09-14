@@ -184,8 +184,12 @@ namespace
 		Table.Add(MakeDef(TEXT("Pri_GreaterHeal"), TEXT("Buyuk Sifa"), C::Priest, T::Special1, 1, 5, 2, TEXT("Pri_HolyLight"),
 			E::HealTarget, 40.f, 12.f, 150.f, 0.f, 0.f));
 		// Ilahi Sifa: Buyuk Sifa'nin ustu; aninda buyuk iyilestirme + uzerine Yenilenme HoT.
+		// QA gozlemi (2026-09-14): zincirdeki diger 3 sifa skili (GreaterHeal/HolyRain/LifeBond)
+		// hepsi HealTarget iken bu HealSelf birakilmisti - secili muttefigi degil, hep kendini
+		// iyilestiriyordu. HealTarget'a alindi (hedef yoksa/kendine tiklandiysa zaten kendini
+		// iyilestirmeye devam eder, bkz. Pri_GreaterHeal yorumu) - Priest'in "sifaci" kimligiyle tutarli.
 		Table.Add(MakeDef(TEXT("Pri_DivineRestoration"), TEXT("Ilahi Sifa"), C::Priest, T::Special1, 2, 7, 2, TEXT("Pri_GreaterHeal"),
-			E::HealSelf, 55.f, 20.f, 180.f, 0.f, 0.f, TEXT("Regen")));
+			E::HealTarget, 55.f, 20.f, 180.f, 0.f, 0.f, TEXT("Regen")));
 		// Buff: zamanla iyilesme (Yenilenme HoT).
 		Table.Add(MakeDef(TEXT("Pri_Renew"), TEXT("Yenilenme"), C::Priest, T::Special0, 1, 3, 1, TEXT(""),
 			E::BuffSelf, 18.f, 12.f, 0.f, 0.f, 0.f, TEXT("Regen")));
