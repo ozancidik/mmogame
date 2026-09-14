@@ -575,6 +575,15 @@ regresyondur.
 
 ---
 
+# CIDDI GUVENLIK ACIGI: satin alma int32 tasmasi duzeltildi — commit 3e35942 (2026-09-14)
+
+> Bu bir gorsel test degil, guvenlik dogrulamasi. Normal oynanista bu acigi TETIKLEYEMEZSIN (UI Count=1 gonderir) - sadece hileli/modifiye bir istemci ServerBuyPotion/ServerBuyConsumable'i dogrudan devasa bir Count ile cagirirsa ortaya cikardi. Duzeltme sonrasi Count sunucu tarafinda [1,999] araligina sikistiriliyor, tasma imkansiz.
+
+- [ ] **Normal alisveris regresyon testi:** Saticidan normal sekilde (UI'dan tikla) potion/tuketilebilir satin al → eskisi gibi calismali, altin dogru dusmeli.
+- [ ] (Opsiyonel, teknik test) Eger konsoldan Exec ile manuel test etmek istersen: cok yuksek bir Count denemesi artik 999'a sikisip normal fiyatlandirma ile calismali, altin kazandirmamali.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
