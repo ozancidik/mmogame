@@ -86,7 +86,7 @@ int32 FMMOItemDatabase::GetUpgradeCost(int32 CurrentPlus)
 int32 FMMOItemDatabase::GetUpgradeChancePct(int32 CurrentPlus)
 {
 	// KO hissi: dusuk artilar kolay, yuksek artilar kumar.
-	static const int32 Chances[MaxPlus] = { 90, 80, 70, 55, 45, 35, 25, 20, 15 };
+	static const int32 Chances[MaxPlus] = { 90, 80, 70, 55, 45, 35, 25, 20 };
 	if (CurrentPlus < 0 || CurrentPlus >= MaxPlus)
 	{
 		return 0;
@@ -94,16 +94,18 @@ int32 FMMOItemDatabase::GetUpgradeChancePct(int32 CurrentPlus)
 	return Chances[CurrentPlus];
 }
 
-bool FMMOItemDatabase::BurnsOnFail(int32 CurrentPlus)
+int32 FMMOItemDatabase::GetBurnChancePct(int32 CurrentPlus)
 {
-	// Ekonomi denge raporu (2026-09-14): eski esik (+4 denemesinden itibaren yanma) P(+9)
-	// ~%0.065 yapiyordu - guvenli hazirlik maliyeti (~395g) bile ortalama ~1538 kopya
-	// gerektiriyordu (~607.500g), yani pratikte hic kimsenin ulasamayacagi bir hedefti ve
-	// tek ciddi gold-sink'i (bu sistem) normal oyuncular icin islevsiz birakiyordu. Esik
-	// +7'ye cekildi: +0..+6 artik guvenli/kayipsiz (klasik KO gerilimi hala +7 ve sonrasinda
-	// var), P(+9) ~%0.75'e cikiyor (~133 kopya yerine ~1538) - hala zor ama teorik olarak
-	// hirsli bir oyuncu icin ulasilabilir, "kumar" hissi korunuyor.
-	return CurrentPlus >= 6;
+	// 2026-09-14 guncellemesi: sabit esik yerine kademeli yanma olasiligi.
+	// +0..+2 denemesi tamamen guvenli (basarisizlikta item hep kalir).
+	// +3'ten itibaren basarisizlikta yanma sansi her seviyede artar, son deneme
+	// (+7 -> +8, MaxPlus=8 ile ulasilabilecek en yuksek deneme) yanma garantisiyle biter.
+	static const int32 BurnChances[MaxPlus] = { 0, 0, 0, 15, 30, 50, 70, 100 };
+	if (CurrentPlus < 0 || CurrentPlus >= MaxPlus)
+	{
+		return 0;
+	}
+	return BurnChances[CurrentPlus];
 }
 
 float FMMOItemDatabase::GetAttack(const FMMOItemDef& Def, int32 Plus)

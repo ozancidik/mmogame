@@ -1075,10 +1075,14 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 
 		if (!bMaxed)
 		{
+			const int32 BurnPct = FMMOItemDatabase::GetBurnChancePct(Inst.Plus);
+			const FString BurnTag = BurnPct > 0
+				? FString::Printf(TEXT(" YANMA %%%d"), BurnPct)
+				: FString();
 			Line += FString::Printf(TEXT("   [+%d: %da %%%d%s]"), Inst.Plus + 1,
 				FMMOItemDatabase::GetUpgradeCost(Inst.Plus),
 				FMMOItemDatabase::GetUpgradeChancePct(Inst.Plus),
-				FMMOItemDatabase::BurnsOnFail(Inst.Plus) ? TEXT(" YAKAR!") : TEXT(""));
+				*BurnTag);
 		}
 		else
 		{

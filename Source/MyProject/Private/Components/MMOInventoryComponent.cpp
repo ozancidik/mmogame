@@ -328,7 +328,7 @@ void UMMOInventoryComponent::TryUpgrade(int32 BagIndex)
 		Inst.Plus++;
 		ClientUpgradeResult(true, false, Inst.ItemId, Inst.Plus);
 	}
-	else if (FMMOItemDatabase::BurnsOnFail(Inst.Plus))
+	else if (FMath::RandRange(1, 100) <= FMMOItemDatabase::GetBurnChancePct(Inst.Plus))
 	{
 		// YANDI! Item yok olur (klasik KO).
 		const FName BurnedId = Inst.ItemId;

@@ -106,14 +106,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO|Progression")
 	int32 ExperienceToNextLevel = 100;
 
-	// Ekonomi denge raporu (2026-09-14): 80 iken mevcut icerik (12 mob, 15 gorev, Lv7'ye
-	// kadar) TUM gorevler bitirildiginde bile oyuncuyu sadece ~Lv15-16'ya tasiyordu -
-	// geriye 64 seviye (Lv16->80) dolduracak HICBIR tasarlanmis mob/gorev olmadan
-	// kaliyordu, ve %25 katlanarak buyuyen XP egrisi o noktadan sonra pratikte sonsuz bir
-	// duvar oluyordu. Icerigin gercekten tasidigi derinlige (~Lv15-16 + biraz grind payi)
-	// yakin bir deger secildi; yeni bolge/mob/gorev eklendikce bu yukseltilebilir.
+	// 2026-09-14: kullanici acikca MaxLevel=80 istedi (KO'nun hedef derinligine uygun
+	// tavan). Not: 20'ye cekilmisti cunku mevcut icerik (12 mob, 15 gorev) tum gorevler
+	// bitirildiginde oyuncuyu sadece ~Lv15-16'ya tasiyor - bu hala gecerli bir kisit,
+	// yani 80 su an "hedef tavan", icerik derinligi degil; Lv16-80 arasi mob/gorev
+	// eklendikce bu tavan gercek anlamda doldurulmali (bkz. skill agaci genisletme notu,
+	// MMOSkillDatabase.cpp).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Progression")
-	int32 MaxLevel = 20;
+	int32 MaxLevel = 80;
 
 	// ------------------------------------------------------------------
 	// Türetilmiş / anlık statlar

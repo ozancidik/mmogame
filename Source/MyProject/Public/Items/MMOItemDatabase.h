@@ -16,7 +16,7 @@ public:
 	static const FMMOItemDef* Find(FName ItemId);
 
 	// --- Upgrade kurallari (KO tarzi) ---
-	static constexpr int32 MaxPlus = 9;
+	static constexpr int32 MaxPlus = 8;
 
 	// Bir sonraki artiya gecis maliyeti (altin).
 	static int32 GetUpgradeCost(int32 CurrentPlus);
@@ -24,8 +24,9 @@ public:
 	// Basari sansi (yuzde).
 	static int32 GetUpgradeChancePct(int32 CurrentPlus);
 
-	// Bu artidan denemede basarisizlik itemi YAKAR mi? (+4 ve uzeri deneme = yanma riski)
-	static bool BurnsOnFail(int32 CurrentPlus);
+	// Basarisiz denemede itemi YAKMA olasiligi (yuzde, 0-100).
+	// +0..+2 guvenli (0), +3'ten itibaren her artiyla kademeli artar.
+	static int32 GetBurnChancePct(int32 CurrentPlus);
 
 	// Artiya gore stat hesaplari (her + %20 guclendirir).
 	static float GetAttack(const FMMOItemDef& Def, int32 Plus);
