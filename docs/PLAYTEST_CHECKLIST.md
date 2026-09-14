@@ -7,6 +7,16 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
+# Ekonomi denge duzeltmeleri 2: upgrade yanma esigi + MaxLevel — commit 8532890 (2026-09-14)
+
+> Derleme temiz.
+
+- [ ] **Upgrade artik +6'ya kadar guvenli:** Bir item'i +6'ya kadar yukseltmeye calis (basarisiz olsa bile item KAYBOLMAMALI, sadece altin gider) → +6'dan +7'ye denerken artik yanma riski BASLAMALI (basarisizlikta item kaybolabilir).
+- [ ] **MaxLevel 20:** Karakteri Lv20'ye getir (MMOGainXP ile hizlica test edilebilir) → Lv20'de "Level Up" tetiklenmemeli/XP kazanimi durmali (eskiden 80'e kadar devam ederdi).
+- [ ] **Regresyon:** +0-+5 arasi upgrade davranisi (fiyat, sans) degismedi, sadece yanma esigi kaydi — bunu da dogrula.
+
+---
+
 # Ekonomi denge duzeltmeleri (elit loot sansi + yan gorev altini) — commit beee9f9 (2026-09-14)
 
 > Bir ekonomi-denge inceleme ajaninin raporuna dayanarak 2 sayisal degisiklik yapildi. Derleme temiz, oynanarak dogrulanmasi gerekiyor.
