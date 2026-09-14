@@ -74,6 +74,19 @@ namespace
 			E::MeleeDamage, 45.f, 10.f, 150.f, 240.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("War_TempestSlash"), TEXT("Savas Firtinasi"), C::Warrior, T::Special0, 5, 24, 2, TEXT("War_ShatterBlow"),
 			E::AoESelf, 95.f, 12.f, 270.f, 0.f, 440.f));
+		// QA BULGU #6 duzeltmesi (2026-09-15): Special0 fiziksel hasar zinciri Lv24'te
+		// (War_TempestSlash) tikaniyordu - Lv24'ten Lv70'e (Titan Ofkesi capstone) kadar 46
+		// seviye boyunca Warrior'a YENI hicbir hasar skili gelmiyordu (Special1/Special2'deki
+		// Lv45/58 eklemeleri buff, Power=0). Archer/Mage ayni araliktaki Special2 hattinda
+		// (Lv45/58) yeni hasar skilleri kazaniyordu, bu yuzden Warrior "bos" kaliyordu. Fiziksel
+		// zincir Lv45 ve Lv58'de iki halka daha uzatildi, Power/Mana/CD Archer'in
+		// Arc_SpikeTrap/PoisonCloud ve Mage'in Mag_ArcaneBurst/ManaStorm ile (ayni seviyedeki
+		// hasar skilleri) AYNI olcekte tutuldu (Power ~510 @Lv45, ~660 @Lv58; Mana 195/250;
+		// CD Archer'inkiyle birebir 18/20). Savas Firtinasi'ndan (rutbe 5) devam eden zincir.
+		Table.Add(MakeDef(TEXT("War_WarCyclone"), TEXT("Savas Kasirgasi"), C::Warrior, T::Special0, 6, 45, 2, TEXT("War_TempestSlash"),
+			E::MeleeDamage, 195.f, 18.f, 510.f, 240.f, 0.f));
+		Table.Add(MakeDef(TEXT("War_WarDeluge"), TEXT("Savas Tufani"), C::Warrior, T::Special0, 7, 58, 3, TEXT("War_WarCyclone"),
+			E::AoESelf, 250.f, 20.f, 660.f, 0.f, 560.f));
 		Table.Add(MakeDef(TEXT("War_LifeReap"), TEXT("Yasam Cali"), C::Warrior, T::Special1, 2, 16, 2, TEXT("War_BloodDrain"),
 			E::HealSelf, 70.f, 16.f, 310.f, 0.f, 0.f));
 		Table.Add(MakeDef(TEXT("War_BloodLord"), TEXT("Kan Efendisi"), C::Warrior, T::Special1, 3, 33, 2, TEXT("War_LifeReap"),
@@ -206,6 +219,17 @@ namespace
 			E::RangedDamage, 45.f, 10.f, 150.f, 1500.f, 0.f));
 		Table.Add(MakeDef(TEXT("Pri_WrathOfAngels"), TEXT("Meleklerin Ofkesi"), C::Priest, T::Special0, 3, 24, 2, TEXT("Pri_HolyFlame"),
 			E::AoETarget, 105.f, 13.f, 290.f, 1500.f, 420.f));
+		// QA BULGU #6 duzeltmesi (2026-09-15): Warrior ile ayni sorun Priest'te de vardi -
+		// Special0 kutsal hasar zinciri Lv24'te (Pri_WrathOfAngels) tikaniyordu, Lv70 capstone'a
+		// kadar yeni hasar skili gelmiyordu (Special2'deki Lv45/58 eklemeleri buff). Zincir
+		// Lv45 ve Lv58'de iki halka daha uzatildi, Power/Mana/CD Archer'in
+		// Arc_SpikeTrap/PoisonCloud ve Mage'in Mag_ArcaneBurst/ManaStorm ile (ayni seviyedeki
+		// hasar skilleri) AYNI olcekte tutuldu (Power ~510 @Lv45, ~660 @Lv58; Mana 195/250;
+		// CD Archer'inkiyle birebir 18/20). Meleklerin Ofkesi'nden (rutbe 3) devam eden zincir.
+		Table.Add(MakeDef(TEXT("Pri_AngelicBlade"), TEXT("Meleklerin Kilici"), C::Priest, T::Special0, 4, 45, 2, TEXT("Pri_WrathOfAngels"),
+			E::RangedDamage, 195.f, 18.f, 510.f, 1500.f, 0.f));
+		Table.Add(MakeDef(TEXT("Pri_AngelicStorm"), TEXT("Meleklerin Firtinasi"), C::Priest, T::Special0, 5, 58, 3, TEXT("Pri_AngelicBlade"),
+			E::AoETarget, 250.f, 20.f, 660.f, 1600.f, 560.f));
 		// Kutsal Yagmur: Buyuk Sifa'nin devami, secili muttefigi iyilestirir (yoksa kendini).
 		Table.Add(MakeDef(TEXT("Pri_HolyRain"), TEXT("Kutsal Yagmur"), C::Priest, T::Special1, 3, 16, 2, TEXT("Pri_DivineRestoration"),
 			E::HealTarget, 110.f, 16.f, 380.f, 0.f, 0.f));
