@@ -106,8 +106,14 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO|Progression")
 	int32 ExperienceToNextLevel = 100;
 
+	// Ekonomi denge raporu (2026-09-14): 80 iken mevcut icerik (12 mob, 15 gorev, Lv7'ye
+	// kadar) TUM gorevler bitirildiginde bile oyuncuyu sadece ~Lv15-16'ya tasiyordu -
+	// geriye 64 seviye (Lv16->80) dolduracak HICBIR tasarlanmis mob/gorev olmadan
+	// kaliyordu, ve %25 katlanarak buyuyen XP egrisi o noktadan sonra pratikte sonsuz bir
+	// duvar oluyordu. Icerigin gercekten tasidigi derinlige (~Lv15-16 + biraz grind payi)
+	// yakin bir deger secildi; yeni bolge/mob/gorev eklendikce bu yukseltilebilir.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Progression")
-	int32 MaxLevel = 80;
+	int32 MaxLevel = 20;
 
 	// ------------------------------------------------------------------
 	// Türetilmiş / anlık statlar

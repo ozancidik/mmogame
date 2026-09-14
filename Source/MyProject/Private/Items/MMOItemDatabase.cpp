@@ -96,8 +96,14 @@ int32 FMMOItemDatabase::GetUpgradeChancePct(int32 CurrentPlus)
 
 bool FMMOItemDatabase::BurnsOnFail(int32 CurrentPlus)
 {
-	// +4'e ve uzerine denemede basarisizlik itemi yakar (klasik KO gerilimi).
-	return CurrentPlus >= 3;
+	// Ekonomi denge raporu (2026-09-14): eski esik (+4 denemesinden itibaren yanma) P(+9)
+	// ~%0.065 yapiyordu - guvenli hazirlik maliyeti (~395g) bile ortalama ~1538 kopya
+	// gerektiriyordu (~607.500g), yani pratikte hic kimsenin ulasamayacagi bir hedefti ve
+	// tek ciddi gold-sink'i (bu sistem) normal oyuncular icin islevsiz birakiyordu. Esik
+	// +7'ye cekildi: +0..+6 artik guvenli/kayipsiz (klasik KO gerilimi hala +7 ve sonrasinda
+	// var), P(+9) ~%0.75'e cikiyor (~133 kopya yerine ~1538) - hala zor ama teorik olarak
+	// hirsli bir oyuncu icin ulasilabilir, "kumar" hissi korunuyor.
+	return CurrentPlus >= 6;
 }
 
 float FMMOItemDatabase::GetAttack(const FMMOItemDef& Def, int32 Plus)
