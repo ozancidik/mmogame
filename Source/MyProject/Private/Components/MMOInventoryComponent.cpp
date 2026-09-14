@@ -52,7 +52,12 @@ void UMMOInventoryComponent::AddGold(int32 Amount)
 		return;
 	}
 
-	Gold = FMath::Max(0, Gold + Amount);
+	// GUVENLIK/BUG-HUNT (qa-kontrolcu bulgusu, hardening): Gold+Amount int32'de tasarsa
+	// (Gold gercekten ~2.1 milyara yaklastiginda, normal uzun-vadeli oynanista ihtimal
+	// dahilinde) sonuc negatife doner ve FMath::Max(0,...) oyuncunun TUM altinini
+	// sifirlardi. int64'te topla, sonra guvenle [0, INT32_MAX] araligina sikistir.
+	const int64 Sum = (int64)Gold + (int64)Amount;
+	Gold = (int32)FMath::Clamp<int64>(Sum, 0, MAX_int32);
 	OnGoldChanged.Broadcast(Gold);
 }
 
