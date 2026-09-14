@@ -133,9 +133,21 @@ int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 {
 	// Basit üstel eğri: level yükseldikçe gereken exp artar.
 	// L1->L2 = 100, sonrasında her seviyede ~%25 artış.
-	const float Base = 100.f;
-	const float Growth = 1.25f;
-	return FMath::RoundToInt(Base * FMath::Pow(Growth, (float)FMath::Max(0, InLevel - 1)));
+	// GUVENLIK/BUG-HUNT: bu egri MaxLevel=80'e kadar tasarlanmis araligin ICINDE bile
+	// int32'yi tasiyordu (100*1.25^76 ~= 1.85 milyar, 1.25^77 ~= 2.32 milyar > INT32_MAX).
+	// Tasan deger negatife donuyor -> GainExperience'daki "Experience >= ExperienceToNextLevel"
+	// kontrolu hep dogru oluyor -> oyuncu Lv77'den itibaren araya sikisan seviyeleri atlayip
+	// direkt Lv80'e sicriyordu, HUD XP bari bozuluyordu, ApplyDeathPenalty negatif kayip
+	// hesaplayip olum cezasini sessizce iptal ediyordu. Hile gerekmiyor, MaxLevel'a normal
+	// oynanisla ulasan HERKES tetikleyecekti. double'da hesaplayip (float'in ~7 basamaklik
+	// hassasiyeti bu buyuklukte deger icin yetersiz) int32'ye guvenle sigacak sekilde tepeye
+	// kirp (MaxLevel'daki gercek deger zaten ulasilamayacak kadar yuksek bir hedef; kirpma
+	// oyun deneyimini degistirmez).
+	const double Base = 100.0;
+	const double Growth = 1.25;
+	const double Raw = Base * FMath::Pow(Growth, (double)FMath::Max(0, InLevel - 1));
+	const double Clamped = FMath::Min(Raw, (double)MAX_int32);
+	return FMath::RoundToInt(Clamped);
 }
 
 void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill)
