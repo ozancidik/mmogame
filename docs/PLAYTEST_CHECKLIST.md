@@ -874,6 +874,152 @@ regresyondur.
 
 ---
 
+# Dorduncu bolge: Lv16-24 icerik dilimi (4 normal mob + 1 elit + 5 gorev + Adamantin tier) — 2026-09-14
+
+> Derleme temiz (`Result: Succeeded`), oynanis test EDILMEDI. **Kapsam notu:** bu, Lv80 hedefinin **Lv16-24** kismini doldurur; **Lv31-80 hala bos ve bu bilerek boyle** (kademeli ilerliyoruz, tum bosluk tek seferde doldurulmuyor).
+>
+> Yeni icerik (tema: **Alev Vadisi**, ucuncu bolgenin buzul temasinin volkanik karsiti): normal moblar `EmberHound` (Kor Tazisi, Lv16), `MagmaGolem` (Magma Golemi, Lv18), `AshOrc` (Kul Orku, Lv20), `InfernalWraith` (Cehennem Hayaleti, Lv22); elit `MagmaTyrant` (Magma Tirani, Lv24). Gorev zinciri: `Q_FrostLich` → Q_EmberHounds → Q_MagmaGolems → Q_AshOrcs → Q_InfernalWraiths → Q_MagmaTyrant. Yeni esya tier'i: **Adamantin** (Lv16, 4 parca).
+>
+> Hizli seviye atlamak icin `MMOGainXP` konsol komutu kullanilabilir (zincirin ilk gorevi Lv16 istiyor).
+
+## Spawner yerlesimi / cakisma
+
+- [ ] **Dorduncu bolge yerinde mi:** Oyuna gir, PlayerStart'in baktigi yonde COK ileri git ve SAGA kay (eksende ~5600u, saga ~2400u — Buz Lordu'nun 4200u'sunun otesinde). 5 mob'luk bir grup olmali ve **sadece** Kor Tazisi / Magma Golemi / Kul Orku / Cehennem Hayaleti cikmali.
+- [ ] **Magma Tirani tek ve karsi tarafta:** Ayni eksende (~5600u) ama SOLA ~2400u → tek bir Magma Tirani olmali, yaninda baska spawner mob'u olmamali. Oldurunce ~60sn sonra tekrar dogmali.
+- [ ] **Band sizintisi yok (onemli, regresyon):** Ana alan (~1050u one) hala sadece Lv1-5; ikinci bolge (2800u one + 1600u saga) hala sadece Lv6-7; ucuncu bolge (2800u one + 1600u sola) hala sadece Lv8-12 olmali. Yeni Lv16-22 moblari bu uc havuzun HICBIRINE sizmamali.
+- [ ] **Bolgeler ust uste binmiyor:** Kodda hesaplanan mesafeler — dorduncu bolgeden en yakin spawner'lar: Buz Lordu ~2778u, ikinci bolge ~2912u; Magma Tirani ile dorduncu bolge arasi 4800u. Hepsi >700u. Yerinde gozle dogrula: dorduncu bolge moblari Buz Lordu'nun alanina karismamali (spawn yaricapi 500u).
+
+## Mob davranisi / olcekleme
+
+- [ ] **Guc egrisi mantikli mi:** Lv13 Buz Lordu'nu yenebilen bir karakter Lv16 Kor Tazisi'ni zorlanarak, Lv22 Cehennem Hayaleti'ni ancak iyi ekipmanla yenebilmeli. Hicbiri "tek vurusta olen" veya "hic olmeyen" hissi vermemeli.
+- [ ] **Efektler calisiyor:** Kor Tazisi ve Cehennem Hayaleti vurusta **Poison**, Kul Orku **Slow** uygulayabilmeli (HUD'da debuff ikonu). Magma Golemi, Kul Orku ve Cehennem Hayaleti cani %35-45 altina dusunce **Rage** ile ofkelenmeli (hasari artmali).
+- [ ] **Kul Orku gorseli:** Warrok (ork) mesh'i ve animasyonlariyla cikmali — mor/gri Manny degil. Yurume/saldiri/olum animasyonlari oynamali.
+- [ ] **Magma Tirani elit muamelesi:** Nameplate'te turuncu `[ELIT] Magma Tirani Lv24` gorunmeli; oldurunce **tum sunucuya** "elit dustu" duyurusu gitmeli.
+- [ ] **Boyut:** Magma Tirani Scale=2.0 ile oyundaki en buyuk mob olmali (Kadim Golem 2.1'in hemen altinda) — zeminden batmis/havada asili gorunmemeli.
+
+## Elit loot orani (ekonomi kurali)
+
+- [ ] **%50 — garantili DEGIL:** Magma Tirani'ni **en az 6-8 kez** oldur ve kac seferinde ekipman dustugunu say. Yaklasik yarisinda dusmeli; her seferinde dusuyorsa `EliteEquipDropChance` yanlis okunuyor demektir (0.5 olmali, 1.0 degil — onceki ekonomi raporunun bulgusu).
+- [ ] **Dustugunde 2 parca, +3..+5:** Dusus oldugunda **2 ekipman** birden dusmeli ve arti seviyeleri +3 ile +5 arasinda olmali (Buz Lordu'nun +2..+4'unun bir kademe ustu).
+- [ ] **Adamantin tier dusuyor:** Magma Tirani Lv24 oldugu icin loot havuzu (`RequiredLevel <= 24 && >= MaxReq-2`, MaxReq=16) sadece **Adamantin** parcalarini icermeli — Mithril DUSMEMELI.
+- [ ] **REGRESYON — eski elitler degismedi:** Buz Lordu hala **Mithril** dusurmeli (Lv13, MaxReq=10 — Adamantin onun havuzuna girmemeli). Orumcek Ana / Ork Reisi / Kadim Golem / Golge Suikastci hala Ejder/Celik dusurmeli. Dusus oranlari eskisi gibi ~%50 kalmali.
+
+## Gorev zinciri
+
+- [ ] **Zincir kilidi:** Lv16 olmadan / `Q_FrostLich` bitmeden gorevli NPC'de "Kor Tazilari" GORUNMEMELI. Q_FrostLich bitip Lv16 olunca listede belirmeli.
+- [ ] **Sirali acilis:** Her gorev bir oncekini gerektirmeli: Q_EmberHounds (Lv16) → Q_MagmaGolems (Lv18) → Q_AshOrcs (Lv20) → Q_InfernalWraiths (Lv22) → Q_MagmaTyrant (Lv24). Bir ara halkayi atlayip sonrakini alabiliyorsan prereq bozuk demektir.
+- [ ] **Sayac dogru mob'u sayiyor:** Ornegin Q_AshOrcs aktifken Kor Tazisi oldur → sayac ARTMAMALI; Kul Orku oldur → artmali.
+- [ ] **Oduller:** Sirasiyla Buyuk Can Iksiri x4, Adamantin Bot, Adamantin Kask, Adamantin Zirh, Adamantin Kilic gelmeli; XP/altin 5400/3500'den 12000/8000'e kademeli artmali (hepsi Q_FrostLich'in 4500/3000'inin uzerinde).
+- [ ] **Gorev paneli tasmiyor (onemli):** Zincir acikken gorevli NPC panelinde artik 5 gorev daha var (toplam 20 gorev tanimi). Tum alinabilir gorevler ekrana sigmali, "odul al" satirlari erisilebilir olmali — daha once iki kez overflow duzeltmesi yapilmisti, bu dilimden sonra TEKRAR bak.
+
+## Adamantin tier (yeni esya kademesi)
+
+- [ ] **Dukkan listesi tasmiyor (onemli):** Saticiyi ac — satin-alma sutununda 4 esya daha var (toplam 25 ekipman + 7 tuketilebilir). Tum satirlar panele sigmali ve tiklanabilir olmali; satir yuksekligi okunamayacak kadar kuculmemeli. Kucultuyorsa HUD'da kaydirma/sutun bolme gerekiyor demektir — bu, bu dilimin en olasi gorsel sorunu.
+- [ ] **Statlar ve seviye:** Adamantin Kilic 62 atak, Adamantin Zirh 38 def, Adamantin Kask 16 def, Adamantin Bot 22 def; hepsi Lv16 gerektirmeli. Lv16 altinda kusanmayi dene → reddedilmeli.
+- [ ] **Upgrade calisiyor:** Bir Adamantin parcasini +1/+2'ye yukselt → mevcut upgrade maliyeti/sansi/yanma kurallari aynen islemeli (yeni tier ozel bir durum degil).
+- [ ] **Envanter/karakter paneli:** Adamantin parcasini kusan → karakter penceresinde atak/def artisi dogru yansimali, isim panelden tasmamali ("Adamantin Kilic +5" gibi uzun metin).
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
+
+---
+
+# QA DENETIMI: ucuncu bolge / Lv8-15 dilimi (2c6fd23) — 5 bulgu (2026-09-14)
+
+> Bagimsiz QA gecisi. Derleme ZORLA yeniden dogrulandi (commit'in 4 .cpp dosyasinin zaman
+> damgasi guncellenip tam derleme yapildi — "up to date" yalanci-basarisi elendi):
+> **`Result: Succeeded`, sifir uyari/hata** (2 ceviri birimi gercekten yeniden derlendi).
+>
+> Asagidaki 4 iddia bagimsiz olarak **DOGRULANDI, bulgu yok** — tekrar test etmeye gerek yok:
+> - **Spawner geometrisi:** 8 spawner'in konumu `MobAreaDistance=700` ile yeniden hesaplandi.
+>   Ucuncu bolge (F*2800, R*-1600) icin en yakin komsu **1695.2u** (Golge Suikastci) — commit'in
+>   ~1695u iddiasi dogru. Buz Lordu (F*4200) icin en yakin **1960u**. Yaricaplar dusuldugunde bile
+>   (500+150) en dar bosluk **1045u**, yani 700u kuralinin cok uzerinde. Cakisma YOK.
+> - **Level-band:** Lv8-12 bandinda 4 non-elit mob var (8/9/10/12) → havuz bos donmuyor,
+>   crash/sonsuz dongu riski yok. `GetRandomInLevelRange` zaten bos band icin `GetRandom()`
+>   fallback'ine sahip. (Not: Lv11'de mob yok — bosluk zararsiz, sadece bilgi.)
+> - **Elit loot havuzu:** `EliteEquipDropChance = 0.5` (1.0 DEGIL) — dogrulandi. FrostLich
+>   MobLevel=13 → MaxReq=10 → filtre `RequiredLevel >= 8` → havuz **tam olarak 4 Mithril parcasi**.
+>   Bos/yanlis havuz olusmuyor. Eski elitlerin havuzlari (Lv5/6/7) tek tek yeniden hesaplandi:
+>   **degismemis**, Mithril sizmiyor.
+> - **Gorev zinciri:** 5 gorevin hedef ArchetypeId'si (`FrostWraith`/`CursedKnight`/`VenomSpider`/
+>   `OrcBerserker`/`FrostLich`) mob tablosuyla **birebir** esitleniyor — bu tur uyumsuzluk YOK.
+>   Prereq zinciri gecerli (`Q_Boss` mevcut), odul id'leri (`GreaterHealthPotion` + 4 Mithril) mevcut.
+>   Mob efekt id'leri (`Slow`/`Poison`/`Rage`) efekt veritabaninda var → a0262a6 buff fix'iyle catisma yok.
+
+## MEDIUM — Buz Lordu haritanin disinda/navmesh disinda kalabilir (ONCE BUNU TEST ET)
+
+Buz Lordu `PlayerStart + Facing*4200u`'e konuyor. Bu, projede **bugune kadar yerlestirilmis en uzak
+nokta** (onceki rekor: ikinci bolge ~3225u radyal, Golge Suikastci 2240u eksende). `Lvl_ThirdPerson`
+sablon haritasinin o mesafede zemini/navmesh'i olup olmadigi editor acilmadan dogrulanamadi.
+Onemli olmasinin sebebi: `Q_FrostLich` zincirin SON halkasi ve tek hedefi o tek forced-spawn mob —
+mob dunyadan duserse veya pathlenemezse **zincir kalici olarak tamamlanamaz hale gelir**.
+(Ilgili: `MMOGameMode.cpp:156` LichLoc, `MMOMobSpawner.cpp:71` spawn Z ofseti +100.)
+Zemin yoksa bu bulgu **HIGH**'a cikar.
+
+- [ ] **Zemin var mi (KRITIK ilk adim):** Play bas → PlayerStart'in baktigi yonde duz ilerle (~4200u).
+      Yol boyunca zemin bitip **bosluga dusuyor musun**? Dusuyorsan Buz Lordu da orada demektir.
+- [ ] **Buz Lordu gercekten duruyor mu:** O noktaya varinca tek bir Buz Lordu **zeminde duruyor**
+      olmali — havada asili, zemine gomulu veya asagi duser halde OLMAMALI.
+- [ ] **Pathleniyor mu:** Buz Lordu'na vur ve geri kac → pesinden **yuruyerek** gelmeli. Yerinde
+      kayiyor/titriyor/hic hareket etmiyorsa navmesh yok demektir.
+- [ ] **Ucuncu bolge icin ayni kontrol:** Eksende ~2800u + SOLA ~1600u noktasinda 5 mob'un hepsi
+      zeminde mi, yoksa bir kismi boslukta mi doguyor?
+
+## LOW — `Q_CursedKnights` odulu verildigi anda kusanilamiyor
+
+`Q_CursedKnights` gorevi Lv9'da aliniyor (`MMOQuestTypes.cpp:65-67`) ama odulu **Mithril Bot**,
+ve Mithril tier'i **Lv10 gerektiriyor** (`MMOItemDatabase.cpp:60`). Yani oyuncu odulu Lv9'da
+aliyor ama cantada bekletmek zorunda. Coken bir sey yok (odul cantaya giriyor, sadece `Equip`
+reddediyor). Zincirin diger 3 ekipman odulu bu sorunu tasimiyor (Lv10/12/13 > Lv10).
+Oneri (kod bana ait degil): ya gorevin `RequiredLevel`'ini 10 yap, ya odulu Ejder Bot'a cek.
+
+- [ ] **Tetikleme:** Zinciri Lv9'dayken `Q_CursedKnights`'a kadar getir ve tamamla → Mithril Bot
+      cantaya gelmeli ama kusanmaya calisinca **"Level 10 gerekli"** reddi almalisin. Odul
+      KAYBOLMAMALI — Lv10 olunca kusanilabilmeli.
+
+## LOW — Dukkan satin-alma sutununda yazi artik satir kutusuna sigmiyor
+
+Panel TASMIYOR (otomatik kuculme calisiyor, liste tam sigiyor) — ama **yazi boyutu satirla birlikte
+kuculmuyor**. Hesap (`MMOHUD.cpp:1308-1311`): satir sayisi 24 → **29** oldu (21 ekipman + 7
+tuketilebilir + 1 iksir). Kullanilabilir yukseklik 446px sabit → `BuyRowH = 446/29 = 15.38px`,
+kutu yuksekligi `BuyCellH = 11.38px`. Yazi ise sabit 0.72 olcekte (~12-13px) ciziliyor
+(`:1333`, `:1345`) → yazi kendi kutusundan tasip alt satira degiyor. Commit oncesi 24 satirda
+`446/24 = 18.6px` idi ve siginiyordu — **esigi asan tam olarak bu commit**. Tiklama bolgeleri
+kutularla ayni hesaplandigi icin **tiklama hala dogru calisir**; sorun sadece okunabilirlik.
+Bir sonraki tier (4-5 esya daha) durumu belirgin kotulestirir.
+
+- [ ] **Gozle dogrula:** Saticiyi ac (E) → satin-alma sutununda satirlarin yazilari **ust uste
+      biniyor / kutu disina tasiyor mu**? Ozellikle listenin alt yarisina bak.
+- [ ] **Tiklama hala dogru mu (onemli):** Listenin EN ALTINDAKI esyaya tikla → **tam o esya**
+      satin alinmali (bir ust/alt komsusu degil). Kaymis alim varsa bulgu LOW'dan yukari cikar.
+
+## LOW — Bantsiz spawner'lar artik Lv12 mob dogurabilir (latent regresyon, dogrulanmali)
+
+`AMMOMobSpawner` varsayilanlari `MinMobLevel=0 / MaxMobLevel=0` (`MMOMobSpawner.h:39-42`). Bu
+durumda arketip secilmiyor ve mob kendi `BeginPlay`'inde `FMMOMobDatabase::GetRandom()`'a dusuyor
+(`MMOMob.cpp:103`) — bu fonksiyon **tum non-elit havuzdan** seciyor, yani artik Lv12 Ork Berserk de
+dahil. Commit oncesi bu yolun tavani Lv7 idi. **Su an canli bir yol yok**: GameMode'un actigi
+spawner'larin hepsi ya `ForcedArchetypeId` ya da bantli. Risk su iki durumda gercege doner:
+(a) `Lvl_ThirdPerson` icine **elle yerlestirilmis** bir `AMMOMobSpawner`/`AMMOMob` varsa,
+(b) `MMOSpawnMob` debug komutu **bos id** ile cagrilirsa.
+
+- [ ] **Baslangic alani temiz mi:** Play bas, PlayerStart cevresinde ve ana mob alaninda (~1050u)
+      dolas → **hicbir Lv8+ mob** (Buz Hayaleti / Lanetli Sovalye / Zehir Orumcegi / Ork Berserk)
+      gormemelisin. Gorursen haritada elle konmus bir spawner var demektir.
+- [ ] **Debug komutu:** Konsola argumansiz `MMOSpawnMob` yaz → cikan mob Lv12 Ork Berserk olabiliyor
+      mu? (Sadece bilgi; debug yolu, oyuncuya acik degil.)
+
+## LOW — Dusuk seviye moblar artik Mithril dusurebiliyor (olcum istegi)
+
+Elit-OLMAYAN mob loot'u item tablosundan **duz rastgele** seciyor (`MMOMob.cpp:701`) — tablo artik
+Mithril tier'i de icerdigi icin **Lv1 Goblin bile Mithril Kilic dusurebilir**. Kusanilamaz (Lv10
+gerekir) ama **satilabilir**: Mithril Kilic satis ~350 altin, onceki tavan Ejder Kilici ~272 altin
+(+%29 tavan artisi). Bu mevcut tasarimin dogal sonucu, yeni bir hata degil — ama ekonomi raporunun
+"altin cabuk anlamsizlasiyor" bulgusuyla ayni yone bakiyor, bu yuzden olculmesi isteniyor.
+
+- [ ] **Olcum:** Baslangic alaninda (Lv1-5) ~20 mob oldur → kac tanesinden **Mithril** parcasi dustu?
+      2-3'ten fazlaysa erken oyun altin akisi beklenenden hizli demektir, not al.

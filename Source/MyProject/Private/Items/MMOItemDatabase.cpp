@@ -37,6 +37,11 @@ namespace
 		// uzerine mevcut egriyle devam eder. Elit loot havuzu "RequiredLevel <= MobLevel &&
 		// >= MaxReq-2" ile secildigi icin mevcut Lv5-7 elitleri bu tier'i DUSURMEZ (MaxReq=7).
 		Table.Add(MakeItem(TEXT("MithrilBlade"), TEXT("Mithril Kilic"), S::Weapon, 48.f, 0.f, 10));
+		// Adamantin tier (Lv16): dorduncu bolge (Lv16-22, Alev Vadisi) kademesinin ust-tier'i.
+		// Mithril'in uzerine ayni egriyle devam eder (Ejder->Mithril ~+%30; Mithril->Adamantin de oyle).
+		// Elit loot havuzu "RequiredLevel <= MobLevel && >= MaxReq-2" oldugu icin mevcut Lv5-13
+		// elitleri bu tier'i DUSURMEZ (onlarin MaxReq'i hala <=10); sadece Magma Tirani (Lv24) dusurur.
+		Table.Add(MakeItem(TEXT("AdamantineBlade"), TEXT("Adamantin Kilic"), S::Weapon, 62.f, 0.f, 16));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -44,6 +49,7 @@ namespace
 		Table.Add(MakeItem(TEXT("PlateArmor"), TEXT("Plaka Zirh"), S::Armor, 0.f, 15.f, 5));
 		Table.Add(MakeItem(TEXT("DragonPlate"), TEXT("Ejder Zirh"), S::Armor, 0.f, 21.f, 7));
 		Table.Add(MakeItem(TEXT("MithrilPlate"), TEXT("Mithril Zirh"), S::Armor, 0.f, 28.f, 10));
+		Table.Add(MakeItem(TEXT("AdamantinePlate"), TEXT("Adamantin Zirh"), S::Armor, 0.f, 38.f, 16));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -51,6 +57,7 @@ namespace
 		Table.Add(MakeItem(TEXT("SteelHelmet"), TEXT("Celik Kask"), S::Helmet, 0.f, 7.f, 5));
 		Table.Add(MakeItem(TEXT("DragonHelm"), TEXT("Ejder Kask"), S::Helmet, 0.f, 9.f, 7));
 		Table.Add(MakeItem(TEXT("MithrilHelm"), TEXT("Mithril Kask"), S::Helmet, 0.f, 12.f, 10));
+		Table.Add(MakeItem(TEXT("AdamantineHelm"), TEXT("Adamantin Kask"), S::Helmet, 0.f, 16.f, 16));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
@@ -58,6 +65,7 @@ namespace
 		Table.Add(MakeItem(TEXT("SteelBoots"), TEXT("Celik Bot"), S::Boots, 0.f, 8.f, 5));
 		Table.Add(MakeItem(TEXT("DragonBoots"), TEXT("Ejder Bot"), S::Boots, 0.f, 12.f, 7));
 		Table.Add(MakeItem(TEXT("MithrilBoots"), TEXT("Mithril Bot"), S::Boots, 0.f, 16.f, 10));
+		Table.Add(MakeItem(TEXT("AdamantineBoots"), TEXT("Adamantin Bot"), S::Boots, 0.f, 22.f, 16));
 
 		return Table;
 	}

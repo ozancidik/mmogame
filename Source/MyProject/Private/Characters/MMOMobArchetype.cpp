@@ -107,6 +107,36 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.5f;
 
+		// --- Dorduncu bolge NORMAL moblari (Lv16-22; MinMobLevel=16/MaxMobLevel=22 bandli spawner ile cikar) ---
+		// Tema: Alev Vadisi (volkanik) — ucuncu bolgenin buzul temasinin karsiti.
+		// Olcekleme Lv8-12 egrisini AYNEN surdurur: seviye basina kabaca +2.5 Str, +2.5 Vit,
+		// +3.5 hasar ve XP/altinda seviye basina ~x1.19 (Lv12 OrcBerserker 660 XP -> Lv16 1300,
+		// Lv18 1850, Lv20 2600, Lv22 3700). Hassas ekonomi balansi degil, tutarli bir kademe.
+		// Kor Tazisi: cok hizli akinci, genis aggro; kor isirigi yakar (Poison).
+		Table.Add(MakeMob(TEXT("EmberHound"), TEXT("Kor Tazisi"), 16, 41, 38, 58.f, 1300, 200, 480, 460.f, 1250.f, 1.1f, FLinearColor(0.85f, 0.35f, 0.1f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.4f;
+
+		// Magma Golemi: cok yavas ama devasa canli tank; can azalinca ofkelenir.
+		Table.Add(MakeMob(TEXT("MagmaGolem"), TEXT("Magma Golemi"), 18, 46, 52, 64.f, 1850, 280, 660, 230.f, 950.f, 1.45f, FLinearColor(0.5f, 0.2f, 0.18f)));
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.45f;
+
+		// Kul Orku: dengeli vurucu; kul bulutu yavaslatir, dusuk canda ofkelenir.
+		Table.Add(MakeMob(TEXT("AshOrc"), TEXT("Kul Orku"), 20, 52, 48, 72.f, 2600, 380, 880, 360.f, 1200.f, 1.25f, FLinearColor(0.45f, 0.35f, 0.3f)));
+		SetWarrokVisual(Table.Last()); // Mixamo Warrok ork mesh'i + animasyonlari (veri satiri)
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.3f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
+		// Cehennem Hayaleti: bandin en guclu normali; hizli, yakici ve ofkelenir.
+		Table.Add(MakeMob(TEXT("InfernalWraith"), TEXT("Cehennem Hayaleti"), 22, 58, 54, 82.f, 3700, 520, 1200, 430.f, 1300.f, 1.3f, FLinearColor(0.8f, 0.25f, 0.35f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.45f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.35f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -177,6 +207,24 @@ namespace
 		Table.Last().EliteEquipDropCount = 2;
 		Table.Last().EliteMinItemPlus = 2;
 		Table.Last().EliteMaxItemPlus = 4;
+
+		// Magma Tirani (dorduncu bolge eliti, Lv24): bandin (Lv16-22) ustunde duran kademe-sonu elit.
+		// Buz Lordu'nun (Lv13) volkanik karsiligi; devasa canli, cok agir vurur, yakar ve ofkelenir.
+		Table.Add(MakeMob(TEXT("MagmaTyrant"), TEXT("Magma Tirani"), 24, 68, 82, 95.f, 6800, 1100, 2300, 270.f, 1350.f, 2.0f, FLinearColor(0.9f, 0.3f, 0.08f)));
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		// 2 ekipman, +3..+5. Dusus sansi yine bilerek 0.5 (garantili DEGIL): ekonomi denge raporu
+		// (2026-09-14) %100 garantili elit loot'u tekrar-farm edilebilir bir altin/esya muslugu
+		// olarak isaretlemisti — her yeni elit ayni oranla baslar. Bkz. SpiderQueen yorumu.
+		// Elit loot havuzu "RequiredLevel <= MobLevel && >= MaxReq-2" oldugu icin bu elit
+		// Adamantin tier'ini (Lv16) dusurur; Mithril (Lv10) havuza girmez (MaxReq=16).
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
 
 		return Table;
 	}

@@ -79,6 +79,33 @@ namespace
 			T::KillSpecificMob, TEXT("FrostLich"), 1, 4500, 3000, 13, TEXT("Q_OrcBerserkers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("MithrilBlade"));
 
+		// --- Dorduncu bolge zinciri (Lv16-24, Alev Vadisi): Q_FrostLich'ten SONRA baslar ---
+		// Q_FrostLich (4500XP/3000g) zincirin ucuncu kademesini bitiriyordu; bu zincir Lv16-22
+		// mob'lari + Lv24 eliti ile bir sonraki kademeyi acar. Oduller Q_FrostLich'in uzerine
+		// kademeli cikar (5400 -> 12000 XP, 3500 -> 8000 altin) ve Adamantin tier'ini (Lv16)
+		// dagitir. NOT: Lv31-80 hala bos, bilerek boyle — kademeli ilerliyoruz.
+		Table.Add(MakeQuest(TEXT("Q_EmberHounds"), TEXT("Kor Tazilari"), TEXT("Alev Vadisi'nin gecidini ac: 5 Kor Tazisi oldur."),
+			T::KillSpecificMob, TEXT("EmberHound"), 5, 5400, 3500, 16, TEXT("Q_FrostLich")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 4;
+
+		Table.Add(MakeQuest(TEXT("Q_MagmaGolems"), TEXT("Magma Golemleri"), TEXT("Lav golunun bekcilerini kir: 5 Magma Golemi oldur."),
+			T::KillSpecificMob, TEXT("MagmaGolem"), 5, 6500, 4200, 18, TEXT("Q_EmberHounds")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_AshOrcs"), TEXT("Kul Orklari"), TEXT("Kul ovasindaki ork akincilarini dagit: 6 Kul Orku oldur."),
+			T::KillSpecificMob, TEXT("AshOrc"), 6, 7800, 5000, 20, TEXT("Q_MagmaGolems")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_InfernalWraiths"), TEXT("Cehennem Hayaletleri"), TEXT("Vadinin dibindeki hayaletleri kov: 5 Cehennem Hayaleti oldur."),
+			T::KillSpecificMob, TEXT("InfernalWraith"), 5, 9400, 6000, 22, TEXT("Q_AshOrcs")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AdamantinePlate"));
+
+		// Zincirin sonu: dorduncu bolge eliti (Lv24).
+		Table.Add(MakeQuest(TEXT("Q_MagmaTyrant"), TEXT("Magma Tirani"), TEXT("Alev Vadisi'nin hukumdarini devir: Magma Tirani'ni oldur."),
+			T::KillSpecificMob, TEXT("MagmaTyrant"), 1, 12000, 8000, 24, TEXT("Q_InfernalWraiths")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));

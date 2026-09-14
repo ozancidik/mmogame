@@ -164,6 +164,45 @@ void AMMOGameMode::SpawnMobArea()
 		UGameplayStatics::FinishSpawningActor(LichSpawner, LichTM);
 	}
 
+	// --- DORDUNCU SAVAS BOLGESI (Lv16-22 NORMAL moblar, Alev Vadisi) ---
+	// Eksende MobAreaDistance*8 (5600u) + SAG yone 2400u — Buz Lordu'nun (4200u) otesinde.
+	// Mevcut TUM spawner'lara merkez-merkez mesafeler (MobAreaDistance=700, F=Facing, R=RightDir):
+	//   Buz Lordu      (F*4200)          : ~2778u
+	//   Ikinci bolge   (F*2800 + R*1600) : ~2912u
+	//   Golge Suikastci(F*2240)          : ~4129u
+	//   Ork Reisi      (F*1540)          : ~4716u
+	//   Orumcek Ana    (F*1120 + R*700)  : ~4792u
+	//   Ucuncu bolge   (F*2800 - R*1600) : ~4883u
+	//   Ana alan       (F*1050)          : ~5144u
+	//   Kadim Golem    (F*1120 - R*700)  : ~5448u
+	//   Magma Tirani   (F*5600 - R*2400) :  4800u
+	// Hepsi >700u (QA kurali). ForcedArchetypeId YOK; band Lv16-22 normallerini secer.
+	const FVector FourthZoneLoc = Origin + Facing.Vector() * (MobAreaDistance * 8.f) + RightDir * 2400.f + FVector(0.f, 0.f, 50.f);
+	const FTransform FourthZoneTM(FRotator::ZeroRotator, FourthZoneLoc);
+	if (AMMOMobSpawner* FourthZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), FourthZoneTM))
+	{
+		FourthZone->MaxMobs = 5;
+		FourthZone->SpawnRadius = 500.f;
+		FourthZone->MinMobLevel = 16;
+		FourthZone->MaxMobLevel = 22;
+		UGameplayStatics::FinishSpawningActor(FourthZone, FourthZoneTM);
+		UE_LOG(LogTemp, Log, TEXT("[MMODBG] FourthZone spawner @ %s"), *FourthZoneLoc.ToCompactString());
+	}
+
+	// Elit: Magma Tirani (Lv24, dorduncu bolge kademe-sonu) — dorduncu bolgenin AYNASI
+	// (eksende 5600u + SOL yone 2400u). En yakin spawner'lar: Buz Lordu ~2778u,
+	// Ucuncu bolge ~2912u, Dorduncu bolge 4800u — hepsi >700u.
+	const FVector TyrantLoc = Origin + Facing.Vector() * (MobAreaDistance * 8.f) - RightDir * 2400.f + FVector(0.f, 0.f, 50.f);
+	const FTransform TyrantTM(FRotator::ZeroRotator, TyrantLoc);
+	if (AMMOMobSpawner* TyrantSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), TyrantTM))
+	{
+		TyrantSpawner->MaxMobs = 1;
+		TyrantSpawner->SpawnRadius = 150.f;
+		TyrantSpawner->TopUpInterval = 60.f;
+		TyrantSpawner->ForcedArchetypeId = FName(TEXT("MagmaTyrant"));
+		UGameplayStatics::FinishSpawningActor(TyrantSpawner, TyrantTM);
+	}
+
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
 	FActorSpawnParameters NpcParams;
 	NpcParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
