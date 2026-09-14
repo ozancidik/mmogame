@@ -101,18 +101,20 @@ void AMMOGameMode::SpawnMobArea()
 		UGameplayStatics::FinishSpawningActor(GolemSpawner, GolemTM);
 	}
 
-	// KRITIK duzeltme (2026-09-15, qa-kontrolcu OFPA-analizi): haritanin (Summer_scene) gercek
-	// zemini tek bir SM_Template_Map_Floor aktoru, olcek(4,4,1), yani zemin SADECE
-	// X/Y in [-2000,+2000] (4000x4000u) araliginda var; disari yerlestirilen HERHANGI bir
-	// spawner havada/bosllukta kalir, moblar dusup yok olur veya hicbir zaman gorunmez, o
-	// zincirin gorevleri KALICI OLARAK TAMAMLANAMAZ olur. Eski multiplier tabanli (F*3.2,
-	// F*4, F*6, F*8) yerleşim bunu asiyordu (6/10 spawner disardaydi). Su andan itibaren TUM
-	// spawner'lar |F|<=1850 VE |R|<=1850 icinde tutulur (150u duvar payi) - kare zemin oldugu
-	// icin F ve R BAGIMSIZ sinirlanir (capraz mesafe degil). F negatif = PlayerStart'in
-	// ARKASI, o da zeminin bir parcasi, kullanilabilir alani ikiye katlar.
+	// KRITIK duzeltme (2026-09-15, qa-kontrolcu OFPA-analizi + kendi dogrulamam): haritanin
+	// (Summer_scene) gercek zemini tek bir SM_Template_Map_Floor aktoru, olcek(4,4,1), yani
+	// zemin SADECE X/Y in [-2000,+2000] (4000x4000u) araliginda var; disari yerlestirilen
+	// HERHANGI bir spawner havada/bosllukta kalir, moblar dusup yok olur veya hicbir zaman
+	// gorunmez, o zincirin gorevleri KALICI OLARAK TAMAMLANAMAZ olur. Eski multiplier tabanli
+	// (F*3.2, F*4, F*6, F*8) yerleşim bunu asiyordu (6/10 spawner disardaydi). Ilk duzeltmem
+	// merkez noktalarini sinir icine aldi ama spawner'in KENDI SpawnRadius'unu (bolge
+	// spawner'larinda 500u) hesaba katmamisti - moblar yine bosluga dusebiliyordu. Su andan
+	// itibaren her spawner icin |F|+SpawnRadius<=1850 VE |R|+SpawnRadius<=1850 kurali uygulanir
+	// (150u duvar payi, kare zemin oldugu icin F/R bagimsiz). F negatif = PlayerStart'in ARKASI,
+	// o da zeminin bir parcasi, kullanilabilir alani ikiye katlar.
 
-	// Elit: Golge Suikastci (assassin) — on-sag kose.
-	const FVector AssassinLoc = Origin + Facing.Vector() * 1850.f + RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
+	// Elit: Golge Suikastci (assassin) — on-sag, Orumcek Ana'dan yeterince uzak (r=150).
+	const FVector AssassinLoc = Origin + Facing.Vector() * 1400.f + RightDir * 1350.f + FVector(0.f, 0.f, 50.f);
 	const FTransform AssassinTM(FRotator::ZeroRotator, AssassinLoc);
 	if (AMMOMobSpawner* AssassinSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), AssassinTM))
 	{
@@ -124,9 +126,9 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- IKINCI SAVAS BOLGESI (Lv6-7 NORMAL moblar) ---
-	// On-sol kose (Golge Suikastci'nin R eksenindeki aynasi). |F|,|R|<=1850 kuralina uyar.
-	// ForcedArchetypeId YOK; MinMobLevel=6/MaxMobLevel=7 ile banddan rastgele Lv6-7 normal secilir.
-	const FVector SecondZoneLoc = Origin + Facing.Vector() * 1850.f - RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
+	// Arka-sag (F negatif = PlayerStart'in arkasi). SpawnRadius=500 hesaba katilarak
+	// |F|+500<=1850 VE |R|+500<=1850 icinde. ForcedArchetypeId YOK; MinMobLevel=6/MaxMobLevel=7.
+	const FVector SecondZoneLoc = Origin - Facing.Vector() * 650.f + RightDir * 1300.f + FVector(0.f, 0.f, 50.f);
 	const FTransform SecondZoneTM(FRotator::ZeroRotator, SecondZoneLoc);
 	if (AMMOMobSpawner* SecondZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SecondZoneTM))
 	{
@@ -139,9 +141,9 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- UCUNCU SAVAS BOLGESI (Lv8-12 NORMAL moblar) ---
-	// Arka-sag kose (F negatif = PlayerStart'in arkasi, zeminin kullanilmayan yarisi).
+	// Tam arka-orta (F=-1300, R=0), zeminin kullanilmayan arka yarisinin merkezi.
 	// ForcedArchetypeId YOK; band Lv8-12 normalleri secer.
-	const FVector ThirdZoneLoc = Origin - Facing.Vector() * 1850.f + RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
+	const FVector ThirdZoneLoc = Origin - Facing.Vector() * 1300.f + FVector(0.f, 0.f, 50.f);
 	const FTransform ThirdZoneTM(FRotator::ZeroRotator, ThirdZoneLoc);
 	if (AMMOMobSpawner* ThirdZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThirdZoneTM))
 	{
@@ -153,8 +155,8 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Log, TEXT("[MMODBG] ThirdZone spawner @ %s"), *ThirdZoneLoc.ToCompactString());
 	}
 
-	// Elit: Buz Lordu (Lv13, ucuncu bolge kademe-sonu) — arka-sol kose (Ucuncu bolgenin R-aynasi).
-	const FVector LichLoc = Origin - Facing.Vector() * 1850.f - RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
+	// Elit: Buz Lordu (Lv13, ucuncu bolge kademe-sonu) — arka-sag kose (r=150).
+	const FVector LichLoc = Origin - Facing.Vector() * 1650.f + RightDir * 1300.f + FVector(0.f, 0.f, 50.f);
 	const FTransform LichTM(FRotator::ZeroRotator, LichLoc);
 	if (AMMOMobSpawner* LichSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), LichTM))
 	{
@@ -166,9 +168,9 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- DORDUNCU SAVAS BOLGESI (Lv16-22 NORMAL moblar, Alev Vadisi) ---
-	// Zeminin sag-orta kenari (F=0, R=+1850) — TUM diger 8 spawner'a en az 900u+.
+	// Arka-sol (F=-650, R=-1300), Ikinci bolgenin R-aynasi. SpawnRadius=500 hesaba katildi.
 	// ForcedArchetypeId YOK; band Lv16-22 normallerini secer.
-	const FVector FourthZoneLoc = Origin + RightDir * 1850.f + FVector(0.f, 0.f, 50.f);
+	const FVector FourthZoneLoc = Origin - Facing.Vector() * 650.f - RightDir * 1300.f + FVector(0.f, 0.f, 50.f);
 	const FTransform FourthZoneTM(FRotator::ZeroRotator, FourthZoneLoc);
 	if (AMMOMobSpawner* FourthZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), FourthZoneTM))
 	{
@@ -180,9 +182,9 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Log, TEXT("[MMODBG] FourthZone spawner @ %s"), *FourthZoneLoc.ToCompactString());
 	}
 
-	// Elit: Magma Tirani (Lv24, dorduncu bolge kademe-sonu) — zeminin sol-orta kenari
-	// (F=0, R=-1850), Dorduncu bolgenin R-aynasi.
-	const FVector TyrantLoc = Origin - RightDir * 1850.f + FVector(0.f, 0.f, 50.f);
+	// Elit: Magma Tirani (Lv24, dorduncu bolge kademe-sonu) — on-sol, Golge Suikastci'nin
+	// R-aynasi, Kadim Golem'den yeterince uzak (r=150).
+	const FVector TyrantLoc = Origin + Facing.Vector() * 1400.f - RightDir * 1350.f + FVector(0.f, 0.f, 50.f);
 	const FTransform TyrantTM(FRotator::ZeroRotator, TyrantLoc);
 	if (AMMOMobSpawner* TyrantSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), TyrantTM))
 	{
