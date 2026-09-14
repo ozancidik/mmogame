@@ -556,6 +556,15 @@ regresyondur.
 
 ---
 
+# Elit/boss dustugunde sunucu-genelinde duyuru — commit 133ef36 (2026-09-14)
+
+> Derleme temiz, gorsel test edilmedi. 2 oyuncu gerekiyor (biri uzakta olmali).
+
+- [ ] **Ana senaryo:** Bir elit/boss'u (or. Kadim Golem) oldur, o an UZAKTA/farkli bir bolgede olan ikinci bir oyuncu ekraninda turuncu "[DUNYA] Kadim Golem ... tarafindan devrildi!" mesaji gormeli (sadece olduren degil, HERKES).
+- [ ] **Normal mob'larda tetiklenmemeli:** Elit olmayan bir mob (Goblin vb.) oldur → bu mesaj CIKMAMALI.
+
+---
+
 ## Onaylanmış (test edilip çalıştığı doğrulandı)
 
 <!-- Test edip onayladığın maddeleri buraya taşı -->
