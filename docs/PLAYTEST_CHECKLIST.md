@@ -1115,3 +1115,144 @@ tarzi bir rutbe-seviye ihlali yok. `AppliedEffectId` bos birakildi (saf hasar sk
 - [ ] **UI:** Skill agacinda (HUD skill paneli) Warrior/Priest Special0 sutununda artik 7 (Warrior)
       / 5 (Priest) satir gorunmeli, isimler ("Savas Kasirgasi", "Savas Tufani", "Meleklerin
       Kilici", "Meleklerin Firtinasi") kesilmeden/tasmadan okunabilir olmali.
+
+---
+
+# BAGIMSIZ QA DENETIMI - Dorduncu bolge (Lv16-24, commit e6ba822) - 2026-09-15
+
+> Denetci: qa-kontrolcu (kod DEGISTIRILMEDI, sadece okundu + derlendi + hesaplandi).
+> **Derleme:** Build.bat ilk calistirmada "Target is up to date" dedi (gercekten derlemedi); commit'in
+> 4 dosyasinin zaman damgasi guncellenip ZORLA yeniden derlendi -> `Result: Succeeded`, **0 uyari,
+> 0 hata**. (Not: derleme sirasinda calisma agacinda baska bir ajanin devam eden isi vardi -
+> `MMOQuestTypes.cpp` + `MMOSkillDatabase.cpp` icinde Lv16-40 kilometre tasi gorevleri; derleme
+> o degisiklikleri de icerecek sekilde temiz gecti.)
+>
+> **PIE calistirilamadi** (editor/oyun erisimi yok). Asagidaki bulgular kod ve `.uasset` ikili
+> verisinden hesaplandi; "dogrula" adimlari editorde/PIE'de 1-2 dakikada teyit edilebilir.
+
+> Asagidaki 6 iddia bagimsiz olarak **DOGRULANDI, bulgu yok** - tekrar test etmeye gerek yok:
+> - **Spawner geometrisi (10 spawner):** Kod yorumundaki 9 mesafe degeri tek tek yeniden hesaplandi ve
+>   **birebir tutuyor**: Buz Lordu 2778.5u, Ikinci bolge 2912.0u, Golge Suikastci 4129.1u, Ork Reisi
+>   4716.3u, Orumcek Ana 4791.7u, Ucuncu bolge 4882.6u, Ana alan 5144.2u, Kadim Golem 5448.0u,
+>   Magma Tirani 4800.0u. En dar ikili tum haritada (bu commit'e ait DEGIL, eskiden beri var):
+>   Ana alan <-> Orumcek Ana = **703.5u** - 700u kuralinin hemen uzerinde, yaricaplar (350+150=500)
+>   dusuldugunde cakisma yok. Yeni iki spawner icin cakisma/uzerine binme YOK.
+> - **Level-band filtreleme:** Lv16-22 bandinda **4 non-elit** mob var (16/18/20/22) ->
+>   `GetRandomInLevelRange` bos donmuyor, `GetRandom()` fallback'ine dusmuyor, elit sizintisi yok.
+>   (Lv17/19/21 bos - Lv11 boslugunun ayni deseni, zararsiz.)
+> - **MagmaTyrant elit loot orani:** `EliteEquipDropChance = 0.5f` (1.0 DEGIL) - dogrulandi.
+>   `EliteEquipDropCount=2`, `EliteMinItemPlus=3`, `EliteMaxItemPlus=5`; `MaxPlus=8` sinirini asmiyor.
+> - **Elit loot havuzu (REGRESYON YOK):** Filtre `RequiredLevel <= MobLevel && >= MaxReq-2`
+>   (`MMOMob.cpp:678-691`). Magma Tirani Lv24 -> MaxReq=16 -> havuz `>=14` -> **tam olarak 4 Adamantin
+>   parcasi** (Mithril=10 girmiyor). Buz Lordu Lv13 -> MaxReq=10 -> havuz `>=8` -> **hala tam olarak 4
+>   Mithril parcasi** (Adamantin=16 > 13 oldugu icin havuza giremez). Lv5/6/7 elitlerinin havuzu da
+>   degismedi. **Adamantin hicbir eski elite sizmiyor.**
+> - **Gorev zinciri:** 5 gorevin hedef ArchetypeId'si (`EmberHound`/`MagmaGolem`/`AshOrc`/
+>   `InfernalWraith`/`MagmaTyrant`) mob tablosuyla **birebir** esitleniyor; kill-credit zaten
+>   ArchetypeId uzerinden isliyor (`MMOMob.cpp:605` -> `MMOQuestComponent.cpp:230`). Prereq zinciri
+>   gecerli (`Q_FrostLich` mevcut), odul id'leri (`GreaterHealthPotion` + 4 Adamantin parcasi) mevcut.
+>   **Onceki turun `Q_CursedKnights` hatasi TEKRARLANMAMIS:** her Adamantin odulu (RequiredLevel=16)
+>   Lv18/20/22/24 gorevlerinden veriliyor -> odul verildigi anda kusanilabiliyor.
+> - **Onceki QA fix'leriyle catisma YOK:** a0262a6 (buff/mana/skill kitabi), ffd2cc4 (dukkan yazi
+>   olcegi), 75d0277 (DivineRestoration) - hicbirinin dokundugu kod bu commit'te degismedi; kullanilan
+>   efekt id'leri (`Poison`/`Slow`/`Rage`) efekt veritabaninda mevcut. Ekipman kusanma seviye kontrolu
+>   sunucu tarafinda (`MMOInventoryComponent.cpp:240`) - Adamantin icin de gecerli.
+
+## CRITICAL - FIXED (bkz. altta yeni commit) - Haritanin zemini sadece 4000x4000u: 10 spawner'in 6'si (YENI IKISI DAHIL) bosluga konuyor
+
+Onceki turda "dogrulanamadi" diye MEDIUM birakilan Buz Lordu off-map riski, `Content/__ExternalActors__`
+ikili verisi cozulerek **olculdu** ve risk gerceklesiyor gorunuyor:
+
+- Zemin tek bir aktor: `SM_Template_Map_Floor`, aktor olcegi **(4, 4, 1)**, mesh yari-boyu **(500, 500, 25)**
+  -> zemin **X ve Y'de sadece -2000 .. +2000** (toplam 4000x4000u).
+- Duvarlar: `SM_Cube` (yari-boy 50) aktorleri olcek 40 (=4000u uzunluk) ile +-2000'de.
+  Haritadaki HICBIR statik mesh aktorunun koordinati **2000u'yu asmiyor** (66 OFPA dosyasi tarandi).
+- `PlayerStart` = **(0, 0, 302)**, rotasyon sifir -> `Facing = +X`, `RightDir = +Y`.
+- `NavMeshBoundsVolume` (0,0,200) olcek (140,140,30) -> hacim +-14000u, yani **hacim buyuk ama altinda
+  zemin yok**; navmesh sadece gercek geometri uzerinde uretilir.
+
+Buna gore spawner'lar (`MMOGameMode.cpp:51-207`):
+
+| Spawner | Konum (X, Y) | Zemin uzerinde mi |
+|---|---|---|
+| Ana alan | (1050, 0) | EVET |
+| Ork Reisi | (1540, 0) | EVET |
+| Orumcek Ana | (1120, +700) | EVET |
+| Kadim Golem | (1120, -700) | EVET |
+| Golge Suikastci | (2240, 0) | **HAYIR** (240u disarida) |
+| Ikinci bolge | (2800, +1600) | **HAYIR** |
+| Ucuncu bolge | (2800, -1600) | **HAYIR** |
+| Buz Lordu | (4200, 0) | **HAYIR** (2200u disarida) |
+| **Dorduncu bolge (YENI)** | **(5600, +2400)** | **HAYIR (X'te 3600u, Y'de 400u disarida)** |
+| **Magma Tirani (YENI)** | **(5600, -2400)** | **HAYIR** |
+
+Sonuc - dogruysa: bu commit'in **tum icerigi oynanamaz** (5 normal mob + elit bosluga doguyor, oyuncu
++-2000'deki duvarlari asamiyorsa oraya yuruyemez bile), `Q_EmberHounds` -> `Q_MagmaTyrant` zincirinin
+**5 gorevi de tamamlanamaz**. Ayni sey Lv6-15 icerigi (ikinci/ucuncu bolge, Buz Lordu, Golge Suikastci)
+icin de gecerli. Ek risk: dusen moblar kill-Z'de yok olunca spawner `TopUpInterval` (dorduncu bolge icin
+**varsayilan 4sn**) ile surekli yenilerini uretir -> sunucuda sonu gelmez spawn/yok-olma dongusu.
+
+**Duzeltme YONU (kodu ben yazmiyorum):** ya mesafe carpanlari harita sinirina (+-2000u) sigacak sekilde
+kucultulmeli, ya haritaya gercek zemin/navmesh eklenmeli (docs/MapOptions.md'deki kasaba haritasi isi),
+ya da spawn noktalari zemine raycast ile oturtulmali. **Yeni bolge eklemeden once bu cozulmeli** -
+her tier ayni hatayi buyuterek tekrarliyor.
+
+- [ ] **EN KRITIK ADIM - zemin sinirini bul:** Play bas, PlayerStart'in baktigi yonde (+X) duz kos.
+      Yaklasik **2000u**'de gorunmez bir duvara mi carpiyorsun / zemin bitip bosluga mi dusuyorsun?
+      (Referans: ana mob alani ~1050u'de, Ork Reisi ~1540u'de - oralar zemin uzerinde olmali.)
+- [ ] **Dorduncu bolge gercekten var mi:** Editorde Simulate (veya PIE'de serbest kamera) ile
+      X=5600, Y=+2400 noktasina git. 5 mob **zeminde duruyor** mu, yoksa **asagi mi dusuyorlar /
+      hic yoklar mi**? Dusuyorsa bulgu ONAYLANDI.
+- [ ] **Magma Tirani ayni kontrol:** X=5600, Y=-2400 -> tek Magma Tirani zeminde mi?
+- [ ] **Gorev zinciri gercekten tamamlanabiliyor mu (asil test):** `MMOGainXP` ile Lv16'ya cik,
+      `Q_EmberHounds`'u al ve **5 Kor Tazisi oldurebiliyor musun**? Mob bulamiyorsan zincir kilitli demektir.
+- [ ] **Regresyon - eski bolgeler:** Ayni kontrolu Buz Lordu (X=4200), ucuncu bolge (X=2800, Y=-1600) ve
+      Golge Suikastci (X=2240) icin de yap. Bunlar da bostaysa sorun bu commit'e ozel degil, **6 spawner'i
+      birden** kapsiyor ve oncelik bu commit'ten daha yuksek.
+- [ ] **Log kontrolu:** PIE cikisinda `[MMODBG] SpawnOne: requested=... actualLoc=...` satirlarina bak.
+      `actualLoc` ile `requested` ayni kaliyorsa mob havada doguyor; surekli yeni SpawnOne satirlari
+      akiyorsa dusup yok olma dongusu var demektir.
+
+## MEDIUM - Dukkan satin-alma sutunu 33 satira cikti: yazi ~5px, tiklama kutusu 9.5px
+
+ffd2cc4 (yazi olcegini satirla orantili kucultme) tasmayi durdurdu ama **liste buyumeye devam ediyor**.
+Hesap (`MMOHUD.cpp:1306-1314`): satir sayisi Adamantin ile **29 -> 33** (1 iksir + 7 tuketilebilir +
+**25** ekipman). Kullanilabilir yukseklik sabit 446px ->
+`BuyRowH = 446/33 = 13.5px`, `BuyCellH = 9.5px`, `BuyTextScale = 13.5/26 = 0.52`
+-> ekipman yazilari **0.72 x 0.52 = 0.374** olcekte, yani kabaca **5 piksel** yuksekliginde.
+Panel tasmiyor ve tiklama bolgeleri hala dogru hesaplaniyor, ama:
+1. Liste okunamayacak siniri zorluyor (Lv gereksinimi ve fiyat 5px yazidan okunmali),
+2. `BuyTextScale`'in alt siniri **0.45** - bir sonraki tier (37+ satir) bu tabana carpar ve
+   **ffd2cc4'un duzelttigi tasma geri gelir** (yazi `LY+4`'ten baslayip 8px'lik kutuyu asar).
+
+Duzeltme yonu: dukkan listesine kaydirma/sayfalama, ya da sutun bolme, ya da seviye filtresi
+(oyuncunun seviyesinin cok ustundeki tier'leri gizle).
+
+- [ ] **Okunabilirlik:** Saticiyi ac (E) -> satin-alma sutunundaki **Adamantin** satirlarini (en altta)
+      okuyabiliyor musun? Fiyat ve "(Lv16)" secilebiliyor mu, yoksa lekeye mi donusmus?
+- [ ] **Tiklama hala dogru mu (onemli):** Listenin **EN ALTINDAKI** esyaya (Adamantin Bot) tikla ->
+      tam o esya alinmali, bir ust/alt komsusu degil. Kaymis alim varsa bulgu HIGH'a cikar.
+- [ ] **Satir ust uste binmiyor:** Listenin alt yarisinda yazilar birbirine degiyor mu?
+
+## LOW - Adamantin tier'i, Lv1 moblarinin "piyango" tavanini ~%37 yukseltti
+
+Elit-OLMAYAN mob loot'u item tablosundan **duz rastgele** seciyor (`MMOMob.cpp:701`; `EquipDropChance`
+varsayilan 0.25). Tablo artik Adamantin'i de icerdigi icin **Lv1 Goblin bile Adamantin Kilic dusurebilir**.
+Kusanilamaz (Lv16 gerekir, sunucu reddediyor) ama **satilabilir**: Adamantin Kilic +0 Siradan satis
+~478 altin, Efsanevi nadirlikte ~1433 altin. Onceki tavan (Mithril Kilic) ~350 / ~1051 altin idi.
+Onceki turda Mithril icin acilan ayni bulgunun bir kademe buyugu; yeni bir hata degil, **her tier ile
+buyuyen** bir ekonomi kaymasi. Ilgili: ekonomi raporunun "altin cabuk anlamsizlasiyor" bulgusu.
+
+- [ ] **Olcum:** Baslangic alaninda (Lv1-5) ~20 mob oldur -> kac tanesinden **Adamantin** parcasi dustu?
+      2-3'ten fazlaysa erken oyun altin akisi beklenenden hizli demektir, not al.
+- [ ] **Kusanma kilidi calisiyor:** Dusen Adamantin parcasini Lv16 altinda kusanmayi dene -> **reddedilmeli**,
+      esya cantada KALMALI.
+
+## LOW (bilgi) - Lv16-22 bandinda seviye bosluklari
+
+Band 4 mob iceriyor: Lv16 / 18 / 20 / 22. **Lv17, 19, 21 bos.** Spawner banddan rastgele sectigi icin
+bu bir hata degil (Lv11 boslugunun ayni deseni) - sadece "seviye atladikca yeni mob gorme" hissi
+kademeli degil sicramali oluyor. Kod degisikligi gerektirmez.
+
+- [ ] **Gozlem:** Dorduncu bolgede 10-15 mob'un nameplate'ine bak -> sadece Lv16/18/20/22 gorunmeli;
+      araya Lv17/19/21 veya **Lv13 ve alti** bir mob KARISMAMALI (band sizintisi kontrolu).

@@ -101,8 +101,18 @@ void AMMOGameMode::SpawnMobArea()
 		UGameplayStatics::FinishSpawningActor(GolemSpawner, GolemTM);
 	}
 
-	// Elit: Golge Suikastci (assassin) — diger elit/boss'lardan daha ileride, eksende uzak nokta.
-	const FVector AssassinLoc = Origin + Facing.Vector() * (MobAreaDistance * 3.2f) + FVector(0.f, 0.f, 50.f);
+	// KRITIK duzeltme (2026-09-15, qa-kontrolcu OFPA-analizi): haritanin (Summer_scene) gercek
+	// zemini tek bir SM_Template_Map_Floor aktoru, olcek(4,4,1), yani zemin SADECE
+	// X/Y in [-2000,+2000] (4000x4000u) araliginda var; disari yerlestirilen HERHANGI bir
+	// spawner havada/bosllukta kalir, moblar dusup yok olur veya hicbir zaman gorunmez, o
+	// zincirin gorevleri KALICI OLARAK TAMAMLANAMAZ olur. Eski multiplier tabanli (F*3.2,
+	// F*4, F*6, F*8) yerleşim bunu asiyordu (6/10 spawner disardaydi). Su andan itibaren TUM
+	// spawner'lar |F|<=1850 VE |R|<=1850 icinde tutulur (150u duvar payi) - kare zemin oldugu
+	// icin F ve R BAGIMSIZ sinirlanir (capraz mesafe degil). F negatif = PlayerStart'in
+	// ARKASI, o da zeminin bir parcasi, kullanilabilir alani ikiye katlar.
+
+	// Elit: Golge Suikastci (assassin) — on-sag kose.
+	const FVector AssassinLoc = Origin + Facing.Vector() * 1850.f + RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
 	const FTransform AssassinTM(FRotator::ZeroRotator, AssassinLoc);
 	if (AMMOMobSpawner* AssassinSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), AssassinTM))
 	{
@@ -114,10 +124,9 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- IKINCI SAVAS BOLGESI (Lv6-7 NORMAL moblar) ---
-	// Baslangictan belirgin biçimde uzakta ve yana kaydirilmis ayri bir alan: eksende MobAreaDistance*4 (2800u)
-	// + sag yone 1600u. En yakin mevcut spawner (Golge Suikastci, eksende 3.2x) ile merkez arasi ~1695u (>600u).
+	// On-sol kose (Golge Suikastci'nin R eksenindeki aynasi). |F|,|R|<=1850 kuralina uyar.
 	// ForcedArchetypeId YOK; MinMobLevel=6/MaxMobLevel=7 ile banddan rastgele Lv6-7 normal secilir.
-	const FVector SecondZoneLoc = Origin + Facing.Vector() * (MobAreaDistance * 4.f) + RightDir * 1600.f + FVector(0.f, 0.f, 50.f);
+	const FVector SecondZoneLoc = Origin + Facing.Vector() * 1850.f - RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
 	const FTransform SecondZoneTM(FRotator::ZeroRotator, SecondZoneLoc);
 	if (AMMOMobSpawner* SecondZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SecondZoneTM))
 	{
@@ -130,16 +139,9 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- UCUNCU SAVAS BOLGESI (Lv8-12 NORMAL moblar) ---
-	// Ikinci bolgenin AYNASI: eksende MobAreaDistance*4 (2800u) + SOL yone 1600u.
-	// Mevcut spawner'lara merkez-merkez mesafeler (MobAreaDistance=700, F=Facing, R=RightDir):
-	//   Ikinci bolge (F*2800 + R*1600) : 3200u
-	//   Golge Suikastci (F*2240)       : ~1695u
-	//   Kadim Golem (F*1120 - R*700)   : ~1906u
-	//   Ork Reisi (F*1540)             : ~2037u
-	//   Ana alan (F*1050)              : ~2371u
-	//   Orumcek Ana (F*1120 + R*700)   : ~2848u
-	// Hepsi >700u (QA kurali). ForcedArchetypeId YOK; band Lv8-12 normalleri secer.
-	const FVector ThirdZoneLoc = Origin + Facing.Vector() * (MobAreaDistance * 4.f) - RightDir * 1600.f + FVector(0.f, 0.f, 50.f);
+	// Arka-sag kose (F negatif = PlayerStart'in arkasi, zeminin kullanilmayan yarisi).
+	// ForcedArchetypeId YOK; band Lv8-12 normalleri secer.
+	const FVector ThirdZoneLoc = Origin - Facing.Vector() * 1850.f + RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
 	const FTransform ThirdZoneTM(FRotator::ZeroRotator, ThirdZoneLoc);
 	if (AMMOMobSpawner* ThirdZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThirdZoneTM))
 	{
@@ -151,9 +153,8 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Log, TEXT("[MMODBG] ThirdZone spawner @ %s"), *ThirdZoneLoc.ToCompactString());
 	}
 
-	// Elit: Buz Lordu (Lv13, ucuncu bolge kademe-sonu) — eksende en uzak nokta (MobAreaDistance*6 = 4200u).
-	// En yakin spawner'lara mesafe: Golge Suikastci ~1960u, Ikinci/Ucuncu bolge ~2126u (>700u).
-	const FVector LichLoc = Origin + Facing.Vector() * (MobAreaDistance * 6.f) + FVector(0.f, 0.f, 50.f);
+	// Elit: Buz Lordu (Lv13, ucuncu bolge kademe-sonu) — arka-sol kose (Ucuncu bolgenin R-aynasi).
+	const FVector LichLoc = Origin - Facing.Vector() * 1850.f - RightDir * 1400.f + FVector(0.f, 0.f, 50.f);
 	const FTransform LichTM(FRotator::ZeroRotator, LichLoc);
 	if (AMMOMobSpawner* LichSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), LichTM))
 	{
@@ -165,19 +166,9 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- DORDUNCU SAVAS BOLGESI (Lv16-22 NORMAL moblar, Alev Vadisi) ---
-	// Eksende MobAreaDistance*8 (5600u) + SAG yone 2400u — Buz Lordu'nun (4200u) otesinde.
-	// Mevcut TUM spawner'lara merkez-merkez mesafeler (MobAreaDistance=700, F=Facing, R=RightDir):
-	//   Buz Lordu      (F*4200)          : ~2778u
-	//   Ikinci bolge   (F*2800 + R*1600) : ~2912u
-	//   Golge Suikastci(F*2240)          : ~4129u
-	//   Ork Reisi      (F*1540)          : ~4716u
-	//   Orumcek Ana    (F*1120 + R*700)  : ~4792u
-	//   Ucuncu bolge   (F*2800 - R*1600) : ~4883u
-	//   Ana alan       (F*1050)          : ~5144u
-	//   Kadim Golem    (F*1120 - R*700)  : ~5448u
-	//   Magma Tirani   (F*5600 - R*2400) :  4800u
-	// Hepsi >700u (QA kurali). ForcedArchetypeId YOK; band Lv16-22 normallerini secer.
-	const FVector FourthZoneLoc = Origin + Facing.Vector() * (MobAreaDistance * 8.f) + RightDir * 2400.f + FVector(0.f, 0.f, 50.f);
+	// Zeminin sag-orta kenari (F=0, R=+1850) — TUM diger 8 spawner'a en az 900u+.
+	// ForcedArchetypeId YOK; band Lv16-22 normallerini secer.
+	const FVector FourthZoneLoc = Origin + RightDir * 1850.f + FVector(0.f, 0.f, 50.f);
 	const FTransform FourthZoneTM(FRotator::ZeroRotator, FourthZoneLoc);
 	if (AMMOMobSpawner* FourthZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), FourthZoneTM))
 	{
@@ -189,10 +180,9 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Log, TEXT("[MMODBG] FourthZone spawner @ %s"), *FourthZoneLoc.ToCompactString());
 	}
 
-	// Elit: Magma Tirani (Lv24, dorduncu bolge kademe-sonu) — dorduncu bolgenin AYNASI
-	// (eksende 5600u + SOL yone 2400u). En yakin spawner'lar: Buz Lordu ~2778u,
-	// Ucuncu bolge ~2912u, Dorduncu bolge 4800u — hepsi >700u.
-	const FVector TyrantLoc = Origin + Facing.Vector() * (MobAreaDistance * 8.f) - RightDir * 2400.f + FVector(0.f, 0.f, 50.f);
+	// Elit: Magma Tirani (Lv24, dorduncu bolge kademe-sonu) — zeminin sol-orta kenari
+	// (F=0, R=-1850), Dorduncu bolgenin R-aynasi.
+	const FVector TyrantLoc = Origin - RightDir * 1850.f + FVector(0.f, 0.f, 50.f);
 	const FTransform TyrantTM(FRotator::ZeroRotator, TyrantLoc);
 	if (AMMOMobSpawner* TyrantSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), TyrantTM))
 	{
