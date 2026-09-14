@@ -7,6 +7,63 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
+# QA taramasi: "istemci int32 -> carpma/birikim, ust sinir yok" hata sinifi — commit yok, henuz DUZELTILMEDI (2026-09-14)
+
+> QA notu: `3e35942`'deki BuyPotion/BuyConsumable int32-tasma acigi emsal alinarak TUM `UFUNCTION(Server, ...)` ve `UFUNCTION(Exec)` fonksiyonlari tarandi (Inventory, Stats, Skill, Party, Quest, Character, Mob, PlayerController, LootPickup, ItemDatabase). **Ikinci bir "bedava altin" acigi BULUNAMADI** — fiyat hesaplarina giren tek istemci-kontrollu sayi `Count`'tu ve o artik clamp'li. Ama ayni sinifta 1 gercek acik (ServerGiveItem) + 1 gercek tasma (XP egrisi, hile gerektirmiyor) + 2 sertlestirme bulundu. Bu bolumdeki maddeler **kod duzeltilmeden once** yazildi; duzeltmeyi mmo-developer yapmali, sonra bu maddeler test edilmeli.
+
+### BULGU 1 (YUKSEK) — `ServerGiveItem` sunucu tarafinda HIC clamp'lenmiyor
+- Dosya: `Source/MyProject/Private/Characters/MMOCharacter.cpp:1103` (`ServerGiveItem_Implementation`), istemci yolu `:1086-1101` (`MMOGiveItem`).
+- Sorun: `MMOGiveItem` istemcide `FMath::Max(1, Count)` uyguluyor (sadece ALT sinir), ama Server RPC gövdesi `Count`'u **oldugu gibi** `Inventory->AddItem(ItemId, Count)`'a veriyor. BuyPotion'daki duzeltmenin (`Clamp(Count, 1, 999)`) tersine, clamp **RPC'nin sunucu tarafinda tekrar uygulanmiyor** — hileli istemci `MMOGiveItem`'i hic kullanmadan dogrudan `ServerGiveItem(Id, 2000000000)` atabilir.
+- Tetikleyen girdi: aynı çağriyi 2 kez yap → `MMOInventoryComponent.cpp:70` `Stack.Count += Count` int32'yi tasirip stack'i NEGATIFE cevirir; `RemoveItem` (`:94`) bir daha asla o itemi harcayamaz (item kalici olarak kullanilamaz hale gelir), `GetTotalItemCount` (`:122`) de tasar.
+- Ikinci (ve daha ciddi) yon: bu bir DEBUG/hile komutu ama Server RPC olarak aga acik ve **hicbir yetki kontrolu yok** — uzak istemci kendine sinirsiz iksir/parsomen verebilir. Emsal cozum ayni dosyada zaten var: `ServerSetPvP_Implementation` (`MMOCharacter.cpp:725-729`) `GetController()->IsLocalController()` ile sadece HOST'a izin veriyor.
+- Onerilen yon (kodu QA yazmaz): (a) `ServerGiveItem_Implementation` icinde `Count = FMath::Clamp(Count, 1, 999)`, (b) `ServerSetPvP`'deki `IsLocalController()` host-guard'ini buraya da ekle.
+- [ ] **Duzeltildikten sonra regresyon:** Play bas → konsola `MMOGiveItem HealthPotion 3` → envanterde (I) iksir sayaci **+3** olmali (normal debug kullanimi BOZULMAMALI).
+- [ ] **Ust sinir calisiyor:** Konsola `MMOGiveItem HealthPotion 999999` → sayac **999'da (veya secilen tavanda) durmali**, negatif/garip bir sayi GORUNMEMELI.
+- [ ] **Ust uste cagri tasmiyor:** `MMOGiveItem HealthPotion 999` komutunu 5 kez arka arkaya calistir → sayac duzgun artmali, negatife DONMEMELI, F ile iksir kullanimi calismaya devam etmeli.
+- [ ] **Host-guard (2 pencereli PIE):** Listen server ac; ISTEMCI penceresinin konsoluna `MMOGiveItem HealthPotion 5` yaz → (host-guard eklendiyse) istemciye item GELMEMELI. Host penceresinde ayni komut calismali.
+
+### BULGU 2 (ORTA, hile gerektirmiyor — normal oynanista tetiklenir) — XP egrisi Level 77'de int32'yi tasiyor
+- Dosya: `Source/MyProject/Private/Components/MMOStatsComponent.cpp:132-139` (`ComputeExperienceForLevel`), kullanildigi yerler `:96`, `:286-290` (`GainExperience`), `:307` (`ApplyDeathPenalty`), `:731` (`OnRep_Level`).
+- Sorun: egri `100 * 1.25^(Level-1)`. Hesap: L76 = 1.854.603.075 (sinir ici), **L77 = 2.318.253.844 > INT32_MAX (2.147.483.647)**. `FMath::RoundToInt` ile sinir disi float->int32 donusumu tanimsiz davranis; MSVC/x64'te INT32_MIN (-2147483648) verir. `MaxLevel = 80` oldugu icin bu bolge **tasarlanan seviye araliginin ICINDE**.
+- Tetiklenen davranis: `ExperienceToNextLevel` negatif olur →
+  1. `GetExperiencePercent()` (`MMOStatsComponent.h:260`) negatif → HUD XP bari bozulur.
+  2. `GainExperience`'daki `while (Level < MaxLevel && Experience >= ExperienceToNextLevel)` kosulu **her zaman dogru** → oyuncu ilk XP kirintisinda 77'den dogrudan 80'e firlar; **Level 77/78/79 tamamen atlanir** (ayrica `Experience -= ExperienceToNextLevel` isaretli tasma uretir).
+  3. `ApplyDeathPenalty` (`:307`) negatif `Loss` hesaplar → `if (Loss > 0)` yanlis → o seviyelerde olum XP cezasi sessizce devre disi.
+- Onerilen yon: egriyi `int64`'te hesaplayip `FMath::Clamp`/`FMath::Min` ile INT32_MAX altina sikistirmak, ya da yuksek seviyelerde egriyi duzlestirmek (denge karari mmo-developer'a ait, QA sadece tasmayi raporlar).
+- Not: (2) ve (3) maddeleri, tasmanin UB olmasi nedeniyle derleyiciye bagli; **tasmanin kendisi kesin** (hesapla dogrulandi), sonucun tam sekli dogrulanmali.
+- [ ] **Duzeltildikten sonra:** `MMOGainXP 2000000000` gibi komutlarla (veya save dosyasindan) karakteri Level 70'e getir, sonra kucuk XP'lerle yukari cik → **77, 78, 79 seviyelerinin her biri tek tek gorunmeli**, XP bari her seviyede 0'dan dolmali.
+- [ ] **XP bari negatif/bos degil:** Level 77-80 arasinda HUD'daki XP bari 0-100% arasinda mantikli gorunmeli (negatif dolgu / ters bar OLMAMALI).
+- [ ] **Olum cezasi yuksek seviyede calisiyor:** Level 77+ iken bilerek ol → XP'nin bir kismi gitmeli (o seviyelerde ceza sessizce kaybolmamali).
+- [ ] **Dusuk seviye regresyonu yok:** Level 1-10 arasi normal XP kazanimi/level atlama eskisi gibi calismali.
+
+### BULGU 3 (KUCUK / sertlestirme) — `AddGold` tasma korumasi yok, tasarsa altini SIFIRLAR
+- Dosya: `Source/MyProject/Private/Components/MMOInventoryComponent.cpp:48-57`.
+- `Gold = FMath::Max(0, Gold + Amount);` — `Gold + Amount` int32'yi asarsa negatife doner, `Max(0, ...)` de onu **0 yapar**: oyuncunun tum altini sessizce silinir. Ust sinir (altin tavani) da yok.
+- Bugun istemciden erisilebilir DEGIL (tum `Amount` degerleri sunucu-tarafi ve kucuk), ama `ApplySaveData` (`:590`) `In.Gold`'u **hic dogrulamadan** kopyaliyor — elle duzenlenmis/bozuk bir kayitta Gold INT_MAX'a yakinsa, ilk satistan sonra altin tamamen ucar. Onerilen yon: `int64` ara hesap + makul bir altin tavani (or. 2.000.000.000) ve `ApplySaveData`'da `Gold`/`Level`/ana statlar icin clamp.
+- [ ] (duzeltilirse) **Normal altin akisi bozulmadi:** Mob oldur → altin topla; ekipman sat → altin gelsin; iksir al → altin dussun. Hicbirinde altin sifirlanmamali.
+
+### BULGU 4 (KUCUK / sertlestirme) — kayittan gelen `Level`/`Experience` dogrulanmiyor
+- Dosya: `Source/MyProject/Private/Components/MMOStatsComponent.cpp:653-667` (`ApplySaveData`).
+- `Level = In.Level;` hicbir kontrol yok. Bozuk/eski bir kayitta `Level` 76 ustuyse dogrudan BULGU 2'nin tasma bolgesine duser; cok buyuk bir degerde (`Pow` -> +inf) `RoundToInt` yine tanimsiz. Onerilen yon: `Level = FMath::Clamp(In.Level, 1, MaxLevel)` ve `Experience = FMath::Max(0, In.Experience)` (ayni dosyada `RecalculateDerivedStats` icin zaten benzer savunmaci clamp'ler var, `:155-159`).
+
+### TEMIZ CIKANLAR (bu hata sinifi acisindan — sessiz kalmamak icin)
+Asagidakiler tek tek okundu, **istemci-kontrollu sayinin fiyat/odul ile carpildigi baska bir yer yok**:
+- `BuyPotion` / `BuyConsumable` (`MMOInventoryComponent.cpp:428`, `:476`): `Clamp(Count, 1, 999)` RPC'ye gonderilmeden ONCE yapiliyor **ve** sunucu yolu (`ServerBuyPotion_Implementation` -> `BuyPotion`) ayni clamp'ten tekrar geciyor → hileli istemci atlatamaz. **Duzeltme dogru.**
+- `BuyEquipment` / `SellEquipment` / `TryUpgrade`: fiyatlar `FMMOItemDatabase`'den (`GetBuyPrice`/`GetSellPrice`/`GetUpgradeCost`), `Plus` `MaxPlus=9` ile sinirli, `BagIndex` `IsValidIndex` ile dogrulanmis. Istemciden gelen sayi fiyata girmiyor.
+- `MMOSkillComponent`: `ManaCost`/`Cooldown`/`Power` tamamen `FMMOSkillDatabase`'den; Server RPC'ler yalniz `FName` ve `IsValidIndex`'li `Slot` aliyor.
+- `MMOQuestComponent`: `RewardXP`/`RewardGold`/`RewardConsumableCount` gorev tanimindan; istemci-kontrollu carpan yok. `AcceptQuest`/`ClaimReward` mesafe dogrulamali.
+- `MMOPartyComponent`: Server RPC'lerinin hic sayisal parametresi yok.
+- `MMOMob` / `MMOLootPickup`: XP/altin arketipten, `HasAuthority()` kapili; loot tek-sefer guard'li.
+- `MMOPlayerController::ServerRequestHeal` (`:712`): `Cost = FMath::Max(0, Npc->HealCost)`, carpma yok, sunucu-tarafi mesafe + cooldown var.
+- `SpendStatPoint` / `SpendSkillPoints` (`MMOStatsComponent.cpp:329`, `:392`): `Amount`/`Cost` kalan puanla karsilastiriliyor, Server RPC zaten sabit `1` gonderiyor.
+- `AttackTarget` / `ServerAttackTarget`: hasar sunucudaki `Stats->AttackPower`'dan; istemci sayi gondermiyor.
+
+### YAN BULGU (ayri sinif, ayni "sunucu RPC'sinde dogrulama yok" ailesi)
+- `ServerSpawnMob_Implementation` (`MMOCharacter.cpp:890`) ve `ServerApplyBuff_Implementation` (`:753`) de debug Exec komutlari ama **host-guard'siz Server RPC**. Uzak istemci istedigi arketipte sinirsiz mob spawnlayip (XP/loot ciftligi) veya efekt veritabanindaki herhangi bir buff'i kendine verebilir. Sayisal tasma degil, ama ekonomi/ilerleme acisindan istismar edilebilir. `ServerSetPvP`'deki `IsLocalController()` deseni buralara da uygulanmali.
+- [ ] (duzeltilirse, 2 pencereli PIE) **Istemci konsolundan** `MMOSpawnMob OrcWarlord` ve `MMOBuff Rage` → istemcide ETKI ETMEMELI; host penceresinde ikisi de calismali.
+
+---
+
 # Save/load race + envanter canta sinirlamasi + yeni tuketilebilir — commit 373cabd, 70f7286, c4e9b85 (2026-09-12)
 
 > QA notu: Bu 3 duzeltme dogrudan (subagent olmadan) kod incelemesiyle bulundu/uygulandi; derleme temiz. Save-race testi ozel bir zamanlama gerektirir (asagida adimlar). Canta sinirlamasi normal genisletilmis oynanista (birden fazla elit/mob oldurup satmadan biriktirme) kolayca tetiklenir.
@@ -581,6 +638,20 @@ regresyondur.
 
 - [ ] **Normal alisveris regresyon testi:** Saticidan normal sekilde (UI'dan tikla) potion/tuketilebilir satin al → eskisi gibi calismali, altin dogru dusmeli.
 - [ ] (Opsiyonel, teknik test) Eger konsoldan Exec ile manuel test etmek istersen: cok yuksek bir Count denemesi artik 999'a sikisip normal fiyatlandirma ile calismali, altin kazandirmamali.
+
+---
+
+# Parti lideri + uye cikarma (kick) — commit 641ff9e (2026-09-14)
+
+> Derleme temiz, gorsel test edilmedi. En az 2 (tercihen 3) oyuncu gerekiyor. Partiyi KURAN (ilk daveti gonderen) kisi lider olur; sadece lider uye cikarabilir. Konsol komutu: hedefi sec (Z / sol tik), sonra `MMOPartyKick`.
+
+- [ ] **Lider isareti:** A ve B parti kursun (A davet eder, B `MMOPartyAccept`). A'nin ekranindaki PARTI basligi "PARTI  (lider sensin)" yazmali; B'nin ekraninda basligin yaninda bu yazi OLMAMALI ama listede A'nin adinin onunde `[L]` gorunmeli.
+- [ ] **Ana senaryo (lider kick atar):** A, B'yi hedef alsin (Z veya uzerine sol tik) → konsola `MMOPartyKick` → A'nin ekraninda "Uye partiden cikarildi", B'nin ekraninda "Parti lideri seni partiden cikardi" mesaji cikmali ve IKI tarafta da PARTI paneli kaybolmali.
+- [ ] **Lider olmayan kick atamaz:** Yeniden parti kurun (A lider). B, A'yi hedef alip `MMOPartyKick` yazsin → "Sadece parti lideri uye cikarabilir" mesaji cikmali, parti BOZULMAMALI (iki tarafta da panel durmali).
+- [ ] **Hedef secili degilken:** Lider hicbir sey secmeden `MMOPartyKick` yazsin → "Once cikarilacak parti uyesini sec" mesaji, baska bir sey olmamali.
+- [ ] **3 kisilik partide kick:** A(lider)+B+C parti olsun. A, C'yi kick etsin → C partisiz kalmali, A ve B ikili parti olarak DEVAM etmeli (ikisinin de panelinde digeri gorunmeli, A hala lider).
+- [ ] **Lider ayrilirsa liderlik gecer:** A(lider)+B+C partisinde A `MMOPartyLeave` yazsin → B ve C ikili parti olarak kalmali ve ikisinden biri (B veya C) artik lider olmali: kalanlardan birinin ekraninda "(lider sensin)", digerinin listesinde `[L]` gorunmeli. Yeni lider `MMOPartyKick` ile digerini cikarabilmeli.
+- [ ] **Regresyon — normal ayrilma:** Eski davranis bozulmamali: ikili partide biri `MMOPartyLeave` yazinca iki taraf da partisiz kalmali; XP paylasimi (parti icindeyken mob oldurunce menzildeki uyelere XP) eskisi gibi calismali.
 
 ---
 
