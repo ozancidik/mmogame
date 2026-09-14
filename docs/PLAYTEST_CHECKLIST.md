@@ -7,7 +7,21 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
-# Ekonomi denge duzeltmeleri 2: upgrade yanma esigi + MaxLevel — commit 8532890 (2026-09-14)
+# Kademeli yanma riski + MaxPlus 8 + MaxLevel 80 — commit 170f87c (2026-09-14)
+
+> Derleme temiz. Bir alt sectiondaki (commit 8532890) yanma-esigi ve MaxLevel=20
+> degisiklikleri bu commit ile SUPERSEDE edildi (kullanicinin acik istegiyle) —
+> o maddeler artik gecerli DEGIL, asagidakiler gecerli.
+
+- [ ] **Yanma artik kademeli:** +0, +1, +2'den deneme yaparken basarisizlikta item HICBIR ZAMAN yanmamali. +3'ten itibaren (yani +3->+4 denemesi) basarisizlikta yanma OLASI olmali (garanti degil): sirasiyla ~%15/%30/%50/%70/%100 (son adim +7->+8, MaxPlus=8 oldugu icin bu artik erisilebilecek en yuksek deneme ve HER basarisizlikta yakiyor).
+- [ ] **MaxPlus artik 8:** Bir item'i +8'e kadar yukselt → +8'de [MAX] etiketi gorunmeli, daha fazla upgrade denemesi sunulmamali (eskiden +9'a kadar cikiyordu).
+- [ ] **HUD yanma etiketi:** Envanter cantasinda yukseltilebilir bir item satirinda, yanma riski olan artilarda (+3 ve sonrasi) "YANMA %X" etiketi gorunmeli; +0-+2 arasinda hic gorunmemeli.
+- [ ] **MaxLevel tekrar 80:** Karakter artik Lv80'e kadar XP kazanabilmeli (eskiden Lv20'de duruyordu). NOT: mevcut skill/gorev/mob icerigi hala sadece ~Lv15-16'ya kadar derinlik tasiyor — bu bilinen bir bosluk, ayri bir "skill agaci genisletme" gorevi arka planda calisiyor (bkz. asagida eklenecek yeni bolum).
+- [ ] **Regresyon:** +0-+2 upgrade davranisi (fiyat, basari sansi) degismedi, sadece yanma mekanigi.
+
+---
+
+# Ekonomi denge duzeltmeleri 2: upgrade yanma esigi + MaxLevel — commit 8532890 (2026-09-14) — SUPERSEDE EDILDI, yukariya bakin
 
 > Derleme temiz.
 
