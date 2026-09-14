@@ -268,7 +268,9 @@ void AMMOHUD::DrawParty(AMMOCharacter* PlayerChar, float StartX, float StartY)
 		return;
 	}
 
-	DrawText(TEXT("PARTI"), FLinearColor(0.6f, 0.85f, 1.f), StartX, StartY, nullptr, 0.85f);
+	// Lider kimse gorunsun: uye cikarma (MMOPartyKick) sadece liderde calisiyor.
+	DrawText(Party->IsPartyLeader() ? TEXT("PARTI  (lider sensin)") : TEXT("PARTI"),
+		FLinearColor(0.6f, 0.85f, 1.f), StartX, StartY, nullptr, 0.85f);
 	float Y = StartY + 18.f;
 
 	const float BarW = 150.f;
@@ -298,7 +300,9 @@ void AMMOHUD::DrawParty(AMMOCharacter* PlayerChar, float StartX, float StartY)
 			ClassSuffix = FString::Printf(TEXT("  %s"), *GetMMOClassDisplayName(MSkill->CharacterClass));
 		}
 
-		DrawText(FString::Printf(TEXT("%s  Lv%d%s"), *Name, S->Level, *ClassSuffix),
+		const FString LeaderTag = (Party->Leader == M) ? TEXT("[L] ") : TEXT("");
+
+		DrawText(FString::Printf(TEXT("%s%s  Lv%d%s"), *LeaderTag, *Name, S->Level, *ClassSuffix),
 			S->bIsDead ? FLinearColor(0.7f, 0.3f, 0.3f) : FLinearColor::White, StartX, Y, nullptr, 0.75f);
 		Y += 14.f;
 

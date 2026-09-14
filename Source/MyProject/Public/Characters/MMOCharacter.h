@@ -188,6 +188,9 @@ public:
 	UFUNCTION(Exec)
 	void MMOPartyLeave();    // partiden ayril
 
+	UFUNCTION(Exec)
+	void MMOPartyKick();     // secili parti uyesini partiden cikar (sadece lider)
+
 	// Bir ana stata 1 puan harcar (stat penceresi / konsol). Istemciden -> Server RPC.
 	// StatName: "STR"/"DEX"/"INT"/"VIT" veya tam ad.
 	UFUNCTION(BlueprintCallable, Category = "MMO|Progression")

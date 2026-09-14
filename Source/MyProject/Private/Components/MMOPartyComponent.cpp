@@ -17,6 +17,7 @@ void UMMOPartyComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UMMOPartyComponent, Members);
+	DOREPLIFETIME(UMMOPartyComponent, Leader);
 }
 
 bool UMMOPartyComponent::HasAuthorityInternal() const
@@ -39,6 +40,16 @@ AMMOCharacter* UMMOPartyComponent::GetOwnerCharacter() const
 void UMMOPartyComponent::OnRep_Members()
 {
 	OnPartyChanged.Broadcast();
+}
+
+void UMMOPartyComponent::OnRep_Leader()
+{
+	OnPartyChanged.Broadcast();
+}
+
+bool UMMOPartyComponent::IsPartyLeader() const
+{
+	return Members.Num() > 0 && Leader != nullptr && Leader == GetOwnerCharacter();
 }
 
 AMMOCharacter* UMMOPartyComponent::FindNearestOtherPlayer(float MaxRange) const
@@ -127,6 +138,18 @@ void UMMOPartyComponent::RequestLeave()
 	else
 	{
 		ServerLeave();
+	}
+}
+
+void UMMOPartyComponent::RequestKick(AMMOCharacter* Target)
+{
+	if (HasAuthorityInternal())
+	{
+		ServerKick_Implementation(Target);
+	}
+	else
+	{
+		ServerKick(Target);
 	}
 }
 
@@ -221,6 +244,39 @@ void UMMOPartyComponent::ServerLeave_Implementation()
 	LeavePartyServer(GetOwnerCharacter());
 }
 
+void UMMOPartyComponent::ServerKick_Implementation(AMMOCharacter* Target)
+{
+	AMMOCharacter* Self = GetOwnerCharacter();
+	if (!Self || !Target || Target == Self)
+	{
+		return;
+	}
+
+	// Sunucu-otoriter dogrulama: sadece lider, kendi partisindeki bir uyeyi cikarabilir.
+	if (!IsPartyLeader() || !Members.Contains(Target))
+	{
+		if (GEngine && Self->IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Sadece parti lideri uye cikarabilir"));
+		}
+		return;
+	}
+
+	UMMOPartyComponent* TP = Target->GetPartyComponent();
+
+	// Cikarma, normal ayrilmayla ayni yolu kullanir.
+	LeavePartyServer(Target);
+
+	if (TP)
+	{
+		TP->ClientNotifyKicked();
+	}
+	if (GEngine && Self->IsLocallyControlled())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(220, 180, 120), TEXT("Uye partiden cikarildi"));
+	}
+}
+
 void UMMOPartyComponent::ClientNotifyInvited_Implementation(AMMOCharacter* From)
 {
 	// Sadece bilgilendirme; kabul kararini sunucudaki PendingInviteFrom belirler.
@@ -232,12 +288,27 @@ void UMMOPartyComponent::ClientNotifyInvited_Implementation(AMMOCharacter* From)
 	}
 }
 
+void UMMOPartyComponent::ClientNotifyKicked_Implementation()
+{
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor(255, 170, 120), TEXT("Parti lideri seni partiden cikardi"));
+	}
+}
+
 // ----------------------------------------------------------------------
 // Parti kumesi yonetimi (sunucu)
 // ----------------------------------------------------------------------
 
-void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet)
+void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AMMOCharacter* NewLeader)
 {
+	// Lider kumenin disinda kaldiysa (ya da verilmediyse) ilk uye lider olur —
+	// boylece parti asla lidersiz kalmaz.
+	if (!NewLeader || !FullSet.Contains(NewLeader))
+	{
+		NewLeader = FullSet.Num() > 0 ? FullSet[0] : nullptr;
+	}
+
 	for (AMMOCharacter* M : FullSet)
 	{
 		if (!M)
@@ -250,6 +321,7 @@ void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet)
 			continue;
 		}
 
+		PC->Leader = NewLeader;
 		PC->Members.Reset();
 		for (AMMOCharacter* Other : FullSet)
 		{
@@ -305,7 +377,19 @@ void UMMOPartyComponent::FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invit
 		return;
 	}
 
-	ApplyPartySet(Set);
+	// Davet eden zaten bir partideyse o partinin lideri korunur; yoksa partiyi kuran
+	// (davet eden) lider olur.
+	AMMOCharacter* NewLeader = Inviter;
+	if (const UMMOPartyComponent* IP = Inviter->GetPartyComponent())
+	{
+		AMMOCharacter* ExistingLeader = IP->Leader.Get();
+		if (IP->Members.Num() > 0 && ExistingLeader && Set.Contains(ExistingLeader))
+		{
+			NewLeader = ExistingLeader;
+		}
+	}
+
+	ApplyPartySet(Set, NewLeader);
 }
 
 void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
@@ -330,20 +414,26 @@ void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
 		}
 	}
 
+	// Ayrilan lider ise liderlik kalanlardan birine gecer (ApplyPartySet, kumede
+	// olmayan lideri ilk uyeyle degistirir); parti dagilmaz.
+	AMMOCharacter* OldLeader = LP->Leader.Get();
+
 	// Ayrilani partisiz yap.
 	LP->Members.Reset();
+	LP->Leader = nullptr;
 	LP->OnPartyChanged.Broadcast();
 
 	// Kalanlari yeniden ayarla (tek kisi kalirsa o da partisiz olur).
 	if (Others.Num() >= 2)
 	{
-		ApplyPartySet(Others);
+		ApplyPartySet(Others, OldLeader);
 	}
 	else if (Others.Num() == 1)
 	{
 		if (UMMOPartyComponent* OP = Others[0]->GetPartyComponent())
 		{
 			OP->Members.Reset();
+			OP->Leader = nullptr;
 			OP->OnPartyChanged.Broadcast();
 		}
 	}

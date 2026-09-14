@@ -33,8 +33,17 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_Members, BlueprintReadOnly, Category = "MMO|Party")
 	TArray<TObjectPtr<AMMOCharacter>> Members;
 
+	// Parti lideri (partiyi kuran; o ayrilirsa kalanlardan birine gecer). Partisizken null.
+	// Partideki HER uyenin bileseninde ayni karakteri gosterir.
+	UPROPERTY(ReplicatedUsing = OnRep_Leader, BlueprintReadOnly, Category = "MMO|Party")
+	TObjectPtr<AMMOCharacter> Leader;
+
 	UFUNCTION(BlueprintPure, Category = "MMO|Party")
 	bool IsInParty() const { return Members.Num() > 0; }
+
+	// Sahibi bu partinin lideri mi? (Sadece lider uye cikarabilir.)
+	UFUNCTION(BlueprintPure, Category = "MMO|Party")
+	bool IsPartyLeader() const;
 
 	// Menzildeki (Origin'e Range icinde) parti uyelerini + sahibi dondurur (XP paylasimi icin).
 	void GetPartyInRange(const FVector& Origin, float Range, TArray<AMMOCharacter*>& Out) const;
@@ -43,6 +52,8 @@ public:
 	void RequestInviteNearest();
 	void RequestAccept();
 	void RequestLeave();
+	// Bir uyeyi partiden cikarir (sunucu sadece lider cagirdiysa uygular).
+	void RequestKick(AMMOCharacter* Target);
 
 	// Bekleyen daveti (sadece sunucu) ve daveti gonderen.
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
@@ -54,6 +65,9 @@ public:
 protected:
 	UFUNCTION()
 	void OnRep_Members();
+
+	UFUNCTION()
+	void OnRep_Leader();
 
 	bool HasAuthorityInternal() const;
 	bool IsLocallyControlledOwner() const;
@@ -74,10 +88,14 @@ protected:
 
 	// Sunucu tarafi parti islemleri.
 	void FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invitee);
-	void LeavePartyServer(AMMOCharacter* Leaver);
+	// Bir karakteri partiden cikarir. Normal ayrilma da, lider tarafindan cikarilma (kick)
+	// da bunu kullanir — davranis ikisinde de ayni (kalanlar yeniden duzenlenir, tek kisi
+	// kalirsa o da partisiz olur).
+	static void LeavePartyServer(AMMOCharacter* Leaver);
 
-	// Verilen tam uye kumesini her uyenin Members listesine (kendisi haric) yazar.
-	static void ApplyPartySet(const TArray<AMMOCharacter*>& FullSet);
+	// Verilen tam uye kumesini her uyenin Members listesine (kendisi haric) yazar ve
+	// hepsine ayni lideri isler.
+	static void ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AMMOCharacter* NewLeader);
 
 	// Daveti sunucu cozer (istemci diger oyuncularin controller'larini goremez).
 	UFUNCTION(Server, Reliable)
@@ -89,7 +107,15 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerLeave();
 
+	// Uye cikarma; sunucu Leader == cagiran mi diye dogrular.
+	UFUNCTION(Server, Reliable)
+	void ServerKick(AMMOCharacter* Target);
+
 	// Davet edilene ekranda bildirim gonder.
 	UFUNCTION(Client, Reliable)
 	void ClientNotifyInvited(AMMOCharacter* From);
+
+	// Partiden cikarilana ekranda bildirim gonder.
+	UFUNCTION(Client, Reliable)
+	void ClientNotifyKicked();
 };

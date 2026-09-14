@@ -8,6 +8,7 @@
 #include "Components/MMOQuestComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Core/MMOTargeting.h"
+#include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
 #include "Items/MMOConsumableTypes.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -793,6 +794,38 @@ void AMMOCharacter::MMOPartyLeave()
 	{
 		PartyComponent->RequestLeave();
 	}
+}
+
+void AMMOCharacter::MMOPartyKick()
+{
+	if (!PartyComponent)
+	{
+		return;
+	}
+
+	// Hedef = oyuncunun secili tuttugu karakter (Z / sol tik ile secilen).
+	AMMOPlayerController* MPC = Cast<AMMOPlayerController>(GetController());
+	AMMOCharacter* Target = MPC ? MPC->GetSelectedTarget() : nullptr;
+	if (!Target || Target == this)
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Once cikarilacak parti uyesini sec"));
+		}
+		return;
+	}
+
+	// Yetki/uyelik dogrulamasini sunucu yapar; buradaki kontrol sadece erken geri bildirim.
+	if (!PartyComponent->Members.Contains(Target))
+	{
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Secili oyuncu partinde degil"));
+		}
+		return;
+	}
+
+	PartyComponent->RequestKick(Target);
 }
 
 namespace
