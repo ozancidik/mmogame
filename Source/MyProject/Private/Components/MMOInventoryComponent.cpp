@@ -427,7 +427,12 @@ void UMMOInventoryComponent::ServerBuyEquipment_Implementation(FName ItemId)
 
 void UMMOInventoryComponent::BuyPotion(int32 Count)
 {
-	Count = FMath::Max(1, Count);
+	// GUVENLIK: Count sadece alttan degil USTTEN de sinirlanmali. Sinirsiz birakilirsa
+	// hileli bir istemci ServerBuyPotion'i devasa bir Count ile cagirip
+	// (PotionPrice * Count) int32'yi TASIRIP negatif yapabilir - bu hem "altin yetersiz"
+	// kontrolunu (Gold < NegatifFiyat hep yanlis) atlatir HEM DE AddGold(-Price) negatifin
+	// eksisi pozitif oldugu icin oyuncuya BEDAVA ALTIN verir (gercek altin/esya uretme acigi).
+	Count = FMath::Clamp(Count, 1, 999);
 
 	if (!HasAuthorityInternal())
 	{
@@ -470,7 +475,9 @@ void UMMOInventoryComponent::ServerBuyPotion_Implementation(int32 Count)
 
 void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 {
-	Count = FMath::Max(1, Count);
+	// GUVENLIK: BuyPotion'daki ayni int32-tasma acigi (bkz. oradaki yorum) - USTTEN de
+	// sinirla, yoksa (Def->Price * Count) tasip negatif fiyat -> bedava altin/esya olur.
+	Count = FMath::Clamp(Count, 1, 999);
 
 	if (!HasAuthorityInternal())
 	{
