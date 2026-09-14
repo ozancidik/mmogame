@@ -143,9 +143,32 @@ int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 	// hassasiyeti bu buyuklukte deger icin yetersiz) int32'ye guvenle sigacak sekilde tepeye
 	// kirp (MaxLevel'daki gercek deger zaten ulasilamayacak kadar yuksek bir hedef; kirpma
 	// oyun deneyimini degistirmez).
+	//
+	// QA bulgusu (2026-09-15, HIGH #2): int32 tasmasi kapandiktan SONRA bile bu egri
+	// MaxLevel=80'e ulasmayi MATEMATIKSEL olarak imkansiz kiliyordu - mob XP'si (en
+	// yuksegi Magma Tirani, 6800 XP, Lv24) sabit kalirken gereken XP ustel buyudugu icin
+	// Lv80'e ulasmak icin ~2.66 MILYON kill gerekiyordu (kumulatif Lv1-80 ~18 MILYAR XP).
+	// Icerigin gercekten var oldugu Lv1-25 araligi (mevcut mob/gorev dengesiyle zaten
+	// tuned/kabul edilmis) HIC DOKUNULMADAN korunuyor; Lv25'ten sonra (henuz mob/spawner
+	// icerigi olmayan, "hedef tavan" araligi - bkz. MMOStatsComponent.h'deki MaxLevel
+	// yorumu) egri DOGRUSALA donusuyor. Boylece Lv25->80 toplami ~8.000 Magma Tirani
+	// kill'i civarina iner (~55.6M XP) - hala ciddi bir "endgame grind" ama artik SONLU
+	// ve ulasilabilir, milyonlarca kill degil.
 	const double Base = 100.0;
 	const double Growth = 1.25;
-	const double Raw = Base * FMath::Pow(Growth, (double)FMath::Max(0, InLevel - 1));
+	const int32 LinearBoundaryLevel = 25;
+	const double LinearIncrement = 37000.0;
+
+	double Raw;
+	if (InLevel <= LinearBoundaryLevel)
+	{
+		Raw = Base * FMath::Pow(Growth, (double)FMath::Max(0, InLevel - 1));
+	}
+	else
+	{
+		const double BoundaryValue = Base * FMath::Pow(Growth, (double)(LinearBoundaryLevel - 1));
+		Raw = BoundaryValue + (double)(InLevel - LinearBoundaryLevel) * LinearIncrement;
+	}
 	const double Clamped = FMath::Min(Raw, (double)MAX_int32);
 	return FMath::RoundToInt(Clamped);
 }

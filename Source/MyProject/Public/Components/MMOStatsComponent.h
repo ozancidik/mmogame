@@ -158,8 +158,14 @@ public:
 	// var, bkz. ko_research_report.md). Bu, INT'ye hic basmayan Warrior/Archer icin kendi
 	// gec-oyun skillerinin coğunu KULLANILAMAZ hale getiriyordu - kozmetik degil, fonksiyonel
 	// bir bug. HealthPerLevel'in yanina ayni desenle eklendi.
+	// QA takip denetimi (2026-09-15, HIGH #1): ilk deger (4.0) YETERSIZ kaldi - INT'ye hic
+	// yatirim yapmayan bir Lv80 Warrior/Archer MaxMana=375-385 cikiyordu, ama Lv70/80
+	// capstone'lar 320-400 mana istiyor - en pahalisi (400) hala atilamiyordu (3 skil puanini
+	// harcayip ogrenip SONRA hicbir zaman kullanamama riski). 5.5'e cikarildi: en dusuk INT'li
+	// sinifin (Warrior, INT=6) Lv80'de MaxMana'si artik 495 - en pahali skil (400) icin ~95
+	// pay birakiyor.
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
-	float ManaPerLevel = 4.f;
+	float ManaPerLevel = 5.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
 	float AttackPerStrength = 1.5f;
