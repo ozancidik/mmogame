@@ -151,6 +151,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
 	float ManaPerIntelligence = 5.f;
 
+	// QA denetimi (2026-09-14, BULGU #2): MaxMana'nin eskiden seviye terimi yoktu (MaxHealth'in
+	// aksine) - INT'ye hic yatirim yapmayan bir karakterin mana tavani Lv1'de de Lv80'de de
+	// ayniydi (~55-85), ama Lv10-80 genisletmesindeki skiller Lv80'de 400 mana'ya kadar
+	// cikan maliyetler varsayarak tasarlandi (KO'nun gercek MaxMP formulunde de seviye terimi
+	// var, bkz. ko_research_report.md). Bu, INT'ye hic basmayan Warrior/Archer icin kendi
+	// gec-oyun skillerinin coğunu KULLANILAMAZ hale getiriyordu - kozmetik degil, fonksiyonel
+	// bir bug. HealthPerLevel'in yanina ayni desenle eklendi.
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
+	float ManaPerLevel = 4.f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
 	float AttackPerStrength = 1.5f;
 

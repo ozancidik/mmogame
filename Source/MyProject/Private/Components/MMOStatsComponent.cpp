@@ -156,7 +156,7 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill)
 	const float OldMaxMana = MaxMana;
 
 	MaxHealth = 50.f + (Vitality * HealthPerVitality) + (Level * HealthPerLevel);
-	MaxMana = 25.f + (Intelligence * ManaPerIntelligence);
+	MaxMana = 25.f + (Intelligence * ManaPerIntelligence) + (Level * ManaPerLevel);
 	AttackPower = Strength * AttackPerStrength + Dexterity * 0.5f + EquipmentAttackBonus
 		+ SumEffectMagnitude(EMMOEffectType::AttackBuff);
 	Defense = Vitality * DefensePerVitality + EquipmentDefenseBonus

@@ -752,17 +752,49 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 
 	const float HeaderH = 22.f;
 	const float TreeGapH = 6.f;
-	const float RowX = PX + 14.f;
-	const float RowW = PW - 28.f;
+	const float ColGapW = 12.f;
 
-	// Satir yuksekligini mevcut alana gore daralt (shop/quest/inventory ile ayni felsefe —
-	// sabit RowH=32 varsayimi kalabalik bir agac zincirinde panel disina tasabilirdi;
-	// mastery agaclarina ileride skill eklendikce bu artik otomatik uyum saglar, asla tasmaz).
+	// QA denetimi (2026-09-14, commit 2e401c2 sonrasi BULGU #3): 57 skil'e ciktiktan sonra
+	// tek sutunlu duzende bazi siniflar (16 skil, 5 agac) RowH'in okunabilirlik tabanina
+	// (20px, iki satirlik hucre icin gereken minimum) carpip panel disina tasiyordu — "asla
+	// tasmaz" varsayimi artik gecersizdi. Sabit RowH'i daha da kucultmek yerine (metin
+	// cakismasina yol acardi) shop'un buy/sell ikili-sutun desenini burada da kullanip
+	// agaclari 2 sutuna dagitiyoruz; boylece sutun basina dusen satir sayisi yariya iner ve
+	// mevcut RowH araligi (20-32px) her sinif icin tekrar yeterli olur.
+	const bool bTwoColumns = ActiveTreeCount > 1;
+	const float ColW = bTwoColumns ? (PW - 28.f - ColGapW) / 2.f : (PW - 28.f);
+	const float Col0X = PX + 14.f;
+	const float Col1X = Col0X + ColW + ColGapW;
+
+	// Agaclari iki sutuna dengeli dagit (o ana kadar hangi sutunun toplam skil sayisi
+	// azsa oraya ekle) — sutunlarin RowH'i birbirinden cok sapmasin diye.
+	TArray<int32> ColOfTree;
+	ColOfTree.Init(0, 5);
+	int32 ColSkillCount[2] = { 0, 0 };
+	int32 ColTreeCount[2] = { 0, 0 };
+	for (int32 t = 0; t < 5; ++t)
+	{
+		if (TreeSkills[t].Num() == 0)
+		{
+			continue;
+		}
+		const int32 Col = (!bTwoColumns || ColSkillCount[0] <= ColSkillCount[1]) ? 0 : 1;
+		ColOfTree[t] = Col;
+		ColSkillCount[Col] += TreeSkills[t].Num();
+		++ColTreeCount[Col];
+	}
+
+	// Satir yuksekligini sutun basina mevcut alana gore daralt (shop/quest/inventory ile ayni
+	// felsefe): her sutun kendi skil/agac sayisina gore kendi RowH'ini hesaplar.
 	const float AvailableH = (PY + PH - 40.f) - (PY + 82.f); // altta "hotbara ata" mesaji icin pay birak
-	const float OverheadH = ActiveTreeCount * (HeaderH + TreeGapH);
-	const float RowH = FMath::Clamp((AvailableH - OverheadH) / (float)FMath::Max(1, TotalSkillCount), 20.f, 32.f);
+	float ColRowH[2];
+	for (int32 c = 0; c < 2; ++c)
+	{
+		const float OverheadH = ColTreeCount[c] * (HeaderH + TreeGapH);
+		ColRowH[c] = FMath::Clamp((AvailableH - OverheadH) / (float)FMath::Max(1, ColSkillCount[c]), 20.f, 32.f);
+	}
 
-	float RowY = PY + 82.f;
+	float ColRowY[2] = { PY + 82.f, PY + 82.f };
 
 	for (int32 t = 0; t < 5; ++t)
 	{
@@ -771,6 +803,12 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 		{
 			continue;
 		}
+
+		const int32 Col = ColOfTree[t];
+		const float RowX = (Col == 0) ? Col0X : Col1X;
+		const float RowW = ColW;
+		const float RowH = ColRowH[Col];
+		float& RowY = ColRowY[Col];
 
 		// Agac basliginda o agacin guncel mastery rutbesi (KO: skill puani agaca yatirilir).
 		DrawText(FString::Printf(TEXT("%s (Rutbe: %d)"), TreeNames[t], SkillComp->GetMasteryRank(Trees[t])),

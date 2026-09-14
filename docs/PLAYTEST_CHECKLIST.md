@@ -7,6 +7,108 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
+# QA DENETIMI: kademeli yanma (170f87c) + 57 skill (2e401c2) — 6 bulgu (2026-09-14)
+
+> QA gecisi. Derleme ZORLA yeniden dogrulandi (4 degisen .cpp dosyasinin zaman damgasi
+> guncellenip tam derleme yapildi): **`Result: Succeeded`, sifir uyari.**
+>
+> **SAGLAM cikanlar (bunlari test etmene gerek yok, kodda dogrulandi):**
+> Yanma roll sirasi DOGRU — `GetUpgradeChancePct(Inst.Plus)` ve `GetBurnChancePct(Inst.Plus)`
+> ayni indeksi (deneme ONCESI arti) kullaniyor ve yanma dali `else if` oldugu icin `Inst.Plus++`
+> calismadan degerlendiriliyor, **off-by-one yok**. Sunucu-otoriterlik saglam: `TryUpgrade` yetki
+> yoksa `ServerTryUpgrade`'e yonleniyor, `RandRange` yalnizca sunucuda donuyor, `ClientUpgradeResult`
+> sadece sonucu bildiriyor. Array sinirlari saglam: iki tablo da `[MaxPlus]` boyutunda + `<0 || >=MaxPlus`
+> guardli, `TryUpgrade` zaten `Plus >= MaxPlus`'i eliyor — **out-of-bounds imkansiz**. Yanan item'da
+> dangling-reference yok (`BurnedId`, `RemoveAt`'ten ONCE kopyalaniyor). HUD "YANMA %X" etiketi
+> TryUpgrade ile **birebir ayni** cagriyi kullaniyor, uyumlu. Skill tarafinda: 57 skill, **duplicate
+> SkillId/isim YOK**, tum `AppliedEffectId`'ler mevcut 6 efektin (Poison/Slow/Regen/Rage/IronSkin/Haste)
+> icinde — hayalet efekt referansi YOK, **hicbir skilde `RequiredMasteryRank > RequiredLevel` YOK**,
+> her agacta rutbeler 1,2,3... bosluksuz ve minimum seviye rutbeyle birlikte monoton artiyor →
+> **"hicbir zaman acilamayan skil" YOK**. `Special3` (enum 4) < `MasteryTreeCount` (5) ve HUD
+> `Trees[5]`/`TreeNames[5]` ile uyumlu. Skill puani ekonomisi rahat (en pahali sinif Warrior 14 rutbe
+> istiyor, Lv80'de 158 puan var).
+
+- [x] **FIXED (bkz. altta yeni commit) — BULGU #1 — HIGH — 6 yeni buff skili, Lv3-4'teki atasinin BIREBIR AYNISI (kesin downgrade).**
+  `MMOSkillComponent.cpp::ExecuteSkill` icinde `BuffSelf` dali sadece `ApplyEffect(Def.AppliedEffectId, Caster)`
+  cagiriyor — **`Def.Power` tamamen yok sayiliyor**, siddet duz olarak `MMOEffectDatabase`'den geliyor.
+  Ustelik `MMOStatsComponent.cpp:492-503` ayni EffectId'yi **yigmiyor, sadece sureyi tazeliyor**.
+  Sonuc: su 6 yeni skil oyun-ici olarak eski skille TAMAMEN ayni seyi yapiyor, sadece 8-10 kat mana
+  ve daha uzun cooldown ile: `War_BloodLord` (Lv33, 145 mana) = `War_BattleShout` (Lv3, 15 mana);
+  `War_SteelArmor` (Lv45, 120) ve `War_Unbreakable` (Lv58, 150) = `War_IronSkin` (Lv4, 15);
+  `Arc_ShadowStep` (Lv16, 70) ve `Arc_WindsBreath` (Lv33, 145) = `Arc_Sprint` (Lv3, 12);
+  `Pri_ResiliencePrayer` (Lv58, 150) = `Pri_Renew` (Lv3, 18).
+  Yani **Warrior'in butun "Ustalik 3" agaci (3 skilden 2'si) hicbir sey katmiyor.**
+  (`Pri_HolyShield` istisna — Priest'in daha once IronSkin kaynagi yoktu, o gercekten yeni.)
+  **Test:** Warrior ile Lv58'e cik, once `War_IronSkin` (15 mana) bas → C ekraninda Defense artisini not al.
+  Efekt bitince `War_Unbreakable` (150 mana) bas → **Defense artisi birebir ayni cikmali**. Cikiyorsa bulgu dogrulandi.
+  **Yon (kodu mmo-developer yazar):** ya skil basina magnitude override (`FMMOSkillDef`'e alan) ya da
+  ayri efekt ID'leri (`IronSkin2`/`Rage2` gibi) gerekiyor; su haliyle 6 skill bos.
+
+- [x] **FIXED (bkz. altta yeni commit) — BULGU #2 — MEDIUM — Mana tavani seviyeyle BUYUMUYOR; yeni Lv24+ skillerin cogu klasik build'de kullanilamaz.**
+  `MMOStatsComponent.cpp:159`: `MaxMana = 25 + Intelligence * ManaPerIntelligence` (=5). `MaxHealth`'in aksine
+  **seviye terimi YOK**. Baslangic INT=12 ile MaxMana = **85** ve INT'ye puan basmayan bir karakterde Lv80'de de 85 kalir.
+  Sonuc: Warrior'in Lv24'te actigi ILK yeni skil `War_TempestSlash` (95 mana) daha ilk gunden **kullanilamaz**.
+  Capstone'lar 320-420 mana istiyor → INT 75-79 gerekiyor = **63-67 stat puani** (Lv80'de toplam 237'nin ~%28'i),
+  Warrior/Archer icin baska hicbir ise yaramayan bir stata. Mage/Priest dogal olarak INT bastigi icin onlarda sorun hafif.
+  **Test:** `MMOGainXP` ile Warrior'i Lv24'e cikar, stat puanlarini hep STR/VIT'e yatir → `War_TempestSlash`'i
+  ogren ve hotbar'dan kullanmayi dene → **"Yeterli mana yok!"** cikmali. Sonra Lv80'e cikip yine INT'ye hic
+  basmadan `War_DoomsdayBlow`'u (400 mana) dene → yine kullanilamamali.
+
+- [x] **FIXED (bkz. altta yeni commit) — BULGU #3 — MEDIUM — Skill kitabi (K) paneli TASIYOR; satirlar panelin disina cikiyor.**
+  `MMOHUD.cpp:758-765`'teki "shrink-to-fit" sistemi `RowH`'i **20px tabanina** sikistiriyor, dolayisiyla
+  57 skilde artik yetmiyor. Hesap: `AvailableH`=364, `OverheadH`=5*(22+6)=140.
+  Warrior (16 skill): `RowH` = Clamp(14, 20, 32) = **20 (tabana takiliyor)**; icerik 140+320=460 > 364;
+  cizim y=172'de baslayip **y=632'de bitiyor**, panelin alt kenari ise `PY+PH`=**576** → **~56px panel disinda**,
+  son 2-3 satir karanlik panel arkaplani olmadan dogrudan oyun goruntusunun uzerine biniyor.
+  Archer ve Priest (14 skill): bitis 592 → ~16px disarida. Mage (13 skill): bitis 572, panel icinde ama
+  `PY+PH-26`=550'deki "Bir hotbar slotuna tikla" mesajinin uzerine biniyor.
+  Koddaki `// ... asla tasmaz` yorumu artik **dogru degil**.
+  **Test:** Warrior ile oyuna gir, `K` ile skill kitabini ac → asagi dogru bak: **"Ustalik 4" agacinin
+  son 1-2 satiri mavi-siyah panelin ALT KENARININ ALTINDA**, arkaplansiz sekilde gorunmeli. Ayni testi
+  Mage ile yap → son satir "hotbara ata" yazisiyla ust uste binmeli.
+
+- [x] **FIXED (bkz. altta yeni commit) — BULGU #4 — LOW — Mage'in Lv10 skilli, Lv8 skilinden ZAYIF.**
+  `Mag_ChainLightning` (Lv8, rutbe 3) Power=130; bir sonraki rutbe olan `Mag_FlameStorm` (Lv10, rutbe 4) Power=**115**.
+  Ayrica `Mag_Meteor` (Lv6) Radius=420 iken FlameStorm Radius=**400** — yaricap da KUCULMUS, mana ise artmis (38 → 45).
+  (Tek-hedef vs AoE farki var ama ayni sinifin ayni agacinda bir sonraki rutbe.)
+  **Test:** Mage ile Lv10'a cik, ikisini de bir mob'a kullan → FlameStorm'un vurusu ChainLightning'den dusuk gorunmeli.
+
+> BULGU #1-4 duzeltildi (bkz. altta yeni commit). #5 ve #6 bilerek DUZELTILMEDI — ikisi de
+> sayisal balans/taste konusu (bug degil), ayri bir ekonomi/denge gecisine birakildi.
+
+- [ ] **BULGU #5 — LOW — Warrior'in Lv80 capstone'u, Lv70 capstone'undan neredeyse hic guclu degil.**
+  `War_TitanWrath` (Lv70) Power=1150, CD=20s → `War_DoomsdayBlow` (Lv80) Power=**1200** (+%4.3), mana +%25, CD=**26s**.
+  Saniye basina: 57.5 → **46** (yani DUSUYOR); tek kazanci AoE olmasi.
+  Diger siniflarda ayni sicrama cok daha buyuk: Archer 860→1600 (+%86), Mage 900→1350 (+%50), Priest 950→1650.
+  **Test:** Warrior ile Lv80'e cik, iki capstone'u ayni mob'a kullan → hasar farki neredeyse hissedilmemeli.
+
+- [ ] **BULGU #6 — LOW — Warrior ve Priest icin Lv24 → Lv70 arasi HASAR PLATOSU (46 seviye).**
+  Warrior'in son yeni hasar skili Lv24 `War_TempestSlash` (270); Lv33/45/58'de eklenenlerin hepsi buff (Power=0).
+  Priest'te de ayni: son hasar skili Lv24 `Pri_WrathOfAngels` (290), Lv45/58 buff.
+  Archer (Lv45: 510, Lv58: 660) ve Mage (Lv45: 520, Lv58: 680) bu araligi doldurmus — iki sinif dolu, iki sinif bos.
+  **Test:** Warrior ile Lv33/45/58'e cik → her seferinde acilan yeni skilin bir buff oldugunu ve mob oldurme
+  hizinin Lv24'ten beri degismedigini gozlemle.
+
+- [ ] **Gozlem (LOW, ONCEDEN VARDI) — Priest sifa zincirinin ortasindaki skil muttefik iyilestiremiyor.**
+  `Pri_DivineRestoration` (Lv7, rutbe 2) efekti `HealSelf`; ayni zincirdeki `Pri_GreaterHeal` (rutbe 1),
+  `Pri_HolyRain` (rutbe 3) ve `Pri_LifeBond` (rutbe 4) ise `HealTarget`. Bu commit'in getirdigi bir hata degil
+  ama artik yeni skillerin ortasinda siritiyor.
+  **Test:** Partide bir muttefigi sec → `Pri_GreaterHeal` ONU iyilestirmeli, `Pri_DivineRestoration` ise KENDINI.
+
+- [ ] **Gozlem (LOW) — MaxPlus 9→8 oncesi kayitlardaki +9 item'lar +9 olarak kaliyor.**
+  `MMOInventoryComponent.cpp:597` (`ApplySaveData`) `EquipmentBag`'i hicbir dogrulama yapmadan kopyaliyor.
+  **Cokme/ out-of-bounds YOK** (TryUpgrade ve HUD [MAX] etiketi dogru davraniyor), ama oyunda artik
+  uretilemeyen, kalici olarak tavan-ustu bir item olusur.
+  **Test:** Elinde bu degisiklikten onceki bir kayit varsa yukle → varsa +9 item hala +9 gorunmeli ve
+  uzerinde [MAX] yazmali, upgrade teklif edilmemeli. (Yeni kayitla oynuyorsan bu madde gecersiz, atla.)
+
+- [ ] **Nuans (bug degil, bilmen iyi) — HUD'daki "YANMA %X", tiklama basina degil, BASARISIZLIK HALINDE olasilik.**
+  +7'de ekranda "YANMA %100" yazar ama basari sansi %20 oldugu icin **tiklama basina gercek yanma ihtimali %80**'dir.
+  Kodda hata yok; sadece etiketin ne anlattigini bilerek okuman gerekiyor.
+  **Test:** Bir item'i +7'ye getir → satirda "%20" (basari) ve "YANMA %100" birlikte gorunmeli.
+
+---
+
 # Skill agaci Lv80'e genisletildi: 4 sinifa 8'er yeni skill (2026-09-14)
 
 > MaxLevel 80'e cikarildiktan sonra Lv9-80 arasinda ogrenilecek yeni skill yoktu (en yuksek RequiredLevel=8'di).

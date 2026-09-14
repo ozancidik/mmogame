@@ -77,11 +77,11 @@ namespace
 		Table.Add(MakeDef(TEXT("War_LifeReap"), TEXT("Yasam Cali"), C::Warrior, T::Special1, 2, 16, 2, TEXT("War_BloodDrain"),
 			E::HealSelf, 70.f, 16.f, 310.f, 0.f, 0.f));
 		Table.Add(MakeDef(TEXT("War_BloodLord"), TEXT("Kan Efendisi"), C::Warrior, T::Special1, 3, 33, 2, TEXT("War_LifeReap"),
-			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("Rage")));
+			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("RageII")));
 		Table.Add(MakeDef(TEXT("War_SteelArmor"), TEXT("Celik Zirh"), C::Warrior, T::Special2, 2, 45, 2, TEXT("War_IronSkin"),
-			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
+			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkinII")));
 		Table.Add(MakeDef(TEXT("War_Unbreakable"), TEXT("Yikilmaz"), C::Warrior, T::Special2, 3, 58, 3, TEXT("War_SteelArmor"),
-			E::BuffSelf, 150.f, 26.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
+			E::BuffSelf, 150.f, 26.f, 0.f, 0.f, 0.f, TEXT("IronSkinIII")));
 		// Capstone 1/2: Titan Ofkesi.
 		Table.Add(MakeDef(TEXT("War_TitanWrath"), TEXT("Titan Ofkesi"), C::Warrior, T::Special3, 1, 70, 3, TEXT(""),
 			E::MeleeDamage, 320.f, 20.f, 1150.f, 260.f, 0.f));
@@ -114,9 +114,9 @@ namespace
 		Table.Add(MakeDef(TEXT("Arc_DragonArrow"), TEXT("Ejder Oku"), C::Archer, T::Special0, 5, 24, 2, TEXT("Arc_EagleEye"),
 			E::RangedDamage, 105.f, 13.f, 360.f, 1900.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Arc_ShadowStep"), TEXT("Golge Adimi"), C::Archer, T::Special1, 2, 16, 2, TEXT("Arc_Sprint"),
-			E::BuffSelf, 70.f, 18.f, 0.f, 0.f, 0.f, TEXT("Haste")));
+			E::BuffSelf, 70.f, 18.f, 0.f, 0.f, 0.f, TEXT("HasteII")));
 		Table.Add(MakeDef(TEXT("Arc_WindsBreath"), TEXT("Ruzgarin Nefesi"), C::Archer, T::Special1, 3, 33, 2, TEXT("Arc_ShadowStep"),
-			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("Haste")));
+			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("HasteIII")));
 		// Civili Tuzak: alandaki hedeflere zehir birakan yeni okcu hatti.
 		Table.Add(MakeDef(TEXT("Arc_SpikeTrap"), TEXT("Civili Tuzak"), C::Archer, T::Special2, 1, 45, 2, TEXT(""),
 			E::AoETarget, 195.f, 18.f, 510.f, 1900.f, 480.f, TEXT("Poison")));
@@ -146,8 +146,14 @@ namespace
 		// Lv10-80 genisletmesi (KO tarzi uydurma icerik, bkz. commit mesaji): Special0 ates/yildirim
 		// zincirinin devami, Special1 buz hattinin devami, Special2 yeni arkane hatti, Special3 =
 		// gec oyun "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80).
+		// QA denetimi (2026-09-14, BULGU #4): bu skil bir onceki zincir halkasi olan
+		// Mag_ChainLightning'den (Power 130, tek hedef) daha DUSUK Power (115) ve Mag_Meteor'dan
+		// (Radius 420) daha kucuk Radius (400) tasiyordu - ters egri. AoE oldugu icin tek-hedef
+		// ChainLightning'den daha yuksek olmasi gerekmiyordu ama zincirdeki bir onceki AoE (Meteor)
+		// ve tek-hedef (ChainLightning) skillerin IKISINDEN de dusuk olmasi mantiksizdi; ikisinin de
+		// uzerine cikaracak sekilde duzeltildi.
 		Table.Add(MakeDef(TEXT("Mag_FlameStorm"), TEXT("Alev Firtinasi"), C::Mage, T::Special0, 4, 10, 2, TEXT("Mag_ChainLightning"),
-			E::AoETarget, 45.f, 11.f, 115.f, 1800.f, 400.f));
+			E::AoETarget, 45.f, 11.f, 155.f, 1800.f, 430.f));
 		Table.Add(MakeDef(TEXT("Mag_Thunderclap"), TEXT("Gok Gurlemesi"), C::Mage, T::Special0, 5, 24, 2, TEXT("Mag_FlameStorm"),
 			E::RangedDamage, 105.f, 13.f, 380.f, 1900.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Mag_IceChain"), TEXT("Buz Zinciri"), C::Mage, T::Special1, 2, 16, 2, TEXT("Mag_FrostNova"),
@@ -199,9 +205,9 @@ namespace
 			E::HealTarget, 210.f, 20.f, 750.f, 0.f, 0.f, TEXT("Regen")));
 		// Kutsal Kalkan: Priestin yeni koruma hatti (Special2, ilk defa kullaniliyor).
 		Table.Add(MakeDef(TEXT("Pri_HolyShield"), TEXT("Kutsal Kalkan"), C::Priest, T::Special2, 1, 45, 2, TEXT(""),
-			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkin")));
+			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkinII")));
 		Table.Add(MakeDef(TEXT("Pri_ResiliencePrayer"), TEXT("Direnc Duasi"), C::Priest, T::Special2, 2, 58, 3, TEXT("Pri_HolyShield"),
-			E::BuffSelf, 150.f, 24.f, 0.f, 0.f, 0.f, TEXT("Regen")));
+			E::BuffSelf, 150.f, 24.f, 0.f, 0.f, 0.f, TEXT("RegenII")));
 		// Capstone 1/2: Tanrisal Yargi (saldiri).
 		Table.Add(MakeDef(TEXT("Pri_DivineJudgment"), TEXT("Tanrisal Yargi"), C::Priest, T::Special3, 1, 70, 3, TEXT(""),
 			E::AoETarget, 320.f, 22.f, 950.f, 1600.f, 600.f));
