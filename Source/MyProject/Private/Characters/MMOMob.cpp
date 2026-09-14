@@ -698,7 +698,23 @@ void AMMOMob::HandleDeath()
 			}
 			if (!Picked)
 			{
-				Picked = &AllItems[FMath::RandRange(0, AllItems.Num() - 1)];
+				// QA gozlemi (2026-09-14, ilerleyen tier'lerde buyuyen bir sorun olarak isaretlendi):
+				// eskiden TUM item havuzundan (Lv1'den o anki en yuksek tier'e kadar) tamamen
+				// rastgele seciliyordu, yani bir Lv1 Goblin ile bir Lv16 mob'un ust-tier (Mithril/
+				// Adamantin) esya dusurme sansi AYNIYDI. Item sayisi arttikca (9->29) bu "piyango
+				// tavani" surekli yukseldi. Normal (elit olmayan) mob'lar artik kendi seviyesinin
+				// biraz UZERINDEKI (heyecan verici ama absurt olmayan) esyalarla sinirlandirildi.
+				TArray<const FMMOItemDef*> LevelAppropriate;
+				for (const FMMOItemDef& It : AllItems)
+				{
+					if (It.RequiredLevel <= MobLevel + 3)
+					{
+						LevelAppropriate.Add(&It);
+					}
+				}
+				Picked = LevelAppropriate.Num() > 0
+					? LevelAppropriate[FMath::RandRange(0, LevelAppropriate.Num() - 1)]
+					: &AllItems[FMath::RandRange(0, AllItems.Num() - 1)];
 			}
 
 			// Plus: elitse arketip araligindan, degilse mevcut kucuk sans (+1).
