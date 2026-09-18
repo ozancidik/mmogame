@@ -7,17 +7,18 @@ Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça
 
 ---
 
-# ÖNCE BUNLARI TEST ET (2026-09-15 durumu — dosya 1500+ satır oldu, en kritik/en riskli 5 madde)
+# ÖNCE BUNLARI TEST ET (2026-09-18 durumu — dosya 1500+ satır oldu, en kritik/en riskli 6 madde)
 
-Bu dosyada biriken onlarca maddeden bugün gerçekten önemli olan, sırayla test edilmesi gereken 5 madde:
+Bu dosyada biriken onlarca maddeden gerçekten önemli olan, sırayla test edilmesi gereken 6 madde:
 
-1. **[EN ÖNEMLİ] Spawner'lar artık haritanın içinde mi?** Haritanın (Summer_scene) gerçek zemini sadece 4000x4000u — 10 spawner'dan 6'sı bunun DIŞINDAYDI (oynanamaz içerik). İKİ kez düzeltildi (commit `2ca4d7a` + `0353f01`, matematiksel olarak doğrulandı ama PIE'de HİÇ görülmedi). Oyuna gir, sırayla Golge Suikastçı/İkinci-Üçüncü-Dördüncü bölge/Buz Lordu/Magma Tiranı spawner'larına yürü → hepsi zemin ÜZERİNDE, boşluğa düşmeden görünmeli. Biri bile boşluktaysa o zincirin tüm görevleri kilitli demektir.
-2. **Lv80 capstone skilleri artık atılabiliyor mu?** Warrior/Archer'ın Lv80 nihai skilleri (400 mana) matematiksel olarak atılamıyordu (mana tavanı yetersizdi) — `ManaPerLevel` 5.5'e çıkarıldı. Yüksek seviyeye çık (`MMOGainXP`), capstone'u öğren, kullan → "Yeterli mana yok" almamalı.
-3. **XP eğrisi artık makul mü?** Eskiden Lv80'e ulaşmak ~2.66 MİLYON kill gerektiriyordu (imkansız). Artık Lv25'e kadar aynı, sonrası doğrusal (~8.264 kill toplam). Birkaç canavar öldürüp XP barının makul hızda ilerlediğini gözle kontrol et; ölüm cezasının (Lv25+ karakterlerde) aşırı ağır hissettirmediğini doğrula.
-4. **Kademeli yanma + MaxPlus 8 doğru hissettiriyor mu?** +0-+2 güvenli, +3'ten itibaren yanma riski artıyor, +8 tavan. Bir item'ı upgrade ederek dene.
-5. **Skill kitabı artık 2 sütunlu — okunabilir mi?** 57 skil'e çıkınca eski tek-sütun tasıyordu, artık ağaçlar 2 sütuna dengeli dağıtılıyor. `K` ile aç, taşma/üst üste binme var mı bak.
+1. **[EN ÖNEMLİ, YENİ] Karakter oluşturunca/öldükten sonra dogus noktasinda güvende misin?** Spawner'ları haritaya sığdırma düzeltmesi (madde 2) bir yan etki yarattı: Lv8-12/Lv16-22 mob bölgeleri dogus noktasına aggro menziliyle ulaşabiliyordu — taze bir Lv1 karakter 2-3 vuruşta ölüp aynı yere yeniden doğup ölüm döngüsüne girebiliyordu. Commit `fd13bd9` ile aggro menzilleri ve spawner yarıçapları küçültüldü, Şifacı Lyra güvenli tarafa taşındı (python ile ≥300u güvenlik payı doğrulandı, ama PIE'de HİÇ görülmedi). Yeni bir karakterle oyuna gir, birkaç dakika dogus noktasında/çevresinde bekle → hiçbir canavar sana saldırmamalı; sonra öl ve yeniden doğ → aynı şekilde güvende olmalısın.
+2. **Spawner'lar artık haritanın içinde mi?** Haritanın (Summer_scene) gerçek zemini sadece 4000x4000u — 10 spawner'dan 6'sı bunun DIŞINDAYDI (oynanamaz içerik). İKİ kez düzeltildi (commit `2ca4d7a` + `0353f01`, matematiksel olarak doğrulandı ama PIE'de HİÇ görülmedi). Sırayla Golge Suikastçı/İkinci-Üçüncü-Dördüncü bölge/Buz Lordu/Magma Tiranı spawner'larına yürü → hepsi zemin ÜZERİNDE, boşluğa düşmeden görünmeli. Biri bile boşluktaysa o zincirin tüm görevleri kilitli demektir.
+3. **Lv80 capstone skilleri artık atılabiliyor mu?** Warrior/Archer'ın Lv80 nihai skilleri (400 mana) matematiksel olarak atılamıyordu (mana tavanı yetersizdi) — `ManaPerLevel` 5.5'e çıkarıldı. Yüksek seviyeye çık (`MMOGainXP`), capstone'u öğren, kullan → "Yeterli mana yok" almamalı.
+4. **XP eğrisi artık makul mü?** Eskiden Lv80'e ulaşmak ~2.66 MİLYON kill gerektiriyordu (imkansız). Artık Lv25'e kadar aynı, sonrası doğrusal (~8.251 kill toplam, bağımsız QA ile de doğrulandı). Birkaç canavar öldürüp XP barının makul hızda ilerlediğini gözle kontrol et.
+5. **Kademeli yanma + MaxPlus 8 doğru hissettiriyor mu?** +0-+2 güvenli, +3'ten itibaren yanma riski artıyor, +8 tavan. Bir item'ı upgrade ederek dene.
+6. **Skill kitabı artık 2 sütunlu — okunabilir mi?** 57 skil'e çıkınca eski tek-sütun tasıyordu, artık ağaçlar 2 sütuna dengeli dağıtılıyor. `K` ile aç, taşma/üst üste binme var mı bak.
 
-Aşağıdaki tarihli bölümlerin çoğu bunlardan ÖNCEKİ, daha küçük özellikler için — bu 5 madde onaylanmadan diğerlerine geçmene gerek yok.
+Aşağıdaki tarihli bölümlerin çoğu bunlardan ÖNCEKİ, daha küçük özellikler için — bu 6 madde onaylanmadan diğerlerine geçmene gerek yok.
 
 ---
 
@@ -1511,3 +1512,205 @@ supheye duserse tekrar bastan incelemesin diye kayda geciyor.
       1 rutbe yatir -> **istemci HUD'inda** rutbe ve yeni skil aninda gorunuyor mu (replikasyon calisiyor)?
       Sonra `J` ile gorev penceresinden bir gorev alip teslim et -> XP/altin/esya odulunun **ucunun de**
       geldigini envanter + stat penceresinden dogrula.
+
+---
+
+# ENTEGRASYON DENETIMI: 2026-09-14/15 degisikliklerinin BIRBIRIYLE etkilesimi (2026-09-18)
+
+> Bu tur tek tek ozellikleri degil, **art arda yapilan degisikliklerin ARASINDAKI** etkilesimi
+> denetledi (XP egrisi <-> olum cezasi <-> eski kayitlar <-> mana formulu <-> spawner konumlari
+> <-> yeni mob tier'leri). Her degisiklik kendi basina zaten denetlenmisti; burada yalnizca
+> **birlesince ortaya cikan** sorunlar var.
+>
+> **Derleme:** `Target is up to date` yalanci-basarisi alindigi icin `MMOStatsComponent.cpp`'nin
+> zaman damgasi guncellenip TAM derleme zorlandi: **5 aksiyon derlendi, `Result: Succeeded`, sifir
+> uyari, sifir hata.**
+
+## HIGH #1 - FIXED (commit fd13bd9, AggroRange 600'e cekildi + SpawnRadius 400'e indirildi, python ile dogrulandi) - Lv16-22 moblar oyuncunun DOGUS NOKTASINI aggro menzilinde tutuyor (yeni bolge tasinmasinin yan etkisi)
+
+`MMOGameMode.cpp:131-183` (spawner konumlari) + `MMOMobArchetype.cpp:109-137` (Lv16-22 tier'i) +
+`MMOMob.h:51,58,62` (AggroRange/LeashRange/WanderRadius).
+
+Spawner'larin harita icine cekilmesi (`2ca4d7a`/`0353f01`) zeminin **PlayerStart'in arkasindaki**
+yarisini kullanima acti. Ayni turda eklenen Lv8-12 (`2c6fd23`) ve Lv16-22 (`e6ba822`) tier'leri de
+oraya kondu. Iki degisiklik ayri ayri dogru, **birlesince** oyuncunun dogdugu noktayi yuksek seviye
+moblarin aggro menziline sokuyor. PlayerStart = (0,0), spawner merkezleri PlayerStart'a gore:
+
+| Spawner | Merkez (F,R) | Yaricap | PlayerStart'a EN YAKIN spawn noktasi | Mob seviyesi | Mob AggroRange |
+|---|---|---|---|---|---|
+| Ucuncu bolge | (-1300, 0) | 500 | **800u** | Lv8-12 | 1000-1250 |
+| Ikinci bolge | (-650, +1300) | 500 | **953u** | Lv6-7 | 950-1250 |
+| **Dorduncu bolge** | (-650, -1300) | 500 | **953u** | **Lv16-22** | **950-1300** |
+
+Aggro saf mesafe kontrolu; **seviye farki ve gorus hatti kontrolu YOK** (`MMOMob.cpp:436-466`).
+Ustune her mob kendi HomeLocation'i cevresinde `WanderRadius = 450` ile geziniyor, yani uzak
+kenarda spawn eden mob bile oyuncuya 450u daha yaklasabiliyor. `LeashRange = 1800` oldugu icin
+mob PlayerStart'a kadar gelip **leash'lenmeden orada dovusmeye devam ediyor** (evine uzaklik
+en fazla ~1453u).
+
+Somut senaryo: taze Lv1 karakter (MaxHealth = 50 + 12x8 + 1x12 = **158**, Defense = 6).
+Cehennem Hayaleti (Lv22, hasar 82, aggro 1300, hiz 430) -> vurus basina 82-6 = **76 hasar**,
+**3 vurusta olduruyor**. Magma Tirani (Lv24, hasar 95) yakinda degil ama Kor Tazisi (Lv16, hiz 460)
+kacilamayacak kadar hizli. Olum -> 5sn -> `RespawnAtStart` ayni PlayerStart'a koyuyor
+(`MMOCharacter.cpp:519-534`) -> mob hala 953-1400u otede ve aggro menzilinde -> **olum dongusu**.
+(Olu oyuncu hedeflenmiyor, bu yuzden ceset kampi yok; ama `Revive` aninda tekrar hedeflenebilir.)
+
+- [ ] **Play bas, HICBIR SEY YAPMADAN dogdugun yerde 60 saniye bekle.** Arkandan (kameranin
+      arkasi, PlayerStart'in -X yonu) mob gelip sana saldiriyor mu? Geliyorsa **hangi mobun adi**
+      ekranda yaziyor not et (Kor Tazisi / Magma Golemi / Kul Orku / Cehennem Hayaleti = Lv16-22 = HIGH).
+- [ ] **Play bas -> kamerayi 180 derece cevir -> geriye dogru yuru.** Kac adim sonra Lv16-22 bir mob
+      sana kosmaya basliyor? 950-1400u arasinda basliyorsa bulgu dogrulandi.
+- [ ] **Oldukten sonra:** respawn olur olmaz ayni mob tekrar uzerine geliyor mu? (Olum dongusu testi -
+      arka arkaya 2 kez olursen bulgu kesinlesir.)
+
+## HIGH #2 - FIXED (commit fd13bd9, Lyra guvenli on tarafa tasindi) - Sifaci Lyra NPC'si Lv8-12 bolgesinin aggro menzilinin ICINDE
+
+`MMOGameMode.cpp:229` -> Lyra `Origin + (-250, +200, 60)` = PlayerStart'in **arkasinda**.
+Ucuncu bolge spawner'inin (Lv8-12) merkezine uzaklik 1069u, yaricap 500 dusuldugunde
+**en yakin spawn noktasina 569u**. Bu moblarin aggro menzili 1000-1250. Ikinci bolgeye (Lv6-7)
+en yakin spawn noktasi da **670u**.
+
+Yani "ol, dirilme, Lyra'ya git, altin verip tam canlan" dongusunun **iyilesme noktasi dusman
+bolgesinin icinde**. Lyra'nin konumu spawner'lar tasinmadan ONCE yazilmisti ve yorumu hala
+"mob alanina ters yon" diyor - o yorum artik gecersiz, cunku mob alani da o tarafa tasindi.
+
+Ek not (LOW, ayni satirlar): NPC'ler `Origin + FVector(...)` ile **ham dunya eksenine** gore
+konumlaniyor, spawner'lar ise `Facing.Vector()` / `RightDir` ile. PlayerStart'in rotasyonu
+sifir oldugu surece ikisi ortusuyor; biri haritada PlayerStart'i **dondururse** NPC'lerle
+spawner'lar sessizce ayrisir.
+
+- [ ] **Play -> arkani don -> Sifaci Lyra'ya yuru -> yaninda 30 saniye dur.** Mob geliyor mu?
+- [ ] **Play -> kasten ol -> dirildikten sonra Lyra'ya kosup iyilesmeyi dene.** Islem yarida
+      kesiliyor mu (mob saldirisi yuzunden) yoksa rahatca tamamlanabiliyor mu?
+
+## MEDIUM #3 - Olum cezasi Lv25+ icin cok agir DEGIL ama oyun-suresi maliyeti ~87 kat artti
+
+`MMOStatsComponent.cpp:335-349`. Sordugun sorunun **net cevabi: bu bir REGRESYON DEGIL.**
+Formul `Min(Experience, ExperienceToNextLevel * 0.1)` -> kayip her zaman **bar'in %10'u**,
+her seviyede ayni oran; clamp sayesinde **seviye kaybi imkansiz** ve seviye atladiktan hemen
+sonra olursen kayip ~0. Ustelik yeni DOGRUSAL egri, eski ustel egriye gore cezayi **kuculttu**:
+Lv50'de eski bar 5.605.000 XP -> ceza 560.500; yeni bar 946.176 -> ceza **94.618** (yaklasik 6 kat AZ).
+
+**Ama** asil sorun cezanin kendisi degil, **XP GELIRININ sabit kalmasi**. Oyundaki en yuksek
+XP veren mob Magma Tirani (Lv24, 6800 XP) ve en iyi normal mob Cehennem Hayaleti (Lv22, 3700 XP);
+Lv25 ustu icin **hic mob yok**. Cezanin "kac kill" karsiligi:
+
+| Seviye | ExperienceToNextLevel | Olum cezasi (%10) | = kac Cehennem Hayaleti (3700 XP) |
+|---|---|---|---|
+| Lv10 | 745 | 75 | 0,02 |
+| Lv24 | 16.941 | 1.694 | **0,46** |
+| Lv26 | 58.176 | 5.818 | 1,57 |
+| Lv50 | 946.176 | 94.618 | **25,6** |
+| Lv79 | 2.019.176 | 201.918 | 54,6 |
+
+Magma Tirani ile olcersen Lv50'de bir olum = **13,9 Magma Tirani kill'i**; o elit `MaxMobs=1` ve
+`TopUpInterval=60sn` oldugu icin dakikada en fazla 1 kez oldurulebiliyor -> **tek olum ~14 dakika
+saf elit farm'i siliyor**. Lv24'te ayni olum 0,46 kill (yaklasik 1 dakika). Yani **oran 30-55 kat
+bozuluyor** ve bu tamamen "Lv25-80 icin icerik yok" probleminin turevi.
+
+- [ ] **`MMOGainXP` ile Lv50'ye cik -> XP barini yarilayacak kadar XP kazan -> kasten ol.**
+      Ekranda cikan "Oldun! -N EXP" mesajindaki N degeri **94.618 civarinda** mi? (Cikmiyorsa
+      ya `HasAuthority` yolu ya da mesaj yolu bozuk demektir, ayri bulgu.)
+- [ ] **Ayni testi seviye atlar atlamaz (Experience ~0 iken) tekrarla** -> kayip **0 veya cok kucuk**
+      olmali (clamp calisiyor mu). Negatif deger veya seviye DUSMESI gorursen KRITIK, hemen bildir.
+- [ ] **Lv80'de ol** -> `Experience` MaxLevel'da sifirlandigi icin ceza **0** olmali.
+
+## MEDIUM #4 - Lv25 -> Lv26 gecisinde tek seviyede 2,75 kat XP duvari
+
+`ComputeExperienceForLevel` (`MMOStatsComponent.cpp:157-173`). Egri Lv25'e kadar `x1,25`
+buyuyor, Lv25'ten sonra `+37.000` sabit ekliyor. Sinirdaki iki deger:
+
+- Lv25 -> Lv26: **21.176 XP** (5,7 Cehennem Hayaleti)
+- Lv26 -> Lv27: **58.176 XP** (15,7 kill) -> **tek seviyede x2,75 sicrama**
+
+Oyuncu 24 seviye boyunca "her seviye %25 daha zor" temposuna alistiktan sonra tam Lv26'da
+duvara carpiyor. Matematiksel olarak hatali degil (bilincli bir tasarim karari), ama oynanista
+**ani ve aciklanamayan bir yavaslama** olarak hissedilecek. Yumusatma karari mmo-developer'a ait.
+
+Ayni bolumden **DOGRULANAN** hesap: commit `e57a472`'nin "Lv25->80 toplami ~8.000 Magma Tirani
+kill'i" iddiasi **dogru** - bagimsiz hesapladim: toplam **56.109.680 XP** = 8.251 Magma Tirani
+veya **15.165 Cehennem Hayaleti** kill'i. Iddia abartili degil.
+
+- [ ] **`MMOGainXP` ile tam Lv25 ol, XP barini gozle -> Lv26 ol -> tekrar gozle.** Bar'in
+      dolma hizi gozle gorulur sekilde yavasliyor mu? (Hissiyat testi; kod dogru.)
+
+## MEDIUM #5 - `ManaPerLevel = 5.5` capstone'u "atilabilir" yapti ama "tekrar atilabilir" yapmadi
+
+`ManaPerLevel` degisikligi (`e57a472`) **kendi hedefini tutturmus**: en dusuk INT'li sinif
+(Warrior, INT=6) Lv80'de `MaxMana = 25 + 6x5 + 80x5.5 = 495` -> en pahali skil 400 mana ->
+**calisiyor** (dogrulandi, yorumdaki 495 rakami birebir tutuyor). Lv70'te de 440 >= 320 ✓.
+
+**Ama** `ManaRegenPerSec = 7.f` **sabit, seviyeyle hic buyumuyor** ve savasta
+`CombatRegenMult = 0.25` ile **1,75/sn**'ye dusuyor (`MMOStatsComponent.h:190-200`).
+Skill maliyetleri Lv1'den Lv80'e **42 kat** buyuduğu halde (10 -> 420) regen sabit:
+
+- Lv80 Warrior, Kiyamet Darbesi (400 mana, CD 26sn): 1 atistan sonra 95 mana kalir. CD boyunca
+  savasta yenilenen mana **45,5**. Ikinci atis icin gereken 305 mana -> **~174 saniye savas icinde
+  bekleme**. Yani nihai skil pratikte "CD'de bir" degil **"dovuste bir"**.
+- Lv8 Buyucu, Zincir Yildirim (42 mana, CD 10sn): havuz 234, CD basina regen 17,5 -> **5-6 art
+  arda atis**, sonra beklemeli. Oran cok daha saglikli.
+
+- [ ] **Yuksek seviyeye cik, Lv80 capstone'u ogren ve bir dovuste ARKA ARKAYA 2 kez atmayi dene.**
+      Ikincisinde "yeterli mana yok" alip cooldown bitmesine ragmen bekliyor musun? (Beklenen
+      davranis: evet - bu bulgunun dogrulanmasi.)
+
+## SAGLAM - denetlenip TEMIZ cikanlar (yanlis alarm vermeyelim diye acikca yaziyorum)
+
+1. **Eski kayit dosyalari + yeni XP egrisi: GECERLI BIR BULGU YOK.** `FMMOCharacterSaveData`
+   (`MMOSaveGame.h:17-94`) icinde `ExperienceToNextLevel` alani **hic yok**; `FillSaveData`
+   onu yazmiyor (`MMOStatsComponent.cpp:676-686`) ve `ApplySaveData` her yuklemede
+   `ExperienceToNextLevel = ComputeExperienceForLevel(Level)` ile **Level'dan yeniden hesapliyor**
+   (satir 709). Ustune `Level` `Clamp(1, MaxLevel)`, `Experience` `Max(0, ...)` ile dogrulaniyor.
+   Egri ne kadar degisirse degissin **eski kayit bozuk esikle yuklenmez**. Bu tasarim dogru.
+2. **Mob navigasyonu YON-BAGIMSIZ.** `MMOMob.cpp:368-416` (leash/eve donus) sadece
+   `FVector::Dist(GetActorLocation(), HomeLocation)` kullaniyor; `IdleWander` (satir 533-561)
+   aciyi `FRandRange(0, 2*PI)` ile tam daireden seciyor. Hicbir yerde sabit yon/isaret varsayimi
+   yok -> spawner'larin PlayerStart'in **arkasina** (negatif Facing) tasinmasi navigasyonu
+   etkilemiyor. (Navmesh yoksa `IdleWander` hic gezinmiyor, `MoveToLocation` yerine duz-cizgi
+   fallback'e dusuyor - ikisi de yonden bagimsiz.)
+3. **Dokunulmayan 4 eski spawner gercekten sinir icinde.** `MobAreaDistance = 700` ile bagimsiz
+   hesapladim: Ana alan F=1050/r=350 -> 1400; Ork Reisi F=1540/r=150 -> 1690; Orumcek Ana
+   F=1120,R=+700/r=150 -> 1270/850; Kadim Golem F=1120,R=-700/r=150 -> ayni. Hepsi
+   `|F|+r <= 1850` kuralinin **icinde**. `0353f01`'in "4 eski spawner'a dokunulmadi" karari
+   dogru, celiski yok. (Zeminin `[-2000,+2000]` oldugu iddiasi OFPA olcumune dayaniyor,
+   bunu bagimsiz **dogrulayamadim** - PIE testi hala sart, bkz. dosya basindaki 1. madde.)
+4. **Replikasyon eksiksiz.** `GetLifetimeReplicatedProps` (satir 69-89) `Level` ve `Experience`
+   dahil 16 alani kaydediyor. `ExperienceToNextLevel` **kasten** replike edilmiyor; istemcide
+   `OnRep_Level` icinde ayni deterministik fonksiyonla yeniden hesaplaniyor (satir 768-774) -
+   bant genisligi acisindan dogru, sunucu/istemci ayrismasi imkansiz.
+5. **Lv1-24 eski skillerin mana dengesi BOZULMADI.** Zincir Yildirim (Lv8, 42 mana, CD 10sn) ve
+   Ilahi Sifa (Lv7, 55 mana, CD 20sn) zaten **mana ile degil COOLDOWN ile** sinirliydi: Lv8'de
+   havuz 190 -> 234'e cikti (+%23) ama tek atis maliyeti havuzun sadece %18'i. Lv1'de fark daha
+   da kucuk (85 -> 90,5, +%6,5). `ManaPerLevel` terimi seviyeyle **dogrusal** buyudugu icin etkisi
+   nerdeyse tamamen gec-oyunda; erken oyun dengesi pratikte ayni. **Spam'lenebilirlik degismedi.**
+6. **Loot seviye filtresi (`453b2dc`) yeni tier'lerle celismiyor.** `RequiredLevel <= MobLevel+3`
+   (`MMOMob.cpp:710`); esya tablosundaki **en yuksek** `RequiredLevel` = 16 (Adamantin tier).
+   Lv16 Kor Tazisi bile filtreden `<= 19` ile geciyor -> **erisilemez esya yok**. Tavan filtre
+   degil, esya tablosunun kendisi.
+7. **`MaxPlus = 8` ile tablolar tutarli.** `Chances[MaxPlus]` ve `BurnChances[MaxPlus]` ikisi de
+   tam 8 elemanli (`MMOItemDatabase.cpp:103,117`); son deneme (+7 -> +8) %20 basari / %100 yanma.
+   `9 -> 8` degisikliginden artakalan tutarsizlik yok.
+
+## LOW - kucuk notlar
+
+- **Eski LOW bulgusu ARTIK GECERSIZ:** yukaridaki "Lv77+ `Experience += Amount` int32 tasmasi"
+  maddesi yeni egriyle **kapandi**. `ExperienceToNextLevel` artik Lv79'da bile sadece 2.019.176
+  (eskiden `MAX_int32` = 2.147.483.647'ye kirpiliyordu), yani `Experience` seviye atlamadan
+  2,1 milyara birikemez. Normal oynanista **ulasilamaz**; sadece `MMOGainXP` gibi bir hile
+  komutuyla tek seferde ~2 milyar XP verilirse hala tasar. Kod degisikligi gerekmiyor.
+- **Eski kayitta "bankada duran XP" (kozmetik).** `ApplySaveData` `Experience`'i oldugu gibi
+  yukluyor ama seviye-atlama dongusunu **calistirmiyor**. Eski USTEL egriyle Lv26+ kaydedilmis
+  bir dosyada `Experience` yeni bar'i asabilir (or. Lv50, Experience=2.000.000 > bar 946.176).
+  Sonuc: HUD'da `EXP 2000000 / 946176` yazar ve **ilk mob oldurusunde tek seferde birkac seviye
+  birden atlanir**. Cokme yok, veri kaybi yok; XP bari da `DrawStatBar` icinde
+  `Clamp(0,1)`'lendigi icin (`MMOHUD.cpp:44`) tasip cizmiyor. Boyle bir kaydin **var olma
+  ihtimali dusuk** (eski egriyle Lv26'ya ulasmak zaten neredeyse imkansizdi, ustelik bir sure
+  `MaxLevel=20` idi) -> aciliyet yok.
+- **"Oldun! -N EXP" mesaji dedicated server'da hic gorunmez.** `MMOCharacter.cpp:501-512`'de
+  `IsLocallyControlled()` kontrolu `HasAuthority()` blogunun **icinde**; listen-server/host'ta
+  calisir, dedicated sunucuda istemciye hic ulasmaz. Su an tek-oyunculu/PIE test edildigi icin
+  gorunmez degil - ileride dedicated'a gecilirse bir `Client` RPC gerekecek.
+
+- [ ] **(Opsiyonel, eski kayit varsa)** Eski bir `.sav` ile gir -> stat penceresinde XP satiri
+      `EXP <buyuk sayi> / <kucuk sayi>` seklinde mi? Oyleyse bir mob oldur -> tek seferde birden
+      fazla seviye atliyor mu? (LOW; sadece boyle bir kayit elindeyse test et.)
