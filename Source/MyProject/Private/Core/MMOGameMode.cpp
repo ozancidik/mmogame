@@ -126,14 +126,16 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// --- IKINCI SAVAS BOLGESI (Lv6-7 NORMAL moblar) ---
-	// Arka-sag (F negatif = PlayerStart'in arkasi). SpawnRadius=500 hesaba katilarak
-	// |F|+500<=1850 VE |R|+500<=1850 icinde. ForcedArchetypeId YOK; MinMobLevel=6/MaxMobLevel=7.
+	// GUVENLIK duzeltmesi (2026-09-18, QA HIGH #1): SpawnRadius 500->400'e indirildi (bkz.
+	// MMOMobArchetype.cpp'deki AggroRange notu - ikisi birlikte dogus noktasi/NPC'lerde
+	// >=300u guvenlik payi sagliyor, python ile dogrulandi).
+	// Arka-sag (F negatif = PlayerStart'in arkasi). ForcedArchetypeId YOK; MinMobLevel=6/MaxMobLevel=7.
 	const FVector SecondZoneLoc = Origin - Facing.Vector() * 650.f + RightDir * 1300.f + FVector(0.f, 0.f, 50.f);
 	const FTransform SecondZoneTM(FRotator::ZeroRotator, SecondZoneLoc);
 	if (AMMOMobSpawner* SecondZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), SecondZoneTM))
 	{
 		SecondZone->MaxMobs = 5;
-		SecondZone->SpawnRadius = 500.f;
+		SecondZone->SpawnRadius = 400.f;
 		SecondZone->MinMobLevel = 6;
 		SecondZone->MaxMobLevel = 7;
 		UGameplayStatics::FinishSpawningActor(SecondZone, SecondZoneTM);
@@ -148,7 +150,7 @@ void AMMOGameMode::SpawnMobArea()
 	if (AMMOMobSpawner* ThirdZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThirdZoneTM))
 	{
 		ThirdZone->MaxMobs = 5;
-		ThirdZone->SpawnRadius = 500.f;
+		ThirdZone->SpawnRadius = 400.f;
 		ThirdZone->MinMobLevel = 8;
 		ThirdZone->MaxMobLevel = 12;
 		UGameplayStatics::FinishSpawningActor(ThirdZone, ThirdZoneTM);
@@ -175,7 +177,7 @@ void AMMOGameMode::SpawnMobArea()
 	if (AMMOMobSpawner* FourthZone = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), FourthZoneTM))
 	{
 		FourthZone->MaxMobs = 5;
-		FourthZone->SpawnRadius = 500.f;
+		FourthZone->SpawnRadius = 400.f;
 		FourthZone->MinMobLevel = 16;
 		FourthZone->MaxMobLevel = 22;
 		UGameplayStatics::FinishSpawningActor(FourthZone, FourthZoneTM);
@@ -227,6 +229,11 @@ void AMMOGameMode::SpawnMobArea()
 	}
 
 	// Sifaci NPC: Sifaci Lyra (tam iyilestirme + altin dususu). Saticinin karsi yanina koy.
-	const FVector HealerLoc = Origin + FVector(-250.f, 200.f, 60.f);
+	// GUVENLIK duzeltmesi (2026-09-18, QA HIGH #2): eskiden F=-250 (PlayerStart'in hafif
+	// ARKASI) idi - zararsizdi ta ki bu commit'ten once o taraf bos olana kadar; artik orada
+	// Lv8-12/Lv16-22 mob bolgeleri var, Lyra onlarin aggro menziline cok yakin dusuyordu
+	// (~569-670u). Diger hub NPC'leriyle (Satici/Gorevli/Kael) AYNI on tarafa (F pozitif)
+	// tasindi, R=-350 ile digerleriyle cakismasin diye ayri konumlandirildi.
+	const FVector HealerLoc = Origin + FVector(250.f, -350.f, 60.f);
 	World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(), HealerLoc, FRotator(0.f, 180.f, 0.f), NpcParams);
 }

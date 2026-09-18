@@ -63,19 +63,30 @@ namespace
 		Table.Last().EnrageHealthPct = 0.4f;
 
 		// --- Ikinci bolge NORMAL moblari (Lv6-7; seviye-bandi spawner ile cikar, rastgele ana havuza band sayesinde sizmaz) ---
+		// GUVENLIK duzeltmesi (2026-09-18, QA entegrasyon taramasi HIGH #1): bu ve asagidaki
+		// Ucuncu/Dorduncu bolge mob'larinin AggroRange'i (950-1300) spawner'lar haritanin
+		// gercek zeminine sigacak sekilde PlayerStart'in ARKASINA tasindiktan (2ca4d7a/0353f01)
+		// SONRA cok tehlikeli hale geldi: en yakin spawn noktasi dogus/canlanma noktasina
+		// sadece ~900-1450u, aggro menzili ise buraya kadar ulasabiliyordu (bazi ciftlerde
+		// menzil dogus noktasini fazlasiyla asiyordu). Taze bir Lv1 karakter (158 HP) 2-3
+		// vurusta olebiliyor, `RespawnAtStart` da onu AYNI tehlikeli noktaya geri koyuyordu -
+		// kalici bir olum dongusu. TUM 11 Ikinci/Ucuncu/Dorduncu-bolge mobunun AggroRange'i
+		// 600'e cekildi (bagimsiz olarak python ile dogrulandi: en kotu durumda bile dogus
+		// noktasi/NPC'lere >=300u guvenlik payi kaliyor). Ayni sebeple spawner SpawnRadius'lari
+		// da (`MMOGameMode.cpp`) 500->400'e indirildi.
 		// Ork Savascisi: Trol'den guclu, disiplinli dovusur; vurusta yaralayip yavaslatir.
-		Table.Add(MakeMob(TEXT("OrcWarrior"), TEXT("Ork Savascisi"), 6, 18, 18, 22.f, 210, 35, 95, 300.f, 950.f, 1.2f, FLinearColor(0.55f, 0.15f, 0.05f)));
+		Table.Add(MakeMob(TEXT("OrcWarrior"), TEXT("Ork Savascisi"), 6, 18, 18, 22.f, 210, 35, 95, 300.f, 600.f, 1.2f, FLinearColor(0.55f, 0.15f, 0.05f)));
 		SetWarrokVisual(Table.Last()); // Mixamo Warrok ork mesh'i + animasyonlari (veri satiri)
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.3f;
 
 		// Korku Kurdu: cok hizli, genis aggro; isirip avini yavaslatir.
-		Table.Add(MakeMob(TEXT("DireWolf"), TEXT("Korku Kurdu"), 6, 19, 15, 23.f, 220, 30, 90, 470.f, 1250.f, 1.1f, FLinearColor(0.3f, 0.32f, 0.38f)));
+		Table.Add(MakeMob(TEXT("DireWolf"), TEXT("Korku Kurdu"), 6, 19, 15, 23.f, 220, 30, 90, 470.f, 600.f, 1.1f, FLinearColor(0.3f, 0.32f, 0.38f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.35f;
 
 		// Kara Buyucu: yuksek hasar, zehirli buyu; can azalinca ofkelenir.
-		Table.Add(MakeMob(TEXT("Warlock"), TEXT("Kara Buyucu"), 7, 20, 18, 26.f, 270, 45, 120, 300.f, 1150.f, 1.05f, FLinearColor(0.4f, 0.15f, 0.55f)));
+		Table.Add(MakeMob(TEXT("Warlock"), TEXT("Kara Buyucu"), 7, 20, 18, 26.f, 270, 45, 120, 300.f, 600.f, 1.05f, FLinearColor(0.4f, 0.15f, 0.55f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.4f;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
@@ -85,22 +96,22 @@ namespace
 		// Olcekleme Lv5-7 egrisini surdurur: seviye basina kabaca +2 Str, +2 Vit, +3 hasar,
 		// +%20-25 XP ve altin. Hassas ekonomi balansi degil, tutarli bir kademe.
 		// Buz Hayaleti: hizli, dondurucu; vurusta yavaslatir.
-		Table.Add(MakeMob(TEXT("FrostWraith"), TEXT("Buz Hayaleti"), 8, 22, 18, 29.f, 330, 55, 145, 420.f, 1200.f, 1.1f, FLinearColor(0.35f, 0.6f, 0.8f)));
+		Table.Add(MakeMob(TEXT("FrostWraith"), TEXT("Buz Hayaleti"), 8, 22, 18, 29.f, 330, 55, 145, 420.f, 600.f, 1.1f, FLinearColor(0.35f, 0.6f, 0.8f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.35f;
 
 		// Lanetli Sovalye: agir zirhli, yavas ama dayanikli; can azalinca ofkelenir.
-		Table.Add(MakeMob(TEXT("CursedKnight"), TEXT("Lanetli Sovalye"), 9, 24, 26, 31.f, 400, 65, 170, 260.f, 1000.f, 1.25f, FLinearColor(0.3f, 0.32f, 0.4f)));
+		Table.Add(MakeMob(TEXT("CursedKnight"), TEXT("Lanetli Sovalye"), 9, 24, 26, 31.f, 400, 65, 170, 260.f, 600.f, 1.25f, FLinearColor(0.3f, 0.32f, 0.4f)));
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
 		// Zehir Orumcegi: cok hizli, genis aggro; vurusta yuksek sansla zehirler.
-		Table.Add(MakeMob(TEXT("VenomSpider"), TEXT("Zehir Orumcegi"), 10, 26, 22, 36.f, 480, 80, 200, 440.f, 1250.f, 1.15f, FLinearColor(0.3f, 0.45f, 0.2f)));
+		Table.Add(MakeMob(TEXT("VenomSpider"), TEXT("Zehir Orumcegi"), 10, 26, 22, 36.f, 480, 80, 200, 440.f, 600.f, 1.15f, FLinearColor(0.3f, 0.45f, 0.2f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.45f;
 
 		// Ork Berserk: bandin en guclu normali; hem yavaslatir hem ofkelenir.
-		Table.Add(MakeMob(TEXT("OrcBerserker"), TEXT("Ork Berserk"), 12, 31, 30, 44.f, 660, 110, 270, 340.f, 1200.f, 1.35f, FLinearColor(0.65f, 0.2f, 0.08f)));
+		Table.Add(MakeMob(TEXT("OrcBerserker"), TEXT("Ork Berserk"), 12, 31, 30, 44.f, 660, 110, 270, 340.f, 600.f, 1.35f, FLinearColor(0.65f, 0.2f, 0.08f)));
 		SetWarrokVisual(Table.Last()); // Mixamo Warrok ork mesh'i + animasyonlari (veri satiri)
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.25f;
@@ -113,17 +124,17 @@ namespace
 		// +3.5 hasar ve XP/altinda seviye basina ~x1.19 (Lv12 OrcBerserker 660 XP -> Lv16 1300,
 		// Lv18 1850, Lv20 2600, Lv22 3700). Hassas ekonomi balansi degil, tutarli bir kademe.
 		// Kor Tazisi: cok hizli akinci, genis aggro; kor isirigi yakar (Poison).
-		Table.Add(MakeMob(TEXT("EmberHound"), TEXT("Kor Tazisi"), 16, 41, 38, 58.f, 1300, 200, 480, 460.f, 1250.f, 1.1f, FLinearColor(0.85f, 0.35f, 0.1f)));
+		Table.Add(MakeMob(TEXT("EmberHound"), TEXT("Kor Tazisi"), 16, 41, 38, 58.f, 1300, 200, 480, 460.f, 600.f, 1.1f, FLinearColor(0.85f, 0.35f, 0.1f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.4f;
 
 		// Magma Golemi: cok yavas ama devasa canli tank; can azalinca ofkelenir.
-		Table.Add(MakeMob(TEXT("MagmaGolem"), TEXT("Magma Golemi"), 18, 46, 52, 64.f, 1850, 280, 660, 230.f, 950.f, 1.45f, FLinearColor(0.5f, 0.2f, 0.18f)));
+		Table.Add(MakeMob(TEXT("MagmaGolem"), TEXT("Magma Golemi"), 18, 46, 52, 64.f, 1850, 280, 660, 230.f, 600.f, 1.45f, FLinearColor(0.5f, 0.2f, 0.18f)));
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.45f;
 
 		// Kul Orku: dengeli vurucu; kul bulutu yavaslatir, dusuk canda ofkelenir.
-		Table.Add(MakeMob(TEXT("AshOrc"), TEXT("Kul Orku"), 20, 52, 48, 72.f, 2600, 380, 880, 360.f, 1200.f, 1.25f, FLinearColor(0.45f, 0.35f, 0.3f)));
+		Table.Add(MakeMob(TEXT("AshOrc"), TEXT("Kul Orku"), 20, 52, 48, 72.f, 2600, 380, 880, 360.f, 600.f, 1.25f, FLinearColor(0.45f, 0.35f, 0.3f)));
 		SetWarrokVisual(Table.Last()); // Mixamo Warrok ork mesh'i + animasyonlari (veri satiri)
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.3f;
@@ -131,7 +142,7 @@ namespace
 		Table.Last().EnrageHealthPct = 0.4f;
 
 		// Cehennem Hayaleti: bandin en guclu normali; hizli, yakici ve ofkelenir.
-		Table.Add(MakeMob(TEXT("InfernalWraith"), TEXT("Cehennem Hayaleti"), 22, 58, 54, 82.f, 3700, 520, 1200, 430.f, 1300.f, 1.3f, FLinearColor(0.8f, 0.25f, 0.35f)));
+		Table.Add(MakeMob(TEXT("InfernalWraith"), TEXT("Cehennem Hayaleti"), 22, 58, 54, 82.f, 3700, 520, 1200, 430.f, 600.f, 1.3f, FLinearColor(0.8f, 0.25f, 0.35f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.45f;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
