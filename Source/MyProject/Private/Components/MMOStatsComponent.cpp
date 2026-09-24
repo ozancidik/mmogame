@@ -154,9 +154,8 @@ int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 	// Icerigin gercekten var oldugu Lv1-25 araligi (mevcut mob/gorev dengesiyle zaten
 	// tuned/kabul edilmis) HIC DOKUNULMADAN korunuyor; Lv25'ten sonra (henuz mob/spawner
 	// icerigi olmayan, "hedef tavan" araligi - bkz. MMOStatsComponent.h'deki MaxLevel
-	// yorumu) egri DOGRUSALA donusuyor. Boylece Lv25->80 toplami ~8.000 Magma Tirani
-	// kill'i civarina iner (~55.6M XP) - hala ciddi bir "endgame grind" ama artik SONLU
-	// ve ulasilabilir, milyonlarca kill degil.
+	// yorumu) egri ustelden yumusak bir parabole donusuyor (asagidaki QA MEDIUM #4 notuna
+	// bak) - hala ciddi bir "endgame grind" ama artik SONLU ve ulasilabilir.
 	const double Base = 100.0;
 	const double Growth = 1.25;
 	const int32 LinearBoundaryLevel = 25;
@@ -716,6 +715,10 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	Vitality = In.Vitality;
 
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
+	// Egri degistigi icin eski bir kayittaki Experience yeni esigi asabilir ("40000/26492"
+	// HUD'u + sonraki XP'de kontrolsuz level atlama). Fazlayi kirp; stat/skill puani vermeden
+	// seviye atlatmak yerine bu daha guvenli.
+	Experience = (Level >= MaxLevel) ? 0 : FMath::Min(Experience, FMath::Max(0, ExperienceToNextLevel - 1));
 	// Turetilmisleri (MaxHealth vb.) yeniden hesapla ve tam canla basla.
 	RecalculateDerivedStats(/*bRefill=*/true);
 	OnExperienceChanged.Broadcast(Experience, ExperienceToNextLevel);

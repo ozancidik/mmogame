@@ -186,14 +186,14 @@ public:
 	float DeathXPPenaltyPct = 0.1f;
 
 	// Savaş dışı saniyelik HP/MP yenilenmesi (sadece oyuncu).
-	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning", meta = (ClampMin = "0"))
 	float HealthRegenPerSec = 6.f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning", meta = (ClampMin = "0"))
 	float ManaRegenPerSec = 7.f;
 
 	// Seviye basina ek mana yenilenmesi (Lv80'de +20/sn).
-	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning", meta = (ClampMin = "0"))
 	float ManaRegenPerLevel = 0.25f;
 
 	// Savaştayken yenilenme çarpanı (son hasardan sonra CombatDuration boyunca).
