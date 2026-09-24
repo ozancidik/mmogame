@@ -192,6 +192,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
 	float ManaRegenPerSec = 7.f;
 
+	// Seviye basina ek mana yenilenmesi (Lv80'de +20/sn).
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
+	float ManaRegenPerLevel = 0.25f;
+
 	// Savaştayken yenilenme çarpanı (son hasardan sonra CombatDuration boyunca).
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Tuning")
 	float CombatRegenMult = 0.25f;

@@ -61,7 +61,10 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	}
 	if (Mana < MaxMana)
 	{
-		Mana = FMath::Min(MaxMana, Mana + ManaRegenPerSec * Mult * DeltaTime);
+		// Seviye ile buyuyen yenilenme (QA MEDIUM #5): sabit 7/sn ile Lv80 capstone (400 mana,
+		// 26sn CD) savasta ~174sn'de bir atilabiliyordu.
+		const float RegenPerSec = ManaRegenPerSec + Level * ManaRegenPerLevel;
+		Mana = FMath::Min(MaxMana, Mana + RegenPerSec * Mult * DeltaTime);
 		OnManaChanged.Broadcast(Mana, MaxMana);
 	}
 }
@@ -157,7 +160,12 @@ int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 	const double Base = 100.0;
 	const double Growth = 1.25;
 	const int32 LinearBoundaryLevel = 25;
-	const double LinearIncrement = 37000.0;
+	// QA MEDIUM #4: eski duz +37000 artis Lv25->26'da tek adimda x2.75 duvar yaratiyordu.
+	// Simdi Lv25 sonrasi egri, us egrinin egimiyle (~%22) baslayip kademeli hizlanan bir
+	// parabol: n=Level-25 icin B + 4725*n + 591*n^2 (Lv26 ~26.5K, Lv50 ~509K, Lv79 ~2.0M;
+	// Lv25->80 toplami ~40M XP ~ 5.900 Magma Tirani kill'i).
+	const double LinearSlope = 4725.0;
+	const double QuadCoeff = 591.0;
 
 	double Raw;
 	if (InLevel <= LinearBoundaryLevel)
@@ -167,7 +175,8 @@ int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 	else
 	{
 		const double BoundaryValue = Base * FMath::Pow(Growth, (double)(LinearBoundaryLevel - 1));
-		Raw = BoundaryValue + (double)(InLevel - LinearBoundaryLevel) * LinearIncrement;
+		const double N = (double)(InLevel - LinearBoundaryLevel);
+		Raw = BoundaryValue + LinearSlope * N + QuadCoeff * N * N;
 	}
 	const double Clamped = FMath::Min(Raw, (double)MAX_int32);
 	return FMath::RoundToInt(Clamped);
