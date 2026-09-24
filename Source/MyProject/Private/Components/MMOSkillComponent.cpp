@@ -602,6 +602,14 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		? Def.AnimIndex
 		: ((Def.Effect == EMMOSkillEffect::MeleeDamage) ? FMath::RandRange(0, 2) : AMMOCharacter::ChargedAnimIndex);
 
+	// Hasar veren skill kullanan oyuncu canlanma korumasini kaybeder (dokunulmazken saldiramasin).
+	// Iyilestirme/buff skilleri korumayi bozmaz.
+	if (Def.Effect == EMMOSkillEffect::MeleeDamage || Def.Effect == EMMOSkillEffect::RangedDamage
+		|| Def.Effect == EMMOSkillEffect::AoESelf || Def.Effect == EMMOSkillEffect::AoETarget)
+	{
+		Caster->EndSpawnProtection();
+	}
+
 	switch (Def.Effect)
 	{
 	case EMMOSkillEffect::HealSelf:

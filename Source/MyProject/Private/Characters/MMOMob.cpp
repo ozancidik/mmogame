@@ -432,6 +432,10 @@ void AMMOMob::Tick(float DeltaSeconds)
 			{
 				continue; // olu oyuncuya saldirma
 			}
+			if (PChar->IsSpawnProtected())
+			{
+				continue; // canlanma korumasindaki oyuncuyu hedef alma
+			}
 		}
 		const float D = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
 		if (D < Dist)
@@ -449,7 +453,7 @@ void AMMOMob::Tick(float DeltaSeconds)
 	{
 		if (const AMMOCharacter* FC = Cast<AMMOCharacter>(Forced))
 		{
-			bForcedActive = FC->GetStats() && !FC->GetStats()->bIsDead;
+			bForcedActive = FC->GetStats() && !FC->GetStats()->bIsDead && !FC->IsSpawnProtected();
 		}
 	}
 

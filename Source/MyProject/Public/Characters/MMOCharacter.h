@@ -94,6 +94,24 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|Combat")
 	float RespawnDelay = 5.f;
 
+	// --- Canlanma korumasi (respawn protection) ---
+	// Oyuncu canlandiktan / oyuna girdikten (possess) sonra kac saniye hasar almaz ve
+	// moblar onu hedef almaz. 0 = koruma yok. Oyuncu saldirirsa koruma erken biter.
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Combat", meta = (ClampMin = "0.0"))
+	float SpawnProtectionDuration = 4.f;
+
+	// Koruma aktif mi (sunucu yazar, istemcilere replike olur; HUD 'KORUMA' etiketi bunu okur).
+	UPROPERTY(ReplicatedUsing = OnRep_SpawnProtected, BlueprintReadOnly, Category = "MMO|Combat")
+	bool bSpawnProtected = false;
+
+	UFUNCTION(BlueprintPure, Category = "MMO|Combat")
+	bool IsSpawnProtected() const { return bSpawnProtected; }
+
+	// Korumayi hemen bitirir (sure doldu ya da oyuncu saldirdi). Sadece otoritede etki eder.
+	void EndSpawnProtection();
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	// --- Saldiri animasyonlari (KO'daki gibi: her vurus/skill bir animasyon oynatir) ---
 	// 0..2 = temel vurus varyasyonlari, 3 = buyuk vurus / buyu okuma (charged).
 	// Constructor'da Mannequin Attack animasyonlariyla doldurulur; BP'den degistirilebilir.
@@ -328,6 +346,14 @@ protected:
 	void RespawnAtStart();
 
 	FTimerHandle RespawnTimerHandle;
+
+	// Canlanma korumasini SpawnProtectionDuration saniyeligine baslatir (sadece otorite).
+	void StartSpawnProtection();
+
+	UFUNCTION()
+	void OnRep_SpawnProtected();
+
+	FTimerHandle SpawnProtectionTimerHandle;
 
 	// Blueprint'te ölüm animasyonu/efekti için override edilebilir olay.
 	UFUNCTION(BlueprintImplementableEvent, Category = "MMO")

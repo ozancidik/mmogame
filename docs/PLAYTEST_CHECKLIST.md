@@ -1714,3 +1714,25 @@ Skill maliyetleri Lv1'den Lv80'e **42 kat** buyuduğu halde (10 -> 420) regen sa
 - [ ] **(Opsiyonel, eski kayit varsa)** Eski bir `.sav` ile gir -> stat penceresinde XP satiri
       `EXP <buyuk sayi> / <kucuk sayi>` seklinde mi? Oyleyse bir mob oldur -> tek seferde birden
       fazla seviye atliyor mu? (LOW; sadece boyle bir kayit elindeyse test et.)
+
+---
+
+# Canlanma korumasi (respawn protection) — 4 sn hasar/aggro muafiyeti (2026-09-24)
+
+> Derleme temiz (`Result: Succeeded`). Dogus noktasi yakininda agresif mob varsa olum dongusunu
+> engelleyen savunma katmani. Oyuncu canlaninca (dogal respawn VE Sifaci diriltmesi) ve oyuna ilk
+> girince (possess) `SpawnProtectionDuration` (varsayilan 4 sn, BP'de `MMO|Combat` altinda) boyunca
+> sunucuda hasar almaz, moblar onu hedef almaz. Oyuncu saldirirsa (normal vurus ya da hasar veren
+> skill) koruma aninda biter. Iyilestirme/buff skilleri korumayi BOZMAZ. Moblar etkilenmez.
+
+- [ ] **Ilk giris:** Play bas → HP barinin SAGINDA mavi kutuda **"KORUMA"** etiketi gorunmeli, ~4 sn sonra kaybolmali ve ekrana "Canlanma korumasi bitti" yazmali.
+- [ ] **Hasar almiyor:** Oyuna girer girmez konsola `MMODamage 50` yaz → can DUSMEMELI (koruma aktif). 4 sn sonra ayni komut → can dusmeli.
+- [ ] **Olum sonrasi:** Bir moba kendini oldurt (ya da `MMODamage 9999`, koruma bittikten sonra) → 5 sn sonra dogus noktasinda canlan → "KORUMA" etiketi ~4 sn gorunmeli.
+- [ ] **Mob aggro yapmiyor:** Agresif bir mob'un aggro menziline girip orada ol/canlan (ya da mob kovalarken korumali haldeyken yanina git) → koruma suresince mob sana KOSMAMALI/VURMAMALI (etrafta gezinmeli); koruma bitince normal aggro'ya donmeli.
+- [ ] **Saldiri korumayi bitirir:** Koruma aktifken bir moba sol tik ile vur → etiket ANINDA kaybolmali, "Canlanma korumasi bitti" yazmali, mob sana karsilik vermeli.
+- [ ] **Hasar skili korumayi bitirir:** Koruma aktifken hotbar'dan bir hasar skili (or. Warrior `War_PowerStrike`) kullan → koruma aninda bitmeli. Bir iyilestirme/buff skili (or. `War_IronSkin`, Priest sifasi) kullan → koruma BITMEMELI.
+- [ ] **Sifaci diriltmesi:** Olu iken Sifaci Lyra ile erken dirilis → dirilince de "KORUMA" etiketi ~4 sn gorunmeli.
+- [ ] **PvP (2 pencereli PIE, Listen Server):** `MMOPvP 1` acikken bir oyuncu olup canlansin → diger oyuncu korumali oyuncuya vurunca HASAR GITMEMELI; 4 sn sonra gitmeli. `MMOPvP 0` iken eskisi gibi "PvP kapali" demeli (degismedi).
+- [ ] **Istemcide etiket (2 pencereli PIE):** Istemci penceresindeki oyuncu olup canlaninca KENDI HUD'unda "KORUMA" etiketi gorunmeli (replike bayrak) ve bitince mesaj cikmali.
+- [ ] **Regresyon:** Moblar hasar almaya/olmeye devam etmeli; koruma bittikten sonra oyuncunun hasar alma, olum cezasi (-EXP), 5 sn respawn geri sayimi eskisi gibi calismali.
+- [ ] **Tasarim notu (karar senin):** Sure 4 sn; Sifaci diriltmesi de korumayi veriyor (sadece dogal respawn istenirse `HandleRevived` yerine `RespawnAtStart`'a tasinabilir).

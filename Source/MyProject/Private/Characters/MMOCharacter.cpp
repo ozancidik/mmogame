@@ -36,6 +36,7 @@
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 #include "Save/MMOSaveGame.h"
+#include "Net/UnrealNetwork.h"
 
 AMMOCharacter::AMMOCharacter()
 {
@@ -165,6 +166,57 @@ void AMMOCharacter::HandleRevived()
 	// giden bir temizlik (handle gecersiz), zararsiz. Sadece sunucuda anlamli, ama
 	// istemcide bos bir handle'i temizlemek de zararsiz.
 	GetWorldTimerManager().ClearTimer(RespawnTimerHandle);
+
+	// Canlanma korumasi: dogal respawn (RespawnAtStart -> Revive) ve sifaci diriltmesi
+	// ikisi de buradan gecer. Dogus noktasinin yakininda agresif mob varsa oyuncu hemen
+	// tekrar olup olum dongusune girmesin diye kisa sure hasar/aggro'dan muaf tut.
+	if (HasAuthority() && IsPlayerControlled())
+	{
+		StartSpawnProtection();
+	}
+}
+
+void AMMOCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AMMOCharacter, bSpawnProtected);
+}
+
+void AMMOCharacter::StartSpawnProtection()
+{
+	if (!HasAuthority() || SpawnProtectionDuration <= 0.f)
+	{
+		return;
+	}
+
+	bSpawnProtected = true;
+	GetWorldTimerManager().SetTimer(SpawnProtectionTimerHandle, this,
+		&AMMOCharacter::EndSpawnProtection, SpawnProtectionDuration, false);
+	ForceNetUpdate();
+	OnRep_SpawnProtected(); // OnRep sunucuda calismaz; host kendi geri bildirimini burada alir
+}
+
+void AMMOCharacter::EndSpawnProtection()
+{
+	if (!HasAuthority() || !bSpawnProtected)
+	{
+		return;
+	}
+
+	bSpawnProtected = false;
+	GetWorldTimerManager().ClearTimer(SpawnProtectionTimerHandle);
+	ForceNetUpdate();
+	OnRep_SpawnProtected();
+}
+
+void AMMOCharacter::OnRep_SpawnProtected()
+{
+	// HUD etiketi bayragi her karede okur; burada sadece korumanin bittigini yerel oyuncuya bildir.
+	if (!bSpawnProtected && IsLocallyControlled() && GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(150, 200, 255), TEXT("Canlanma korumasi bitti"));
+	}
 }
 
 void AMMOCharacter::PossessedBy(AController* NewController)
@@ -183,6 +235,9 @@ void AMMOCharacter::PossessedBy(AController* NewController)
 	{
 		GetWorldTimerManager().SetTimer(AutoLoadTimerHandle, this, &AMMOCharacter::AutoLoadDeferred, 0.6f, false);
 		GetWorldTimerManager().SetTimer(AutoSaveTimerHandle, this, &AMMOCharacter::SaveCharacter, 60.f, true);
+
+		// Ilk giris de bir "dogus": kisa canlanma korumasi ver.
+		StartSpawnProtection();
 	}
 }
 
@@ -455,6 +510,13 @@ void AMMOCharacter::ClearBPInputMappings()
 float AMMOCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
 	AController* EventInstigator, AActor* DamageCauser)
 {
+	// Canlanma korumasi (sunucu-otoriter): koruma suresince hicbir kaynaktan (mob, PvP,
+	// DoT) hasar islenmez. Moblarda bayrak hic set edilmez, onlari etkilemez.
+	if (bSpawnProtected && HasAuthority())
+	{
+		return 0.f;
+	}
+
 	const float BaseHandled = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	if (!HasAuthority() || !Stats)
@@ -642,6 +704,9 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 		}
 		return;
 	}
+
+	// Saldiran oyuncu canlanma korumasini kaybeder (dokunulmazken vurmasin).
+	EndSpawnProtection();
 
 	// Hedefe don ve vur.
 	const FVector Dir = (Victim->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();

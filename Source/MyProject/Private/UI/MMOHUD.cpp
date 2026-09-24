@@ -101,6 +101,13 @@ void AMMOHUD::DrawHUD()
 	DrawText(FString::Printf(TEXT("HP  %d / %d"), FMath::RoundToInt(S->Health), FMath::RoundToInt(S->MaxHealth)),
 		FLinearColor::White, X + 8.f, Y + 4.f);
 
+	// Canlanma korumasi aktifken HP barinin sagina kucuk 'KORUMA' etiketi (replike bayrak).
+	if (MMOChar->IsSpawnProtected())
+	{
+		DrawRect(FLinearColor(0.1f, 0.3f, 0.6f, 0.85f), X + BarWidth + 8.f, Y + 2.f, 78.f, 22.f);
+		DrawText(TEXT("KORUMA"), FLinearColor(0.75f, 0.9f, 1.f), X + BarWidth + 14.f, Y + 5.f, nullptr, 1.1f);
+	}
+
 	// MP bar� (mavi).
 	const float ManaY = Y + 34.f;
 	DrawStatBar(X, ManaY, BarWidth, 20.f, S->GetManaPercent(), FLinearColor(0.15f, 0.35f, 0.9f, 1.f));
