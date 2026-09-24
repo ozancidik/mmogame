@@ -21,6 +21,12 @@ ekran baloncuğuna sığacak uzunluktadır. Her NPC'nin sesi belirgin biçimde f
 - Suratımı beğenmedin, biliyorum. Ama bu şehirde kazık atmayan tek ben kaldım.
 - Al şunu, git artık. Tezgâhın önünde dikilen alıcıyı değil, sineği andırıyorsun.
 
+*Yeni bölgeler (Ayazdiş Buzulu / Alev Vadisi):*
+
+- Buzula mı çıkıyorsun? Kör demirle gidersen o hayaletler seni hatıra diye sislerine katar.
+- Mithril hafiftir ama ucuz değildir; senin gibi aceleciler ikisini hep karıştırır.
+- Alev Vadisi'nden dönenlerin kılıcı kor gibi kızarır. Soğumadan tezgâhıma koyma, yakarsın.
+
 ---
 
 ## Görevci Yaşlı Doran (görev veren bilge)
@@ -38,6 +44,12 @@ ekran baloncuğuna sığacak uzunluktadır. Her NPC'nin sesi belirgin biçimde f
 - Kaybettiğini sandığın şey belki de önden gidip seni yolda bekliyordur.
 - Git şimdi, dönesin diye. Her veda, yeni bir öykünün ilk satırıdır.
 
+*Yeni bölgeler (Ayazdiş Buzulu / Alev Vadisi):*
+
+- Buzul, Uzun Kış'ın unuttuğumuz son nefesidir, evlat. Oraya giden, geçmişe yürüdüğünü bilmeli.
+- Kış çekildiği yerde ateş uyandı. Dünya bir terazidir; bir kefe boşalınca öbürü taşar.
+- Adamantin ateşte dövülür, insan da öyle. Vadiden döndüğünde başka biri olacaksın.
+
 ---
 
 ## Muhafız Kael (kasaba kapısı muhafızı)
@@ -54,6 +66,12 @@ ekran baloncuğuna sığacak uzunluktadır. Her NPC'nin sesi belirgin biçimde f
 - Haydutlar yolları kesti. Kervanla git, tek atlıyı avlarlar.
 - Geç bakalım. Ama sınırda gördüğün her şeyi bana bildir, unutma.
 - Kapıdan geçen çok, geri dönen az. Sen dönenlerden ol.
+
+*Yeni bölgeler (Ayazdiş Buzulu / Alev Vadisi):*
+
+- Kuzeyden dönenlerin parmakları donmuş oluyor. Kendini sıcak tut, kılıcını sıkı.
+- Lanetli şövalyeler bir zamanlar bizim gibi nöbet tutardı. Acıma onlara; yeminleri çoktan bozuldu.
+- Doğuda duman var. Alev Vadisi'ne hazır olmadan gitme; kor tazıları acemiyi kokusundan bulur.
 
 ---
 
@@ -74,3 +92,42 @@ ekran baloncuğuna sığacak uzunluktadır. Her NPC'nin sesi belirgin biçimde f
 - İlacım tükenmek üzere, altınım da; azıcık bağış getir, hem sana hem sıradakine yeter.
 - Solgun Fısıltı ormanı sardıkça daha çok yaralı geliyor kapıma; sen sağ dön de yükümü hafiflet.
 - Tanrıçanın huzuru yolunu aydınlatsın; sen sağ ol yeter, gerisi gelir.
+
+*Yeni bölgeler (Ayazdiş Buzulu / Alev Vadisi):*
+
+- Buzuldan dönenlerin yarası kanamaz, donar. Önce ellerini ateşe tut, sonra bana göster.
+- Vadiden gelen yanıklar derin olur, evlat; külünü yıkamadan saramam. Otur, sabırla bekle.
+- Gümüş Dal'ın eski yazıtları buzla ateşin aynı fısıltıyla uyandığını söyler. Kimse inanmadı; şimdi herkes inanıyor.
+
+---
+
+## Kilometre Taşı Görevleri (Unvan Replikleri)
+
+*Seviye ve servet kilometre taşları tamamlandığında ilgili NPC'nin söylediği kısa
+tebrik replikleri. Unvan, görevin oyun-içi adıdır.*
+
+**Seviye zinciri**
+
+- **Kıdemli Savaşçı** *(Q_Level20)* — Muhafız Kael: "Kıdemli Savaşçı. Kapıdan
+  dönenlerin arasında artık adın yazılı. Selam sana."
+- **Usta Savaşçı** *(Q_Level30)* — Yaşlı Doran: "Usta Savaşçı… Kılıcı artık elin
+  değil, aklın tutuyor, evlat. En zor ders de budur."
+- **Efsanevi Şövalye** *(Q_Level40)* — Yaşlı Doran: "Efsanevi Şövalye. Akçakule'nin
+  ocak başlarında adın anılıyor; o hikâyeleri boşa çıkarma."
+- **Savaş Ustası** *(Q_Level50)* — Muhafız Kael: "Savaş Ustası. Talimde acemilere
+  seni örnek veriyorum. Bunu kolay söylemem."
+- **Kahraman** *(Q_Level65)* — Şifacı Lyra: "Kahraman… Bunca yara seni kırmadı,
+  yoğurdu. Tanrıça yolunu hep aydınlatsın."
+- **Zirve** *(Q_Level80)* — Yaşlı Doran: "Zirvedesin, evlat. Buradan her yol
+  görünür; ama unutma, dağın tepesinde de rüzgâr eser."
+
+**Servet zinciri**
+
+- **Vadinin Tüccarı** *(Q_Gold5000)* — Satıcı Merek: "Vadinin Tüccarı, öyle mi?
+  Kesen ağırlaştı; bakalım ne kadarını benim tezgâhımda bırakacaksın."
+- **Efsanevi Servet** *(Q_Gold15000)* — Satıcı Merek: "Efsanevi Servet… Hıh. Kesen
+  benimkinden şişkin, hazmetmesi zor. Yine de çeliğim altınından kıymetlidir."
+- **Bölge Tüccarı** *(Q_Gold30000)* — Satıcı Merek: "Bölge Tüccarı olmuşsun;
+  Keseciler adını fısıldıyor. Ben fısıldamam, açık söylerim: harca şunu, çürütme."
+- **Altın Çağın Efendisi** *(Q_Gold50000)* — Satıcı Merek: "Altın Çağın Efendisi.
+  Ömrümde bir kesede bu kadar altın görmedim. Bari bir kılıç al, hayrını gör."
