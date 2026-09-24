@@ -68,6 +68,16 @@ protected:
 	// yapamasin — vendor'daki IsOwnerNearVendor ile ayni desen, digerinde eksikti).
 	bool IsOwnerNearQuestGiver(float MaxDist = 800.f) const;
 
+	// IsOwnerNearQuestGiver onbellegi: en son menzilde bulunan gorevli (sadece hizli yol;
+	// menzilde degilse tam tarama yapilir, sonuc degismez).
+	mutable TWeakObjectPtr<class AMMOQuestGiverNPC> CachedNearGiver;
+
+	// Server RPC hiz siniri: ayni oyuncudan QuestRpcMinInterval icinde gelen ikinci istek yoksayilir.
+	static constexpr float QuestRpcMinInterval = 0.25f;
+	float LastAcceptRpcTime = -1.f;
+	float LastClaimRpcTime = -1.f;
+	bool PassesRpcRateLimit(float& LastTime);
+
 	UFUNCTION(Server, Reliable)
 	void ServerAcceptQuest(FName QuestId);
 

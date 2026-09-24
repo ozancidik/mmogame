@@ -81,6 +81,8 @@ struct FMMOQuestProgress
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "MMO|Quest")
 	int32 KillProgress = 0;
 
+	// KULLANILMIYOR: cift-odul korumasi ClaimReward'da CompletedQuests.Add + ActiveQuests.RemoveAll
+	// ile yapiliyor. Alan sadece eski save dosyalariyla uyum icin (SaveGame) birakildi; okuma/yazma yapma.
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "MMO|Quest")
 	bool bClaimed = false;
 };

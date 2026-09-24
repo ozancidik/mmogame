@@ -48,10 +48,23 @@ bool UMMOQuestComponent::IsOwnerNearQuestGiver(float MaxDist) const
 	}
 	const FVector Loc = OwnerActor->GetActorLocation();
 	const float MaxDistSq = MaxDist * MaxDist;
+
+	// Hizli yol: en son yakin bulunan gorevli hala menzildeyse dunyayi taramaya gerek yok
+	// (oyuncu genelde ayni NPC basinda kabul+odul yapar). Menzilde degilse tam taramaya dus —
+	// sonuc tam taramayla birebir ayni kalir.
+	if (const AMMOQuestGiverNPC* Cached = CachedNearGiver.Get())
+	{
+		if (FVector::DistSquared(Loc, Cached->GetActorLocation()) <= MaxDistSq)
+		{
+			return true;
+		}
+	}
+
 	for (TActorIterator<AMMOQuestGiverNPC> It(World); It; ++It)
 	{
 		if (*It && FVector::DistSquared(Loc, (*It)->GetActorLocation()) <= MaxDistSq)
 		{
+			CachedNearGiver = *It;
 			return true;
 		}
 	}
@@ -193,7 +206,6 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	FMMOQuestProgress P;
 	P.QuestId = QuestId;
 	P.KillProgress = 0;
-	P.bClaimed = false;
 	ActiveQuests.Add(P);
 
 	if (GEngine && IsLocallyControlledOwner())
@@ -202,8 +214,29 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	}
 }
 
+bool UMMOQuestComponent::PassesRpcRateLimit(float& LastTime)
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	const float Now = World->GetTimeSeconds();
+	if (Now - LastTime < QuestRpcMinInterval)
+	{
+		return false;
+	}
+	LastTime = Now;
+	return true;
+}
+
 void UMMOQuestComponent::ServerAcceptQuest_Implementation(FName QuestId)
 {
+	// Reliable RPC spam korumasi: ayni oyuncudan cok sik gelen istekleri yoksay.
+	if (!PassesRpcRateLimit(LastAcceptRpcTime))
+	{
+		return;
+	}
 	AcceptQuest(QuestId);
 }
 
@@ -311,6 +344,10 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 
 void UMMOQuestComponent::ServerClaimReward_Implementation(FName QuestId)
 {
+	if (!PassesRpcRateLimit(LastClaimRpcTime))
+	{
+		return;
+	}
 	ClaimReward(QuestId);
 }
 
