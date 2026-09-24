@@ -1717,6 +1717,109 @@ Skill maliyetleri Lv1'den Lv80'e **42 kat** buyuduğu halde (10 -> 420) regen sa
 
 ---
 
+# QA - commit `7bc76d0` (Lv25+ XP egrisi parabol + seviyeyle buyuyen mana yenilenmesi) - 2026-09-24
+
+**Ozet:** Kritik veya orta bulgu YOK. 5 kucuk (LOW) bulgu + 1 duzeltme (eski test beklentileri artik
+yanlis). Derleme temiz. Yukaridaki MEDIUM #4 (Lv26 duvari) ve MEDIUM #5 (sabit mana yenilenmesi)
+bu commit ile **kapandi** (asagidaki python dogrulamasi).
+
+**Derleme:** editor kapaliyken `MMOStatsComponent.cpp` zaman damgasi guncellenip zorla derlendi ->
+`[1/4] Compile Module.MyProject.3.cpp`, link basarili, **`Result: Succeeded`**, uyari/hata yok.
+
+## SAGLAM - bagimsiz python hesabiyla dogrulananlar
+
+1. **Lv1-25 egrisi DEGISMEDI.** Eski ve yeni formul 1..25 araliginda 25 seviyenin hepsinde birebir
+   ayni (fark listesi bos). `InLevel <= 0` guard'i da ayni (ikisi de 100 doner).
+2. **Lv25 -> Lv26 duvari gitti.** Lv25 bar 21.176, Lv26 bar **26.492** -> oran **1,251** (onceki
+   adimlarin hepsi 1,250). Eskiden 58.176 (x2,75) idi. `4725` katsayisi ustel egrinin Lv25'teki
+   egimi (`21176 x ln(1,25) = 4725,2`) -> gecis puruzsuz. Sonrasinda oran kademeli dusuyor
+   (Lv30 1,20 / Lv50 1,07 / Lv80 1,035) ama mutlak artis her seviyede buyuyor.
+3. **Lv1-80 kesin monoton artan** (hicbir seviyede esit/azalan yok).
+4. **int32 sinirinin cok uzaginda.** En buyuk bar (Lv80) 2.068.826 = `INT32_MAX`'in **%0,096**'si.
+   Kumulatif Lv1->80 toplami bile 40.153.013 (sigar). `MAX_int32` kirpmasi artik hic devreye girmiyor.
+5. **Commit mesajindaki rakamlar DOGRU:** Lv26 26.492 (~26,5K), Lv50 508.676 (~509K), Lv79
+   1.999.682 (~2,0M), **Lv25->80 toplam 40.068.710 XP (~40M)** = **5.892 Magma Tirani** (~5.900)
+   = 10.829 Cehennem Hayaleti. Eski lineer egriye (56.109.680 / 8.251 kill) gore %29 daha az.
+6. **Mana yenilenmesi + `CombatRegenMult`:** carpan toplam hiza uygulaniyor
+   (`(ManaRegenPerSec + Level*ManaRegenPerLevel) * Mult`, `MMOStatsComponent.cpp:66-67`).
+   Lv80: savas disi 27/sn, savas ici 6,75/sn. Dogru.
+7. **Moblar etkilenmiyor.** Yenilenme kodu `IsPlayerControlled()` erken-donusunun (`cpp:48-52`)
+   ARKASINDA; moblar bu satira hic ulasmiyor.
+8. **Sunucu-otoriterlik/replikasyon:** yenilenme sadece `HasAuthorityInternal()` tick'inde; `Mana`
+   zaten replike + `OnRep_Mana` HUD'u guncelliyor. Yeni `ManaRegenPerLevel` `EditDefaultsOnly`,
+   replike degil - dogru (istemci hesaplamiyor). BP'de yeni alan icin eski override olamaz ->
+   C++ varsayilani 0,25 gecerli.
+
+## LOW-1 - Eski lineer-egri kayitlarinda "bankada XP" artik DAHA OLASI
+
+`ApplySaveData` (`cpp:709-721`) `Experience`'i oldugu gibi yukluyor, seviye-atlama dongusunu
+calistirmiyor. Yeni bar'lar Lv26-79 araliginda eski lineer bar'lardan **KUCUK** (yalnizca Lv80
+buyuk): or. Lv26 eski 58.176 -> yeni 26.492; Lv50 946.176 -> 508.676. Yani `e57a472`..`7bc76d0`
+arasinda Lv26+ iken kaydedilmis ve `Experience` yeni bar'i asan bir kayit HUD'da `EXP 40000 / 26492`
+gibi gorunur, ilk XP kazaniminda tek seferde 1+ seviye atlar. Onceki turdaki ayni LOW bulgusundan
+farki: Lv25->26 sadece 21.176 XP (~3 Magma Tirani) oldugu icin **test kaydinin Lv26'da olmasi
+gercekci**. Cokme/veri kaybi yok, bir sonraki XP kazanciyla kendiliginden duzeliyor.
+Onerilen yon (mmo-developer): `ApplySaveData` sonunda `Experience >= ExperienceToNextLevel` ise
+ayni while dongusunu calistirmak ya da Experience'i bar-1'e kirpmak.
+
+- [ ] **(Lv26+ eski kaydin varsa)** Oyunu ac -> C ile stat penceresi -> XP satirinda ilk sayi ikinciden
+      buyuk mu? Buyukse bir mob oldur -> birden fazla seviye mi atladin? (Beklenen: evet, bulgu dogrulanir.)
+
+## LOW-2 - Mana yenilenmesi erken oyunu da degistirdi (commit mesaji sadece gec-oyundan bahsediyor)
+
+`Level * 0.25` terimi Lv1'den itibaren isliyor. Savas disi: Lv1 7,25 (+%3,6), Lv8 **9,0 (+%29)**,
+Lv24 **13,0 (+%86)**. Savas ici Lv8 1,75 -> 2,25/sn. Onceki turdaki SAGLAM #5 ("Lv1-24 mana dengesi
+bozulmadi") MaxMana icin yazilmisti; yenilenme artik erken oyunda da degisti. Skiller zaten
+cooldown-sinirli oldugu icin spam riski dusuk; asil etki **dovusler arasi bekleme suresinin
+kisalmasi**. Bilincli bir karar mi **dogrulanmali** (tasarim karari mmo-developer/kullanicinin;
+sadece gec-oyun isteniyorsa `Max(0, Level-25)` benzeri bir esik kullanilabilir).
+
+- [ ] **Lv8 Buyucu ile mana'yi sifira indir -> savas disinda bekle -> 234 mana kac saniyede
+      doluyor?** Beklenen ~26 sn (eskiden ~33 sn). Hissiyat "fazla hizli" mi not et.
+
+## LOW-3 - Capstone "dovuste bir"den "~1,7 CD'de bir"e indi, "her CD'de bir" degil (bug degil, bilgi)
+
+Lv80 Savasci, Kiyamet Darbesi (`MMOSkillDatabase.cpp:106-107`: 400 mana, CD 26 sn), MaxMana 495:
+atistan sonra 95 kalir; 26 sn'lik CD boyunca savas ici yenilenme 26 x 6,75 = 175,5 -> **270,5 < 400**,
+yani CD bittiginde ikinci atis hala "yeterli mana yok" der. Tekrar atmak icin gereken sure
+305 / 6,75 = **~45 sn** (eskiden ~174 sn). Iyilesme 3,9 kat; commit'in "makul surede" ifadesiyle
+uyumlu, tasarim hedefi "her CD'de bir" ise hala tutmuyor.
+
+- [ ] **(Yukaridaki MEDIUM #5 testinin YENI beklentisi)** Lv80 Savasci ile dovus icinde Kiyamet
+      Darbesi at -> CD bitince tekrar dene -> "yeterli mana yok" almali; **~45 sn** sonra (yine dovus
+      icinde, hasar almaya devam ederken) atilabilmeli. 174 sn bekletiyorsa degisiklik calismiyor.
+
+## LOW-4 - `ComputeExperienceForLevel` ustundeki eski yorum artik yanlis
+
+`MMOStatsComponent.cpp:150-159` hala "Lv25'ten sonra egri DOGRUSALA donusuyor ... ~8.000 Magma
+Tirani ... ~55.6M XP" diyor; hemen altindaki yeni yorum (163-166) parabol/40M diyor. Kod dogru,
+sadece okuyani yaniltan celiskili dokumantasyon.
+
+## LOW-5 - `ManaRegenPerLevel` / `ManaRegenPerSec` icin alt sinir yok
+
+`MMOStatsComponent.h:193,197` - `meta=(ClampMin=0)` yok. Bir tasarimci BP'de negatif deger girerse
+`FMath::Min(MaxMana, ...)` sadece USTTEN kirptigi icin Mana 0'in altina iner. Sadece yanlis
+konfigurasyonla tetiklenir; oynanista ulasilamaz.
+
+## DUZELTME - yukaridaki eski bolumlerdeki rakamlar artik GECERSIZ
+
+MEDIUM #3 tablosu ve test adimi lineer egriye gore yazilmisti. Yeni degerler (olum cezasi = bar'in %10'u):
+
+| Seviye | ExperienceToNextLevel | Olum cezasi | = kac Magma Tirani (6800) |
+|---|---|---|---|
+| Lv24 | 16.941 | 1.694 | 0,25 |
+| Lv26 | 26.492 | 2.649 | 0,39 |
+| Lv50 | 508.676 | **50.868** | 7,5 |
+| Lv79 | 1.999.682 | 199.968 | 29,4 |
+
+- [ ] **(MEDIUM #3 testinin YENI beklentisi)** `MMOGainXP` ile Lv50'ye cik -> XP barini yarilayacak
+      kadar XP kazan -> kasten ol -> "Oldun! -N EXP" mesajinda N **~50.868** olmali (eski 94.618 DEGIL).
+- [ ] **(MEDIUM #4 testinin YENI beklentisi)** `MMOGainXP` ile Lv25 ol -> C ile stat penceresi, bar
+      21.176 -> Lv26 ol -> bar **26.492** olmali (eski 58.176 DEGIL). Lv27'de 32.990, Lv50'de 508.676.
+- [ ] **Lv79'a cik** -> stat penceresinde bar **1.999.682** yazmali; XP bari dolu/tasmis cizilmemeli.
+
+---
+
 # Canlanma korumasi (respawn protection) — 4 sn hasar/aggro muafiyeti (2026-09-24)
 
 > Derleme temiz (`Result: Succeeded`). Dogus noktasi yakininda agresif mob varsa olum dongusunu
@@ -1736,3 +1839,322 @@ Skill maliyetleri Lv1'den Lv80'e **42 kat** buyuduğu halde (10 -> 420) regen sa
 - [ ] **Istemcide etiket (2 pencereli PIE):** Istemci penceresindeki oyuncu olup canlaninca KENDI HUD'unda "KORUMA" etiketi gorunmeli (replike bayrak) ve bitince mesaj cikmali.
 - [ ] **Regresyon:** Moblar hasar almaya/olmeye devam etmeli; koruma bittikten sonra oyuncunun hasar alma, olum cezasi (-EXP), 5 sn respawn geri sayimi eskisi gibi calismali.
 - [ ] **Tasarim notu (karar senin):** Sure 4 sn; Sifaci diriltmesi de korumayi veriyor (sadece dogal respawn istenirse `HandleRevived` yerine `RespawnAtStart`'a tasinabilir).
+
+---
+
+# QA / Game Design - "Yeni oyuncunun ilk 10 dakikasi" denetimi (sadece kod okuma + python) - 2026-09-24
+
+> **Kapsam:** Lv1 dogus (PlayerStart (0,0), Facing=+X), sinif secimi/baslangic skili, hub NPC'leri,
+> ilk gorev zinciri (Q_Goblins -> Q_Bandits), baslangic ekonomisi, dogus noktasinin tehlikesi.
+> PIE oynanmadi; tum rakamlar kod sabitlerinden + bagimsiz python (Monte Carlo) hesabindan.
+> Varsayimlar: harita zemini X/Y [-2000,2000], navmesh var (Summer_scene'de `NavMeshBoundsVolume`
+> bulundu -> `IdleWander` aktif), oyuncu yurume hizi BP varsayilani ~500 (**dogrulanmali**).
+> Calisma kopyasindaki commit edilmemis **4 sn canlanma korumasi** asagidaki bulgularin HICBIRINI
+> cozmuyor (koruma 4 sn; asagidaki riskler 30 sn - 10 dk olceginde).
+>
+> **Ozet:** 2 HIGH (hub/dogus noktasi yuksek seviye elit ve bolge moblarinin gezinti+aggro
+> menzilinde; onceki HIGH#1/#2 duzeltmesi `WanderRadius`'u hesaba katmamis), 4 MEDIUM (ana zincir
+> temposu, mob Enrage'i etkisiz, sinif degistirme puan kaybi, sinif-degistirme ile tam-can exploit'i),
+> 3 LOW. Ulasilamayan gorev / yanlis mob adi **YOK** (asagida SAGLAM).
+
+## HIGH-1 - Hub NPC'leri ve dogus noktasi, ELITLERIN (Magma Tirani Lv24 dahil) gezinti+aggro menzilinde
+
+`MMOGameMode.cpp:66-198` (elit spawner konumlari) + `MMOMobArchetype.cpp:153-238` (elit AggroRange
+1100-1350; HIGH#1 duzeltmesi sadece NORMAL moblari 600'e cekti, elitlere dokunmadi) +
+`MMOMob.h:62` `WanderRadius=450` + `MMOMob.cpp:537-565` (`IdleWander`: ev +- 450u) +
+`MMOGameMode.cpp:204-238` (hub NPC'leri (250,+-200), (400,0), (250,-350)).
+
+Aggro saf 3B mesafe; seviye farki kontrolu yok. Elit ev noktasi spawner merkezinden tam 150u
+(`FRandRange(150,150)`), ustune 450u gezinti. Bagimsiz hesap (en yakin olasi mesafe vs aggro):
+
+| Elit (Lv, hasar) | Nokta | Evdeyken min | Gezinirken min | Aggro |
+|---|---|---|---|---|
+| **Magma Tirani (Lv24, 95)** | Lyra (250,-350) | 1374 | **924** | 1350 |
+| **Magma Tirani** | Gorevli (250,-200) | 1476 | **1026** | 1350 |
+| **Magma Tirani** | Kael (400,0) | 1530 | **1080** | 1350 |
+| Kadim Golem (Lv7, 26) | Lyra | **788 (EVDE BILE)** | 338 | 850 |
+| Ork Reisi (Lv6, 24) | Kael | **990 (EVDE BILE)** | 540 | 1200 |
+| Orumcek Ana (Lv5, 16) | Satici / Kael | **853 (EVDE BILE)** | 403 | 1100 |
+| Golge Suikastci (Lv7, 25) | Satici | 1476 | 1026 | 1300 |
+
+Monte Carlo (oyuncu noktada 30 sn kipirdamadan dursa, en az bir kez aggro alma olasiligi):
+- **Lyra'nin yaninda: Magma Tirani %59**, Kadim Golem %75, Ork Reisi %67.
+- **Gorevli'nin yaninda: Magma Tirani %34**, Ork Reisi %73, Kadim Golem %61.
+- **Kael'in yaninda: Magma Tirani %24**, Ork Reisi %95, Orumcek Ana %98.
+- PlayerStart'ta: Orumcek Ana %47, Ork Reisi %22, Kadim Golem %5.
+
+Lv1'in kaybettigi dovusler (TTK/TTD sn, iksirsiz): Magma Tirani **her sinifi ~2.4-3.3 sn'de**
+olduruyor (Lv1 hasari 95-Def = 87-90/vurus). Kadim Golem: 4 sinifin hepsi kaybeder (Warrior
+16.2/15.8). Ork Reisi: Buyucu (18.3/11.2) ve Priest kaybeder. Tirani hizi 270, Golem 180 -> fark
+edilirse kacilabilir; ama oyuncu NPC penceresi acikken/diyalog okurken fark etmeyebilir. Leash
+1800 >= hub'a olan ev mesafesi (~1374-1530) -> Tirani hub'a kadar gelir, leash'lenmez. Oldukten
+sonra oyuncu (0,0)'da dogar (Tirani'ya gezinti-min 1345 < 1350) -> **olum dongusu mumkun**.
+
+Onerilen yon (mmo-developer): elitlerin AggroRange'ini ve/veya `WanderRadius`'unu elit spawner'lari
+icin kucultmek (or. elitlerde gezinti 0-150), ya da Magma Tirani/Kadim Golem spawner'larini hub'dan
+uzaklastirmak. Kural: `|spawner-NPC| - SpawnRadius - WanderRadius >= AggroRange + pay`.
+
+- [ ] **Play -> Sifaci Lyra'nin yanina yuru -> HICBIR SEY YAPMADAN 60 sn bekle.** Magma Tirani (turuncu,
+      devasa, Lv24) ya da Kadim Golem (gri, devasa) sana kosuyor mu? Adini not et. Tirani geldiyse HIGH dogrulandi.
+- [ ] **Ayni testi Gorevli'nin ve Kael'in yaninda tekrarla** (60'ar sn). Ork Reisi / Orumcek Ana kac saniyede geliyor?
+- [ ] **Lv1 iken Magma Tirani seni kovalarken dogus noktasina kac** -> Tirani (0,0)'a kadar geliyor mu? Oldukten
+      sonra canlaninca (4 sn koruma bitince) Tirani hala yakinda mi? (Olum dongusu testi.)
+- [ ] **Gorevli penceresi acikken** (gorev okurken) bir elit gelip vurursa pencere acik kaliyor mu, hasar yazisi goruluyor mu? (UX notu)
+
+## HIGH-2 - Onceki HIGH#1/#2 "FIXED" (fd13bd9) dogrulamasi `WanderRadius`'u unutmus: Lv8-22 moblar dogus noktasina / Gorevli'ye / Lyra'ya yine ulasiyor
+
+`MMOGameMode.cpp:133-185` (SpawnRadius 400) + `MMOMobArchetype.cpp:66-76` (aggro 600, yorum ">=300u
+guvenlik payi, python ile dogrulandi") + `MMOMob.cpp:562` (`FRandRange(0, WanderRadius)`).
+
+">=300u pay" hesabi yalnizca **ev noktasina** gore dogru (3. bolge: 1300-400-600 = 300). Mob evden
+450u daha gezinebildigi icin gercek pay NEGATIF:
+
+| Bolge (Lv) | Nokta | Evdeyken min | Gezinirken min | Aggro | Pay |
+|---|---|---|---|---|---|
+| 3. bolge (Lv8-12) | **PlayerStart (0,0)** | 900 | **450** | 600 | **-150** |
+| 4. bolge (Lv16-22) | **Lyra** | 909 | **459** | 600 | **-141** |
+| 4. bolge (Lv16-22) | **Gorevli** | 1021 | **571** | 600 | -29 |
+| 2. bolge (Lv6-7) | Satici | 1021 | 571 | 600 | -29 |
+| 2. bolge (Lv6-7) | PlayerStart | 1053 | 603 | 600 | +3 (sinirda) |
+
+Frekans elitlerden dusuk (30 sn beklemede PlayerStart'ta 3. bolge %3.7, Lyra'da 4. bolge %3.1)
+ama 10 dakikalik oturumda ve her respawn'da tekrarlanan bir zar. Sonuc olumcul: Kor Tazisi (Lv16,
+hiz 460 - oyuncudan kacilamaz olabilir) Lv1'i ~4-6 sn'de, Cehennem Hayaleti ~3 sn'de olduruyor.
+Onerilen yon: ya bu 3 bolgenin moblarina `WanderRadius` <= 150 vermek, ya da aggro'yu
+`dist - SpawnRadius - WanderRadius - 150` kuralina gore yeniden hesaplamak. Checklist'teki
+HIGH#1/#2 "FIXED" etiketi bu kosul dogrulanana kadar **yeniden acik** sayilmali.
+
+- [ ] **Play -> dogdugun yerde (PlayerStart) 3 dakika hic kipirdamadan bekle** (kamerayi arkaya cevir, -X yonu).
+      Bir Buz Hayaleti / Lanetli Sovalye / Zehir Orumcegi / Ork Berserk (Lv8-12) sana gelirse HIGH-2 dogrulandi.
+- [ ] **Sifaci Lyra'nin yaninda 3 dakika bekle** -> Kor Tazisi / Magma Golemi / Kul Orku / Cehennem Hayaleti (Lv16-22) geliyor mu?
+- [ ] **Gorevli'nin yaninda 3 dakika bekle** -> ayni Lv16-22 moblar geliyor mu?
+
+## MEDIUM-3 - Ana gorev zinciri temposu: gorev seviyeleri anlamsiz, oyuncu zincirin ~10 seviye onunde
+
+`MMOQuestTypes.cpp:36-54` + `MMOGameMode.cpp:52-60` (ana spawner: `MaxMobs=3` varsayilan,
+`MaxMobLevel=5` -> havuz Goblin/Kurt/Ork/Haydut/Trol, **esit olasilikla** rastgele) +
+`MMOMob.cpp:601` (XP'de seviye-farki azalmasi YOK).
+
+Zincir SERI (Goblin -> Kurt -> Ork -> Haydut), ama havuz ORTAK ve sadece 3 canli mob var: hedef mob
+yoksa slotu bosaltmak icin baska mob kesmek ZORUNLU, ve bir sonraki gorevin moblari (or. Q_Goblins
+sirasinda Kurtlar) sayilmadan harcaniyor. Simulasyon (4000 kosum; oyuncu hedef mobu varsa onu,
+yoksa en dusuk seviyeliyi keser; Q_Cleanup/Q_Level5/Q_Trolls paralel alinir):
+
+| Gorev (ReqLv) | Bitene kadar ort. kill (p90) | Bittiginde ort. seviye |
+|---|---|---|
+| Q_Level5 (1) | 9 | Lv6.5 |
+| Q_Cleanup (1) | 10 | Lv7.0 |
+| **Q_Goblins (1)** | **22.8 (37)** | **Lv9.8** |
+| Q_Wolves (**2**) | 47.8 (66) | **Lv12.5** |
+| Q_Orcs (**3**) | 62.8 (84) | Lv13.7 |
+| Q_Bandits (**4**) | 82.6 (107) | **Lv14.9** |
+
+8-12 sn/kill varsayiminda (dogrulanmali): **Lv5 ~1.5-2 dk'da, Lv10 ~3-5 dk'da**; ilk gorev
+(5 Goblin) ortalama 23, kotu sansta 37 kill = 3-7 dk. Q_Wolves "Lv2" gorevi Lv~10'da aliniyor; gorev
+XP'si (200-650) o seviyelerde bar'in %20-35'i -> gorev odulu anlamsizlasiyor. Q_Boss (Ork Reisi,
+ReqLv5) Lv~15'te yapiliyor. Bug degil (ilerleme IMKANSIZ degil, tersine cok hizli), ama "ilk 10 dk"
+deneyimi: ana zincir erken oyunu yonlendirmiyor, rastgele grind yonlendiriyor.
+Onerilen yon (tasarim karari kullanici/mmo-developer): ana spawner `MaxMobs` 3 -> 6-8; Goblin/Kurt
+icin ayri kucuk spawner'lar ya da agirlikli havuz; zincirdeki gorevleri paralel alinabilir yapmak;
+ve/veya seviye farkina gore mob XP azalmasi.
+
+- [ ] **Yeni karakter -> Gorevli'den Goblin Avi + Temizlik + Guclen al -> ana alanda sadece savas.**
+      5 Goblin icin toplam KAC mob kestin, Q_Goblins'i teslim ettiginde seviyen kac? (Beklenen ~20-25 kill, ~Lv9-10.)
+- [ ] **Saati tut:** Play'den Lv5'e kac dakika, Lv10'a kac dakika? (Beklenen ~2 / ~4-5 dk.)
+- [ ] **Hissiyat:** Ekranda ayni anda sadece 3 mob mu var? "Goblin bekliyorum ama hep Trol/Haydut cikiyor" hissi var mi?
+
+## MEDIUM-4 - Mob "Enrage" (Rage / OFK) tamamen etkisiz: mob hasari artmiyor
+
+`MMOMob.cpp:361-366` (Enrage -> `Stats->ApplyEffect(Rage)`) + `MMOEffectDatabase.cpp:38` (Rage =
+`AttackBuff` +20) + `MMOStatsComponent.cpp:191-192` (buff sadece `AttackPower`'a eklenir) +
+`MMOMob.cpp:515` (mob vurusu `ApplyDamage(Player, MobAttackDamage, ...)` -> **`AttackPower`'i HIC
+kullanmiyor**, `MobAttackDamage` arketipten sabit).
+
+Sonuc: Trol (ana alan, Lv5), Ork Reisi (Q_Boss), Kadim Golem, Kara Buyucu, Lanetli Sovalye, Ork
+Berserk, Magma Golemi, Kul Orku, Cehennem Hayaleti, Buz Lordu, Magma Tirani'nin "can azalinca
+ofkelenir" ozelligi sadece HUD'da OFK ikonu gosteriyor; vurus hasari degismiyor. Checklist'teki
+satir 392, 452, 865, 910'daki "hasari artmali" beklentileri **bu kodla KALACAK**.
+Onerilen yon: mob vurusunda `MobAttackDamage + SumEffectMagnitude(AttackBuff)` (veya Stats->AttackPower
+ile harmanlama) kullanmak. (Ayni sebeple oyuncunun mob'a attigi AttackBuff-azaltan debuff'lar da
+mob'u etkilemez - dogrulanmali.)
+
+- [ ] **Trol'u %40 canin altina indir** -> OFK ikonu cikmali -> ikon ONCESI ve SONRASI sana vurdugu hasar
+      yazisini karsilastir. Ayniysa MEDIUM-4 dogrulandi (beklenen: ayni, 20-Def).
+
+## MEDIUM-5 - Sinif secimi: tek ipucu 8 sn'lik konsol mesaji; sonradan degistirmek harcanan stat/skill puanlarini SILIYOR
+
+`MMOCharacter.cpp:361` (ipucu: `AddOnScreenDebugMessage` 8 sn, sadece kayit yoksa) +
+`MMOCharacter.cpp:1216-1240` (`MMOClass` Exec) + `MMOSkillComponent.cpp:138-181` (`SetupForClass`:
+`InitializePrimaryStats(...)` taban statlari YAZAR, `LearnedSkills`/`MasteryRankArray` sifirlanir;
+`UnspentStatPoints`/`UnspentSkillPoints` **iade edilmez**).
+
+Yeni oyuncu varsayilan Savasci olarak baslar; HUD'da (sinif adi disinda) sinif secme arayuzu yok.
+8 sn'lik mesaji kaciran ya da ilk 10 dk'da Lv8-10'a gelip (bkz. MEDIUM-3) sonra "Buyucu olayim"
+diyen oyuncu: Lv9'da harcanmis **24 stat + 16 skill puani kalici olarak kaybolur** (seviye kalir,
+puanlar geri gelmez). Ayrica konsol tusu `Tilde` (`DefaultInput.ini:85-86`) - Turkce Q klavyede
+bu tusun konsolu acip acmadigi **dogrulanmali**.
+Onerilen yon: ya sinif degisimini Lv1 / hic puan harcanmamis durumla sinirlamak, ya da degisimde
+(Level-1)*StatPointsPerLevel ve (Level-1)*SkillPointsPerLevel'i `Unspent`'e iade etmek; ilk giriste
+kalici bir sinif secim paneli.
+
+- [ ] **Yeni karakter (kayit sil) -> Play** -> sinif ipucu mesajini okuyabildin mi (8 sn)? Konsol (`~`/`"` tusu) Turkce klavyede aciliyor mu?
+- [ ] **Savasci ile Lv3'e cik, 6 stat puanini STR'ye ver, skill puani harca -> konsola `MMOClass mage`.**
+      C ile stat penceresi: STR 6'ya dustu mu, "harcanmamis puan" 0 mi? (Beklenen: evet = puanlar kayboldu, bulgu dogrulandi.)
+
+## MEDIUM-6 - `ServerSetupForClass` dogrulamasiz: istemci her an tam can + tam mana + tum cooldown sifirlama alabilir
+
+`MMOSkillComponent.h:139-140` (`Server, Reliable`, WithValidation yok) + `MMOSkillComponent.cpp:93-96,
+138-160`: hicbir olum/savas/seviye/sure kontrolu yok. `InitializePrimaryStats` -> `RecalculateDerivedStats(
+bRefill=true)` -> `Health=MaxHealth, Mana=MaxMana`; `CooldownEndTimes.Reset()`.
+Tetik: savas ortasinda `MMOClass warrior` (ayni sinif bile) -> aninda full HP/MP + skill CD'leri sifir.
+Olu iken yapilirsa `bIsDead=true` kalirken `Health` MaxHealth'e dolar (tutarsiz durum). Exec konsol
+komutu shipping'de kapali olabilir (**dogrulanmali**) ama Server RPC modlu bir istemciden her
+zaman cagrilabilir -> sunucu-otoriterlik ihlali. Onerilen yon: sunucuda "savasta degil / canli /
+cooldown" kapisi, ya da sinif degisimini Lv1'e kilitlemek (MEDIUM-5 ile tek duzeltme).
+
+- [ ] **Bir moba dovus, canin %30'a dussun -> konsola `MMOClass warrior` (zaten Savasci iken).** Can ve mana
+      aninda DOLUYOR mu, skill cooldown'u sifirlaniyor mu? (Beklenen: evet = exploit dogrulandi.)
+- [ ] **Oluyken (respawn geri sayiminda) `MMOClass warrior`** -> HP bari dolu gorunup karakter olu mu kaliyor? Respawn normal mi?
+
+## LOW-7 - Priest'in Lv1 slot-1 skili bir IYILESTIRME; Okcu/Buyucu temel vurusu yakin dovus
+
+`MMOSkillComponent.cpp:164-180` en dusuk RequiredLevel'li Basic skili verir: Priest -> `Pri_HolyLight`
+(HealSelf, `MMOSkillDatabase.cpp:193`); ilk hasar skili `Pri_Smite` Lv2 + Basic agacina puan yatirmayi
+ister. Lv1 Priest'in "1" tusu hasar vermez; tek hasari AP 16'lik temel vurus (Trol'e karsi TTK 17.9 sn
+/ TTD 20.1 sn - iksirsiz ve sifa basmadan cok sinirda). Ayrica `MeleeRange=220` tum siniflar icin ortak:
+Okcu ve Buyucu mana bitince yakin dovuse girmek zorunda. Tasarim karari; bug degil.
+
+- [ ] **`MMOClass priest` -> ana alanda bir Trol'e sadece temel vurus + 1 (sifa) ile dovus.** Kazanabiliyor musun? "1"e basmak hasar veriyor mu? (Beklenen: hayir, sadece sifa.)
+
+## LOW-8 - Ana alanin normal moblari hub'in ICINDEN geciyor (zararsiz ama "guvenli kasaba" hissi yok)
+
+Ana spawner (1050,0) r=350 + gezinti 450 -> Kael'in (400,0) uzerine kadar (-150u), Satici/Gorevli'ye
+25u'ya kadar gelebiliyor; Kurt aggro 1150 -> PlayerStart'ta 30 sn beklemede %96 aggro. Lv1 icin
+tehlikesiz (Savasci Goblin/Kurttan 1 hasar/vurus alir), ama NPC diyalogu sirasinda surekli saldiri
++ hasar yazisi. `MMOGameMode.cpp:49-50`'deki "moblar meydanda/NPC'lerin arasinda degil" yorumu
+aggro/gezinti hesaba katildiginda gecerli degil. Ayrica ana alanda sadece 3 mob var -> 2+ oyunculu
+MP'de yeni oyuncular ayni Goblin'ler icin yarisir (dogrulanmali).
+
+- [ ] **Kael'e tiklayip diyalog okurken 30 sn bekle** -> Lv1-5 moblar hub'a girip sana vuruyor mu?
+
+## LOW-9 - Baslangic: 0 altin, 0 iksir (bilgi - su an sorun degil)
+
+`MMOInventoryComponent.h:47` `Gold=0`, baslangic esyasi yok. Hesap: ana alan ort. 22 altin/kill, mob
+%35 sansla Can Iksiri dusurur (~3 kill/iksir), Iksir 20g (~1 kill), Lyra 100g (~4.5 kill), Lv1 zirh
+parcasi 99-171g (4.5-8 kill). Lv1 normallere karsi hicbir sinif iksir gerektirmiyor (bkz. SAGLAM-3),
+bu yuzden sifir baslangic su an bir engel DEGIL. **Ama** HIGH-1/HIGH-2'deki bir elit/yuksek-seviye
+temasinda oyuncunun cebinde tek iksir yok. Oneri (tasarim): 2-3 baslangic Can Iksiri.
+
+## SAGLAM - denetlenip TEMIZ cikanlar
+
+1. **Tum gorev hedefleri gercekten spawn oluyor, isimler dogru.** Ana havuz (`MaxMobLevel=5`,
+   `GetRandomInLevelRange(0,5)`) = Goblin, WolfPup, Orc, Bandit, Troll -> Q_Goblins/Q_Wolves/Q_Orcs/
+   Q_Bandits/Q_Trolls hedefleri havuzda. Q_Boss=OrcWarlord, Q_SpiderQueen/StoneGolem/ShadowAssassin/
+   FrostLich/MagmaTyrant = `ForcedArchetypeId`'li spawner'larda birebir ayni ID. Q_Warlocks/OrcWarriors/
+   DireWolves -> 2. bolge bandi (6-7), Q_FrostWraiths..Q_OrcBerserkers -> 3. bolge (8-12), Q_EmberHounds..
+   Q_InfernalWraiths -> 4. bolge (16-22). `NotifyMobKilled` `ArchetypeId` ile esliyor. **Ulasilamayan gorev yok.**
+2. **Lv6+ normal moblar ana havuza sizmiyor** (band filtresi `bIsElite` + `Level<=5`).
+3. **Lv1 vs Lv1-5 normaller:** hicbir sinif ana alan normallerine iksirsiz kaybetmiyor (en sinirli: Priest-Trol
+   17.9/20.1 sn, Buyucu-Trol 7.7/14.2 sn). Ana alanin kendisi Lv1 icin guvenli; tehlike HIGH-1/2'deki disaridan gelenler.
+4. **Baslangic skili + hotbar:** 4 sinifin hepsinde en dusuk seviyeli Basic skil ogrenilip `Hotbar[0]`'a konuyor
+   (Savasci Guclu Vurus 8 mana ~7 atis, Okcu Cabuk Atis ~11, Buyucu Buz Oku ~14, Priest Kutsal Isik ~8).
+5. **Gorevli dogus noktasina 320u** -> istemci 500u tiklama menzilinde, sunucu 800u (`IsOwnerNearQuestGiver`)
+   kontrolunden geciyor; Play'e basar basmaz tiklanabilir. Lyra-Gorevli arasi 150u -> tiklama cakismasi yok (kapsul ~42u).
+6. **Lv1'de alinabilir gorevler:** Q_Goblins, Q_Cleanup, Q_Level5, Q_Gold500 - on kosul/seviye kapilari (`IsQuestAvailable`,
+   `AcceptQuest`) tutarli; Q_Wolves Q_Goblins'siz alinamiyor.
+
+
+## QA denetimi — canlanma korumasi (commit a33c18d, 2026-09-24)
+
+> Derleme: ilk deneme "Target is up to date" (yalanci basari) verdi; degisen 5 dosyanin tarihi
+> guncellenip ZORLA derlendi → UHT (-WarningsAsErrors) + 4 unity derleme + link, **Result: Succeeded**,
+> uyari/hata yok. Kod incelemesi: korumayi sonsuza uzatan yol YOK, istemci bayragi sahteleyemiyor
+> (yalniz sunucu yaziyor, RPC degil), TakeDamage disinda hasar yolu YOK (tum `ApplyDamage` cagrilari
+> ve DoT `TakeDamage`'den geciyor; `Stats->ApplyDamage` sadece `TakeDamage` icinden cagriliyor),
+> 4 hasar skili tipinin hepsi korumayi bitiriyor. Asagidaki bulgular PIE'de dogrulanmali.
+
+### BULGU 1 (ORTA — ozelligin asil senaryosunu bozar) — Otomatik saldiri olumden sonra da suruyor, korumayi hemen bitiriyor
+`AMMOPlayerController::TargetEnemy` (otomatik saldiri hedefi) oyuncu olunce TEMIZLENMIYOR
+(`MMOPlayerController.cpp` 607-627; sadece hedef olurse/WASD/Z/toggle ile sifirlanir). Oyuncu
+canlaninca `PlayerTick` o mob'a yeniden yol bulur, menzile girince `MMOAttack()` →
+`AttackTarget(nullptr)` → `EndSpawnProtection()` (`MMOCharacter.cpp:709`). Dogus noktasinin
+yanindaki mob'a olup orada canlanan oyuncu (bu ozelligin hedefledigi durum) 1 sn icinde kendi
+kendine saldirip korumayi kaybeder → olum dongusu devam eder. Ayrica uzak bir mob'a olunduyse
+canlaninca haritayi yuruyerek o mob'a geri gider. Yon: olumde (ya da canlanmada) otomatik saldiri
+/ tikla-git hedefini temizlemek (mmo-developer karar versin).
+- [ ] Play → dogus noktasina yakin bir mob'a sol tik ile saldir (otomatik saldiri acik) → mob seni
+      oldursun (gerekirse `MMODamage 9999`, koruma bittikten sonra) → canlan → **HICBIR tusa basma**.
+      BEKLENEN (duzeltme sonrasi): karakter yerinde durmali, "KORUMA" ~4 sn kalmali.
+      SU ANKI SUPHE: karakter kendiliginden mob'a yurur/vurur, "Canlanma korumasi bitti" hemen cikar.
+- [ ] Ayni testi uzak bir mob ile yap: canlaninca karakter kendiliginden o mob'a dogru yurumeye
+      basliyor mu? (Evetse bu bulgunun ayni koku.)
+
+### BULGU 2 (KUCUK / dogrulanmali) — Oncesinden kalan DoT korumayi bozmadan mob'u oyuncuya kilitler
+Oyuncu olmeden once mob'a zehir (DoT) attiysa, DoT tick'i mob'un `TakeDamage`'ine instigator=oyuncu
+ile gelir (`MMOStatsComponent.cpp:669` → `MMOMob.cpp:135-150`) ve `ForcedTarget` korumali oyuncuya
+kurulur; korumayi bitirmez, oldururse XP'yi korumaliyken alir. Koruma bitince `ForcedAggroUntil`
+(8 sn) hala aciksa mob AggroRange disindan oyuncuya kosar. Istismar degeri dusuk.
+- [ ] Okcu ile mob'a zehirli ok at → hemen `MMODamage 9999` ile ol → canlan → koruma bitince mob'un
+      aggro menzilinin DISINDAN sana kosup kosmadigini gozle (kosarsa bu bulgu dogrulandi).
+
+### BULGU 3 (KUCUK / dogrulanmali) — Kovalamaya baslamis mob korumali oyuncunun yanina kadar yurumeye devam edebilir
+Korumali hedef atlaninca mob `IdleWander()`'a duser; ama `NextWanderTime` dolmadiysa fonksiyon
+`StopMovement` cagirmadan doner (`MMOMob.cpp:465-470, 553-557`), onceki `MoveToActor(oyuncu)`
+surer. Mob korumali oyuncunun dibinde bekler, koruma biter bitmez vurur. Ulasilabilirligi dusuk
+(olen oyuncudan zaten vazgeciliyor), cogunlukla 2 oyunculu senaryoda.
+- [ ] 2 pencereli PIE: A oyuncusu bir mob'u cekip kossun, B korumali (yeni canlanmis) halde yakinda
+      dursun → mob B'ye yurumemeli / B'nin yaninda "bekleyip" koruma bitince aninda vurmamali.
+
+### BULGU 4 (KUCUK / UX) — Yaniltici geri bildirimler
+- PvP'de korumali oyuncuya vuran saldiran "VURDUN: X hasar" gorur ama hasar 0'dir
+  (`MMOCharacter.cpp:722-729` gercek degeri degil `AttackPower`'i yaziyor). Diger oyuncular hedefin
+  korumali oldugunu gormuyor (isim plakasinda isaret yok).
+- HUD etiketi "KORUMA", satilan savunma buffi "Koruma" parsomeniyle ayni ad — karisabilir.
+- [ ] 2 pencereli PIE, `MMOPvP 1`: korumali oyuncuya vur → saldiranin ekraninda ne yaziyor? (0 hasar
+      olmasina ragmen "VURDUN: N hasar" yaziyorsa bu bulgu dogrulandi.)
+- [ ] "Koruma" parsomeni ic → HUD'da canlanma "KORUMA" etiketiyle karistirilacak bir durum var mi?
+
+### Test kolayligi notu
+- 4 sn icinde konsolu acip `MMODamage 50` yazmak zor: test icin `BP_ThirdPersonCharacter` → Class
+  Defaults → `MMO|Combat` → **Spawn Protection Duration = 15** yap, testten sonra 4'e geri al.
+
+---
+
+# Ilk-10-dk QA duzeltmeleri: sinif degistirme kapisi + puan iadesi + mob Enrage hasari (2026-09-24)
+
+> Derleme temiz. Kapsanan bulgular: MEDIUM-4, MEDIUM-5, MEDIUM-6 (yukaridaki "ilk 10 dakika" denetimi).
+> `MMOClass` artik sunucuda `UMMOSkillComponent::ChangeClass`'a gidiyor: ayni sinif = no-op ("Zaten bu
+> siniftasin"), son hasardan 5 sn (`CombatDuration`) gecmeden ya da oluyken reddedilir. Gercek degisimde
+> harcanan stat/skill puanlari iade edilir (stat: `(Level-1)*3`, skill: harcanan rutbeler + harcanmamis,
+> en az `(Level-1)*2`), ana statlar yeni sinifin baslangic dagilimina, rutbeler/ogrenilenler/hotbar
+> sifirlanir, yeni sinifin baslangic skili slot 1'e gelir. Can/mana DOLMAZ (yeni maksimuma kirpilir),
+> cooldown'lar SIFIRLANMAZ. Mob vurusu artik `MobAttackDamage + AttackBuff toplami` (Rage +20, Rage II +55).
+> Not: "savas" sadece HASAR ALMAYA bakar (moba vurup hasar almadiysan savasta sayilmazsin).
+> Not: red mesajlari sunucuda basilir - Listen Server istemcisi (2. pencere) "savasta" reddini GORMEZ
+> (sadece "Zaten bu siniftasin" istemcide de cikar).
+
+- [ ] **MEDIUM-6 exploit kapali:** Bir moba dovus, canin ~%30'a dussun → hemen konsola `MMOClass mage` → "Savasta sinif degistirilemez" yazmali, sinif/can/mana DEGISMEMELI.
+- [ ] **Ayni sinif no-op:** Savasci iken (savas disi) `MMOClass warrior` → "Zaten bu siniftasin", hicbir sey degismemeli (hotbar, puanlar, can ayni).
+- [ ] **Savas disi degisim can/mana doldurmuyor:** Hasar al (`MMODamage 50`, koruma bittikten sonra), 5+ sn bekle (regen azicik doldurabilir), `MMOClass mage` → can/mana ANINDA fullenmemeli; sadece yeni maksimuma gore kirpilmali (Savasci→Buyucu'da MaxHP duser).
+- [ ] **Cooldown korunuyor:** Savasci Lv1 `1` (Guclu Vurus) kullan → hemen 5 sn savas-disi olunca degil, CD bitmeden `MMOClass archer` → sonra `MMOClass warrior` (yine 5 sn savas disi) → Guclu Vurus CD'si kaldigi yerden devam etmeli (sifirlanmamali). (Kisa CD'li skilde zor; yapamazsan atla.)
+- [ ] **Oluyken reddediliyor:** Ol (`MMODamage 9999`) → geri sayimda `MMOClass mage` → HICBIR sey olmamali (HP bari dolmamali), canlaninca sinif hala Savasci.
+- [ ] **MEDIUM-5 puan iadesi:** Savasci ile Lv3'e cik (`MMOGainXP 300`), 6 stat puanini STR'ye ver, skill puanlarini Basic agacina yatir → 5 sn savas disi → `MMOClass mage` → C (stat penceresi): statlar Buyucu tabani (STR 6 / DEX 8 / INT 22 / VIT 10), **harcanmamis stat puani 6**; K (skill penceresi): **skill puani 4**, rutbeler 0, hotbar'da sadece Buyucu baslangic skili (Buz Oku) slot 1'de.
+- [ ] **Iade tekrarlanamaz (puan sismesi yok):** Yukaridakinin ardindan hic puan harcamadan `MMOClass warrior` → stat puani yine 6, skill puani yine 4 (artmamali).
+- [ ] **Kayit:** Sinif degistir → `MMOSave` → PIE'yi kapat/ac → sinif, statlar, harcanmamis puanlar ve bos rutbeler korunmali.
+- [ ] **Regresyon - ilk giris:** Yeni karakter (kayit sil) → Play → Savasci tabani + Guclu Vurus slot 1'de, can/mana dolu (PossessedBy kurulumu degismedi).
+- [ ] **MEDIUM-4 Enrage hasari:** Trol'u (ana alan) %40 canin altina indir → OFK ikonu cikmali → ikon ONCESI ve SONRASI sana vurdugu hasar yazisini karsilastir: sonrasi ~20 fazla olmali (Def dusulmeden once +20). Ork Reisi / Kadim Golem ile de dene.
+- [ ] **Denge notu (karar senin):** Rage duz +20 - zayif mobda (Trol) hasari ~2-3 katina, elitte (Magma Tirani 95) ~%20 artiriyor. Oransal istenirse `MMOMob.cpp` vurus satiri tek yerde.
+- 2 pencereli PIE'de `MMODamage` sadece HOST penceresinde calisir (istemcide otorite yok, hicbir sey
+  olmaz) — koruma testini host penceresinde yap.
+
+### Saglam bulunanlar (kod incelemesi)
+- Sonsuz koruma yolu yok: baslatma sadece `HandleRevived` (olum→`Revive`; cagiranlar `bIsDead`
+  kontrol ediyor) ve `PossessedBy` (C++'ta yeniden possess yolu yok); `LoadCharacter/ApplySaveData`
+  `OnRevived` yaymiyor; `SetTimer` ust uste binmiyor, sifirliyor; korumaliyken olunemedigi icin dongu yok.
+- Istemci otoritesi: `bSpawnProtected` sadece `HasAuthority` korumali Start/End'de yaziliyor; mob ve
+  `TakeDamage` sunucu kopyasini okuyor. Istemci `AttackTarget` RPC'ye dallanmadan once korumaya
+  dokunmuyor, sunucu tarafi bitiriyor.
+- Hasar skili sinifi eksiksiz (enum'da 4 hasar + 3 sifa/buff tipi). `ExecuteSkill` korumayi hedef
+  bulunmadan once bitiriyor → hata yonu guvenli (hedefsiz AoE bile korumayi bitirir).
+- Mob: leash/eve donus etkilenmiyor, sonsuz dongu yok; vurus-debuff'i saldiri dalinda oldugu icin
+  korumali oyuncuya uygulanmiyor. HUD etiketi (y 50-72) ust-orta hedef barla (y 8-46) cakismiyor.

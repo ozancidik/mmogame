@@ -443,6 +443,44 @@ bool UMMOStatsComponent::SpendSkillPoints(int32 Cost)
 	return true;
 }
 
+void UMMOStatsComponent::ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 SpentSkillPoints)
+{
+	if (!HasAuthorityInternal())
+	{
+		return;
+	}
+
+	// Iade: puanlarin tek kaynagi HandleLevelUp (seviye basina StatPointsPerLevel /
+	// SkillPointsPerLevel, Lv1'de 0). Stat puaninin toplami seviyeden, skill puaninin
+	// harcanani mastery rutbelerinden gelir; ikisi de "en az seviyeden hesaplanan toplam"
+	// ile alttan sinirlanir (eski skill sisteminden kalan, rutbeye yazilmamis harcamalar icin).
+	const int32 LevelsGained = FMath::Max(0, Level - 1);
+	UnspentStatPoints = FMath::Max(UnspentStatPoints, LevelsGained * StatPointsPerLevel);
+	UnspentSkillPoints = FMath::Max(UnspentSkillPoints + FMath::Max(0, SpentSkillPoints), LevelsGained * SkillPointsPerLevel);
+
+	Strength = NewStrength;
+	Dexterity = NewDexterity;
+	Intelligence = NewIntelligence;
+	Vitality = NewVitality;
+
+	// Doldurma YOK (QA MEDIUM-6: sinif degistirip can/mana fullemek exploit'ti). Delta'li
+	// RecalculateDerivedStats(false) yerine mevcut degeri koruyup yeni maksimuma kirp:
+	// delta yontemi VIT'i dusen sinifa geciste cani 0'a (olmeden) indirebiliyordu.
+	const float OldHealth = Health;
+	const float OldMana = Mana;
+	RecalculateDerivedStats(/*bRefill=*/false);
+	Health = FMath::Clamp(OldHealth, 1.f, MaxHealth);
+	Mana = FMath::Clamp(OldMana, 0.f, MaxMana);
+	OnHealthChanged.Broadcast(Health, MaxHealth);
+	OnManaChanged.Broadcast(Mana, MaxMana);
+}
+
+bool UMMOStatsComponent::IsInCombat() const
+{
+	const UWorld* World = GetWorld();
+	return World && (World->GetTimeSeconds() - LastDamageTime) < CombatDuration;
+}
+
 void UMMOStatsComponent::SetEquipmentBonuses(float AttackBonus, float DefenseBonus)
 {
 	if (!HasAuthorityInternal())

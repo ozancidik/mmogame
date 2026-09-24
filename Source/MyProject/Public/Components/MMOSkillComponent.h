@@ -51,7 +51,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Skill")
 	void SetupForClass(EMMOClass NewClass);
 
-	/** Sinif degistirme istegi: otoritedeyse dogrudan, istemcideyse Server RPC ile. */
+	/**
+	 * Sinif degistirme istegi: otoritedeyse dogrudan, istemcideyse Server RPC ile. Sunucuda
+	 * ChangeClass'a gider (savas disi + farkli sinif sarti, puan iadesi, can/mana/cooldown korunur).
+	 */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Skill")
 	void RequestSetupForClass(EMMOClass NewClass);
 
@@ -111,6 +114,20 @@ protected:
 
 	AMMOCharacter* FindNearestEnemy(float Range) const;
 	void ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef& Def);
+
+	/**
+	 * Oyuncu kaynakli sinif degisimi (sadece otorite; QA MEDIUM-5/6). Ayni sinif = no-op,
+	 * savasta/oluyken reddedilir. Gercek degisimde: harcanan stat/skill puanlari iade edilir,
+	 * ana statlar yeni sinifin baslangic dagilimina, rutbeler/ogrenilenler/hotbar sifirlanir.
+	 * Can/mana doldurulmaz, cooldown'lar sifirlanmaz.
+	 */
+	void ChangeClass(EMMOClass NewClass);
+
+	// Sinifin baslangic ana stat dagilimi (SetupForClass ve ChangeClass ortak).
+	static void GetClassBaseStats(EMMOClass InClass, int32& OutStr, int32& OutDex, int32& OutInt, int32& OutVit);
+
+	// Sinifin en dusuk seviyeli Basic skilini ogretir ve slot 0'a koyar.
+	void GrantStarterSkill();
 
 	/** Mevcut rutbelere gore acilmis olmasi gereken tum skilleri LearnedSkills'e yazar (sadece otorite). */
 	void SyncLearnedFromMastery();

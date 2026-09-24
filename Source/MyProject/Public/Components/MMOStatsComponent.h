@@ -247,6 +247,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Primary")
 	bool SpendSkillPoints(int32 Cost);
 
+	/**
+	 * Sinif degisimi (QA MEDIUM-5/6): ana statlari yeni sinifin baslangic dagilimina ceker,
+	 * level-up'ta kazanilan tum stat puanlarini ve SpentSkillPoints kadar skill puanini iade eder.
+	 * Can/mana DOLDURULMAZ (mevcut deger korunur, sadece yeni maksimuma kirpilir). Sadece otorite.
+	 */
+	void ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 SpentSkillPoints);
+
+	/** Son hasardan bu yana CombatDuration gecmediyse true (sadece otoritede anlamli; LastDamageTime replike degil). */
+	bool IsInCombat() const;
+
+	// Belirli tipteki tum aktif efektlerin Magnitude toplami (turetilmis stat/hiz hesabi, mob vurusu icin).
+	float SumEffectMagnitude(EMMOEffectType InType) const;
+
 	/** Kusanilan ekipmanin toplam bonuslarini ayarlar ve turetilmis statlari tazeler. Sadece otorite. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Vitals")
 	void SetEquipmentBonuses(float AttackBonus, float DefenseBonus);
@@ -299,9 +312,6 @@ protected:
 	// --- Durum efekti isleme (sunucu) ---
 	// Aktif efektleri her tick isler: sureleri azaltir, periyodik hasar/sifa uygular, bitenleri kaldirir.
 	void ProcessEffects(float DeltaTime);
-
-	// Belirli tipteki tum aktif efektlerin Magnitude toplami (turetilmis stat/hiz hesabi icin).
-	float SumEffectMagnitude(EMMOEffectType InType) const;
 
 	// Aktif SpeedBuff efektlerine gore sahibin hareket hizini gunceller (sunucu + istemci).
 	void ApplyMovementSpeedFromEffects();

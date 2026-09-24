@@ -82,17 +82,132 @@ void UMMOSkillComponent::RequestSetupForClass(EMMOClass NewClass)
 {
 	if (HasAuthorityInternal())
 	{
-		SetupForClass(NewClass);
+		ChangeClass(NewClass);
 	}
 	else
 	{
+		// Ayni sinif istemcide de elenebilir (CharacterClass replike); kesin karar sunucuda.
+		if (NewClass == CharacterClass)
+		{
+			if (GEngine && IsLocallyControlledOwner())
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Zaten bu siniftasin"));
+			}
+			return;
+		}
 		ServerSetupForClass(NewClass);
 	}
 }
 
 void UMMOSkillComponent::ServerSetupForClass_Implementation(EMMOClass NewClass)
 {
-	SetupForClass(NewClass);
+	// QA MEDIUM-6: eskiden dogrudan SetupForClass'a gidiyordu — savas ortasinda can/mana
+	// fulleniyor, cooldown'lar sifirlaniyordu. Artik dogrulamali yol.
+	ChangeClass(NewClass);
+}
+
+void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
+{
+	if (!HasAuthorityInternal())
+	{
+		return;
+	}
+
+	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	UMMOStatsComponent* S = Owner ? Owner->GetStats() : nullptr;
+	const bool bLocalFeedback = GEngine && IsLocallyControlledOwner();
+
+	if (NewClass == CharacterClass)
+	{
+		if (bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Zaten bu siniftasin"));
+		}
+		return;
+	}
+	if (!S || S->bIsDead)
+	{
+		return;
+	}
+	if (S->IsInCombat())
+	{
+		if (bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 120, 80),
+				FString::Printf(TEXT("Savasta sinif degistirilemez (%.0f sn hasar almamalisin)"), S->CombatDuration));
+		}
+		return;
+	}
+
+	// QA MEDIUM-5: harcanan skill puani = mastery rutbelerinin toplami (her rutbe 1 puan).
+	int32 SpentSkillPoints = 0;
+	for (const int32 Rank : MasteryRankArray)
+	{
+		SpentSkillPoints += FMath::Max(0, Rank);
+	}
+
+	CharacterClass = NewClass;
+	LearnedSkills.Reset();
+	Hotbar.Init(NAME_None, HotbarSize);
+	MasteryRankArray.Init(0, MasteryTreeCount);
+	// CooldownEndTimes BILEREK korunur (sifirlamak exploit'ti).
+
+	int32 Str, Dex, Int, Vit;
+	GetClassBaseStats(NewClass, Str, Dex, Int, Vit);
+	S->ResetPointsForClassChange(Str, Dex, Int, Vit, SpentSkillPoints);
+
+	GrantStarterSkill();
+
+	if (bLocalFeedback)
+	{
+		const TCHAR* ClassName = TEXT("Savasci");
+		switch (NewClass)
+		{
+		case EMMOClass::Warrior: ClassName = TEXT("Savasci"); break;
+		case EMMOClass::Archer:  ClassName = TEXT("Okcu"); break;
+		case EMMOClass::Mage:    ClassName = TEXT("Buyucu"); break;
+		case EMMOClass::Priest:  ClassName = TEXT("Rahip"); break;
+		}
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(120, 200, 255),
+			FString::Printf(TEXT("Sinif: %s. Puanlar iade edildi (stat %d, skill %d)"),
+				ClassName, S->UnspentStatPoints, S->UnspentSkillPoints));
+	}
+}
+
+void UMMOSkillComponent::GetClassBaseStats(EMMOClass InClass, int32& OutStr, int32& OutDex, int32& OutInt, int32& OutVit)
+{
+	switch (InClass)
+	{
+	case EMMOClass::Archer:  OutStr = 10; OutDex = 20; OutInt = 8;  OutVit = 12; break;
+	case EMMOClass::Mage:    OutStr = 6;  OutDex = 8;  OutInt = 22; OutVit = 10; break;
+	case EMMOClass::Priest:  OutStr = 8;  OutDex = 8;  OutInt = 18; OutVit = 14; break;
+	case EMMOClass::Warrior:
+	default:                 OutStr = 18; OutDex = 10; OutInt = 6;  OutVit = 16; break;
+	}
+}
+
+void UMMOSkillComponent::GrantStarterSkill()
+{
+	// Baslangic skili: sinifin en dusuk seviyeli Basic skilini bedava ver ve slot 0'a koy.
+	const FMMOSkillDef* Starter = nullptr;
+	for (const FMMOSkillDef& D : FMMOSkillDatabase::GetAll())
+	{
+		if (D.RequiredClass == CharacterClass && D.Tree == EMMOSkillTree::Basic)
+		{
+			if (!Starter || D.RequiredLevel < Starter->RequiredLevel)
+			{
+				Starter = &D;
+			}
+		}
+	}
+	if (Starter)
+	{
+		LearnedSkills.AddUnique(Starter->SkillId);
+		if (Hotbar.IsValidIndex(0))
+		{
+			Hotbar[0] = Starter->SkillId;
+		}
+	}
 }
 
 void UMMOSkillComponent::MulticastSkillFX_Implementation(EMMOSkillEffect Effect, FVector Start, FVector End, float Radius, int32 AnimIndex)
@@ -151,33 +266,13 @@ void UMMOSkillComponent::SetupForClass(EMMOClass NewClass)
 	{
 		if (UMMOStatsComponent* S = Owner->GetStats())
 		{
-			switch (NewClass)
-			{
-			case EMMOClass::Warrior: S->InitializePrimaryStats(18, 10, 6, 16); break;
-			case EMMOClass::Archer:  S->InitializePrimaryStats(10, 20, 8, 12); break;
-			case EMMOClass::Mage:    S->InitializePrimaryStats(6, 8, 22, 10);  break;
-			case EMMOClass::Priest:  S->InitializePrimaryStats(8, 8, 18, 14);  break;
-			}
+			int32 Str, Dex, Int, Vit;
+			GetClassBaseStats(NewClass, Str, Dex, Int, Vit);
+			S->InitializePrimaryStats(Str, Dex, Int, Vit);
 		}
 	}
 
-	// Baslangic skili: sinifin en dusuk seviyeli Basic skilini bedava ver ve slot 0'a koy.
-	const FMMOSkillDef* Starter = nullptr;
-	for (const FMMOSkillDef& D : FMMOSkillDatabase::GetAll())
-	{
-		if (D.RequiredClass == NewClass && D.Tree == EMMOSkillTree::Basic)
-		{
-			if (!Starter || D.RequiredLevel < Starter->RequiredLevel)
-			{
-				Starter = &D;
-			}
-		}
-	}
-	if (Starter)
-	{
-		LearnedSkills.Add(Starter->SkillId);
-		Hotbar[0] = Starter->SkillId;
-	}
+	GrantStarterSkill();
 }
 
 bool UMMOSkillComponent::IsLearned(FName SkillId) const

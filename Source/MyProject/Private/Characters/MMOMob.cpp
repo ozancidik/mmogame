@@ -543,7 +543,11 @@ void AMMOMob::Tick(float DeltaSeconds)
 		if (Now - LastMobAttackTime >= MobAttackCooldown)
 		{
 			LastMobAttackTime = Now;
-			UGameplayStatics::ApplyDamage(Player, MobAttackDamage, GetController(), this, nullptr);
+			// QA MEDIUM-4: Enrage (Rage = AttackBuff) sadece AttackPower'a ekleniyordu, mob
+			// vurusu ise sabit MobAttackDamage kullaniyordu -> ofke hasari hic artirmiyordu.
+			const float BuffBonus = Stats ? Stats->SumEffectMagnitude(EMMOEffectType::AttackBuff) : 0.f;
+			const float HitDamage = FMath::Max(1.f, MobAttackDamage + BuffBonus);
+			UGameplayStatics::ApplyDamage(Player, HitDamage, GetController(), this, nullptr);
 
 			// Mob da vururken animasyon oynatsin (oyuncuyla ayni Mannequin animasyon seti).
 			MulticastMeleeFX(Player->GetActorLocation() + FVector(0.f, 0.f, 40.f), FMath::RandRange(0, 2));
