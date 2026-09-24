@@ -55,6 +55,9 @@ void AMMOGameMode::SpawnMobArea()
 	if (Spawner)
 	{
 		Spawner->MaxMobLevel = 5;
+		// QA ilk-10-dk MEDIUM-3: 3 canli mob + 5 esit olasilikli tur = 5 Goblin icin ort. 23 kill,
+		// ilk gorevler cok yavas ilerliyordu. 6 mob kill hizini ikiye katlar.
+		Spawner->MaxMobs = 6;
 		Spawner->SpawnRadius = 350.f;
 		UGameplayStatics::FinishSpawningActor(Spawner, SpawnerTM);
 	}
