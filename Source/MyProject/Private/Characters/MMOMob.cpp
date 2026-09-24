@@ -16,6 +16,8 @@
 #include "NavigationSystem.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
 #include "Engine/Engine.h"
 #include "Animation/AnimInstance.h"
 #include "GameFramework/PlayerState.h"
@@ -95,6 +97,14 @@ void AMMOMob::BeginPlay()
 	{
 		// Spawn noktasini ev olarak kaydet (leash / eve donus icin).
 		HomeLocation = GetActorLocation();
+
+		// Hub (PlayerStart) konumunu bul: guvenli bolge merkezi.
+		for (TActorIterator<APlayerStart> HubIt(GetWorld()); HubIt; ++HubIt)
+		{
+			HubLocation = HubIt->GetActorLocation();
+			bHasHub = true;
+			break;
+		}
 
 		// Arketip sec (belirtilmemisse rastgele) ve uygula.
 		const FMMOMobArchetype* Arch = FMMOMobDatabase::Find(ArchetypeId);
@@ -439,6 +449,12 @@ void AMMOMob::Tick(float DeltaSeconds)
 				continue; // canlanma korumasindaki oyuncuyu hedef alma
 			}
 		}
+		if (bHasHub && HubSafeRadius > 0.f
+			&& FVector::Dist2D(Candidate->GetActorLocation(), HubLocation) < HubSafeRadius)
+		{
+			bSkippedProtected = true;
+			continue; // hub guvenli bolgesindeki oyuncuya saldirma
+		}
 		const float D = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
 		if (D < Dist)
 		{
@@ -457,6 +473,13 @@ void AMMOMob::Tick(float DeltaSeconds)
 		{
 			bForcedActive = FC->GetStats() && !FC->GetStats()->bIsDead && !FC->IsSpawnProtected();
 		}
+	}
+
+	if (bForcedActive && bHasHub && HubSafeRadius > 0.f
+		&& FVector::Dist2D(Forced->GetActorLocation(), HubLocation) < HubSafeRadius)
+	{
+		bForcedActive = false; // guvenli bolgeye siginan oyuncuyu kovalamayi birak
+		bSkippedProtected = true;
 	}
 
 	if (bForcedActive)

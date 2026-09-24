@@ -61,6 +61,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float WanderRadius = 450.f;
 
+	// GUVENLI BOLGE: PlayerStart (hub/dogus + NPC'ler) etrafinda bu yaricap icindeki oyunculara
+	// hicbir mob saldirmaz/hedef almaz (klasik MMO kasaba guvenli alani). Aggro+gezinme menzili
+	// hesaplari hub'a ulasabildigi icin (QA HIGH) yapisal savunma. 0 = kapali.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
+	float HubSafeRadius = 700.f;
+
+	FVector HubLocation = FVector::ZeroVector;
+	bool bHasHub = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float MobAttackCooldown = 1.5f;
 
