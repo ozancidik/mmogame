@@ -60,9 +60,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOPartyComponent* GetPartyComponent() const { return PartyComponent; }
 
-	// Sinif degistirme konsol komutu: "MMOClass warrior|archer|mage|priest".
+	// Sinif degistirme konsol komutu: "MMOClass savasci|okcu|buyucu|rahip"
+	// (Ingilizce warrior|archer|mage|priest de calisir).
 	UFUNCTION(Exec)
 	void MMOClass(const FString& ClassName);
+
+	// Yeni karakter sinif secimi ipucu (HUD paneli). Sunucu kayitsiz (yeni) karakterde set
+	// eder, sinif degisince temizler; KAYDA YAZILMAZ. Sadece sahibine replike.
+	UPROPERTY(Replicated)
+	bool bClassChoicePending = false;
+
+	// Oyuncu MMOClass komutunu bir kez kullandiysa ipucu yerelde gizlenir (replike degil).
+	bool bClassHintDismissed = false;
+
+	bool ShouldShowClassHint() const { return bClassChoicePending && !bClassHintDismissed; }
 
 	// --- Kalicilik (kaydet/yukle) ---
 	UFUNCTION(Exec)

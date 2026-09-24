@@ -192,7 +192,10 @@ namespace
 		// --- PRIEST ---
 		Table.Add(MakeDef(TEXT("Pri_HolyLight"), TEXT("Kutsal Isik"), C::Priest, T::Basic, 1, 1, 1, TEXT(""),
 			E::HealSelf, 15.f, 3.f, 60.f, 0.f, 0.f));
-		Table.Add(MakeDef(TEXT("Pri_Smite"), TEXT("Ceza"), C::Priest, T::Basic, 1, 2, 1, TEXT(""),
+		// QA "ilk 10 dk": Rahip'in Lv1'de hic hasar skili yoktu (baslangic skili sifa) —
+		// Ceza Lv1'e cekildi, GrantStarterSkill Kutsal Isik ile birlikte ikisini de verir.
+		// (Rutbe 1 <= Lv1: mastery kurali korunuyor.)
+		Table.Add(MakeDef(TEXT("Pri_Smite"), TEXT("Ceza"), C::Priest, T::Basic, 1, 1, 1, TEXT(""),
 			E::RangedDamage, 10.f, 2.f, 35.f, 1200.f, 0.f));
 		Table.Add(MakeDef(TEXT("Pri_HolyBurst"), TEXT("Kutsal Patlama"), C::Priest, T::Special0, 1, 4, 1, TEXT("Pri_Smite"),
 			E::AoESelf, 25.f, 8.f, 48.f, 0.f, 320.f));

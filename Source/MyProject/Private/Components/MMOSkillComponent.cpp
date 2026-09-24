@@ -182,19 +182,14 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 
 	GrantStarterSkill();
 
+	// Sinif secildi: yeni karakter ipucu paneli kapanir (replike, sahibine gider).
+	Owner->bClassChoicePending = false;
+
 	if (bLocalFeedback)
 	{
-		const TCHAR* ClassName = TEXT("Savasci");
-		switch (NewClass)
-		{
-		case EMMOClass::Warrior: ClassName = TEXT("Savasci"); break;
-		case EMMOClass::Archer:  ClassName = TEXT("Okcu"); break;
-		case EMMOClass::Mage:    ClassName = TEXT("Buyucu"); break;
-		case EMMOClass::Priest:  ClassName = TEXT("Rahip"); break;
-		}
 		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(120, 200, 255),
 			FString::Printf(TEXT("Sinif: %s. Puanlar iade edildi (stat %d, skill %d)"),
-				ClassName, S->UnspentStatPoints, S->UnspentSkillPoints));
+				*GetMMOClassDisplayName(NewClass), S->UnspentStatPoints, S->UnspentSkillPoints));
 	}
 }
 
@@ -212,24 +207,28 @@ void UMMOSkillComponent::GetClassBaseStats(EMMOClass InClass, int32& OutStr, int
 
 void UMMOSkillComponent::GrantStarterSkill()
 {
-	// Baslangic skili: sinifin en dusuk seviyeli Basic skilini bedava ver ve slot 0'a koy.
-	const FMMOSkillDef* Starter = nullptr;
+	// Baslangic skilleri: sinifin en dusuk seviyeli Basic skil(ler)ini bedava ver ve hotbar'a
+	// sirayla (slot 0, 1, ...) koy. Ayni en-dusuk seviyede birden fazla Basic skil varsa
+	// hepsi verilir (Rahip: Kutsal Isik + Ceza, Lv1'de hem sifa hem hasar skili olsun diye).
+	int32 MinLevel = MAX_int32;
 	for (const FMMOSkillDef& D : FMMOSkillDatabase::GetAll())
 	{
 		if (D.RequiredClass == CharacterClass && D.Tree == EMMOSkillTree::Basic)
 		{
-			if (!Starter || D.RequiredLevel < Starter->RequiredLevel)
-			{
-				Starter = &D;
-			}
+			MinLevel = FMath::Min(MinLevel, D.RequiredLevel);
 		}
 	}
-	if (Starter)
+	int32 Slot = 0;
+	for (const FMMOSkillDef& D : FMMOSkillDatabase::GetAll())
 	{
-		LearnedSkills.AddUnique(Starter->SkillId);
-		if (Hotbar.IsValidIndex(0))
+		if (D.RequiredClass == CharacterClass && D.Tree == EMMOSkillTree::Basic && D.RequiredLevel == MinLevel)
 		{
-			Hotbar[0] = Starter->SkillId;
+			LearnedSkills.AddUnique(D.SkillId);
+			if (Hotbar.IsValidIndex(Slot))
+			{
+				Hotbar[Slot] = D.SkillId;
+			}
+			++Slot;
 		}
 	}
 }

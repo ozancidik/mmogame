@@ -181,6 +181,7 @@ void AMMOCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AMMOCharacter, bSpawnProtected);
+	DOREPLIFETIME_CONDITION(AMMOCharacter, bClassChoicePending, COND_OwnerOnly);
 }
 
 void AMMOCharacter::StartSpawnProtection()
@@ -355,13 +356,12 @@ bool AMMOCharacter::LoadCharacter()
 		// degistirmenin tek yolunun gizli bir konsol komutu oldugunu bilmesinin
 		// hicbir yolu yoktu (icerik-erisilebilirligi eksigi, "PVP acik/kapali" gibi
 		// diger konsol-yonlendirmeli bildirimlerle ayni desen kullanildi).
-		if (GEngine && IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor(120, 200, 255),
-				TEXT("Yeni karaktersin (varsayilan: Savasci). Sinif secmek icin konsola yaz: MMOClass warrior|archer|mage|priest"));
-		}
+		// Eskiden 8 sn'lik bir ekran mesajiydi (kacirilabiliyordu, istemcide hic cikmiyordu);
+		// artik replike bayrakla HUD'da sinif secilene kadar kalici bir ipucu paneli cizilir.
+		bClassChoicePending = true;
 		return false; // yeni karakter
 	}
+	bClassChoicePending = false;
 
 	UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
 	if (!SG || !SG->Data.bValid)
@@ -1221,20 +1221,35 @@ void AMMOCharacter::MMOClass(const FString& ClassName)
 	}
 
 	const FString C = ClassName.ToLower();
+	EMMOClass NewClass = EMMOClass::Warrior;
 	if (C == TEXT("warrior") || C == TEXT("savasci"))
 	{
-		SkillComponent->RequestSetupForClass(EMMOClass::Warrior);
+		NewClass = EMMOClass::Warrior;
 	}
 	else if (C == TEXT("archer") || C == TEXT("okcu"))
 	{
-		SkillComponent->RequestSetupForClass(EMMOClass::Archer);
+		NewClass = EMMOClass::Archer;
 	}
 	else if (C == TEXT("mage") || C == TEXT("buyucu"))
 	{
-		SkillComponent->RequestSetupForClass(EMMOClass::Mage);
+		NewClass = EMMOClass::Mage;
 	}
-	else if (C == TEXT("priest"))
+	else if (C == TEXT("priest") || C == TEXT("rahip"))
 	{
-		SkillComponent->RequestSetupForClass(EMMOClass::Priest);
+		NewClass = EMMOClass::Priest;
 	}
+	else
+	{
+		if (GEngine && IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Silver,
+				TEXT("Gecersiz sinif. Kullanim: MMOClass savasci|okcu|buyucu|rahip"));
+		}
+		return;
+	}
+
+	// Oyuncu sinif komutunu bir kez kullandi: yeni karakter ipucunu gizle (ayni sinifi
+	// secip varsayilani kabul etse bile).
+	bClassHintDismissed = true;
+	SkillComponent->RequestSetupForClass(NewClass);
 }

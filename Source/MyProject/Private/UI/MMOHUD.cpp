@@ -24,20 +24,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerState.h"
 
-// Sinif adini goruntule (Turkce). Skill kitabinda zaten vardi, ana HUD'a da eklendi -
-// oyuncunun hangi sinifta oldugunu skill kitabini acmadan (bug-hunt: HICBIR yerde surekli
-// gorunmuyordu, sadece K basinca) her an gormesi icin tek yerde tanimli.
-static FString GetMMOClassDisplayName(EMMOClass Class)
-{
-	switch (Class)
-	{
-	case EMMOClass::Warrior: return TEXT("Savasci");
-	case EMMOClass::Archer:  return TEXT("Okcu");
-	case EMMOClass::Mage:    return TEXT("Buyucu");
-	case EMMOClass::Priest:  return TEXT("Priest");
-	}
-	return TEXT("?");
-}
+// Sinif adi (Turkce) artik Skills/MMOSkillTypes.h'deki GetMMOClassDisplayName'den gelir —
+// HUD ve sinif degisim mesajlari ayni adi gostersin diye tek yerde tanimli.
 
 void AMMOHUD::DrawStatBar(float X, float Y, float Width, float Height, float Percent, const FLinearColor& FillColor)
 {
@@ -158,6 +146,23 @@ void AMMOHUD::DrawHUD()
 	if (bStatWindowOpen)
 	{
 		DrawStatWindow(MMOChar);
+	}
+
+	// Yeni karakter sinif secimi ipucu: ust-ortada (hedef barinin altinda) kucuk kalici panel.
+	// Sinif degisince (replike bayrak) ya da oyuncu MMOClass'i bir kez kullaninca kaybolur.
+	if (MMOChar->ShouldShowClassHint())
+	{
+		const FString Hint = TEXT("Sinifini sec: konsolda MMOClass savasci|okcu|buyucu|rahip (varsayilan: Savasci)");
+		const float HintScale = 1.1f;
+		float TW = 0.f, TH = 0.f;
+		GetTextSize(Hint, TW, TH, nullptr, HintScale);
+		const float PW = TW + 24.f;
+		const float PH = TH + 14.f;
+		const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
+		const float PY = 84.f;
+		DrawRect(FLinearColor(0.04f, 0.07f, 0.14f, 0.85f), PX, PY, PW, PH);
+		DrawRect(FLinearColor(0.35f, 0.6f, 1.f, 0.95f), PX, PY, PW, 2.f);
+		DrawText(Hint, FLinearColor(0.75f, 0.88f, 1.f), PX + 12.f, PY + 7.f, nullptr, HintScale);
 	}
 
 	// Olum ekrani: karartma + OLDUN + geri sayim.

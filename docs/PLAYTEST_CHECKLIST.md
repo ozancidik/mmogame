@@ -2158,3 +2158,93 @@ surer. Mob korumali oyuncunun dibinde bekler, koruma biter bitmez vurur. Ulasila
   bulunmadan once bitiriyor → hata yonu guvenli (hedefsiz AoE bile korumayi bitirir).
 - Mob: leash/eve donus etkilenmiyor, sonsuz dongu yok; vurus-debuff'i saldiri dalinda oldugu icin
   korumali oyuncuya uygulanmiyor. HUD etiketi (y 50-72) ust-orta hedef barla (y 8-46) cakismiyor.
+
+---
+
+# QA denetimi: fa1630f (sinif degistirme kapisi + puan iadesi + Enrage hasari) (2026-09-24)
+
+> Derleme: zorla yeniden derlendi (degisen 3 .cpp + 2 .h), **0 uyari / 0 hata, Result: Succeeded**.
+> Puan iadesi formulu HandleLevelUp ile tutarli (python ile Lv1/Lv9/Lv40 dogrulandi: iade sonrasi
+> stat = (Lv-1)*3, skill = (Lv-1)*2; degistir-geri dongusu puan SISIRMIYOR; eski (rutbesiz) kayitta da
+> taban dogru). Asagidaki adimlar bu denetimde bulunan ACIK noktalari dogrulamak icin.
+
+- [ ] **[BUG ADAYI - MEDIUM] Sinif degistir + VIT'e puan bas = aninda can doldurma dongusu:**
+      Savasci ile `MMOGainXP 600` (Lv5, 12 stat puani) → 12 kez `MMOStat vit` (MaxHP ~334) →
+      koruma bittikten sonra `MMODamage 250` (HP ~100'e dussun) → 5 sn bekle → `MMOClass archer`
+      (HP ~100 kalmali, dogru) → 12 kez `MMOStat vit` → **HP'ye bak.** Hata varsa HP aninda ~+96
+      artar (~196). Sonra 5 sn bekle → `MMOClass warrior` → 12 kez `MMOStat vit` → HP yine ~+96.
+      Beklenen (duzeltilmis): puan basmak sadece MAKSIMUMU artirmali, anlik cani DOLDURMAMALI
+      (ya da degisim bir sure kilitlenmeli). Regen (6/sn) ile ayni iyilesme ~30+ sn surerdi.
+- [ ] **[BUG ADAYI - MEDIUM] Ayni dongu mana icin:** Buyucu ile manayi bosalt (skill spamla),
+      5 sn hasar alma → `MMOClass priest` → `MMOStat int` x N → mana aninda +5/puan artiyor mu?
+- [ ] **[Bilinen tasarim acigi] Hasar ALMADAN savasta sinif degistirme:** Okcu ile uzak bir moba
+      ok at (mob sana ulasamadan / ya da vurup menzilden kac), mob hala seni kovalarken ve
+      5 sn hasar almadiysan `MMOClass mage` → degisim KABUL EDILIYOR mu? (Kod bunu kabul eder;
+      "savas" sadece son alinan hasara bakiyor.) Kabul edilebilir mi karar ver.
+- [ ] **Yeni karakter sinif secimi - can/mana dolu degil (regresyon adayi, LOW):** Kaydi sil →
+      Play → koruma bitince `MMOClass mage` → mana **60/140** gibi yarim gorunur (eskiden fullenirdi).
+      `MMOClass warrior` (5 sn sonra) → HP **142/190**. Regen birkac sn'de doldurur; Lv1'de hic
+      XP yokken ilk secimde doldurma istenir mi karar ver.
+- [ ] **Buff'lar sinif degisiminde kaliyor:** Savasci iken Ofke (War_BattleShout) bas → OFK ikonu
+      varken 5 sn bekle → `MMOClass mage` → OFK ikonu ve AttackPower bonusu HALA duruyor mu?
+      (Kod temizlemiyor; kasitli mi karar ver.)
+- [ ] **Kayit - MMOSave OLMADAN:** Sinif degistir → hic `MMOSave` yazmadan PIE'yi Stop ile kapat →
+      tekrar Play → yeni sinif, sifir rutbeler, iade edilmis puanlar korunmali (EndPlay kaydi).
+- [ ] **Kayit - eski/rutbesiz kayit:** (Varsa) mastery sisteminden ONCE alinmis bir kayitla gir →
+      K penceresinde rutbeler 0 ama skiller ogrenilmis gorunur → 5 sn savas disi `MMOClass archer`
+      → skill puani tam **(Level-1)*2**, stat puani tam **(Level-1)*3** olmali.
+- [ ] **Lv1'de degisim puan vermiyor:** Yeni karakter (Lv1) → `MMOClass archer` → C: stat puani 0,
+      K: skill puani 0 (iade tabani Lv1'de 0 olmali).
+- [ ] **Priest adi tutarsizligi (kozmetik):** `MMOClass priest` → ekran mesaji "Sinif: **Rahip**",
+      HUD/skill penceresinde "**Priest**" yaziyor. Ayrica `MMOClass rahip` CALISMIYOR (diger
+      siniflarin Turkce takma adi var: savasci/okcu/buyucu).
+- [ ] **2 pencereli PIE (Listen Server) - istemci:** Istemci penceresinde Savasci→Buyucu (dusuk VIT)
+      degisimi yapinca istemci ekraninda kirmizi bir "hasar sayisi" ucuyor mu? (OnRep_Health can
+      dususunu hasar sanar; sadece gorsel.) Red mesajlari istemcide cikmiyor (bilinen, yukarida not).
+- [ ] **Enrage Lv1 riski yok (dogrulama):** Lv1 Buyucu (HP 142, Def 5) Magma Tirani/Cehennem
+      Hayaleti ofkeliyken vurus ~110/~97 → **tek vurusta OLMEMELI** (2 vurus). Zaten bu moblarin
+      bolgesinde Lv1 ile olmak beklenen; tek vurus olursa baska bir carpan var demektir, bildir.
+
+### Saglam bulunanlar (fa1630f kod incelemesi)
+- Puan iadesi: tek kaynak `HandleLevelUp` (3/2 puan/seviye), baska stat/skill puani kaynagi veya
+  rutbe yazan baska yol yok → `max(unspent, (Lv-1)*3)` ve `max(unspent+rutbe, (Lv-1)*2)` cift sayim
+  yapmiyor; dongu ile sisme yok (python: Lv1 0/0, Lv9 24/16, Lv40 117/78).
+- Sunucu otoritesi: `ChangeClass` ve `ResetPointsForClassChange` `HasAuthority` korumali; istemci
+  RPC'ye sadece enum yollayabiliyor, puan/stat degeri yollayamiyor. Ayni-sinif / olu / savasta
+  kapilari sunucuda.
+- Can kirpma: `Clamp(OldHealth, 1, MaxHealth)` (MaxHealth >= 1 garanti) → olu olmayan oyuncu 0'a ya
+  da NaN'a dusmez; mana `Clamp(0, MaxMana)`. Olu oyuncu kapidan once elendigi icin 1'e "diriltme" yok.
+- Mob Rage: su an sadece pozitif AttackBuff'lar var (Rage +20, RageII +55; mob sadece Rage alir),
+  `Max(1, ...)` gelecekteki negatif debuff'a karsi guvenli; Enrage bir kez tetiklenir, yigilmaz.
+- Ilk giris (`PossessedBy → SetupForClass`) davranisi ayni; ortak yardimcilar (`GetClassBaseStats`,
+  `GrantStarterSkill`) statlari/baslangic skilini birebir koruyor. Blueprint'lerde
+  `SetupForClass/RequestSetupForClass` referansi yok (Content taramasi).
+
+---
+
+# Sinif secimi ipucu paneli + Turkce sinif adlari + Rahip Lv1 hasar skili (2026-09-24)
+
+> Derleme temiz. Kapsanan QA "ilk 10 dk" bulgulari: sinif secimi sadece 8 sn'lik mesajdaydi,
+> Rahip Lv1'de hasar skilsizdi, `MMOClass rahip` calismiyordu / HUD'da "Priest" yaziyordu.
+
+- [ ] **Ipucu paneli (yeni karakter):** Kaydi sil → Play → ust-ortada (hedef barinin altinda)
+      "Sinifini sec: konsolda MMOClass savasci|okcu|buyucu|rahip (varsayilan: Savasci)" paneli
+      cikmali ve 8 sn sonra KAYBOLMAMALI. Hedef bari/minimap/pencerelerle cakisiyor mu bak.
+- [ ] **Panel sinif secince kapaniyor:** koruma bitince `MMOClass rahip` → panel hemen kaybolmali,
+      ekran mesaji "Sinif: Rahip", HUD'da "Lv 1  Rahip", K penceresinde "Rahip".
+- [ ] **Varsayilani kabul:** Yeni karakterde `MMOClass savasci` → "Zaten bu siniftasin" + panel
+      kaybolmali (komut bir kez kullanildi).
+- [ ] **Gecersiz ad:** `MMOClass xyz` → "Gecersiz sinif. Kullanim: ..." mesaji, panel KALMALI.
+- [ ] **Kayitli karakter:** Kayitli bir karakterle gir → panel HIC cikmamali.
+- [ ] **Eski adlar:** `MMOClass warrior|archer|mage|priest` hala calisiyor mu (60 sn bekleme arasi).
+- [ ] **Rahip Lv1 skilleri:** Yeni karakter → `MMOClass rahip` → hotbar slot 1 = Kutsal Isik,
+      slot 2 = Ceza; ikisi de Lv1'de kullanilabilir, Ceza bir moba hasar vuruyor mu.
+      K penceresinde Ceza "Lv1 Rutbe1" gorunmeli.
+- [ ] **Diger siniflar degismedi:** `MMOClass savasci/okcu/buyucu` → hotbar'da yine TEK baslangic
+      skili (Guclu Vurus / Cabuk Atis / Buz Oku).
+- [ ] **2 pencereli PIE (istemci):** Istemci penceresinde de panel cikmali (bayrak sadece sahibine
+      replike), istemci `MMOClass okcu` yazinca panel kapanmali. Host'ta istemcinin paneli gorunmez.
+- [ ] **Tasarim notu (karar ver):** Rahip'in Basic agaci artik Lv1'de tamamen bedava geliyor —
+      Basic'e rutbe yatirmak Rahip'e yeni skil acmiyor (Buyucu'da da zaten boyle). Eski (bu
+      degisiklikten once kaydedilmis) Lv1 Rahip kaydinda Ceza ogrenilmis gelmez; Basic'e 1 rutbe
+      yatirinca acilir.

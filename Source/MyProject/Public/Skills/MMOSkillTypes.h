@@ -13,8 +13,21 @@ enum class EMMOClass : uint8
 	Warrior UMETA(DisplayName = "Savasci"),
 	Archer  UMETA(DisplayName = "Okcu"),
 	Mage    UMETA(DisplayName = "Buyucu"),
-	Priest  UMETA(DisplayName = "Priest")
+	Priest  UMETA(DisplayName = "Rahip")
 };
+
+/** Sinifin oyuncuya gosterilen Turkce adi — HUD ve ekran mesajlari tek yerden okur. */
+inline FString GetMMOClassDisplayName(EMMOClass Class)
+{
+	switch (Class)
+	{
+	case EMMOClass::Warrior: return TEXT("Savasci");
+	case EMMOClass::Archer:  return TEXT("Okcu");
+	case EMMOClass::Mage:    return TEXT("Buyucu");
+	case EMMOClass::Priest:  return TEXT("Rahip");
+	}
+	return TEXT("?");
+}
 
 /** Skill agaci mastery kategorisi (KO: BASIC + SPECIAL0..3). */
 UENUM(BlueprintType)
