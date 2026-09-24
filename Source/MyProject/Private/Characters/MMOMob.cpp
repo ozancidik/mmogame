@@ -418,6 +418,7 @@ void AMMOMob::Tick(float DeltaSeconds)
 	// En yakin CANLI oyuncuyu bul (MP: birden fazla oyuncu olabilir).
 	APawn* Player = nullptr;
 	float Dist = TNumericLimits<float>::Max();
+	bool bSkippedProtected = false;
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
 		const APlayerController* PC = It->Get();
@@ -434,6 +435,7 @@ void AMMOMob::Tick(float DeltaSeconds)
 			}
 			if (PChar->IsSpawnProtected())
 			{
+				bSkippedProtected = true;
 				continue; // canlanma korumasindaki oyuncuyu hedef alma
 			}
 		}
@@ -464,6 +466,12 @@ void AMMOMob::Tick(float DeltaSeconds)
 	}
 	else if (!Player || Dist > AggroRange)
 	{
+		// Korumali oyuncu yuzunden hedef birakildiysa eski MoveToActor komutunu durdur
+		// (yoksa mob oyuncunun dibine gelip bekler, koruma bitince hemen vurur).
+		if (bSkippedProtected && AICtrl)
+		{
+			AICtrl->StopMovement();
+		}
 		// Menzilde dusman yok: ev cevresinde rastgele gezin (dunya canli dursun).
 		IdleWander();
 		return;

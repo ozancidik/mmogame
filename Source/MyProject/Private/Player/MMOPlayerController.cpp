@@ -607,7 +607,11 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 	if (TargetEnemy.IsValid())
 	{
 		AMMOCharacter* Enemy = TargetEnemy.Get();
-		if (!Enemy->GetStats() || Enemy->GetStats()->bIsDead)
+		// Oyuncu oldu/canlanma korumasinda ise otomatik saldiri hedefini birak (yoksa canlanir
+		// canlanmaz mob'a yuruyup korumayi kendisi bitirir - olum dongusu geri gelir).
+		const AMMOCharacter* MeChar = Cast<AMMOCharacter>(P);
+		const bool bMeDeadOrProtected = MeChar && ((MeChar->GetStats() && MeChar->GetStats()->bIsDead) || MeChar->IsSpawnProtected());
+		if (!Enemy->GetStats() || Enemy->GetStats()->bIsDead || bMeDeadOrProtected)
 		{
 			TargetEnemy.Reset();
 			StopMovement();
