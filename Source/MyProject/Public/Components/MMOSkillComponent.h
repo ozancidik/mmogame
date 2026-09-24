@@ -156,6 +156,11 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerSetupForClass(EMMOClass NewClass);
 
+	// Sinif degisimleri arasi bekleme (sunucu, saniye) ve son degisim zamani.
+	UPROPERTY(EditDefaultsOnly, Category = "MMO|Skills", meta = (ClampMin = "0"))
+	float ClassChangeCooldownSec = 60.f;
+	float LastClassChangeTime = -1000.f;
+
 	// Skill gorselini TUM makinelerde oynat (sunucu tetikler; her istemci yerel cizer).
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastSkillFX(EMMOSkillEffect Effect, FVector Start, FVector End, float Radius, int32 AnimIndex);

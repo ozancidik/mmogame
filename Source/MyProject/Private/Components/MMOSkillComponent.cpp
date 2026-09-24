@@ -103,6 +103,11 @@ void UMMOSkillComponent::ServerSetupForClass_Implementation(EMMOClass NewClass)
 {
 	// QA MEDIUM-6: eskiden dogrudan SetupForClass'a gidiyordu — savas ortasinda can/mana
 	// fulleniyor, cooldown'lar sifirlaniyordu. Artik dogrulamali yol.
+	// Sahte RPC parametresi (gecersiz enum) reddedilir.
+	if ((uint8)NewClass > (uint8)EMMOClass::Priest)
+	{
+		return;
+	}
 	ChangeClass(NewClass);
 }
 
@@ -129,6 +134,21 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 	{
 		return;
 	}
+	// QA: sinif degistir + iade edilen puanlari VIT/INT'e basip cani/manayi anlik doldurma
+	// dongusunu ve savas-disi hileyi kesmek icin sinif degisimi arasinda bekleme suresi.
+	if (const UWorld* CW = GetWorld())
+	{
+		const float Now = CW->GetTimeSeconds();
+		if (Now - LastClassChangeTime < ClassChangeCooldownSec)
+		{
+			if (bLocalFeedback)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 120, 80),
+					FString::Printf(TEXT("Sinif degisimi icin %.0f sn beklemelisin"), ClassChangeCooldownSec - (Now - LastClassChangeTime)));
+			}
+			return;
+		}
+	}
 	if (S->IsInCombat())
 	{
 		if (bLocalFeedback)
@@ -147,6 +167,10 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 	}
 
 	CharacterClass = NewClass;
+	if (const UWorld* CW2 = GetWorld())
+	{
+		LastClassChangeTime = CW2->GetTimeSeconds();
+	}
 	LearnedSkills.Reset();
 	Hotbar.Init(NAME_None, HotbarSize);
 	MasteryRankArray.Init(0, MasteryTreeCount);
