@@ -2554,3 +2554,11 @@ UE 5.7 `MMOMob.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmad
 - [ ] Host ve uzak istemcide aynı sunucu kararı uygulansın; dolu çanta mesajının istemcide görünürlüğü ayrıca gözlensin.
 
 UE 5.7 `MMOLootPickup.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Yerdeki eşyanın mevcut yaşam süresi dolarsa normal şekilde kaybolur.
+
+## Uzak istemcide ganimet rengi — 2026-09-29
+
+- [ ] İki pencereli PIE'de altın, tüketilebilir ve ekipman ganimeti oluştur: uzak istemci sırasıyla sarı, mavi ve yeşil küre görsün.
+- [ ] Ganimet ortaya çıkışında kısa süreli yanlış renk ve sonradan görselin düzelmesi olup olmadığını gözlemle.
+- [ ] Host görünümü, pickup toplama ve 30 saniyelik yok olma davranışı değişmesin.
+
+UE 5.7 `MMOLootPickup.h/.cpp` UHT dahil yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı.

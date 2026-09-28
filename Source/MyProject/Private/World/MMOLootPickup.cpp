@@ -11,6 +11,7 @@
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Net/UnrealNetwork.h"
 
 AMMOLootPickup::AMMOLootPickup()
 {
@@ -35,6 +36,18 @@ AMMOLootPickup::AMMOLootPickup()
 		Mesh->SetStaticMesh(SphereMesh.Object);
 	}
 	Mesh->SetRelativeScale3D(FVector(0.4f));
+}
+
+void AMMOLootPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AMMOLootPickup, bIsGold);
+	DOREPLIFETIME(AMMOLootPickup, bIsEquipment);
+}
+
+void AMMOLootPickup::OnRep_LootVisual()
+{
+	ApplyVisual();
 }
 
 void AMMOLootPickup::SetupAsGold(int32 Amount)

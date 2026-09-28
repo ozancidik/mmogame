@@ -24,8 +24,9 @@ public:
 	AMMOLootPickup();
 
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Loot")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_LootVisual, Category = "MMO|Loot")
 	bool bIsGold = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Loot")
@@ -42,7 +43,7 @@ public:
 	float LifeSpanSeconds = 30.f;
 
 	// Ekipman lootu (silah/zirh...): toplayinca ekipman cantasina girer.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Loot")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_LootVisual, Category = "MMO|Loot")
 	bool bIsEquipment = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Loot")
@@ -73,6 +74,8 @@ protected:
 
 	// Tur/renge gore gorseli ayarlar (BeginPlay'de cagrilir).
 	void ApplyVisual();
+	UFUNCTION()
+	void OnRep_LootVisual();
 
 	float BobTime = 0.f;
 
