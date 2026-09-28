@@ -61,11 +61,15 @@ Kaynak kod sonuçları `MAX_int32` ile sınırlıyor. `GainExperience`, 80. sevi
 | 1–24 | Mevcut arketipleri, görev zincirini, ekipman kademelerini ve beceri koşullarını koru. Yeni tek seferlik ekipman ödüllerinden önce ödül teslimini düzelt. | Erken oyundaki sınıf dövüşlerini ve görev tamamlanmasını PIE içinde ölç; yalnızca gözleme dayanarak ayarla. |
 | 25–30 | `[IMPLEMENTED, PIE bekliyor]` Üç normal mob, bir elit, `Q_MagmaTyrant` sonrası dört görev, dört Obsidyen ekipman ve Summer_scene'de iki spawner eklendi. | Zemin/navmesh ve ulaşım headless probla ölçüldü; oyuncu ve yaratık davranışı, görev akışı ve denge PIE'de doğrulanmalı. |
 | 31–40 | `[IMPLEMENTED, PIE bekliyor]` Dört normal mob, bir elit, beş görev ve dört Alacakaranlık ekipmanı eklendi. `Q_Level30`/`Q_Level40` paralel kilometre taşları olarak kaldı. | İki spawner alanı headless zemin/navmesh probuyla ölçüldü. 30→31 (59,576 XP) ve 40→41 (225,026 XP) için gerçek öldürme süresi ile boss alanı örtüşmesi PIE'de doğrulanmalı. |
-| 41–50 | Mevcut 45. seviye becerilerini anlamlı kılan üçüncü dövüş ve ekipman kademesini, ayrıca 50. seviye karşılaşmasını ekle. | Sadece vuruş hasarını değil, mana giderinin sürdürülebilirliğini de kontrol et (örneğin birkaç 45. seviye hasar becerisi 195 mana istiyor). |
+| 41–50 | Mevcut 45. seviye becerilerini anlamlı kılan üçüncü dövüş ve ekipman kademesini, ayrıca 50. seviye karşılaşmasını ekle. | `Winter_scene` aday haritasına PlayerStart ve navmesh sınırı ekleyip oyuncu yolu ile mob doğuşlarını doğrula; ardından çok oyunculu bölge geçişini tasarla. Sadece vuruş hasarını değil, mana giderinin sürdürülebilirliğini de kontrol et. |
 | 51–65 | 58 ve 65. seviyeler çevresinde en az iki alt aralıkla devam et; öldürme görevlerini `Q_Level65` ile ilişkilendir. | 50→51 (508,676 XP) ve 65→66 (1,155,776 XP) eşiklerini gerçek görev sıklığı ve oturum süresiyle birlikte modelle. |
 | 66–80 | 70 ve 80. seviye son becerilerinin çevresine karşılaşmalar, son ekipman hedefi ve görev zincirine bir sonuç ekle. | `Q_Level80` tamamlanma ödülü olarak kalabilir; XP kısmına işlev kazandır veya yalnızca seviye tavanındaki davranış tasarlandıktan sonra değiştir. |
 
 Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob hasarı/canı/XP'si, görev ödülleri, düşen eşyaların fiyatları, bekleme süreleri ve karşılaşma süresi; formül ile ölçülen dövüş kayıtlarına göre seçilmeli ve ancak oynanış testinden sonra dengelenmiş sayılmalı. Yeni eşya ve görev kimlikleri kendi kayıtlarında bulunmalı. Yeni öldürme görevlerinin hedefleri, erişilebilir bir spawner'ın gerçekten ürettiği arketiplere karşılık gelmeli. XP, görev ilerlemesi, ganimet ve kuşanma doğrulaması sunucu otoritesinde kalmalı.
+
+### 41–50 harita bağımlılığı
+
+`Winter_scene` projenin içinde ayrı bir `.umap` olarak mevcut. 2026-09-28 tarihli salt okunur headless incelemede harita aktörleri arasında PlayerStart veya NavMeshBoundsVolume görülmedi; merkez çevresindeki 25 zemin örneğinin hiçbirinde navmesh projeksiyonu elde edilemedi. Bu, haritanın görsel olarak hazır olmasının mevcut mob AI'siyle oynanabilir bölge olduğu anlamına gelmediğini gösterir. Önce geçerli oyuncu başlangıcı ve navmesh alanı hazırlanmalı, sonra merkez/halka örnekleri ile PlayerStart'a kısmi olmayan yollar ölçülmeli. Ayrı haritaya oyuncu geçişinin listen server'da tüm oyuncuları mı yoksa yalnız ilgili oyuncuyu mu taşıyacağı ayrıca tasarlanmalı; mevcut kodda buna ilişkin bir geçiş uygulanmış sayılmıyor.
 
 ## Sıradaki üç sınırları belirlenmiş kod dilimi
 
@@ -105,3 +109,4 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 - 2026-09-28: Seviye 25–30 veri tabloları eklendi; oynanabilir bölge yerleşimi arazi/navmesh doğrulamasını bekliyor.
 - 2026-09-28: Seviye 31–40 veri tabloları ve iki ölçülmüş bölge eklendi; UE derlemesi geçti, PIE ve denge ölçümü bekliyor.
 - 2026-09-28: Lv31–39 normal bölgesi, Obsidyen Reisi aggro örtüşmesi nedeniyle `(1000,3200)` konumuna alındı; 64/64 halka ve PlayerStart nav yolu headless doğrulandı.
+- 2026-09-28: `Winter_scene` haritasında 25 zemin örneği ve aktör envanteri salt okunur incelendi; Lv41–50 için PlayerStart/navmesh ve çok oyunculu geçiş bağımlılığı belirlendi.
