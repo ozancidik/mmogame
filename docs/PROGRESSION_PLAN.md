@@ -4,25 +4,25 @@
 
 ## Oyuncu hedefi ve öncelikler
 
-Oyuncu her yeni seviye aralığında ulaşabileceği bir düşman, tamamlayabileceği bir görev ve anlamlı bir ekipman veya beceri kararı görmeli. Kaynak kodunda döngü 30. seviye boss'una kadar genişletildi; bu yeni alanın PIE oynanışı bekliyor. 31–80. seviyelerde uygun düşman ve ekipman zinciri hâlâ eksik. Çalışan erken oyun korunarak döngü, küçük ve ölçülebilir aralıklarla genişletilmeli.
+Oyuncu her yeni seviye aralığında ulaşabileceği bir düşman, tamamlayabileceği bir görev ve anlamlı bir ekipman veya beceri kararı görmeli. Kaynak kodunda döngü 40. seviye boss'una kadar genişletildi; bu alanların PIE oynanışı bekliyor. 41–80. seviyelerde uygun düşman ve ekipman zinciri hâlâ eksik. Çalışan erken oyun korunarak döngü, küçük ve ölçülebilir aralıklarla genişletilmeli.
 
 | Öncelik | Eksik ve oyuncuya etkisi | Kaynak kanıtı |
 | --- | --- | --- |
-| P0 | 31–80. seviyeler için normal mob, elit ve erişilebilir spawner yok. Lv25–30 Obsidyen alanı kodda yerleştirildi; PIE doğrulaması bekliyor. | `Source/MyProject/Private/Characters/MMOMobArchetype.cpp` (en yüksek normal `ObsidianRaider` Lv29, elit `ObsidianWarlord` Lv30); `Source/MyProject/Private/Core/MMOGameMode.cpp` (25–29 normal bandı ve Lv30 elit). |
-| P0 | Ana `KillSpecificMob` zinciri artık `Q_ObsidianWarlord` ile bitiyor. Sonraki seviyelerde yeni dövüş görevi yok. | `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`; `Source/MyProject/Private/Components/MMOQuestComponent.cpp`. |
-| P0 | En yüksek temel ekipman gereksinimi Lv25 (dört Obsidyen parçası). 26–80 arasında yeni ekipman kademesi yok. | `Source/MyProject/Private/Items/MMOItemDatabase.cpp`. |
+| P0 | 41–80. seviyeler için normal mob, elit ve erişilebilir spawner yok. Lv25–40 alanları kodda yerleştirildi; PIE doğrulaması bekliyor. | `Source/MyProject/Private/Characters/MMOMobArchetype.cpp` (en yüksek normal `DuskWraith` Lv39, elit `DuskOverlord` Lv40); `Source/MyProject/Private/Core/MMOGameMode.cpp` (31–39 normal bandı ve Lv40 elit). |
+| P0 | Ana `KillSpecificMob` zinciri artık `Q_DuskOverlord` ile bitiyor. Sonraki seviyelerde yeni dövüş görevi yok. | `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`; `Source/MyProject/Private/Components/MMOQuestComponent.cpp`. |
+| P0 | En yüksek temel ekipman gereksinimi Lv33 (dört Alacakaranlık parçası). 34–80 arasında yeni ekipman kademesi yok. | `Source/MyProject/Private/Items/MMOItemDatabase.cpp`. |
 | P1, kodda düzeltildi | Dolu ekipman çantasında görev ödülü kayboluyordu. `117e5fc` ile teslim öncesi kapasite kontrolü eklendi; görev talep edilebilir kalıyor. PIE doğrulaması bekliyor. | `Source/MyProject/Private/Components/MMOQuestComponent.cpp` (`ClaimReward`). |
 | P1, kodda düzeltildi | Boş seviye aralığı başka seviyeden rastgele mob üretiyordu. `117e5fc` ile spawner doğumu atlıyor ve hata kaydı bırakıyor. PIE doğrulaması bekliyor. | `Source/MyProject/Private/Characters/MMOMobArchetype.cpp`; `Source/MyProject/Private/Core/MMOMobSpawner.cpp`. |
-| P1 | Beceri tanımları 80. seviyeye kadar uzanıyor; fakat 24–80. seviye beceri açılışlarını anlamlı kılacak uygun düşman ve ekipman ilerlemesi yok. | `Source/MyProject/Private/Skills/MMOSkillDatabase.cpp`; `Source/MyProject/Private/Components/MMOSkillComponent.cpp`. |
+| P1 | Beceri tanımları 80. seviyeye kadar uzanıyor; fakat 41–80. seviye beceri açılışlarını anlamlı kılacak uygun düşman ve ekipman ilerlemesi yok. | `Source/MyProject/Private/Skills/MMOSkillDatabase.cpp`; `Source/MyProject/Private/Components/MMOSkillComponent.cpp`. |
 
 ## Mevcut ilerleme envanteri `[IMPLEMENTED]`
 
 | Sistem | Kaynak kodundaki durum |
 | --- | --- |
 | Seviye ve statlar | `Level=1`, `MaxLevel=80`; her seviye 3 stat puanı ve 2 beceri puanı veriyor. Can formülü `50 + Vitality × 8 + Level × 12`; mana formülü `25 + Intelligence × 5 + Level × 5.5`. Ölüm, mevcut birikmiş XP'den en fazla o seviyenin XP eşiğinin %10'u kadar düşürüyor. `GainExperience`, 80. seviyede yeni XP kabul etmiyor ve XP'yi sıfırlıyor. Kaynaklar: `Source/MyProject/Public/Components/MMOStatsComponent.h`, `Source/MyProject/Private/Components/MMOStatsComponent.cpp`. |
-| Moblar ve dünya | 26 arketip var: 19 normal (aralıklar 1–5, 6–7, 8–12, 16–22, 25–29) ve 7 elit (en yükseği Lv30). Obsidyen normal/elit spawner'ları Summer_scene zemin ve navmesh ölçümüyle yerleştirildi; gerçek PIE oynanışı bekliyor. Sunucudaki ölüm akışı, mobun tam XP ödülünü öldüren oyuncuya ve yakındaki uygun her parti üyesine veriyor; bu akışta oyuncu/mob seviye farkına göre ödül ayarı yok. Kaynaklar: `Source/MyProject/Private/Characters/MMOMobArchetype.cpp`, `Source/MyProject/Private/Characters/MMOMob.cpp`, `Source/MyProject/Private/Core/MMOGameMode.cpp`. |
-| Görevler | 40 tanım var. Ana öldürme zinciri `Q_Goblins` ile başlıyor ve `Q_ObsidianWarlord` (Lv30) ile bitiyor. Bağımsız öldürme görevleri ile tek seferlik seviye/altın kilometre taşları zinciri tamamlıyor. Bütün görevler, görev veren NPC'nin yakınında kabul edilmeli ve ödülleri yine orada alınmalı. Kaynaklar: `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`, `Source/MyProject/Private/Components/MMOQuestComponent.cpp`. |
-| Ekipman | Silah, zırh, kask ve bot olmak üzere dört yuvada 29 tanım var; en yüksek gereken seviye 25. Kuşanma için gereken seviye kontrol ediliyor. Normal moblarda varsayılan ekipman düşürme şansı %25; seçim havuzu mob seviyesi + 3'e kadar gereken seviyedeki eşyaları içerebiliyor. Elitlerde ekipman şansı zar başına %50; 1 veya 2 kez zar atılıyor ve uygun en yüksek kademe filtresi kullanılıyor. Yükseltme üst sınırı +8; her +1, temel saldırı/savunmaya %20 ekliyor. Altın maliyeti `50 × (mevcut artı + 1)`. Kaynaklar: `Source/MyProject/Private/Items/MMOItemDatabase.cpp`, `Source/MyProject/Private/Characters/MMOMob.cpp`, `Source/MyProject/Private/Components/MMOInventoryComponent.cpp`. |
+| Moblar ve dünya | 31 arketip var: 23 normal (aralıklar 1–5, 6–7, 8–12, 16–22, 25–29, 31–39) ve 8 elit (en yükseği Lv40). Obsidyen ve Alacakaranlık spawner'ları Summer_scene zemin ve navmesh ölçümüyle yerleştirildi; gerçek PIE oynanışı bekliyor. Sunucudaki ölüm akışı, mobun tam XP ödülünü öldüren oyuncuya ve yakındaki uygun her parti üyesine veriyor; bu akışta oyuncu/mob seviye farkına göre ödül ayarı yok. Kaynaklar: `Source/MyProject/Private/Characters/MMOMobArchetype.cpp`, `Source/MyProject/Private/Characters/MMOMob.cpp`, `Source/MyProject/Private/Core/MMOGameMode.cpp`. |
+| Görevler | 45 tanım var. Ana öldürme zinciri `Q_Goblins` ile başlıyor ve `Q_DuskOverlord` (Lv40) ile bitiyor. Bağımsız öldürme görevleri ile tek seferlik seviye/altın kilometre taşları zinciri tamamlıyor. Bütün görevler, görev veren NPC'nin yakınında kabul edilmeli ve ödülleri yine orada alınmalı. Kaynaklar: `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`, `Source/MyProject/Private/Components/MMOQuestComponent.cpp`. |
+| Ekipman | Silah, zırh, kask ve bot olmak üzere dört yuvada 33 tanım var; en yüksek gereken seviye 33. Kuşanma için gereken seviye kontrol ediliyor. Normal moblarda varsayılan ekipman düşürme şansı %25; seçim havuzu mob seviyesi + 3'e kadar gereken seviyedeki eşyaları içerebiliyor. Elitlerde ekipman şansı zar başına %50; 1 veya 2 kez zar atılıyor ve uygun en yüksek kademe filtresi kullanılıyor. Yükseltme üst sınırı +8; her +1, temel saldırı/savunmaya %20 ekliyor. Altın maliyeti `50 × (mevcut artı + 1)`. Kaynaklar: `Source/MyProject/Private/Items/MMOItemDatabase.cpp`, `Source/MyProject/Private/Characters/MMOMob.cpp`, `Source/MyProject/Private/Components/MMOInventoryComponent.cpp`. |
 | Beceriler | 61 tanım var: Warrior 18, Archer 14, Mage 13, Priest 16. Dört sınıfın da 70 ve 80. seviyelerde `Special3` becerileri var. Öğrenmek için hem gereken seviye hem ustalık rütbesi sağlanmalı; ustalığa yatırılan her rütbe 1 beceri puanına mal oluyor ve o rütbedeki birden fazla beceriyi açabiliyor. Bu akışta veri tablosundaki `SkillPointCost`, beceri başına ayrı bir ücret olarak alınmıyor. Örnekler: Warrior `War_WarCyclone` seviye 45 / güç 510, `War_DoomsdayBlow` seviye 80 / güç 1,725 / mana 400; Priest `Pri_HandOfHeaven` seviye 80 / iyileştirme gücü 1,650 / mana 420. Kaynaklar: `Source/MyProject/Private/Skills/MMOSkillDatabase.cpp`, `Source/MyProject/Private/Components/MMOSkillComponent.cpp`. |
 
 **Erken ödüllerin kullanım zamanı:** `[IMPLEMENTED]` `Q_Boss` 5. seviyede açılıyor ama verdiği `GreatSword` için 6. seviye gerekiyor. `Q_CursedKnights` 9. seviyede açılıyor ama verdiği `MithrilBoots` için 10. seviye gerekiyor. Bunlar bir sonraki seviyeye hazırlık ödülleri; görev arayüzü ödül alınmadan önce kuşanma seviyesini göstermeli. Hemen kullanılabilir diye anlatılmamalılar. Kaynaklar: `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`, `Source/MyProject/Private/Items/MMOItemDatabase.cpp`.
@@ -38,19 +38,19 @@ L > 25:  round(100 × 1.25^24 + 4725 × (L-25) + 591 × (L-25)^2)
 
 Kaynak kod sonuçları `MAX_int32` ile sınırlıyor. `GainExperience`, 80. seviyede daha fazla XP kabul etmiyor; hesaplanan L80→81 değeri oynanabilir bir gereksinim değil. Kaynak: `Source/MyProject/Private/Components/MMOStatsComponent.cpp` (`ComputeExperienceForLevel`, `GainExperience`).
 
-| Mevcut seviye → sonraki | Gereken XP | En yüksek normal mobla (5,900 XP) teorik öldürme sayısı | En yüksek elitle (11,000 XP) teorik öldürme sayısı |
+| Mevcut seviye → sonraki | Gereken XP | En yüksek normal mobla (12,000 XP) teorik öldürme sayısı | En yüksek elitle (19,000 XP) teorik öldürme sayısı |
 | --- | ---: | ---: | ---: |
 | 1 → 2 | 100 | — | — |
-| 24 → 25 | 16,941 | 3 | 2 |
-| 25 → 26 | 21,176 | 4 | 2 |
-| 26 → 27 | 26,492 | 5 | 3 |
-| 30 → 31 | 59,576 | 11 | 6 |
-| 40 → 41 | 225,026 | 39 | 21 |
-| 50 → 51 | 508,676 | 87 | 47 |
-| 65 → 66 | 1,155,776 | 196 | 106 |
-| 79 → 80 | 1,999,682 | 339 | 182 |
+| 24 → 25 | 16,941 | 2 | 1 |
+| 25 → 26 | 21,176 | 2 | 2 |
+| 26 → 27 | 26,492 | 3 | 2 |
+| 30 → 31 | 59,576 | 5 | 4 |
+| 40 → 41 | 225,026 | 19 | 12 |
+| 50 → 51 | 508,676 | 43 | 27 |
+| 65 → 66 | 1,155,776 | 97 | 61 |
+| 79 → 80 | 1,999,682 | 167 | 106 |
 
-Öldürme sayıları `ceil(eşik / mobun tabloda yazan XP'si)` ile hesaplandı; seviye uygunluğu, görev XP'si, ölüm cezası, yol, bekleme süresi ve parti etkileri dahil değil. Bunlar ölçülmüş ilerleme hızı değil, ölçeği gösteren hesaplar. 1→80 arasındaki seviye eşiklerinin toplamı **40,153,013 XP**; yalnızca 25→80 arası **40,068,710 XP**. Görev ödülleri hesaba katılmadığında, 1→80 toplam eşiği için yalnızca `ObsidianWarlord` öldürülen kesintisiz ve gerçekçi olmayan bir senaryoda bile en az **3,651 öldürme** gerekiyor. Asıl eksik, tekrar oynanabilir ve seviyeye uygun içerik. Tek seferlik `Q_Level80` görevinin 90,000 XP ödülü, 79→80 eşiğinin o aşamada alınması halinde **%4.5'i**; oyuncu 80. seviyedeyken ise seviye ilerlemesine katkısı yok. Bu görev şu anda 80'e ulaşma yolu değil, seviye tavanına varış kutlaması ve altın ödülü işlevi görüyor.
+Öldürme sayıları `ceil(eşik / mobun tabloda yazan XP'si)` ile hesaplandı; seviye uygunluğu, görev XP'si, ölüm cezası, yol, bekleme süresi ve parti etkileri dahil değil. Bunlar ölçülmüş ilerleme hızı değil, ölçeği gösteren hesaplar. 1→80 arasındaki seviye eşiklerinin toplamı **40,153,013 XP**; yalnızca 25→80 arası **40,068,710 XP**. Görev ödülleri hesaba katılmadığında, 1→80 toplam eşiği için yalnızca `DuskOverlord` öldürülen kesintisiz ve gerçekçi olmayan bir senaryoda bile en az **2,114 öldürme** gerekiyor. Asıl eksik, tekrar oynanabilir ve seviyeye uygun içerik. Tek seferlik `Q_Level80` görevinin 90,000 XP ödülü, 79→80 eşiğinin o aşamada alınması halinde **%4.5'i**; oyuncu 80. seviyedeyken ise seviye ilerlemesine katkısı yok. Bu görev şu anda 80'e ulaşma yolu değil, seviye tavanına varış kutlaması ve altın ödülü işlevi görüyor.
 
 `[PROPOSED]` Seviyeye uygun mob XP'si ve görevler eklenirken mevcut XP eğrisi korunsun. Yalnızca kaynak koda bakarak 1–25 formülü değiştirilmesin veya yeni bir XP çarpanı belirlenmesin. Her yeni aralık için `seviye başına öldürme = ceil((seviye XP eşiği − o seviyede beklenen tek seferlik görev XP'si) / ortalama mob XP'si)` hesaplanmalı; oynama süresi ayrıca ölçülen öldürme ve yol sürelerinden modellenmeli. `[PLACEHOLDER]` İlk oynanış testi hedefi: ilgili görev etkinken seviye başına 12–25 normal mob öldürme. Her sınıfla bir solo, ayrıca bir parti koşusu yapıldıktan sonra yeniden değerlendirilmeli. Bu aralık uygulanmış bir ilerleme hızı değil, sınanacak bir varsayım.
 
