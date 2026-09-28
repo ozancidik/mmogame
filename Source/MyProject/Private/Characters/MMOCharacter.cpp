@@ -940,6 +940,13 @@ void AMMOCharacter::MMOBuff(const FString& EffectId)
 
 void AMMOCharacter::ServerApplyBuff_Implementation(FName EffectId)
 {
+	// Hata ayiklama komutu: uzak istemci kendi RPC'sini dogrudan cagirip buff alamaz.
+	const AController* C = GetController();
+	if (!C || !C->IsLocalController())
+	{
+		return;
+	}
+
 	if (Stats)
 	{
 		Stats->ApplyEffect(EffectId, this);
@@ -1109,6 +1116,13 @@ void AMMOCharacter::MMONpcTalk()
 
 void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)
 {
+	// Sunucunun yerel oyuncusu disindakiler mob olusturup XP/ganimet uretemez.
+	const AController* C = GetController();
+	if (!C || !C->IsLocalController())
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	if (!World)
 	{
@@ -1322,6 +1336,13 @@ void AMMOCharacter::MMOGiveItem(const FString& ItemId, int32 Count)
 
 void AMMOCharacter::ServerGiveItem_Implementation(FName ItemId, int32 Count)
 {
+	// Debug item komutunu yalnizca host kullanabilir; sayi siniri tek basina yeterli degil.
+	const AController* C = GetController();
+	if (!C || !C->IsLocalController())
+	{
+		return;
+	}
+
 	// GUVENLIK (qa-kontrolcu bulgusu): Count sadece MMOGiveItem'in istemci-tarafi
 	// yolunda clamp'leniyordu (FMath::Max(1,Count)) - bu RPC gövdesi ise ham geleni
 	// dogrudan kullaniyordu. Hileli bir istemci ServerGiveItem'i DOGRUDAN (istemci

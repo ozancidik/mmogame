@@ -2465,3 +2465,11 @@ UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE/iki oyunculu doğrulama henüz y
 - [ ] Bilinmeyen yetenek kimliği ve geçersiz sınıf değeri içeren kayıt yüklenirken oyun çökmüyor.
 
 UE 5.7 `MMOSkillComponent.cpp` yeniden derlendi; PIE ve bozuk kayıt senaryoları henüz uygulanmadı.
+
+## Host debug RPC yetkisi — 2026-09-28
+
+- [ ] Listen server'da host `MMOBuff`, `MMOSpawnMob` ve `MMOGiveItem` komutlarını kullanabiliyor.
+- [ ] Uzak istemci aynı komutları yazınca veya ilgili Server RPC'leri doğrudan gönderince buff, mob ya da eşya oluşmuyor.
+- [ ] Host `MMOPvP` komutunun mevcut yetki davranışı değişmedi.
+
+UE 5.7 `MMOCharacter.cpp` yeniden derlendi; iki oyunculu PIE doğrulaması henüz yapılmadı.
