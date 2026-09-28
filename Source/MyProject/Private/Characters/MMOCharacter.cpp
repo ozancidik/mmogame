@@ -612,6 +612,21 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			return;
 		}
 	}
+	// Ayni oturumdaki iki karakter ayni save dosyasina yazmasin. Windows dosya
+	// adlari buyuk/kucuk harf ayirt etmez; bosluk ve '_' da ayni slotu uretir.
+	const FString CandidateSlot = FString(TEXT("MMOSave_")) + Trimmed.Replace(TEXT(" "), TEXT("_"));
+	if (const UWorld* World = GetWorld())
+	{
+		for (TActorIterator<AMMOCharacter> It(World); It; ++It)
+		{
+			const AMMOCharacter* Other = *It;
+			if (Other != this && Other->IsPlayerControlled()
+				&& Other->GetSaveSlotName().Equals(CandidateSlot, ESearchCase::IgnoreCase))
+			{
+				return;
+			}
+		}
+	}
 	if (APlayerState* PS = GetPlayerState())
 	{
 		PS->SetPlayerName(Trimmed);

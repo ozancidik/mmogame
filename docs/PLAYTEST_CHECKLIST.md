@@ -2511,3 +2511,11 @@ UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE henüz yapılmadı.
 - [ ] Mana ve cooldown sunucu tarafında tek kez uygulanıyor; AoE, kendine iyileştirme ve buff becerileri eski davranışını koruyor.
 
 UE 5.7 `MMOSkillComponent.cpp/.h` yeniden derlendi; çok oyunculu PIE henüz yapılmadı.
+
+## Aynı oturumda kayıt adı çakışması — 2026-09-29
+
+- [ ] İki oyunculu PIE'de bir oyuncu `MMOSetName Ozan Can` kullandıktan sonra diğeri `MMOSetName Ozan_Can` deneyince ikinci ad değişmiyor.
+- [ ] `Ozan` ve `ozan` aynı kayıt yuvasına eşlendiği için ikinci oyuncunun isteği reddediliyor.
+- [ ] Farklı geçerli adlar seçildiğinde her iki oyuncunun otomatik/çıkış kaydı ayrı dosyalarda kalıyor.
+
+UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE henüz yapılmadı. Bu koruma yalnızca aynı anda bağlı oyuncuların ad çakışmasını engeller; çevrimdışı karakter sahipliğini doğrulamak için kalıcı hesap kimliği hâlâ gerekli.
