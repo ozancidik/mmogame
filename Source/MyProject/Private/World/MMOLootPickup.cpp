@@ -148,6 +148,16 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 	{
 		return;
 	}
+	// Canta doluysa AddEquipmentInstance esyayi eklemez. Pickup'i yerde birak ki
+	// oyuncu yer actiktan sonra tekrar toplayabilsin.
+	if (bIsEquipment && Inv->EquipmentBag.Num() >= UMMOInventoryComponent::MaxBagSize)
+	{
+		if (GEngine && Char->IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Canta dolu!"));
+		}
+		return;
+	}
 	bCollected = true;
 	if (Collision)
 	{

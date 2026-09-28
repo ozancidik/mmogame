@@ -2545,3 +2545,12 @@ UE 5.7 `MMOTargeting.cpp`, `MMOCharacter.cpp` ve `MMOSkillComponent.cpp` yeniden
 - [ ] Öldüren oyuncu geçerli ve hayattayken tek oyunculu ödül akışı değişmesin.
 
 UE 5.7 `MMOMob.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı.
+
+## Dolu çantada ekipman ganimeti — 2026-09-29
+
+- [ ] Ekipman çantasını 12 parçaya doldurup yerdeki ekipmana yaklaş: eşya çantaya eklenmesin ve yerde kalmaya devam etsin.
+- [ ] Çantadan bir parça satıp pickup alanından çıkıp yeniden gir: yerdeki eşya yalnızca bir kez alınsın.
+- [ ] Çanta doluyken altın ve istiflenebilir tüketilebilir ganimet normal şekilde alınsın.
+- [ ] Host ve uzak istemcide aynı sunucu kararı uygulansın; dolu çanta mesajının istemcide görünürlüğü ayrıca gözlensin.
+
+UE 5.7 `MMOLootPickup.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Yerdeki eşyanın mevcut yaşam süresi dolarsa normal şekilde kaybolur.
