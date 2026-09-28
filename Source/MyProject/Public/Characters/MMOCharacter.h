@@ -259,6 +259,9 @@ protected:
 
 	// Possess sonrasi guvenli zamanlamada kaydi yukle (tum bilesenler hazir olsun diye timer'la).
 	void AutoLoadDeferred();
+	void RetrySavedLocationRestore();
+	bool TryRestoreSavedLocation(const FVector& SavedLocation, const FRotator& SavedRotation, bool& bNavPending);
+	void MoveToPlayerStart();
 
 	UFUNCTION(Server, Reliable)
 	void ServerSaveCharacter();
@@ -271,6 +274,9 @@ protected:
 
 	FTimerHandle AutoLoadTimerHandle;
 	FTimerHandle AutoSaveTimerHandle;
+	FTimerHandle SavedLocationRetryTimerHandle;
+	FVector PendingSavedLocation = FVector::ZeroVector;
+	FRotator PendingSavedRotation = FRotator::ZeroRotator;
 
 	// Yalniz kayit yoksa veya var olan kayit basariyla okunduysa true olur.
 	// Basarisiz/bozuk yuklemede otomatik, manuel ve EndPlay kaydi mevcut dosyayi

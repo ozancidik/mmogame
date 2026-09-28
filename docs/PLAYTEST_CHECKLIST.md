@@ -2445,3 +2445,14 @@ Kodda konum için zemin eğimi, kapsül yüksekliği ve navmesh projeksiyonu do�
 - [ ] Başarılı yüklemeden sonra manuel MMOLoad ile bozuk dosya denenirse sonraki otomatik/manuel kayıt dosyayı ezmiyor.
 
 UE 5.7 C++ derlemesi başarılı; bozuk dosya senaryoları PIE'de henüz uygulanmadı.
+
+## Kayıt konumu QA sertleştirmesi — 2026-09-28
+
+- [ ] Navmesh yükleme anında geçici olarak hazır değilse eski dosya konumu otomatik kayıtta ezilmiyor; navmesh hazır olunca konum yeniden deneniyor.
+- [ ] Kayıt konumu duvarın içinde veya alçak tavanın altındaysa kapsül çakışması saptanıp PlayerStart'a dönülüyor.
+- [ ] Kaydedilen konumun üstündeki çatı, merkezden aşağı yapılan zemin izini yanlış engellemiyor; normal konum korunuyor.
+- [ ] MMOLoad ile geçersiz konum elle yüklenirse karakter mevcut konumunda kalmak yerine PlayerStart'a dönüyor.
+- [ ] Harita adı olmayan eski kayıt Summer_scene'de güvenli konuma dönebiliyor; başka haritada eski XY uygulanmıyor.
+- [ ] Navmesh hiç oluşmayan haritada kaydetme kapısının beklediği ve mevcut disk dosyasının korunması logdan doğrulanıyor.
+
+UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE/iki oyunculu doğrulama henüz yapılmadı.

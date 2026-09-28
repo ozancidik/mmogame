@@ -250,6 +250,100 @@ void AMMOCharacter::AutoLoadDeferred()
 	LoadCharacter();
 }
 
+void AMMOCharacter::MoveToPlayerStart()
+{
+	if (UWorld* World = GetWorld())
+	{
+		for (TActorIterator<APlayerStart> It(World); It; ++It)
+		{
+			SetActorLocation(It->GetActorLocation(), false, nullptr, ETeleportType::TeleportPhysics);
+			SetActorRotation(It->GetActorRotation());
+			return;
+		}
+	}
+}
+
+bool AMMOCharacter::TryRestoreSavedLocation(const FVector& SavedLocation, const FRotator& SavedRotation, bool& bNavPending)
+{
+	bNavPending = false;
+	if (SavedLocation.ContainsNaN())
+	{
+		return false;
+	}
+	UWorld* World = GetWorld();
+	const UCapsuleComponent* Capsule = GetCapsuleComponent();
+	if (!World || !Capsule)
+	{
+		return false;
+	}
+	const UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (!Nav || !Nav->GetMainNavData())
+	{
+		// Harita yuklenirken navmesh henuz hazir olmayabilir. PlayerStart'a donup
+		// autosave ile eski koordinati ezmek yerine kisa araliklarla yeniden dene.
+		bNavPending = true;
+		return false;
+	}
+
+	FHitResult GroundHit;
+	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(MMOCharacterLoadGround), false, this);
+	// Baslangici kapsul merkezinde tut: ustteki cati/kopru, ayak altindaki
+	// destek zeminden once vurulup gecerli kaydi yanlis reddetmesin.
+	const FVector TraceEnd(SavedLocation.X, SavedLocation.Y, SavedLocation.Z - 500.f);
+	if (!World->LineTraceSingleByChannel(GroundHit, SavedLocation, TraceEnd, ECC_Visibility, TraceParams)
+		|| GroundHit.ImpactNormal.Z < 0.7f
+		|| FMath::Abs((SavedLocation.Z - GroundHit.ImpactPoint.Z) - Capsule->GetScaledCapsuleHalfHeight()) > 120.f)
+	{
+		return false;
+	}
+	FNavLocation NavLocation;
+	if (!Nav->ProjectPointToNavigation(GroundHit.ImpactPoint + FVector(0.f, 0.f, 20.f),
+			NavLocation, FVector(75.f, 75.f, 80.f))
+		|| FVector::Dist2D(NavLocation.Location, GroundHit.ImpactPoint) > 75.f
+		|| FMath::Abs(NavLocation.Location.Z - GroundHit.ImpactPoint.Z) > 35.f)
+	{
+		return false;
+	}
+	const FVector Target = NavLocation.Location + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 2.f);
+	const FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(
+		Capsule->GetScaledCapsuleRadius(), Capsule->GetScaledCapsuleHalfHeight());
+	if (World->OverlapBlockingTestByChannel(Target, FQuat::Identity, ECC_Pawn, CapsuleShape, TraceParams))
+	{
+		return false;
+	}
+	SetActorLocation(Target, false, nullptr, ETeleportType::TeleportPhysics);
+	if (!SavedRotation.ContainsNaN())
+	{
+		SetActorRotation(SavedRotation);
+	}
+	return true;
+}
+
+void AMMOCharacter::RetrySavedLocationRestore()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bool bNavPending = false;
+	if (TryRestoreSavedLocation(PendingSavedLocation, PendingSavedRotation, bNavPending))
+	{
+		bInitialLoadComplete = true;
+	}
+	else if (bNavPending)
+	{
+		GetWorldTimerManager().SetTimer(SavedLocationRetryTimerHandle, this,
+			&AMMOCharacter::RetrySavedLocationRestore, 1.f, false);
+		return;
+	}
+	else
+	{
+		MoveToPlayerStart();
+		bInitialLoadComplete = true;
+	}
+	GetWorldTimerManager().ClearTimer(SavedLocationRetryTimerHandle);
+}
+
 void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	// Oyundan cikis/level bitiminde otomatik kaydet (otorite + oyuncu).
@@ -346,6 +440,7 @@ bool AMMOCharacter::LoadCharacter()
 	// Manuel MMOLoad ve otomatik yukleme ayni guvenlik kapisindan gecer. Onceki bir
 	// yukleme basarili olsa bile simdiki dosya okunamazsa autosave onu ezmesin.
 	bInitialLoadComplete = false;
+	GetWorldTimerManager().ClearTimer(SavedLocationRetryTimerHandle);
 
 	const FString Slot = GetSaveSlotName();
 	if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))
@@ -393,43 +488,26 @@ bool AMMOCharacter::LoadCharacter()
 	// Eski/bozuk kayit koordinati harita disinda, boslukta veya navmesh disinda olabilir.
 	// Boyle bir konuma isiklanmak oyuncuyu kalici olarak kilitler. Ilk dogus konumu
 	// guvenli geri donus noktasidir; yeni kayitlarda harita adi da eslesmelidir.
-	bool bRestoreLocation = !D.Location.ContainsNaN()
-		&& (D.MapName.IsEmpty() || D.MapName == UGameplayStatics::GetCurrentLevelName(this, true));
-	FVector RestoredLocation = D.Location;
-	if (bRestoreLocation)
+	bool bNavPending = false;
+	const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(this, true);
+	// Harita adi olmayan eski kaydin hangi map'e ait oldugu bilinmiyor. Konumunu
+	// yalniz mevcut ana harita Summer_scene'de dene; baska map'te ayni XY'yi kullanma.
+	const bool bMatchingMap = D.MapName.IsEmpty()
+		? CurrentMap == TEXT("Summer_scene") : D.MapName == CurrentMap;
+	const bool bRestored = bMatchingMap && TryRestoreSavedLocation(D.Location, D.Rotation, bNavPending);
+	if (!bRestored && bNavPending)
 	{
-		UWorld* World = GetWorld();
-		const UNavigationSystemV1* Nav = World ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
-		const UCapsuleComponent* Capsule = GetCapsuleComponent();
-		FHitResult GroundHit;
-		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(MMOCharacterLoadGround), false, this);
-		const FVector TraceStart(D.Location.X, D.Location.Y, D.Location.Z + 200.f);
-		const FVector TraceEnd(D.Location.X, D.Location.Y, D.Location.Z - 500.f);
-		FNavLocation NavLocation;
-		bRestoreLocation = World && Nav && Nav->GetMainNavData() && Capsule
-			&& World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams)
-			&& GroundHit.ImpactNormal.Z >= 0.7f
-			&& FMath::Abs((D.Location.Z - GroundHit.ImpactPoint.Z) - Capsule->GetScaledCapsuleHalfHeight()) <= 120.f
-			&& Nav->ProjectPointToNavigation(GroundHit.ImpactPoint + FVector(0.f, 0.f, 20.f),
-				NavLocation, FVector(75.f, 75.f, 80.f))
-			&& FVector::Dist2D(NavLocation.Location, GroundHit.ImpactPoint) <= 75.f
-			&& FMath::Abs(NavLocation.Location.Z - GroundHit.ImpactPoint.Z) <= 35.f;
-		if (bRestoreLocation)
-		{
-			RestoredLocation = NavLocation.Location + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 2.f);
-		}
+		PendingSavedLocation = D.Location;
+		PendingSavedRotation = D.Rotation;
+		GetWorldTimerManager().SetTimer(SavedLocationRetryTimerHandle, this,
+			&AMMOCharacter::RetrySavedLocationRestore, 1.f, false);
+		UE_LOG(LogTemp, Warning, TEXT("Character navigation data unavailable; saved location restore deferred"));
+		return true;
 	}
-	if (bRestoreLocation)
+	if (!bRestored)
 	{
-		SetActorLocation(RestoredLocation, false, nullptr, ETeleportType::TeleportPhysics);
-		if (!D.Rotation.ContainsNaN())
-		{
-			SetActorRotation(D.Rotation);
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Saved character position rejected for map %s; keeping PlayerStart"),
+		MoveToPlayerStart();
+		UE_LOG(LogTemp, Warning, TEXT("Saved character position rejected for map %s; moved to PlayerStart"),
 			*UGameplayStatics::GetCurrentLevelName(this, true));
 	}
 	bInitialLoadComplete = true;
