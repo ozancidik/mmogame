@@ -89,7 +89,7 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 
 ### 3. Dövüş ilerlemesini 40. seviyeye kadar sürdür (P0 içerik)
 
-**Güncel durum:** Dört Lv31–39 normal arketip, bir Lv40 elit, dört Lv33 ekipman ve `Q_ObsidianWarlord` sonrasında beş görevlik zincir kaynak koduna eklendi; UE 5.7 derlemesi başarılı. `Summer_scene` üzerinde normal alan `(-4100,-1400)`, elit alan `(-3200,1800)` için zemin/navmesh halkaları ve PlayerStart'a tam nav yolları headless probla ölçüldü. Her doğum denemesinde sunucu tarafındaki zemin/navmesh doğrulaması etkin. Normal alan ile eski Obsidyen boss merkezi yaklaşık 1404 birim uzaklıkta; gezinme ve aggro sırasında karşılaşmaların örtüşüp örtüşmediği PIE'de gözlenmeli. Oynanış dengesi henüz doğrulanmadı.
+**Güncel durum:** Dört Lv31–39 normal arketip, bir Lv40 elit, dört Lv33 ekipman ve `Q_ObsidianWarlord` sonrasında beş görevlik zincir kaynak koduna eklendi; UE 5.7 derlemesi başarılı. `Summer_scene` üzerinde normal alan `(1000,3200)`, elit alan `(-3200,1800)` için zemin/navmesh halkaları ve PlayerStart'a tam nav yolları headless probla ölçüldü. Her doğum denemesinde sunucu tarafındaki zemin/navmesh doğrulaması etkin. İlk normal alan `(-4100,-1400)` Obsidyen Reisi'nin aggro menziline girdiği için yaklaşık 5936 birim uzaktaki yeni merkeze taşındı. Oynanış dengesi ve gerçek doğum davranışı henüz PIE'de doğrulanmadı.
 
 - **Oyuncu kararı/deneyimi:** 31–40. seviyeler, mevcut 40. seviye kilometre taşından önce yeni dövüş tehditleri ve ekipman kararları sunar.
 - **Girdi → çıktı:** 31, 33, 36 ve 39. seviyelerde dört normal arketip ile bir 40. seviye elit eklendi. `Q_ObsidianWarlord` ön koşullu sıralı öldürme zinciri, Lv33 dört yuvalı ekipman ve zemin/navmesh doğrulamalı iki spawner eklendi. `Q_Level30`/`Q_Level40` paralel, tek seferlik başarı ödülleri olarak kaldı.
@@ -104,3 +104,4 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 - 2026-09-28: İlk kod dilimindeki iki hata `117e5fc` ile giderildi ve derlendi; oynanış doğrulaması bekliyor.
 - 2026-09-28: Seviye 25–30 veri tabloları eklendi; oynanabilir bölge yerleşimi arazi/navmesh doğrulamasını bekliyor.
 - 2026-09-28: Seviye 31–40 veri tabloları ve iki ölçülmüş bölge eklendi; UE derlemesi geçti, PIE ve denge ölçümü bekliyor.
+- 2026-09-28: Lv31–39 normal bölgesi, Obsidyen Reisi aggro örtüşmesi nedeniyle `(1000,3200)` konumuna alındı; 64/64 halka ve PlayerStart nav yolu headless doğrulandı.

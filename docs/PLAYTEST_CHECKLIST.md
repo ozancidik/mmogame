@@ -2402,8 +2402,8 @@ Kod derlemesi başarılı (`MMOHUD.cpp` yeniden derlendi); PIE henüz yapılmad�
 ## Alacakaranlık bölgesi Lv31–40 — 2026-09-28
 
 - [ ] Obsidyen Reisi görevi tamamlanınca beş yeni öldürme görevi sırayla açılıyor; hedef ID'leri ve öldürme kredisi tutuyor.
-- [ ] Summer_scene'de (-4100,-1400) çevresinde Lv31/33/36/39 normal moblar, (-3200,1800) çevresinde Lv40 elit zeminde ve navmesh üzerinde doğuyor; oyuncu her iki alana ulaşabiliyor.
-- [ ] Yeni normal alanın eski Obsidyen boss alanına yaklaşık 1404u yakınlığında gezinme ve aggro örtüşmesi oyuncuya beklenmedik çift karşılaşma yaratmıyor.
+- [ ] Summer_scene'de (1000,3200) çevresinde Lv31/33/36/39 normal moblar, (-3200,1800) çevresinde Lv40 elit zeminde ve navmesh üzerinde doğuyor; oyuncu her iki alana ulaşabiliyor.
+- [ ] Yeni normal alanın Obsidyen Reisi alanından yaklaşık 5936u uzaklığı oyun içinde korunuyor; eski (-4100,-1400) konumunda Lv31–39 mob doğmuyor.
 - [ ] Lv33 Alacakaranlık setinin dört parçası gereken seviyede kuşanılıyor; eski Lv29/30 düşüş havuzuna girmiyor ve Lv40 elitin ganimet havuzunda bulunuyor.
 - [ ] Savaş, zehir/yavaşlatma/öfke, görev ödülleri, altın ve XP akışı solo ile iki oyunculu PIE'de inceleniyor. Sayısal denge henüz onaylanmadı.
 

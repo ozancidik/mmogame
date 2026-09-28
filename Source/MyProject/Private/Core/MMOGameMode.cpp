@@ -232,9 +232,12 @@ void AMMOGameMode::SpawnMobArea()
 			UGameplayStatics::FinishSpawningActor(ObsidianBossSpawner, ObsidianBossTM);
 		}
 
-		// Headless Summer_scene probu: iki 250u halkada 32/32 duz, PlayerStart'a bagli nav noktasi.
-		// (-4100,-1400) zemin Z~-2.73; (-3200,1800) zemin Z~-33.2. Dogrulama her spawn'da tekrar calisir.
-		const FVector DuskLoc(-4100.f, -1400.f, 50.f);
+		// Headless Summer_scene probu: (1000,3200) 225/250u halkalarinin 64/64 noktasi
+		// zeminde ve bagli navmesh'te; PlayerStart'a tam yol var. Zemin Z~188,
+		// taban Z=238. Onceki (-4100,-1400) merkezi Obsidyen Reisi'nin 1200u aggro
+		// alaniyla cakisiyordu. Elit (-3200,1800) alaninin zemin Z~-33.2.
+		// Dogrulama her spawn'da tekrar calisir.
+		const FVector DuskLoc(1000.f, 3200.f, 238.f);
 		const FTransform DuskTM(FRotator::ZeroRotator, DuskLoc);
 		if (AMMOMobSpawner* DuskSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), DuskTM))
 		{
