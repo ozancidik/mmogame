@@ -2492,3 +2492,12 @@ UE 5.7 `MMOCharacter.cpp/.h` yeniden derlendi; çok oyunculu PIE henüz yapılma
 - [ ] Önceki geçerli adlarla oluşturulmuş kayıtlar aynı yuva adıyla okunuyor.
 
 UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE ve kayıt uyumu doğrulaması henüz yapılmadı. Bu biçim denetimi oyuncu kimlik doğrulaması sağlamaz: iki kişinin aynı geçerli adı seçip aynı kayda erişmesi için hesap kimliği tabanlı ayrı bir tasarım gerekir.
+
+## Yakın dövüş mesafesi ve gerçek hasar — 2026-09-29
+
+- [ ] Aynı zemindeki normal yakın dövüş menzili çalışıyor; menzil dışındaki hedef vurulamıyor.
+- [ ] Yatayda yakın fakat farklı katta/yükseklikte bulunan seçili hedefe yakın dövüş hasarı gitmiyor.
+- [ ] Savunmalı mobda ekrandaki `VURDUN` değeri gerçek azalan HP ile tutarlı; ham saldırı gücünü göstermiyor.
+- [ ] Canlanma korumasındaki oyuncuya saldırıldığında gerçek hasar 0 gösteriliyor.
+
+UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE henüz yapılmadı.

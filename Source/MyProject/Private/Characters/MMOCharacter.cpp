@@ -850,7 +850,7 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	}
 
 	// Menzil dogrulama (anti-cheat: istemci yalan soylemesin).
-	if (FVector::Dist2D(GetActorLocation(), Victim->GetActorLocation()) > MeleeRange * 1.3f)
+	if (FVector::Dist(GetActorLocation(), Victim->GetActorLocation()) > MeleeRange * 1.3f)
 	{
 		return;
 	}
@@ -877,7 +877,7 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 		SetActorRotation(Dir.Rotation());
 	}
 
-	UGameplayStatics::ApplyDamage(Victim, Stats->AttackPower, GetController(), this, nullptr);
+	const float ActualDamage = UGameplayStatics::ApplyDamage(Victim, Stats->AttackPower, GetController(), this, nullptr);
 	// Vurus animasyonu varyasyonunu sunucuda sec ki tum makineler ayni hareketi gorsun.
 	MulticastMeleeFX(Victim->GetActorLocation() + FVector(0.f, 0.f, 40.f), FMath::RandRange(0, 2));
 
@@ -886,7 +886,7 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 		const bool bKilled = Victim->GetStats()->bIsDead;
 		GEngine->AddOnScreenDebugMessage(-1, 1.5f, bKilled ? FColor::Red : FColor::Yellow,
 			FString::Printf(TEXT("VURDUN: %.0f hasar | hedef HP %.0f/%.0f%s"),
-				Stats->AttackPower,
+				ActualDamage,
 				Victim->GetStats()->Health, Victim->GetStats()->MaxHealth,
 				bKilled ? TEXT("  >>> OLDU!") : TEXT("")));
 	}
