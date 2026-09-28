@@ -282,6 +282,8 @@ protected:
 	// Basarisiz/bozuk yuklemede otomatik, manuel ve EndPlay kaydi mevcut dosyayi
 	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
+	float LastRemoteManualSaveTime = -100.f;
+	static constexpr float RemoteManualSaveCooldown = 10.f;
 
 	// --- Server RPC'ler (istemci istegi -> sunucu uygular) ---
 	UFUNCTION(Server, Reliable)

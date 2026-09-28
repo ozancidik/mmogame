@@ -545,11 +545,27 @@ void AMMOCharacter::MMOLoad()
 
 void AMMOCharacter::ServerSaveCharacter_Implementation()
 {
+	// Reliable RPC spam'i sunucuyu surekli diske yazmaya zorlamasin.
+	const UWorld* World = GetWorld();
+	if (!bInitialLoadComplete || !World
+		|| World->GetTimeSeconds() - LastRemoteManualSaveTime < RemoteManualSaveCooldown)
+	{
+		return;
+	}
+	LastRemoteManualSaveTime = World->GetTimeSeconds();
 	SaveCharacter();
 }
 
 void AMMOCharacter::ServerLoadCharacter_Implementation()
 {
+	// Manuel yukleme debug islemidir. Uzak oyuncu eski disk durumuna donerek
+	// tuketim, olum cezasi veya gorev sonuclarini geri alamaz.
+	const AController* C = GetController();
+	if (!C || !C->IsLocalController())
+	{
+		return;
+	}
+
 	LoadCharacter();
 }
 

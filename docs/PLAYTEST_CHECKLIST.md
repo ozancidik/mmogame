@@ -2473,3 +2473,13 @@ UE 5.7 `MMOSkillComponent.cpp` yeniden derlendi; PIE ve bozuk kayıt senaryolar�
 - [ ] Host `MMOPvP` komutunun mevcut yetki davranışı değişmedi.
 
 UE 5.7 `MMOCharacter.cpp` yeniden derlendi; iki oyunculu PIE doğrulaması henüz yapılmadı.
+
+## Manuel kayıt/yükleme RPC sınırları — 2026-09-29
+
+- [ ] Host `MMOLoad` ile kendi karakterini elle geri yükleyebiliyor; otomatik giriş yüklemesi çalışıyor.
+- [ ] Uzak istemci `MMOLoad` ya da `ServerLoadCharacter` gönderince eski XP, eşya ve görev durumu geri gelmiyor.
+- [ ] Uzak istemci `MMOSave` ile kaydedebiliyor; 10 saniyeden sık Reliable kayıt istekleri diske tekrar tekrar yazmıyor.
+- [ ] İlk otomatik yükleme tamamlanmadan gönderilen erken kayıt isteği, yükleme sonrasındaki ilk geçerli isteği 10 saniyeliğine kilitlemiyor.
+- [ ] Otomatik 60 saniyelik ve çıkıştaki kayıtlar manuel RPC sınırından etkilenmiyor.
+
+UE 5.7 `MMOCharacter.cpp/.h` yeniden derlendi; çok oyunculu PIE henüz yapılmadı. Oyuncu adı dosya adı olarak kullanıldığı için kalıcı hesap kimliği olmayan misafirlerin ad çakışması ayrıca çözülmeli.
