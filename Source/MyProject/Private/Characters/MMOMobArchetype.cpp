@@ -148,6 +148,23 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.35f;
 
+		// --- Besinci bolge NORMAL moblari (Lv25-29; harita dogrulanana kadar spawner YOK) ---
+		// Obsidyen Avcisi: hizli ve zehirli; onceki bandin en guclu normalinden kademeli artis.
+		Table.Add(MakeMob(TEXT("ObsidianStalker"), TEXT("Obsidyen Avcisi"), 25, 63, 60, 88.f, 4400, 600, 1400, 440.f, 600.f, 1.2f, FLinearColor(0.22f, 0.16f, 0.28f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		// Obsidyen Muhafizi: yavas/dayanikli tank; vurusta yavaslatir.
+		Table.Add(MakeMob(TEXT("ObsidianSentinel"), TEXT("Obsidyen Muhafizi"), 27, 68, 76, 94.f, 5100, 800, 1700, 250.f, 600.f, 1.5f, FLinearColor(0.28f, 0.3f, 0.38f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		// Obsidyen Akincisi: Warrok ork gorseli, dengeli vurucu; dusuk canda ofkelenir.
+		Table.Add(MakeMob(TEXT("ObsidianRaider"), TEXT("Obsidyen Akincisi"), 29, 73, 70, 100.f, 5900, 950, 1900, 365.f, 600.f, 1.3f, FLinearColor(0.32f, 0.18f, 0.22f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -232,6 +249,20 @@ namespace
 		// olarak isaretlemisti — her yeni elit ayni oranla baslar. Bkz. SpiderQueen yorumu.
 		// Elit loot havuzu "RequiredLevel <= MobLevel && >= MaxReq-2" oldugu icin bu elit
 		// Adamantin tier'ini (Lv16) dusurur; Mithril (Lv10) havuza girmez (MaxReq=16).
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
+
+		// Obsidyen Reisi (Lv30): besinci bolge sonu; Warrok gorseli ve mevcut Slow/Rage efektleri.
+		Table.Add(MakeMob(TEXT("ObsidianWarlord"), TEXT("Obsidyen Reisi"), 30, 84, 100, 114.f, 11000, 1600, 3200, 290.f, 1200.f, 1.9f, FLinearColor(0.25f, 0.12f, 0.3f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		// Iki bagimsiz %50 zar; Lv25 Obsidyen seti elitin ust-tier loot havuzudur.
 		Table.Last().EliteEquipDropChance = 0.5f;
 		Table.Last().EliteEquipDropCount = 2;
 		Table.Last().EliteMinItemPlus = 3;

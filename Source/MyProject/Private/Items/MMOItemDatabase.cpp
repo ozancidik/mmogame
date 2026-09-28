@@ -42,6 +42,8 @@ namespace
 		// Elit loot havuzu "RequiredLevel <= MobLevel && >= MaxReq-2" oldugu icin mevcut Lv5-13
 		// elitleri bu tier'i DUSURMEZ (onlarin MaxReq'i hala <=10); sadece Magma Tirani (Lv24) dusurur.
 		Table.Add(MakeItem(TEXT("AdamantineBlade"), TEXT("Adamantin Kilic"), S::Weapon, 62.f, 0.f, 16));
+		// Obsidyen tier (Lv25): Adamantin +1 civarinda; mevcut +2..+8 yatirimini gecersiz kilmaz.
+		Table.Add(MakeItem(TEXT("ObsidianBlade"), TEXT("Obsidyen Kilic"), S::Weapon, 76.f, 0.f, 25));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -50,6 +52,7 @@ namespace
 		Table.Add(MakeItem(TEXT("DragonPlate"), TEXT("Ejder Zirh"), S::Armor, 0.f, 21.f, 7));
 		Table.Add(MakeItem(TEXT("MithrilPlate"), TEXT("Mithril Zirh"), S::Armor, 0.f, 28.f, 10));
 		Table.Add(MakeItem(TEXT("AdamantinePlate"), TEXT("Adamantin Zirh"), S::Armor, 0.f, 38.f, 16));
+		Table.Add(MakeItem(TEXT("ObsidianPlate"), TEXT("Obsidyen Zirh"), S::Armor, 0.f, 46.f, 25));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -58,6 +61,7 @@ namespace
 		Table.Add(MakeItem(TEXT("DragonHelm"), TEXT("Ejder Kask"), S::Helmet, 0.f, 9.f, 7));
 		Table.Add(MakeItem(TEXT("MithrilHelm"), TEXT("Mithril Kask"), S::Helmet, 0.f, 12.f, 10));
 		Table.Add(MakeItem(TEXT("AdamantineHelm"), TEXT("Adamantin Kask"), S::Helmet, 0.f, 16.f, 16));
+		Table.Add(MakeItem(TEXT("ObsidianHelm"), TEXT("Obsidyen Kask"), S::Helmet, 0.f, 19.f, 25));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
@@ -66,6 +70,7 @@ namespace
 		Table.Add(MakeItem(TEXT("DragonBoots"), TEXT("Ejder Bot"), S::Boots, 0.f, 12.f, 7));
 		Table.Add(MakeItem(TEXT("MithrilBoots"), TEXT("Mithril Bot"), S::Boots, 0.f, 16.f, 10));
 		Table.Add(MakeItem(TEXT("AdamantineBoots"), TEXT("Adamantin Bot"), S::Boots, 0.f, 22.f, 16));
+		Table.Add(MakeItem(TEXT("ObsidianBoots"), TEXT("Obsidyen Bot"), S::Boots, 0.f, 26.f, 25));
 
 		return Table;
 	}

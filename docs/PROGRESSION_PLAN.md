@@ -79,6 +79,8 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 
 ### 2. Oynanabilir bir 25–30. seviye aralığı sun (P0 içerik)
 
+**Güncel durum:** Üç normal arketip (Lv25/27/29), bir Lv30 elit, dört Obsidyen eşya ve dört görevlik zincir kaynak koduna eklendi; derleme başarılı. Spawner henüz etkin değil. `Summer_scene` üzerinde arazi teması ve bağlantılı navmesh doğrulaması tamamlanınca bu dilimin dünya yerleşimi yapılacak.
+
 - **Oyuncu kararı/deneyimi:** `Q_MagmaTyrant` sonrasında oyuncu yeni bir hedef seçebilir ve ana göreve devam ederken kullanışlı dört yuvalı bir seti yükseltebilir.
 - **Girdi → çıktı:** 25–29 arasında gerçek seviyeleri bulunan `[PLACEHOLDER]` 2–3 normal arketip ve bir 30. seviye elit ekle. `Q_MagmaTyrant` tamamlanmasını ön koşul yapan kısa ve sıralı bir `KillSpecificMob` zinciri ekle. Bu aralıkta gereken seviyesi açıkça tanımlı silah/zırh/kask/bot ekle. 25–30 normal spawner'ı ve zorunlu elit spawner'ını yalnızca zemin/navmesh doğrulanmış konumlara yerleştir. Görev ekipman ödülleri verildikleri anda kayıtlı olmalı ve doğru seviye koşuluyla kuşanılmalı.
 - **Dosya kapsamı:** `Source/MyProject/Private/Characters/MMOMobArchetype.cpp`, `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`, `Source/MyProject/Private/Items/MMOItemDatabase.cpp`, `Source/MyProject/Private/Core/MMOGameMode.cpp`. `MMOMob.cpp` dosyasına yalnızca ölçülmüş ganimet veya XP davranışı gerektirirse dokun.
@@ -98,3 +100,4 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 - 2026-09-28: Kaynak koda dayalı ilk plan.
 - 2026-09-28: Plan proje sahibi için Türkçeye çevrildi. `[PLACEHOLDER]` işaretli sayısal hedefler henüz oynanışta sınanmadı.
 - 2026-09-28: İlk kod dilimindeki iki hata `117e5fc` ile giderildi ve derlendi; oynanış doğrulaması bekliyor.
+- 2026-09-28: Seviye 25–30 veri tabloları eklendi; oynanabilir bölge yerleşimi arazi/navmesh doğrulamasını bekliyor.

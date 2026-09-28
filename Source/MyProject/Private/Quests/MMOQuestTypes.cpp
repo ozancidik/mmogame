@@ -106,6 +106,23 @@ namespace
 			T::KillSpecificMob, TEXT("MagmaTyrant"), 1, 12000, 8000, 24, TEXT("Q_InfernalWraiths")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineBlade"));
 
+		// --- Besinci bolge zinciri (Lv25-30): Q_MagmaTyrant'tan sonra, spawner harita probunu bekler ---
+		Table.Add(MakeQuest(TEXT("Q_ObsidianStalkers"), TEXT("Obsidyen Avcilari"), TEXT("Obsidyen avcilarini durdur: 5 Obsidyen Avcisi oldur."),
+			T::KillSpecificMob, TEXT("ObsidianStalker"), 5, 9000, 9000, 25, TEXT("Q_MagmaTyrant")));
+		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_ObsidianSentinels"), TEXT("Obsidyen Muhafizlari"), TEXT("Gecidi koruyan muhafizlari devir: 5 Obsidyen Muhafizi oldur."),
+			T::KillSpecificMob, TEXT("ObsidianSentinel"), 5, 11000, 11000, 27, TEXT("Q_ObsidianStalkers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_ObsidianRaiders"), TEXT("Obsidyen Akincilari"), TEXT("Obsidyen akincilarini dagit: 5 Obsidyen Akincisi oldur."),
+			T::KillSpecificMob, TEXT("ObsidianRaider"), 5, 13000, 13000, 29, TEXT("Q_ObsidianSentinels")));
+		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianPlate"));
+
+		Table.Add(MakeQuest(TEXT("Q_ObsidianWarlord"), TEXT("Obsidyen Reisi"), TEXT("Obsidyen ordusunun reisini devir: Obsidyen Reisi'ni oldur."),
+			T::KillSpecificMob, TEXT("ObsidianWarlord"), 1, 17000, 18000, 30, TEXT("Q_ObsidianRaiders")));
+		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));

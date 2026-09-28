@@ -2325,3 +2325,12 @@ surer. Mob korumali oyuncunun dibinde bekler, koruma biter bitmez vurur. Ulasila
 - [ ] Mob zehrini hub disinda alip 700 birimlik guvenli alana gir: alandaki periyodik mob hasari durmali. Guvenli alan disinda zehir hasari normal surmeli; oyuncunun moba attigi zehir etkilenmemeli.
 - [ ] Ekipman cantasini 12/12 doldurup ekipman odullu gorevi teslim et: XP/altin/ekipman verilmemeli, gorev teslim edilebilir kalmali ve neden oyuncuya gorunmeli. Bir yer bosaltip yeniden teslim edince odul tek kez verilmeli.
 - [ ] Bos bir seviye bandi (ornegin 25..30) ayarlanmis test spawner'i yarat: Goblin gibi baska seviyeden mob dogmamali, logda band hatasi bir kez gorunmeli. Mevcut dolu band spawner'lari normal calismali.
+
+## Seviye 25–30 Obsidyen veri kademesi (2026-09-28)
+
+Bu kademe derlendi, fakat harita konumu ve navmesh dogrulanmadigi icin spawner henuz etkin degil.
+
+- [ ] Gercek oyun haritasi `Summer_scene` uzerinde yeni bolgenin merkez ve 400 birim yaricapindaki arazi temasini, engelleri ve navmesh baglantisini kontrol et.
+- [ ] Bolge etkinlestirildikten sonra ObsidianStalker Lv25, ObsidianSentinel Lv27, ObsidianRaider Lv29 ve ObsidianWarlord Lv30'un dogdugunu dogrula; hub'a saldirmamalilar.
+- [ ] Q_MagmaTyrant sonrasi dort Obsidyen gorevinin sirayla acildigini, hedef ID'lerinin kill credit aldigini ve ekipman odullerinin canta doluysa kaybolmadigini kontrol et.
+- [ ] Obsidyen setinin dort parcasini Lv25'te giy; elitin iki bagimsiz %50 loot zarini ve +3..+5 sinirlarini PIE'de gozle.
