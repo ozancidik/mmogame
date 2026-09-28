@@ -71,6 +71,8 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 
 `Winter_scene` projenin içinde ayrı bir `.umap` olarak mevcut. 2026-09-28 tarihli salt okunur headless incelemede harita aktörleri arasında PlayerStart veya NavMeshBoundsVolume görülmedi; merkez çevresindeki 25 zemin örneğinin hiçbirinde navmesh projeksiyonu elde edilemedi. Bu, haritanın görsel olarak hazır olmasının mevcut mob AI'siyle oynanabilir bölge olduğu anlamına gelmediğini gösterir. Önce geçerli oyuncu başlangıcı ve navmesh alanı hazırlanmalı, sonra merkez/halka örnekleri ile PlayerStart'a kısmi olmayan yollar ölçülmeli. Ayrı haritaya oyuncu geçişinin listen server'da tüm oyuncuları mı yoksa yalnız ilgili oyuncuyu mu taşıyacağı ayrıca tasarlanmalı; mevcut kodda buna ilişkin bir geçiş uygulanmış sayılmıyor.
 
+2026-09-29 çapraz incelemesinde 25/25 noktada zemin izi bulunduğu, fakat 0/25 noktada navmesh projeksiyonu olduğu teyit edildi. `(0,-1500)` civarı (zemin Z≈0) PlayerStart/hub, `(-3000,-1500)` ve `(3000,-1500)` civarı ise uzak savaş alanı için yalnızca **aday** konumlardır; halka, çarpışma ve tam nav yolu ölçülmeden spawner etkinleştirilmemeli. `MMOGameMode::SpawnMobArea` Winter_scene'de şimdilik içerik üretmez: mevcut Lv1–22 Summer_scene yerleşimi yeni PlayerStart eklendiğinde Winter'a taşınmamalı. Sıradaki harita dilimi: PlayerStart + NavMeshBounds yerleştir, bağlı navmesh'i ve hub/NPC ayak noktalarını ölç, Lv41–50 arketipleri ve ayrı Winter yerleşimini ekle, son olarak bölge geçişini tasarla. Bu adımların hiçbiri tamamlanmış sayılmıyor.
+
 ## Sıradaki üç sınırları belirlenmiş kod dilimi
 
 ### 1. Tek seferlik ödül ve spawner aralığı hatalarını görünür kıl (kod tamamlandı; PIE bekliyor)

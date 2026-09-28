@@ -2570,3 +2570,11 @@ UE 5.7 `MMOLootPickup.h/.cpp` UHT dahil yeniden derlendi (`Result: Succeeded`); 
 - [ ] Winter_scene için PlayerStart ve gezinme ağı eklendikten sonra o haritanın ayrı içerik yerleşimi ayrıca doğrulansın.
 
 UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Bu kontrol Winter_scene'i oynanabilir hâle getirmez; yalnızca geçersiz orijin yerleşimini önler.
+
+## Winter_scene'e Summer_scene moblarının taşınmaması — 2026-09-29
+
+- [ ] Winter_scene'de PlayerStart yokken `SpawnMobArea skipped: ... no PlayerStart` günlüğü görünsün.
+- [ ] Winter_scene'e PlayerStart eklense bile Lv1–22 spawner'ları ve Summer hub NPC'leri doğmasın; `gameplay layout is not configured` uyarısı görünsün.
+- [ ] Summer_scene'de mevcut tüm spawner ve hub NPC yerleşimi sürsün.
+
+UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Winter_scene için PlayerStart/navmesh ve ayrı Lv41+ yerleşimi hâlâ gereklidir.

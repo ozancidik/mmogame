@@ -50,6 +50,13 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Error, TEXT("[MMODBG] SpawnMobArea skipped: map %s has no PlayerStart"), *World->GetMapName());
 		return;
 	}
+	// Winter_scene icin ayri Lv41+ yerlesim/navmesh henuz hazir degil. Bu haritaya
+	// PlayerStart eklense bile Summer_scene'in Lv1-22 moblarini ve hub NPC'lerini tasima.
+	if (World->GetMapName().Contains(TEXT("Winter_scene")))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODBG] SpawnMobArea skipped: Winter_scene gameplay layout is not configured"));
+		return;
+	}
 
 	// Ana mob alani: NPC hub'inin (Kael +400u) belirgin disinda kalsin diye 1.5x mesafede
 	// ve dar yaricapla (350) — moblar meydanda/NPC'lerin arasinda degil, disarida cikar.
