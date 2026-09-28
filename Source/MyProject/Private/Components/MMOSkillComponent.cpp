@@ -557,7 +557,8 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
 	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	UWorld* World = GetWorld();
-	if (!Def || !Owner || !World || !Owner->GetStats() || Owner->GetStats()->bIsDead || !IsLearned(SkillId))
+	if (!Def || !Owner || !World || !Owner->GetStats() || Owner->GetStats()->bIsDead || !IsLearned(SkillId)
+		|| Def->RequiredClass != CharacterClass || Owner->GetStats()->Level < Def->RequiredLevel)
 	{
 		return false;
 	}
@@ -693,7 +694,8 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		return;
 	}
 
-	CharacterClass = In.CharacterClass;
+	CharacterClass = static_cast<uint8>(In.CharacterClass) <= static_cast<uint8>(EMMOClass::Priest)
+		? In.CharacterClass : EMMOClass::Warrior;
 	LearnedSkills = In.LearnedSkills;
 	Hotbar = In.Hotbar;
 	if (Hotbar.Num() != HotbarSize)
@@ -712,6 +714,20 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	const AMMOCharacter* OwnerCharacter = Cast<AMMOCharacter>(GetOwner());
 	const UMMOStatsComponent* Stats = OwnerCharacter ? OwnerCharacter->GetStats() : nullptr;
 	const int32 SavedLevel = FMath::Clamp(In.Level, 1, Stats ? Stats->MaxLevel : 80);
+	// Eski kayitlarin gecerli skillerini, mastery rutbesi sifir olsa da koru.
+	// Ancak baska sinifa ait, bilinmeyen veya henuz seviyesi acilmamis skilleri yukleme.
+	LearnedSkills.RemoveAll([this, SavedLevel](const FName& SkillId)
+	{
+		const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
+		return !Def || Def->RequiredClass != CharacterClass || Def->RequiredLevel > SavedLevel;
+	});
+	for (FName& SlotSkillId : Hotbar)
+	{
+		if (!SlotSkillId.IsNone() && !LearnedSkills.Contains(SlotSkillId))
+		{
+			SlotSkillId = NAME_None;
+		}
+	}
 	for (int32& Rank : MasteryRankArray)
 	{
 		Rank = FMath::Clamp(Rank, 0, SavedLevel);

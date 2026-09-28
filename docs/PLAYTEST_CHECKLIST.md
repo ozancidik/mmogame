@@ -2456,3 +2456,12 @@ UE 5.7 C++ derlemesi başarılı; bozuk dosya senaryoları PIE'de henüz uygulan
 - [ ] Navmesh hiç oluşmayan haritada kaydetme kapısının beklediği ve mevcut disk dosyasının korunması logdan doğrulanıyor.
 
 UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE/iki oyunculu doğrulama henüz yapılmadı.
+
+## Yetenek sınıf/seviye kapısı ve kayıt temizliği — 2026-09-28
+
+- [ ] Savaşçı, Okçu, Büyücü ve Rahip kendi öğrendikleri yetenekleri gereken seviyede kullanabiliyor.
+- [ ] Eski kayıtta mastery rütbesi sıfır olsa da aynı sınıfa ait, seviyeye uygun öğrenilmiş yetenekler korunuyor.
+- [ ] Bozuk kayda başka sınıfın veya daha yüksek seviyenin yeteneği ve hotbar girişi yazılırsa yüklemede temizleniyor; sunucu RPC ile de yeteneği kullandırmıyor.
+- [ ] Bilinmeyen yetenek kimliği ve geçersiz sınıf değeri içeren kayıt yüklenirken oyun çökmüyor.
+
+UE 5.7 `MMOSkillComponent.cpp` yeniden derlendi; PIE ve bozuk kayıt senaryoları henüz uygulanmadı.
