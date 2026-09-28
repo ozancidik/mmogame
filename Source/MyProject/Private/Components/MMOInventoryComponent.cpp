@@ -72,7 +72,8 @@ void UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
 	{
 		if (Stack.ItemId == ItemId)
 		{
-			Stack.Count += Count;
+			Stack.Count = static_cast<int32>(FMath::Min<int64>(
+				static_cast<int64>(FMath::Max(0, Stack.Count)) + Count, MAX_int32));
 			OnInventoryChanged.Broadcast();
 			return;
 		}
@@ -126,12 +127,12 @@ int32 UMMOInventoryComponent::GetItemCount(FName ItemId) const
 
 int32 UMMOInventoryComponent::GetTotalItemCount() const
 {
-	int32 Total = 0;
+	int64 Total = 0;
 	for (const FMMOItemStack& Stack : Items)
 	{
-		Total += Stack.Count;
+		Total += FMath::Max(0, Stack.Count);
 	}
-	return Total;
+	return static_cast<int32>(FMath::Min<int64>(Total, MAX_int32));
 }
 
 void UMMOInventoryComponent::OnRep_Gold()
@@ -306,7 +307,7 @@ void UMMOInventoryComponent::TryUpgrade(int32 BagIndex)
 
 	FMMOEquipmentInstance& Inst = EquipmentBag[BagIndex];
 	const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
-	if (!Def || Inst.Plus >= FMMOItemDatabase::MaxPlus)
+	if (!Def || Inst.Plus < 0 || Inst.Plus >= FMMOItemDatabase::MaxPlus)
 	{
 		return;
 	}
@@ -592,15 +593,27 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		return;
 	}
 
-	Gold = In.Gold;
+	Gold = FMath::Max(0, In.Gold);
 	Items = In.Items;
+	Items.RemoveAll([](const FMMOItemStack& Stack)
+	{
+		return Stack.ItemId.IsNone() || Stack.Count <= 0;
+	});
 	EquipmentBag = In.EquipmentBag;
+	for (FMMOEquipmentInstance& Inst : EquipmentBag)
+	{
+		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+	}
 	NextInstanceId = FMath::Max(1, In.NextInstanceId);
 
 	// Kusanilan dizi her zaman MAX (4) slot olmali. Kayittaki dizi daha uzunsa (bozuk/
 	// eski-surum kayit), fazla girdileri sessizce ATMA — gecerliyse cantaya geri koy
 	// (aksi halde SetNum onlari kirpip kalici item kaybina yol acardi).
 	EquippedItems = In.EquippedItems;
+	for (FMMOEquipmentInstance& Inst : EquippedItems)
+	{
+		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+	}
 	const int32 MaxSlots = (int32)EMMOEquipSlot::MAX;
 	for (int32 i = MaxSlots; i < EquippedItems.Num(); ++i)
 	{

@@ -68,7 +68,7 @@ struct FMMOEquipmentInstance
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "MMO|Item")
 	FName ItemId;
 
-	// Upgrade seviyesi: +0 .. +9.
+	// Upgrade seviyesi: +0 .. +8.
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "MMO|Item")
 	int32 Plus = 0;
 

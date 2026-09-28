@@ -1376,35 +1376,24 @@ debug komutuyla dogrulanabilir.**
 - [ ] **Parti XP kontrolu:** 2 oyuncuyla parti kur, menzilde dur, 1 mob oldur -> **ikisi de TAM XP** mi
       aldi? Aldilarsa bolunmeme ONAYLANDI (notu yukaridaki tabloyla birlikte degerlendir).
 
-## MEDIUM - FIXED (commit e57a472, QuestTextScale) - Gorev paneli 13+ satirda yaziyi kutunun disina tasiriyor (panel tasmiyor, YAZI tasiyor)
+## MEDIUM - Gorev panelinde 13+ satir metin yerlesimi (2026-09-28 kod duzeltmesi; PIE bekliyor)
 
-`MMOHUD.cpp:1793-1801`. Panel yuksekligi adaptif oldugu icin satirlar **panelin disina cikmiyor**
-(bu kisim saglam), ama satir yuksekligi kuculunce iki metin satiri birbirine giriyor:
+`DrawQuestWindow` icin `RowSpace=360px`, `RowH=min(46, 360/ToplamSatir)` ve `CellH=RowH-4`.
+ToplamSatir = alinabilir + aktif gorev sayisi. 13 satirda `RowH` yaklasik 27.7px.
+Onceki `QuestTextScale` yaziyi kucultuyordu, ancak ikinci metnin Y konumu olculen ilk metin
+yuksekligine bagli degildi. Font/olcek degisiminde iki yazi cakisabilir veya odul yazisi hucre
+altina gecebilirdi. Yeni yerlesim her iki metnin gercek yuksekligini `GetTextSize` ile olcuyor,
+gerekirse ikisini birlikte kucultuyor ve ikinci metni ilk metnin altina, hucre icinde koyuyor.
+Gorev tiklama bolgelerinin boyutlari degismedi. MMOHUD.cpp yeniden derlendi ve UE 5.7
+`Result: Succeeded` verdi; bu degisiklik icin PIE calistirilmadi.
 
-- `RowSpace = 466 - 12 - 44 - 50 = 360px`, `RowH = min(46, 360 / ToplamSatir)`, `CellH = RowH - 4`
-- 1. satir `RowY+3`'te (olcek 0.78, ~12.5px), 2. satir `RowY + min(24, RowH*0.5)`'te (olcek 0.64, ~10px)
-- 2. satirin kutu icinde kalmasi icin `RowH*0.5 + 10 <= RowH - 4`, yani **`RowH >= 28`**
-- `RowH >= 28` sarti **ToplamSatir <= 12** demek. **13. satirda** 2. satir (odul yazisi) kutunun
-  alt kenarini asiyor ve 1. satirla cakismaya basliyor.
-
-"ToplamSatir" = o an **alinabilir** gorev sayisi + **aktif** gorev sayisi. Gorev tanimi 20'den
-**25**'e cikti (5f92908), yani bu esige yaklastik. Lv16+ bir oyuncuda ayni anda alinabilir olan
-on-kosulsuz/zinciri acilmis gorevler + kabul edilmis ama teslim edilmemis gorevler 12-14 bandina
-rahatca girebilir. **Su an tetiklenip tetiklenmedigi PIE'de DOGRULANMALI** - hesap esige cok yakin
-oldugunu gosteriyor ama gercek sayiyi oyun akisi belirliyor.
-
-Tiklama bolgeleri (`QuestAcceptRegions` / `QuestClaimRegions`) `CellH` ile hesaplandigi icin
-**tiklama dogru kalir**; sorun sadece okunabilirlik. Duzeltme yonu: dukkan panelindeki gibi
-olcegi satirla orantili kucultmek ya da 2 sutuna bolmek.
-
-- [ ] **Satir sayisini say:** Lv16+ bir karakterle gorevliye git, `J` (gorev penceresi) ac ->
-      "Alinabilir" + "Aktif" bolumlerindeki **toplam satiri say**. **13 veya uzeriyse** bulgu tetikleniyor.
-- [ ] **Gozle dogrula:** Toplam 13+ satirda odul yazisi ("Odul: ... XP, ... altin") kendi koyu
-      kutusunun **disina tasiyor** mu / gorev adiyla **ust uste biniyor** mu?
-- [ ] **Tiklama hala dogru mu (onemli):** En alttaki TAMAM olmus goreve tikla -> **tam o gorevin**
-      odulu gelmeli. Yanlis gorev teslim oluyorsa bulgu HIGH'a cikar.
-- [ ] **Esigi zorla:** Alinabilir tum gorevleri kabul et (hicbirini teslim etme) -> satir sayisi
-      maksimuma ciksin, ayni kontrolu tekrarla.
+- [ ] **13+ satir okunurlugu:** Lv16+ karakterle `J` gorev penceresini ac; alinabilir ve aktif
+      gorevlerin toplaminda 13+ satira ulas. Gorev adi, aciklama/odul ve komsu satirlar birbirine
+      girmemeli; yazilar koyu hucrelerin disina tasmamali.
+- [ ] **Yuksek satir sayisi:** Alinabilir gorevleri kabul edip teslim etmeden biriktir; en sikisik
+      gorunumde ilk ve son satiri, iki bolum basligini ve panelin alt kenarini kontrol et.
+- [ ] **Tiklama:** En alttaki tamamlanmis gorevi tikla; tam o gorevin odulu alinmali. Alinabilir
+      bir gorevi de tiklayip dogru gorevin aktif listeye tasindigini kontrol et.
 
 ## LOW - "Altin biriktir" gorevleri aslinda "su an cebinde X altin olsun" demek; altin harcayinca geri bozuluyor
 
@@ -2331,7 +2320,7 @@ surer. Mob korumali oyuncunun dibinde bekler, koruma biter bitmez vurur. Ulasila
 Bu kademe derlendi. Summer_scene uzerinde read-only headless zemin/navmesh probundan sonra
 normal ve elit spawner'lari etkinlestirildi; PIE oynanis dogrulamasi henuz yapilmadi.
 
-- [ ] Gercek oyun haritasi `Summer_scene` uzerinde yeni bolgenin merkez ve 400 birim yaricapindaki arazi temasini, engelleri ve navmesh baglantisini kontrol et.
+- [ ] Gercek oyun haritasi `Summer_scene` uzerinde yeni normal bolgenin 225 ve elit bolgenin 150 birim yaricapindaki arazi temasini, engelleri ve navmesh baglantisini PIE'de kontrol et.
 - [ ] ObsidianStalker Lv25, ObsidianSentinel Lv27, ObsidianRaider Lv29 ve ObsidianWarlord Lv30'un dogdugunu dogrula; hub'a saldirmamalilar.
 - [ ] Q_MagmaTyrant sonrasi dort Obsidyen gorevinin sirayla acildigini, hedef ID'lerinin kill credit aldigini ve ekipman odullerinin canta doluysa kaybolmadigini kontrol et.
 - [ ] Obsidyen setinin dort parcasini Lv25'te giy; elitin iki bagimsiz %50 loot zarini ve +3..+5 sinirlarini PIE'de gozle.
@@ -2345,3 +2334,15 @@ normal ve elit spawner'lari etkinlestirildi; PIE oynanis dogrulamasi henuz yapil
 - [ ] Hasar almis Lv40 karakterde sinif degistirip iade edilen puanlari VIT'e bas: maksimum can artsin, mevcut can ayni kalsin.
 - [ ] Mana harcadiktan sonra INT'e puan yatir: maksimum mana artsin, mevcut mana ayni kalsin.
 - [ ] Yeni maksimum mevcut can/manadan kucukse degerler yalnizca yeni maksimuma kirpilsin; negatif deger olmasin.
+
+## XP ve envanter sinir degeri sertlestirmesi (2026-09-28)
+
+Buyuk bir XP odulu artik `int64` ara bakiyede seviye esiklerine dagitiliyor. Esya yiginlari
+ve toplam sayi `MAX_int32`'de doyuma ulasiyor; kayittan gelen negatif altin, gecersiz
+yigin sayisi ve +0..+8 disi ekipman arti seviyesi temizleniyor. Negatif arti seviyeli
+ekipmanin yukseltilmesi sunucuda ayrica reddediliyor. Degisen C++ dosyalari UE 5.7'de
+yeniden derlendi; PIE ve eski-kayit davranisi henuz oynanarak dogrulanmadi.
+
+- [ ] Buyuk XP odulunde (ornegin MAX_int32'ye yakin) XP negatif olmasin; seviye 80'de dursun.
+- [ ] Bir esya yigini `MAX_int32` sinirina yaklastiginda ekleme onu negatif yapmasin; toplam esya sayisi da negatif olmasin.
+- [ ] Negatif altin veya arti seviyesi iceren eski/bozuk kaydi yukle: altin en az 0, ekipman arti seviyesi +0..+8 olmali; yukselterek bedava altin kazanilamamali.

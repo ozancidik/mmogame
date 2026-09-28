@@ -1812,11 +1812,18 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 	// erisilebilir, tasan-ve-kilitli degil.
 	const float RowH = FMath::Min(46.f, RowSpace / (float)FMath::Max(1, TotalRows));
 	const float CellH = FMath::Max(1.f, RowH - 4.f);
-	const float Line2Y = FMath::Min(24.f, RowH * 0.5f);
-	// QA bulgusu (2026-09-15, MEDIUM): RowH kucultukce satir metni sabit olcekte kaliyordu,
-	// 13+ satirda (RowH<28) ikinci metin satiri kutu kenarini asip birinciyle cakisiyordu.
-	// Dukkandaki (DrawShop) ayni fix'in aynisi: metni de RowH ile orantili kucult.
-	const float QuestTextScale = FMath::Clamp(RowH / 46.f, 0.45f, 1.f);
+	// Iki metin satirini gercek font yuksekliklerine gore hucreye sigdir.
+	const auto DrawQuestRowText = [this, RowX, RowH, CellH](const FString& Title, const FString& Detail, float Y)
+	{
+		float TextW = 0.f, TitleH = 0.f, DetailH = 0.f;
+		GetTextSize(Title, TextW, TitleH, nullptr, 0.78f);
+		GetTextSize(Detail, TextW, DetailH, nullptr, 0.64f);
+		const float Scale = FMath::Min(1.f, FMath::Max(1.f, CellH - 5.f) / FMath::Max(1.f, TitleH + DetailH));
+		const float DetailY = FMath::Max(4.f + TitleH * Scale,
+			FMath::Min(FMath::Min(24.f, RowH * 0.5f), CellH - 1.f - DetailH * Scale));
+		DrawText(Title, FLinearColor::White, RowX + 6.f, Y + 3.f, nullptr, 0.78f * Scale);
+		DrawText(Detail, FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, Y + DetailY, nullptr, 0.64f * Scale);
+	};
 
 	DrawText(TEXT("Alinabilir gorevler (tikla = al)"), FLinearColor(0.6f, 0.9f, 0.6f), RowX, RowY, nullptr, 0.9f);
 	RowY += 20.f;
@@ -1834,10 +1841,8 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + CellH));
 		QuestAcceptRegions.Add(R);
 
-		DrawText(FString::Printf(TEXT("%s   [Lv%d gerekli]"), *Def.Name, Def.RequiredLevel),
-			FLinearColor::White, RowX + 6.f, RowY + 3.f, nullptr, 0.78f * QuestTextScale);
-		DrawText(FString::Printf(TEXT("%s   Odul: %d XP, %d altin%s"), *Def.Description, Def.RewardXP, Def.RewardGold, *BuildQuestRewardItemSuffix(Def)),
-			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + Line2Y, nullptr, 0.64f * QuestTextScale);
+		DrawQuestRowText(FString::Printf(TEXT("%s   [Lv%d gerekli]"), *Def.Name, Def.RequiredLevel),
+			FString::Printf(TEXT("%s   Odul: %d XP, %d altin%s"), *Def.Description, Def.RewardXP, Def.RewardGold, *BuildQuestRewardItemSuffix(Def)), RowY);
 		RowY += RowH;
 	}
 
@@ -1861,10 +1866,9 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 			R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + CellH));
 			QuestClaimRegions.Add(R);
 		}
-		DrawText(FString::Printf(TEXT("%s   %d/%d %s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
-			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")), FLinearColor::White, RowX + 6.f, RowY + 3.f, nullptr, 0.78f * QuestTextScale);
-		DrawText(FString::Printf(TEXT("Odul: %d XP, %d altin%s"), Def->RewardXP, Def->RewardGold, *BuildQuestRewardItemSuffix(*Def)),
-			FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, RowY + Line2Y, nullptr, 0.64f * QuestTextScale);
+		DrawQuestRowText(FString::Printf(TEXT("%s   %d/%d %s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
+			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")),
+			FString::Printf(TEXT("Odul: %d XP, %d altin%s"), Def->RewardXP, Def->RewardGold, *BuildQuestRewardItemSuffix(*Def)), RowY);
 		RowY += RowH;
 	}
 }
