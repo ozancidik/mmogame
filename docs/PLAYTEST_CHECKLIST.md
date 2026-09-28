@@ -2537,3 +2537,11 @@ UE 5.7 `MMOMob.cpp` ve `MMOSkillComponent.cpp` yeniden derlendi; PIE henüz yap�
 - [ ] Hub sınırının hemen dışında normal saldırı ve beceri kullanımı devam ediyor; istemci ve host sunucuda aynı sınırı uyguluyor.
 
 UE 5.7 `MMOTargeting.cpp`, `MMOCharacter.cpp` ve `MMOSkillComponent.cpp` yeniden derlendi; PIE henüz yapılmadı. Tasarımda mobun `HubSafeRadius` varsayılanı da 700; Blueprint'te başka bir değer verilirse bu ortak saldırı kapısı ayrıca uyarlanmalı.
+
+## Ölü parti üyesine görev kredisi verilmemesi — 2026-09-29
+
+- [ ] İki oyuncu aynı öldürme görevini alsın. İkinci oyuncu mobun 3000 birim yakınında ölü yatarken birinci oyuncu mobu öldürsün: ölünün XP'si ve görev sayacı artmasın.
+- [ ] İkinci oyuncu canlandıktan sonra menzil içindeki yeni öldürmede iki oyuncunun XP'si ve görev sayacı artsın.
+- [ ] Öldüren oyuncu geçerli ve hayattayken tek oyunculu ödül akışı değişmesin.
+
+UE 5.7 `MMOMob.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı.

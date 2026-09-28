@@ -638,14 +638,12 @@ void AMMOMob::HandleDeath()
 
 		for (AMMOCharacter* R : Recipients)
 		{
-			if (!R)
+			// Oluyken XP verilmiyor; ayni oldurmeden gorev kredisi de verilmesin.
+			if (!R || !R->GetStats() || R->GetStats()->bIsDead)
 			{
 				continue;
 			}
-			if (R->GetStats())
-			{
-				R->GetStats()->GainExperience(XPReward);
-			}
+			R->GetStats()->GainExperience(XPReward);
 			if (R->GetQuestComponent())
 			{
 				R->GetQuestComponent()->NotifyMobKilled(ArchetypeId);
