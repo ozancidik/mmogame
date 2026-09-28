@@ -53,11 +53,11 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	}
 
 	const bool bInCombat = (World->GetTimeSeconds() - LastCombatActivityTime) < CombatDuration;
-	const float Mult = bInCombat ? CombatRegenMult : 1.f;
+	const float Mult = FMath::Max(0.f, bInCombat ? CombatRegenMult : 1.f);
 
 	if (Health < MaxHealth)
 	{
-		Health = FMath::Min(MaxHealth, Health + HealthRegenPerSec * Mult * DeltaTime);
+		Health = FMath::Clamp(Health + FMath::Max(0.f, HealthRegenPerSec) * Mult * DeltaTime, 0.f, MaxHealth);
 		OnHealthChanged.Broadcast(Health, MaxHealth);
 	}
 	if (Mana < MaxMana)
@@ -65,7 +65,7 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		// Seviye ile buyuyen yenilenme (QA MEDIUM #5): sabit 7/sn ile Lv80 capstone (400 mana,
 		// 26sn CD) savasta ~174sn'de bir atilabiliyordu.
 		const float RegenPerSec = ManaRegenPerSec + Level * ManaRegenPerLevel;
-		Mana = FMath::Min(MaxMana, Mana + RegenPerSec * Mult * DeltaTime);
+		Mana = FMath::Clamp(Mana + FMath::Max(0.f, RegenPerSec) * Mult * DeltaTime, 0.f, MaxMana);
 		OnManaChanged.Broadcast(Mana, MaxMana);
 	}
 }

@@ -2380,3 +2380,12 @@ UE 5.7 derlemesi basarili, PIE ve eski-kayit oynanisi bekliyor.
 - [ ] Normal kayit-yukle akisinda bekleme suresi kalan saniyeyi korumali.
 - [ ] Kayitta cok uzak gelecek skill/sinif zaman damgasi varsa yuklenen sure en fazla tanimli cooldown + 1 saniye olmali.
 - [ ] Bilinmeyen skill ID'li cooldown kaydi oyuncuya veya UI'a tasinmamali.
+
+## Negatif regen ayari korumasi (2026-09-28)
+
+Can/mana yenilenmesi ve savas carpani olumsuz Blueprint degerlerinde negatif
+can/mana uretmeyecek sekilde 0 alt sinirina kirpildi. Bu degisiklikten sonra
+UE 5.7 derlemesi basarili; PIE davranisi bekliyor.
+
+- [ ] Varsayilan pozitif yenilenmede can/mana ve savas carpani onceki davranisi surdurmeli.
+- [ ] Gecici olarak negatif HealthRegenPerSec, ManaRegenPerSec veya CombatRegenMult ayarlandiginda can/mana sifirin altina inmemeli.
