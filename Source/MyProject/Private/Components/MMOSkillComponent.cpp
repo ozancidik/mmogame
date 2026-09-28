@@ -733,18 +733,25 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	{
 		const float WorldNow = World->GetTimeSeconds();
 		const FDateTime UtcNow = FDateTime::UtcNow();
+		const int64 UtcNowSeconds = UtcNow.ToUnixTimestamp();
 		TArray<FName> SkillIds;
 		TArray<float> RemainingSeconds;
-		if (In.ClassChangeCooldownExpiryUtcSeconds > UtcNow.ToUnixTimestamp())
+		if (In.ClassChangeCooldownExpiryUtcSeconds > UtcNowSeconds)
 		{
-			const float Remaining = static_cast<float>((FDateTime::FromUnixTimestamp(In.ClassChangeCooldownExpiryUtcSeconds) - UtcNow).GetTotalSeconds());
+			// Kayittaki bozuk/gelecekteki zaman damgasi sinifi yillarca kilitlemesin.
+			const int64 Seconds = FMath::Min<int64>(In.ClassChangeCooldownExpiryUtcSeconds - UtcNowSeconds,
+				FMath::CeilToInt(ClassChangeCooldownSec) + 1);
+			const float Remaining = static_cast<float>(Seconds);
 			LastClassChangeTime = WorldNow + Remaining - ClassChangeCooldownSec;
 		}
 		for (const TPair<FName, int64>& Cooldown : In.SkillCooldownExpiryUtcSeconds)
 		{
-			if (Cooldown.Value > UtcNow.ToUnixTimestamp())
+			const FMMOSkillDef* Def = FMMOSkillDatabase::Find(Cooldown.Key);
+			if (Def && Def->Cooldown > 0.f && Cooldown.Value > UtcNowSeconds)
 			{
-				const float Remaining = static_cast<float>((FDateTime::FromUnixTimestamp(Cooldown.Value) - UtcNow).GetTotalSeconds());
+				const int64 Seconds = FMath::Min<int64>(Cooldown.Value - UtcNowSeconds,
+					FMath::CeilToInt(Def->Cooldown) + 1);
+				const float Remaining = static_cast<float>(Seconds);
 				CooldownEndTimes.Add(Cooldown.Key, WorldNow + Remaining);
 				SkillIds.Add(Cooldown.Key);
 				RemainingSeconds.Add(Remaining);

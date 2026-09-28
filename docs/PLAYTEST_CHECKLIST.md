@@ -2369,3 +2369,14 @@ tabani Z=50 ayarlandi. C++ derlemesi basarili; PIE oynanis dogrulamasi bekliyor.
 - [ ] Summer_scene PIE'de Obsidyen normal ve elit moblari doguyor, zemin uzerinde yuruyor ve bosluga dusmuyor olmali.
 - [ ] Spawn noktasi gecersiz olursa 8 denemeden sonra mob olusmamali; log uyarmali, oyun kilitlenmemeli.
 - [ ] Lv1-24 eski spawner'larin dogum ve respawn davranisi degismemeli.
+
+## Kayittan donen cooldown sureleri (2026-09-28)
+
+Sinif degisimi ve beceri bekleme sureleri kayittaki UTC bitisinden hesaplaniyor,
+ama tanimli cooldown + 1 saniyeyi gecemiyor. Bilinmeyen skill ID'leri atiliyor;
+bozuk cok uzak gelecek zaman damgasi beceriyi/sinifi kalici kilitlemiyor.
+UE 5.7 derlemesi basarili, PIE ve eski-kayit oynanisi bekliyor.
+
+- [ ] Normal kayit-yukle akisinda bekleme suresi kalan saniyeyi korumali.
+- [ ] Kayitta cok uzak gelecek skill/sinif zaman damgasi varsa yuklenen sure en fazla tanimli cooldown + 1 saniye olmali.
+- [ ] Bilinmeyen skill ID'li cooldown kaydi oyuncuya veya UI'a tasinmamali.
