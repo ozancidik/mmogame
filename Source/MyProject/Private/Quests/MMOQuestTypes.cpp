@@ -106,7 +106,7 @@ namespace
 			T::KillSpecificMob, TEXT("MagmaTyrant"), 1, 12000, 8000, 24, TEXT("Q_InfernalWraiths")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineBlade"));
 
-		// --- Besinci bolge zinciri (Lv25-30): Q_MagmaTyrant'tan sonra, spawner harita probunu bekler ---
+		// --- Besinci bolge zinciri (Lv25-30): Q_MagmaTyrant'tan sonra ---
 		Table.Add(MakeQuest(TEXT("Q_ObsidianStalkers"), TEXT("Obsidyen Avcilari"), TEXT("Obsidyen avcilarini durdur: 5 Obsidyen Avcisi oldur."),
 			T::KillSpecificMob, TEXT("ObsidianStalker"), 5, 9000, 9000, 25, TEXT("Q_MagmaTyrant")));
 		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianBoots"));

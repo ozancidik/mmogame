@@ -2328,9 +2328,12 @@ surer. Mob korumali oyuncunun dibinde bekler, koruma biter bitmez vurur. Ulasila
 
 ## Seviye 25–30 Obsidyen veri kademesi (2026-09-28)
 
-Bu kademe derlendi, fakat harita konumu ve navmesh dogrulanmadigi icin spawner henuz etkin degil.
+Bu kademe derlendi. Summer_scene uzerinde read-only headless zemin/navmesh probundan sonra
+normal ve elit spawner'lari etkinlestirildi; PIE oynanis dogrulamasi henuz yapilmadi.
 
 - [ ] Gercek oyun haritasi `Summer_scene` uzerinde yeni bolgenin merkez ve 400 birim yaricapindaki arazi temasini, engelleri ve navmesh baglantisini kontrol et.
-- [ ] Bolge etkinlestirildikten sonra ObsidianStalker Lv25, ObsidianSentinel Lv27, ObsidianRaider Lv29 ve ObsidianWarlord Lv30'un dogdugunu dogrula; hub'a saldirmamalilar.
+- [ ] ObsidianStalker Lv25, ObsidianSentinel Lv27, ObsidianRaider Lv29 ve ObsidianWarlord Lv30'un dogdugunu dogrula; hub'a saldirmamalilar.
 - [ ] Q_MagmaTyrant sonrasi dort Obsidyen gorevinin sirayla acildigini, hedef ID'lerinin kill credit aldigini ve ekipman odullerinin canta doluysa kaybolmadigini kontrol et.
 - [ ] Obsidyen setinin dort parcasini Lv25'te giy; elitin iki bagimsiz %50 loot zarini ve +3..+5 sinirlarini PIE'de gozle.
+- [ ] Normal spawner (-2800,-1800), yaricap 225: 150/225u halkalarindaki 64 probda zemin ve bagli navmesh bulundu. Rastgele mob dogumlarini ve bolgeden PlayerStart'a gercek yuru-yolunu PIE'de dogrula.
+- [ ] Elit spawner (-4000,0), yaricap 150: 150/200u halkalarindaki 64 probda zemin ve bagli navmesh bulundu. Normal bolgeye 2163u mesafe ve tam nav yolu var; elitin normal alana/hub'a cekilmedigini PIE'de dogrula.

@@ -148,7 +148,7 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.35f;
 
-		// --- Besinci bolge NORMAL moblari (Lv25-29; harita dogrulanana kadar spawner YOK) ---
+		// --- Besinci bolge NORMAL moblari (Lv25-29; Summer_scene'deki Obsidyen spawner'i) ---
 		// Obsidyen Avcisi: hizli ve zehirli; onceki bandin en guclu normalinden kademeli artis.
 		Table.Add(MakeMob(TEXT("ObsidianStalker"), TEXT("Obsidyen Avcisi"), 25, 63, 60, 88.f, 4400, 600, 1400, 440.f, 600.f, 1.2f, FLinearColor(0.22f, 0.16f, 0.28f)));
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));

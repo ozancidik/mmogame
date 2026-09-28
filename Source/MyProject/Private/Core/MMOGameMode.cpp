@@ -200,6 +200,36 @@ void AMMOGameMode::SpawnMobArea()
 		UGameplayStatics::FinishSpawningActor(TyrantSpawner, TyrantTM);
 	}
 
+	// Besinci bolge Summer_scene navmesh'i uzerinde olculen mutlak koordinatlara baglidir.
+	// Headless harita probu: (-2800,-1800) merkezinin 150/225u halkalarindaki 64 nokta
+	// zeminde ve bagli navmesh'te; PlayerStart ve dorduncu bolgeye tam yol var.
+	// (-4000,0) elit alaninin 150/200u halkalarindaki 64 nokta da bagli ve
+	// normal alandan 2163u uzakta. Baska haritalarda bu konumlar kullanilmaz.
+	if (World->GetMapName().Contains(TEXT("Summer_scene")))
+	{
+		const FVector ObsidianLoc(-2800.f, -1800.f, Origin.Z + 50.f);
+		const FTransform ObsidianTM(FRotator::ZeroRotator, ObsidianLoc);
+		if (AMMOMobSpawner* ObsidianSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ObsidianTM))
+		{
+			ObsidianSpawner->MaxMobs = 5;
+			ObsidianSpawner->SpawnRadius = 225.f;
+			ObsidianSpawner->MinMobLevel = 25;
+			ObsidianSpawner->MaxMobLevel = 29;
+			UGameplayStatics::FinishSpawningActor(ObsidianSpawner, ObsidianTM);
+		}
+
+		const FVector ObsidianBossLoc(-4000.f, 0.f, Origin.Z + 50.f);
+		const FTransform ObsidianBossTM(FRotator::ZeroRotator, ObsidianBossLoc);
+		if (AMMOMobSpawner* ObsidianBossSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ObsidianBossTM))
+		{
+			ObsidianBossSpawner->MaxMobs = 1;
+			ObsidianBossSpawner->SpawnRadius = 150.f;
+			ObsidianBossSpawner->TopUpInterval = 60.f;
+			ObsidianBossSpawner->ForcedArchetypeId = FName(TEXT("ObsidianWarlord"));
+			UGameplayStatics::FinishSpawningActor(ObsidianBossSpawner, ObsidianBossTM);
+		}
+	}
+
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
 	FActorSpawnParameters NpcParams;
 	NpcParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
