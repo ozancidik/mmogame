@@ -2389,3 +2389,12 @@ UE 5.7 derlemesi basarili; PIE davranisi bekliyor.
 
 - [ ] Varsayilan pozitif yenilenmede can/mana ve savas carpani onceki davranisi surdurmeli.
 - [ ] Gecici olarak negatif HealthRegenPerSec, ManaRegenPerSec veya CombatRegenMult ayarlandiginda can/mana sifirin altina inmemeli.
+
+## Satıcı satın alma sayfalaması — 2026-09-28
+
+- [ ] Satıcıda 33+ ürün varken satın alma sütununda 14 okunabilir satır ve önceki/sonraki sayfa düğmeleri görünüyor; hiçbir satır panel dışına taşmıyor.
+- [ ] İlk, orta ve son sayfada tıklanan iksir/tüketilebilir/ekipman doğru ürün kimliği ve tekli adetle satın alınıyor; altın ve çanta sonucu doğrulanıyor.
+- [ ] Sayfa değiştirirken eski sayfanın satırına hızlı tıklama yanlış ürünü almıyor; satıcıyı kapatıp yeniden açınca sayfa 1 açılıyor.
+- [ ] Satma sütununun mevcut davranışı korunuyor. Dar ekranlarda uzun ürün adlarının görünümü ayrıca inceleniyor.
+
+Kod derlemesi başarılı (`MMOHUD.cpp` yeniden derlendi); PIE henüz yapılmadı.

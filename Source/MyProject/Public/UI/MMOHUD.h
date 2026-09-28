@@ -183,6 +183,8 @@ protected:
 	FBox2D InventoryCloseRect = FBox2D(ForceInit);
 	FBox2D ShopRect = FBox2D(ForceInit);
 	FBox2D ShopCloseRect = FBox2D(ForceInit);
+	FBox2D ShopBuyPrevRect = FBox2D(ForceInit);
+	FBox2D ShopBuyNextRect = FBox2D(ForceInit);
 	FBox2D QuestRect = FBox2D(ForceInit);
 	FBox2D QuestCloseRect = FBox2D(ForceInit);
 	FBox2D StatRect = FBox2D(ForceInit);
@@ -197,8 +199,11 @@ protected:
 	// kaliyorlardi). Envanter penceresi artik Items istifini de gosterip tiklamayla kullaniyor.
 	TArray<FMMOClickRegion> InvConsumableRegions;
 
-	// Dukkan tiklama bolgeleri: satin alma (SkillId=ItemId veya "__POTION__") ve satma (Slot=canta index).
+	// Satin alma sayfasi ve bolgeleri: SkillId=ItemId, Slot=0 iksir / 1 tuketilebilir / 2 ekipman.
+	static constexpr int32 ShopBuyPageSize = 14;
+	int32 ShopBuyPage = 0;
 	TArray<FMMOClickRegion> ShopBuyRegions;
+	// Satma bolgeleri: Slot=canta index.
 	TArray<FMMOClickRegion> ShopSellRegions;
 
 	// Gorev penceresi tiklama bolgeleri (SkillId=questId): kabul et ve odul al.

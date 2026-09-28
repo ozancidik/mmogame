@@ -1271,6 +1271,10 @@ bool AMMOHUD::HandleInventoryRightClick(const FVector2D& Pos)
 
 void AMMOHUD::OpenShop()
 {
+	ShopBuyPage = 0;
+	ShopBuyRegions.Reset();
+	ShopBuyPrevRect = FBox2D(ForceInit);
+	ShopBuyNextRect = FBox2D(ForceInit);
 	bShopOpen = true;
 }
 
@@ -1283,6 +1287,8 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 {
 	ShopBuyRegions.Reset();
 	ShopSellRegions.Reset();
+	ShopBuyPrevRect = FBox2D(ForceInit);
+	ShopBuyNextRect = FBox2D(ForceInit);
 	if (!Canvas || !PlayerChar)
 	{
 		return;
@@ -1315,54 +1321,69 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	// --- SATIN AL (sol sutun) ---
 	DrawText(TEXT("SATIN AL (sol tik)"), FLinearColor(0.6f, 0.9f, 0.6f), LeftX, PY + 68.f, nullptr, 0.95f);
 	const float BuyStartY = PY + 90.f;
-	float LY = BuyStartY;
-
-	// Satin-al sutununu panele sigdir: satir sayisi (iksir + tuketilebilir + ekipman)
-	// arttikca satir yuksekligini kucultup tasmayi onle (kaydirma yok, hepsi gorunur kalir).
-	const int32 BuyRowCount = 1 + FMMOConsumableDatabase::GetAll().Num() + FMMOItemDatabase::GetAll().Num();
-	const float BuyAvailH = (PY + PH - 12.f) - BuyStartY;
-	const float BuyRowH = FMath::Min(RowH, BuyAvailH / (float)FMath::Max(1, BuyRowCount));
-	const float BuyCellH = FMath::Max(1.f, BuyRowH - 4.f);
-	// QA denetimi (2026-09-14, Lv8-15/Lv16-24 icerik dilimleri sonrasi): satir yuksekligi
-	// kalabalik listede kuculuyordu ama yazi boyutu SABIT kaliyordu - satir kutusundan tasan
-	// yazi olusuyordu. Yaziyi da ayni oranda kucult (RowH=26 -> tam boy, daha kucukse orantili).
-	const float BuyTextScale = FMath::Clamp(BuyRowH / RowH, 0.45f, 1.f);
-
-	// Iksir satiri.
+	const TArray<FMMOConsumableDef>& Consumables = FMMOConsumableDatabase::GetAll();
+	const TArray<FMMOItemDef>& Equipment = FMMOItemDatabase::GetAll();
+	const int32 BuyRowCount = 1 + Consumables.Num() + Equipment.Num();
+	const int32 BuyPageCount = FMath::DivideAndRoundUp(BuyRowCount, ShopBuyPageSize);
+	ShopBuyPage = FMath::Clamp(ShopBuyPage, 0, BuyPageCount - 1);
+	const int32 FirstIndex = ShopBuyPage * ShopBuyPageSize;
+	const int32 LastIndex = FMath::Min(FirstIndex + ShopBuyPageSize, BuyRowCount);
+	for (int32 Index = FirstIndex; Index < LastIndex; ++Index)
 	{
-		DrawRect(FLinearColor(0.1f, 0.16f, 0.12f, 0.9f), LeftX, LY, ColW, BuyCellH);
+		const float LY = BuyStartY + (Index - FirstIndex) * RowH;
 		FMMOClickRegion R;
-		R.SkillId = FName(TEXT("__POTION__"));
-		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
+		FString Label;
+		FLinearColor Fill;
+		float TextScale = 0.72f;
+		if (Index == 0)
+		{
+			R.SkillId = FName(TEXT("__POTION__"));
+			R.Slot = 0;
+			Label = FString::Printf(TEXT("Can Iksiri  -  %d altin"), FMMOItemDatabase::PotionPrice);
+			Fill = FLinearColor(0.1f, 0.16f, 0.12f, 0.9f);
+			TextScale = 0.78f;
+		}
+		else if (Index <= Consumables.Num())
+		{
+			const FMMOConsumableDef& Def = Consumables[Index - 1];
+			R.SkillId = Def.ItemId;
+			R.Slot = 1;
+			Label = FString::Printf(TEXT("%s  -  %d altin"), *Def.Name, Def.Price);
+			Fill = FLinearColor(0.1f, 0.16f, 0.18f, 0.9f);
+		}
+		else
+		{
+			const FMMOItemDef& Def = Equipment[Index - 1 - Consumables.Num()];
+			R.SkillId = Def.ItemId;
+			R.Slot = 2;
+			Label = FString::Printf(TEXT("%s  -  %d altin (Lv%d)"), *Def.Name, FMMOItemDatabase::GetBuyPrice(Def), Def.RequiredLevel);
+			Fill = FLinearColor(0.1f, 0.13f, 0.2f, 0.9f);
+		}
+		DrawRect(Fill, LeftX, LY, ColW, RowH - 4.f);
+		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + RowH - 4.f));
 		ShopBuyRegions.Add(R);
-		DrawText(FString::Printf(TEXT("Can Iksiri  -  %d altin"), FMMOItemDatabase::PotionPrice),
-			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.78f * BuyTextScale);
-		LY += BuyRowH;
+		DrawText(Label, FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, TextScale);
 	}
 
-	// Tuketilebilirler (mana iksiri, buff parsomenleri).
-	for (const FMMOConsumableDef& Def : FMMOConsumableDatabase::GetAll())
+	const float NavY = BuyStartY + ShopBuyPageSize * RowH + 12.f;
+	const float NavW = 64.f;
+	const float NavH = 26.f;
+	const float NextX = LeftX + ColW - NavW;
+	const bool bHasPrev = ShopBuyPage > 0;
+	const bool bHasNext = ShopBuyPage + 1 < BuyPageCount;
+	DrawRect(bHasPrev ? FLinearColor(0.16f, 0.32f, 0.48f, 0.95f) : FLinearColor(0.12f, 0.12f, 0.14f, 0.9f), LeftX, NavY, NavW, NavH);
+	DrawText(TEXT("< Onceki"), bHasPrev ? FLinearColor::White : FLinearColor(0.45f, 0.45f, 0.48f), LeftX + 4.f, NavY + 5.f, nullptr, 0.7f);
+	DrawText(FString::Printf(TEXT("%d / %d"), ShopBuyPage + 1, BuyPageCount), FLinearColor::White,
+		LeftX + ColW * 0.5f - 20.f, NavY + 5.f, nullptr, 0.8f);
+	DrawRect(bHasNext ? FLinearColor(0.16f, 0.32f, 0.48f, 0.95f) : FLinearColor(0.12f, 0.12f, 0.14f, 0.9f), NextX, NavY, NavW, NavH);
+	DrawText(TEXT("Sonraki >"), bHasNext ? FLinearColor::White : FLinearColor(0.45f, 0.45f, 0.48f), NextX + 4.f, NavY + 5.f, nullptr, 0.7f);
+	if (bHasPrev)
 	{
-		DrawRect(FLinearColor(0.1f, 0.16f, 0.18f, 0.9f), LeftX, LY, ColW, BuyCellH);
-		FMMOClickRegion R;
-		R.SkillId = Def.ItemId;
-		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
-		ShopBuyRegions.Add(R);
-		DrawText(FString::Printf(TEXT("%s  -  %d altin"), *Def.Name, Def.Price),
-			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f * BuyTextScale);
-		LY += BuyRowH;
+		ShopBuyPrevRect = FBox2D(FVector2D(LeftX, NavY), FVector2D(LeftX + NavW, NavY + NavH));
 	}
-
-	for (const FMMOItemDef& Def : FMMOItemDatabase::GetAll())
+	if (bHasNext)
 	{
-		DrawRect(FLinearColor(0.1f, 0.13f, 0.2f, 0.9f), LeftX, LY, ColW, BuyCellH);
-		FMMOClickRegion R;
-		R.SkillId = Def.ItemId;
-		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + BuyCellH));
-		ShopBuyRegions.Add(R);
-		DrawText(FString::Printf(TEXT("%s  -  %d altin (Lv%d)"), *Def.Name, FMMOItemDatabase::GetBuyPrice(Def), Def.RequiredLevel),
-			FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, 0.72f * BuyTextScale);
-		LY += BuyRowH;
+		ShopBuyNextRect = FBox2D(FVector2D(NextX, NavY), FVector2D(NextX + NavW, NavY + NavH));
 	}
 
 	// --- SAT (sag sutun) ---
@@ -1412,16 +1433,32 @@ bool AMMOHUD::HandleShopClick(const FVector2D& Pos)
 	{
 		return true;
 	}
+	if (ShopBuyPrevRect.bIsValid && ShopBuyPrevRect.IsInside(Pos))
+	{
+		--ShopBuyPage;
+		ShopBuyRegions.Reset();
+		ShopBuyPrevRect = FBox2D(ForceInit);
+		ShopBuyNextRect = FBox2D(ForceInit);
+		return true;
+	}
+	if (ShopBuyNextRect.bIsValid && ShopBuyNextRect.IsInside(Pos))
+	{
+		++ShopBuyPage;
+		ShopBuyRegions.Reset();
+		ShopBuyPrevRect = FBox2D(ForceInit);
+		ShopBuyNextRect = FBox2D(ForceInit);
+		return true;
+	}
 
 	for (const FMMOClickRegion& R : ShopBuyRegions)
 	{
 		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
 		{
-			if (R.SkillId == FName(TEXT("__POTION__")))
+			if (R.Slot == 0)
 			{
 				Inv->BuyPotion(1);
 			}
-			else if (FMMOConsumableDatabase::Find(R.SkillId))
+			else if (R.Slot == 1)
 			{
 				Inv->BuyConsumable(R.SkillId, 1);
 			}
