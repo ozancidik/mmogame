@@ -33,6 +33,8 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
+#include "Components/CapsuleComponent.h"
+#include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 #include "Save/MMOSaveGame.h"
@@ -322,6 +324,7 @@ void AMMOCharacter::SaveCharacter()
 	{
 		QuestComponent->FillSaveData(D);
 	}
+	D.MapName = UGameplayStatics::GetCurrentLevelName(this, true);
 	D.Location = GetActorLocation();
 	D.Rotation = GetActorRotation();
 
@@ -389,8 +392,48 @@ bool AMMOCharacter::LoadCharacter()
 		QuestComponent->ApplySaveData(D);
 	}
 
-	SetActorLocation(D.Location, false, nullptr, ETeleportType::TeleportPhysics);
-	SetActorRotation(D.Rotation);
+	// Eski/bozuk kayit koordinati harita disinda, boslukta veya navmesh disinda olabilir.
+	// Boyle bir konuma isiklanmak oyuncuyu kalici olarak kilitler. Ilk dogus konumu
+	// guvenli geri donus noktasidir; yeni kayitlarda harita adi da eslesmelidir.
+	bool bRestoreLocation = !D.Location.ContainsNaN()
+		&& (D.MapName.IsEmpty() || D.MapName == UGameplayStatics::GetCurrentLevelName(this, true));
+	FVector RestoredLocation = D.Location;
+	if (bRestoreLocation)
+	{
+		UWorld* World = GetWorld();
+		const UNavigationSystemV1* Nav = World ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
+		const UCapsuleComponent* Capsule = GetCapsuleComponent();
+		FHitResult GroundHit;
+		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(MMOCharacterLoadGround), false, this);
+		const FVector TraceStart(D.Location.X, D.Location.Y, D.Location.Z + 200.f);
+		const FVector TraceEnd(D.Location.X, D.Location.Y, D.Location.Z - 500.f);
+		FNavLocation NavLocation;
+		bRestoreLocation = World && Nav && Nav->GetMainNavData() && Capsule
+			&& World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams)
+			&& GroundHit.ImpactNormal.Z >= 0.7f
+			&& FMath::Abs((D.Location.Z - GroundHit.ImpactPoint.Z) - Capsule->GetScaledCapsuleHalfHeight()) <= 120.f
+			&& Nav->ProjectPointToNavigation(GroundHit.ImpactPoint + FVector(0.f, 0.f, 20.f),
+				NavLocation, FVector(75.f, 75.f, 80.f))
+			&& FVector::Dist2D(NavLocation.Location, GroundHit.ImpactPoint) <= 75.f
+			&& FMath::Abs(NavLocation.Location.Z - GroundHit.ImpactPoint.Z) <= 35.f;
+		if (bRestoreLocation)
+		{
+			RestoredLocation = NavLocation.Location + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 2.f);
+		}
+	}
+	if (bRestoreLocation)
+	{
+		SetActorLocation(RestoredLocation, false, nullptr, ETeleportType::TeleportPhysics);
+		if (!D.Rotation.ContainsNaN())
+		{
+			SetActorRotation(D.Rotation);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Saved character position rejected for map %s; keeping PlayerStart"),
+			*UGameplayStatics::GetCurrentLevelName(this, true));
+	}
 
 	if (GEngine && IsLocallyControlled())
 	{

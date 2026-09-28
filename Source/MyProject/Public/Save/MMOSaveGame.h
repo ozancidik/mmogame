@@ -93,6 +93,10 @@ struct FMMOCharacterSaveData
 	TArray<FName> CompletedQuests;
 
 	// Konum
+	// Eski kayitlarda bos gelir; yeni kayitlarda konumu hangi haritada aldigimizi tutar.
+	UPROPERTY(SaveGame)
+	FString MapName;
+
 	UPROPERTY(SaveGame)
 	FVector Location = FVector::ZeroVector;
 

@@ -2426,3 +2426,13 @@ UE 5.7 C++ derlemesi başarılı; PIE henüz yapılmadı.
 - [ ] Listen server ile istemci penceresinde aynı davranış gözleniyor.
 
 UE 5.7 `MMOPlayerController.cpp` yeniden derlendi; PIE henüz yapılmadı.
+
+## Kayıttan güvenli konum yükleme — 2026-09-28
+
+- [ ] Summer_scene'de güvenli navmesh üstünde kaydet, oyundan çık ve yeniden gir: aynı bölgede, zeminin üstünde doğ; sınıf/stat/envanter/görev verileri korunuyor.
+- [ ] Eski `MapName` alanı olmayan bir kayıt aynı haritada yükleniyor ve geçerli konumu koruyor.
+- [ ] Harita dışı/boşlukta veya navmesh dışındaki kayıt konumuyla açılışta karakter PlayerStart'ta kalıyor; düşme veya sıkışma yaşanmıyor.
+- [ ] Farklı harita adı taşıyan kayıt, geçerli görünen XY bile olsa mevcut haritada PlayerStart'a dönüyor.
+- [ ] Listen server ve istemci için yükleme sonrası konum replikasyonu doğru; yeni kayıt kaydedildiğinde harita adı yazılıyor.
+
+Kodda konum için zemin eğimi, kapsül yüksekliği ve navmesh projeksiyonu doğrulanıyor. UE 5.7 C++ derlemesi başarılı; PIE henüz yapılmadı.
