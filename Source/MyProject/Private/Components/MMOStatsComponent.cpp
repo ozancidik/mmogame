@@ -794,8 +794,11 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// katmani), Experience de negatif olamaz.
 	Level = FMath::Clamp(In.Level, 1, MaxLevel);
 	Experience = FMath::Max(0, In.Experience);
-	UnspentStatPoints = In.UnspentStatPoints;
-	UnspentSkillPoints = In.UnspentSkillPoints;
+	// Harcanmamis puanlar yalniz level-up'tan gelir; bozuk bir kaydin negatif
+	// veya asiri buyuk bakiyesi class-change iadesini tasirmasin.
+	const int32 LevelsGained = Level - 1;
+	UnspentStatPoints = FMath::Clamp(In.UnspentStatPoints, 0, LevelsGained * FMath::Max(0, StatPointsPerLevel));
+	UnspentSkillPoints = FMath::Clamp(In.UnspentSkillPoints, 0, LevelsGained * FMath::Max(0, SkillPointsPerLevel));
 	Strength = In.Strength;
 	Dexterity = In.Dexterity;
 	Intelligence = In.Intelligence;

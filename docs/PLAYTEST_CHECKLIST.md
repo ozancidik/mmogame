@@ -2346,3 +2346,13 @@ yeniden derlendi; PIE ve eski-kayit davranisi henuz oynanarak dogrulanmadi.
 - [ ] Buyuk XP odulunde (ornegin MAX_int32'ye yakin) XP negatif olmasin; seviye 80'de dursun.
 - [ ] Bir esya yigini `MAX_int32` sinirina yaklastiginda ekleme onu negatif yapmasin; toplam esya sayisi da negatif olmasin.
 - [ ] Negatif altin veya arti seviyesi iceren eski/bozuk kaydi yukle: altin en az 0, ekipman arti seviyesi +0..+8 olmali; yukselterek bedava altin kazanilamamali.
+
+## Kayitli ustalik rutbesi ve puan bakiyesi siniri (2026-09-28)
+
+Kayittan gelen rutbeler 0..kayitli seviye araligina, harcanmamis stat/skill puanlari
+ise level-up ile kazanilabilecek toplam araliga kirpiliyor. Ustalik yatirimi artik
+`Rank+1` yerine `Rank>=Level` kontrolu kullaniyor; bozuk bir INT32_MAX rutbe toplamada
+tasamaz. Degisen dosyalar UE 5.7'de yeniden derlendi; PIE/eski-kayit dogrulamasi bekliyor.
+
+- [ ] Normal Lv1 ve yuksek seviye kayitlarini yukle: mevcut rutbeler ve puanlar degismemeli.
+- [ ] Bozuk kayitta negatif veya INT32_MAX rutbe/puan yukle: rutbe seviyeyi, puanlar kazanilan toplami gecmemeli; sinif degisimi ve ustalik yatirimi tasma uretmemeli.

@@ -442,7 +442,7 @@ bool UMMOSkillComponent::RequestInvestMastery(EMMOSkillTree Tree)
 		return false;
 	}
 	// KO: (rutbe + 1) > karakter seviyesi ise yatirim yapilamaz.
-	if (MasteryRankArray[Idx] + 1 > S->Level)
+	if (MasteryRankArray[Idx] < 0 || MasteryRankArray[Idx] >= S->Level)
 	{
 		return false;
 	}
@@ -706,6 +706,15 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	if (MasteryRankArray.Num() != MasteryTreeCount)
 	{
 		MasteryRankArray.SetNum(MasteryTreeCount);
+	}
+	// Kayittan gelen bozuk rutbeleri sinirla. ServerInvestMastery'de bir sonraki
+	// rutbe icin yapilan toplama boylece tasmaz ve KO'nun rutbe<=seviye kurali korunur.
+	const AMMOCharacter* OwnerCharacter = Cast<AMMOCharacter>(GetOwner());
+	const UMMOStatsComponent* Stats = OwnerCharacter ? OwnerCharacter->GetStats() : nullptr;
+	const int32 SavedLevel = FMath::Clamp(In.Level, 1, Stats ? Stats->MaxLevel : 80);
+	for (int32& Rank : MasteryRankArray)
+	{
+		Rank = FMath::Clamp(Rank, 0, SavedLevel);
 	}
 	// Eski Priest kayitlari, Ceza baslangic skili eklenmeden once yalnizca Kutsal Isik'i
 	// sakliyordu. Ogrenilmis skili tamamla; oyuncunun dolu hotbar slotlarina dokunma.
