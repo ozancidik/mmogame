@@ -182,7 +182,7 @@ int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 	return FMath::RoundToInt(Clamped);
 }
 
-void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill)
+void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill, bool bPreserveCurrentVitals)
 {
 	const float OldMaxHealth = MaxHealth;
 	const float OldMaxMana = MaxMana;
@@ -206,6 +206,11 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill)
 	{
 		Health = MaxHealth;
 		Mana = MaxMana;
+	}
+	else if (bPreserveCurrentVitals)
+	{
+		Health = FMath::Clamp(Health, 0.f, MaxHealth);
+		Mana = FMath::Clamp(Mana, 0.f, MaxMana);
 	}
 	else
 	{
@@ -399,7 +404,10 @@ bool UMMOStatsComponent::SpendStatPoint(FName StatName, int32 Amount)
 	}
 
 	UnspentStatPoints -= Amount;
-	RecalculateDerivedStats(/*bRefill=*/false);
+	// Puani VIT/INT'e yatirmak maksimumu buyutur, mevcut can/mana eklemez.
+	// Aksi halde sinif degisimiyle iade edilen puanlar yeniden harcanarak
+	// bekleme suresinde sinirsiz anlik iyilesme/mana yenilemesi saglayabiliyordu.
+	RecalculateDerivedStats(/*bRefill=*/false, /*bPreserveCurrentVitals=*/true);
 	return true;
 }
 

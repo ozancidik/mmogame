@@ -304,7 +304,7 @@ public:
 protected:
 	// Ana statlardan türetilmiş statları yeniden hesaplar (MaxHealth/MaxMana/AttackPower/Defense).
 	// bRefill true ise anlık can/manayı maksimuma çeker (level-up / spawn anında).
-	void RecalculateDerivedStats(bool bRefill);
+	void RecalculateDerivedStats(bool bRefill, bool bPreserveCurrentVitals = false);
 
 	// Bir sonraki seviye için gereken deneyimi hesaplar.
 	int32 ComputeExperienceForLevel(int32 InLevel) const;

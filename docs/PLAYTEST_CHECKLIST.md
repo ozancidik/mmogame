@@ -2337,3 +2337,11 @@ normal ve elit spawner'lari etkinlestirildi; PIE oynanis dogrulamasi henuz yapil
 - [ ] Obsidyen setinin dort parcasini Lv25'te giy; elitin iki bagimsiz %50 loot zarini ve +3..+5 sinirlarini PIE'de gozle.
 - [ ] Normal spawner (-2800,-1800), yaricap 225: 150/225u halkalarindaki 64 probda zemin ve bagli navmesh bulundu. Rastgele mob dogumlarini ve bolgeden PlayerStart'a gercek yuru-yolunu PIE'de dogrula.
 - [ ] Elit spawner (-4000,0), yaricap 150: 150/200u halkalarindaki 64 probda zemin ve bagli navmesh bulundu. Normal bolgeye 2163u mesafe ve tam nav yolu var; elitin normal alana/hub'a cekilmedigini PIE'de dogrula.
+
+## Stat puani ile anlik can/mana doldurma acigi (2026-09-28)
+
+`SpendStatPoint` artik VIT/INT yatirimindan onceki mevcut can ve manayi koruyup yeni maksimuma kirpiyor. Sinif degisiminde iade edilen puanlarla eski delta hesabini tekrarlayarak can/mana doldurma yolu kapatildi. UE 5.7 derlemesi basarili; PIE oynanis dogrulamasi bekliyor.
+
+- [ ] Hasar almis Lv40 karakterde sinif degistirip iade edilen puanlari VIT'e bas: maksimum can artsin, mevcut can ayni kalsin.
+- [ ] Mana harcadiktan sonra INT'e puan yatir: maksimum mana artsin, mevcut mana ayni kalsin.
+- [ ] Yeni maksimum mevcut can/manadan kucukse degerler yalnizca yeni maksimuma kirpilsin; negatif deger olmasin.
