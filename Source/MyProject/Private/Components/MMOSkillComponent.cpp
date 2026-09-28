@@ -15,6 +15,20 @@
 #include "Net/UnrealNetwork.h"
 #include "Save/MMOSaveGame.h"
 
+namespace
+{
+	int64 GetUtcCooldownExpirySeconds(const FDateTime& UtcNow, float RemainingSeconds)
+	{
+		const FDateTime ExactExpiry = UtcNow + FTimespan::FromSeconds(RemainingSeconds);
+		int64 ExpirySeconds = ExactExpiry.ToUnixTimestamp();
+		if (FDateTime::FromUnixTimestamp(ExpirySeconds) < ExactExpiry)
+		{
+			++ExpirySeconds;
+		}
+		return ExpirySeconds;
+	}
+}
+
 UMMOSkillComponent::UMMOSkillComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -86,15 +100,7 @@ void UMMOSkillComponent::RequestSetupForClass(EMMOClass NewClass)
 	}
 	else
 	{
-		// Ayni sinif istemcide de elenebilir (CharacterClass replike); kesin karar sunucuda.
-		if (NewClass == CharacterClass)
-		{
-			if (GEngine && IsLocallyControlledOwner())
-			{
-				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Zaten bu siniftasin"));
-			}
-			return;
-		}
+		// Ilk Warrior secimi de sunucuda kabul edilmeli; replike sinif tek basina yeterli degil.
 		ServerSetupForClass(NewClass);
 	}
 }
@@ -124,7 +130,12 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 
 	if (NewClass == CharacterClass)
 	{
-		if (bLocalFeedback)
+		// Yeni karakterde varsayilan Warrior secimini de gecerli bir secim say.
+		if (Owner && Owner->bClassChoicePending && S && !S->bIsDead)
+		{
+			Owner->bClassChoicePending = false;
+		}
+		else if (bLocalFeedback)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Zaten bu siniftasin"));
 		}
@@ -609,6 +620,11 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	{
 		return false;
 	}
+	if (Def->Effect == EMMOSkillEffect::MeleeDamage || Def->Effect == EMMOSkillEffect::RangedDamage
+		|| Def->Effect == EMMOSkillEffect::AoESelf || Def->Effect == EMMOSkillEffect::AoETarget)
+	{
+		Owner->GetStats()->MarkCombatActivity();
+	}
 
 	ExecuteSkill(Owner, *Def);
 	CooldownEndTimes.Add(SkillId, Now + Def->Cooldown);
@@ -647,6 +663,27 @@ void UMMOSkillComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 	Out.LearnedSkills = LearnedSkills;
 	Out.Hotbar = Hotbar;
 	Out.MasteryRanks = MasteryRankArray;
+	Out.ClassChangeCooldownExpiryUtcSeconds = 0;
+	Out.SkillCooldownExpiryUtcSeconds.Reset();
+	if (const UWorld* World = GetWorld())
+	{
+		const float WorldNow = World->GetTimeSeconds();
+		const FDateTime UtcNow = FDateTime::UtcNow();
+		// Unix saniyesine yukari yuvarla; kesirli saniye cooldown'u erken bitirmesin.
+		const float ClassRemaining = ClassChangeCooldownSec - (WorldNow - LastClassChangeTime);
+		if (ClassRemaining > 0.f)
+		{
+			Out.ClassChangeCooldownExpiryUtcSeconds = GetUtcCooldownExpirySeconds(UtcNow, ClassRemaining);
+		}
+		for (const TPair<FName, float>& Cooldown : CooldownEndTimes)
+		{
+			const float Remaining = Cooldown.Value - WorldNow;
+			if (Remaining > 0.f)
+			{
+				Out.SkillCooldownExpiryUtcSeconds.Add(Cooldown.Key, GetUtcCooldownExpirySeconds(UtcNow, Remaining));
+			}
+		}
+	}
 }
 
 void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
@@ -670,7 +707,61 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	{
 		MasteryRankArray.SetNum(MasteryTreeCount);
 	}
+	// Eski Priest kayitlari, Ceza baslangic skili eklenmeden once yalnizca Kutsal Isik'i
+	// sakliyordu. Ogrenilmis skili tamamla; oyuncunun dolu hotbar slotlarina dokunma.
+	if (CharacterClass == EMMOClass::Priest && LearnedSkills.Contains(TEXT("Pri_HolyLight"))
+		&& !LearnedSkills.Contains(TEXT("Pri_Smite")))
+	{
+		LearnedSkills.Add(TEXT("Pri_Smite"));
+		if (Hotbar.IsValidIndex(1) && Hotbar[1].IsNone())
+		{
+			Hotbar[1] = TEXT("Pri_Smite");
+		}
+	}
 	CooldownEndTimes.Reset();
+	LastClassChangeTime = -1000.f;
+	if (const UWorld* World = GetWorld())
+	{
+		const float WorldNow = World->GetTimeSeconds();
+		const FDateTime UtcNow = FDateTime::UtcNow();
+		TArray<FName> SkillIds;
+		TArray<float> RemainingSeconds;
+		if (In.ClassChangeCooldownExpiryUtcSeconds > UtcNow.ToUnixTimestamp())
+		{
+			const float Remaining = static_cast<float>((FDateTime::FromUnixTimestamp(In.ClassChangeCooldownExpiryUtcSeconds) - UtcNow).GetTotalSeconds());
+			LastClassChangeTime = WorldNow + Remaining - ClassChangeCooldownSec;
+		}
+		for (const TPair<FName, int64>& Cooldown : In.SkillCooldownExpiryUtcSeconds)
+		{
+			if (Cooldown.Value > UtcNow.ToUnixTimestamp())
+			{
+				const float Remaining = static_cast<float>((FDateTime::FromUnixTimestamp(Cooldown.Value) - UtcNow).GetTotalSeconds());
+				CooldownEndTimes.Add(Cooldown.Key, WorldNow + Remaining);
+				SkillIds.Add(Cooldown.Key);
+				RemainingSeconds.Add(Remaining);
+			}
+		}
+		if (!IsLocallyControlledOwner())
+		{
+			ClientRestoreSkillCooldowns(SkillIds, RemainingSeconds);
+		}
+	}
+}
+
+void UMMOSkillComponent::ClientRestoreSkillCooldowns_Implementation(const TArray<FName>& SkillIds, const TArray<float>& RemainingSeconds)
+{
+	CooldownEndTimes.Reset();
+	if (const UWorld* World = GetWorld())
+	{
+		const float WorldNow = World->GetTimeSeconds();
+		for (int32 Index = 0; Index < SkillIds.Num() && Index < RemainingSeconds.Num(); ++Index)
+		{
+			if (RemainingSeconds[Index] > 0.f)
+			{
+				CooldownEndTimes.Add(SkillIds[Index], WorldNow + RemainingSeconds[Index]);
+			}
+		}
+	}
 }
 
 AMMOCharacter* UMMOSkillComponent::FindNearestEnemy(float Range) const

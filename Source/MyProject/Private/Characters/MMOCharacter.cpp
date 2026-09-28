@@ -707,6 +707,8 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 
 	// Saldiran oyuncu canlanma korumasini kaybeder (dokunulmazken vurmasin).
 	EndSpawnProtection();
+	// Uzak menzilden hasar almadan saldiran oyuncu da savastadir; sinif degistiremez.
+	Stats->MarkCombatActivity();
 
 	// Hedefe don ve vur.
 	const FVector Dir = (Victim->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
@@ -1220,17 +1222,17 @@ void AMMOCharacter::MMOClass(const FString& ClassName)
 		return;
 	}
 
-	const FString C = ClassName.ToLower();
+	const FString C = ClassName.TrimStartAndEnd().ToLower();
 	EMMOClass NewClass = EMMOClass::Warrior;
-	if (C == TEXT("warrior") || C == TEXT("savasci"))
+	if (C == TEXT("warrior") || C == TEXT("savasci") || C == TEXT("savaşçı"))
 	{
 		NewClass = EMMOClass::Warrior;
 	}
-	else if (C == TEXT("archer") || C == TEXT("okcu"))
+	else if (C == TEXT("archer") || C == TEXT("okcu") || C == TEXT("okçu"))
 	{
 		NewClass = EMMOClass::Archer;
 	}
-	else if (C == TEXT("mage") || C == TEXT("buyucu"))
+	else if (C == TEXT("mage") || C == TEXT("buyucu") || C == TEXT("büyücü"))
 	{
 		NewClass = EMMOClass::Mage;
 	}
@@ -1248,8 +1250,5 @@ void AMMOCharacter::MMOClass(const FString& ClassName)
 		return;
 	}
 
-	// Oyuncu sinif komutunu bir kez kullandi: yeni karakter ipucunu gizle (ayni sinifi
-	// secip varsayilani kabul etse bile).
-	bClassHintDismissed = true;
 	SkillComponent->RequestSetupForClass(NewClass);
 }

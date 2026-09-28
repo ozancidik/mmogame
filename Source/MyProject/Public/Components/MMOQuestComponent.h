@@ -83,4 +83,8 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerClaimReward(FName QuestId);
+
+	// Odul verilemediginde nedeni yalnizca gorevi almaya calisan oyuncuya bildir.
+	UFUNCTION(Client, Reliable)
+	void ClientClaimRewardFailed(const FString& Reason);
 };

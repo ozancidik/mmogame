@@ -135,6 +135,6 @@ public:
 	static const FMMOMobArchetype& GetRandom();
 
 	// Seviye bandina (MinLv..MaxLv, dahil) uyan non-elit moblardan rastgele sec.
-	// 0 = o yonde sinir yok. Banda uyan mob yoksa GUVENLE GetRandom()'a duser (crash yok).
-	static const FMMOMobArchetype& GetRandomInLevelRange(int32 MinLv, int32 MaxLv);
+	// 0 = o yonde sinir yok. Gecersiz/bos band icin nullptr doner; cagrilan spawner spawn etmez.
+	static const FMMOMobArchetype* GetRandomInLevelRange(int32 MinLv, int32 MaxLv);
 };

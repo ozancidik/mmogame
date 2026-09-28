@@ -148,9 +148,11 @@ void AMMOHUD::DrawHUD()
 		DrawStatWindow(MMOChar);
 	}
 
-	// Yeni karakter sinif secimi ipucu: ust-ortada (hedef barinin altinda) kucuk kalici panel.
-	// Sinif degisince (replike bayrak) ya da oyuncu MMOClass'i bir kez kullaninca kaybolur.
-	if (MMOChar->ShouldShowClassHint())
+	// Acik pencerelerin basliklarini kapatmamasi icin ipucunu pencereler kapanana kadar gizle.
+	// Secim yapilmadiysa pencere kapatildiginda tekrar gorunur.
+	const bool bAnyWindowOpen = bQuestWindowOpen || bSkillBookOpen || bInventoryOpen ||
+		bShopOpen || bStatWindowOpen;
+	if (MMOChar->ShouldShowClassHint() && !bAnyWindowOpen)
 	{
 		const FString Hint = TEXT("Sinifini sec: konsolda MMOClass savasci|okcu|buyucu|rahip (varsayilan: Savasci)");
 		const float HintScale = 1.1f;

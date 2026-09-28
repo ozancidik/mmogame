@@ -2248,3 +2248,80 @@ surer. Mob korumali oyuncunun dibinde bekler, koruma biter bitmez vurur. Ulasila
       Basic'e rutbe yatirmak Rahip'e yeni skil acmiyor (Buyucu'da da zaten boyle). Eski (bu
       degisiklikten once kaydedilmis) Lv1 Rahip kaydinda Ceza ogrenilmis gelmez; Basic'e 1 rutbe
       yatirinca acilir.
+
+---
+
+# QA denetimi: b5d4567 (sinif ipucu paneli + Turkce sinif adlari + Rahip Lv1 Ceza) (2026-09-24)
+
+> Derleme: editor kapali, degisen 4 .cpp + 2 .h zorla yeniden derlendi (4 unity dosyasi + link),
+> **0 uyari / 0 hata, Result: Succeeded**. Kritik (coker/yanlis otorite) bulgu YOK. Asagidakiler
+> kod okumasinda cikan ACIK noktalar; yukaridaki bolumdeki adimlari tekrarlamaz.
+
+- [ ] **[BUG ADAYI - LOW/MEDIUM] Reddedilen sinif degisimi paneli yine de kapatiyor:** Kaydi sil →
+      Play → koruma bitince bir moba vur ve hasar al (savasta) → hemen `MMOClass buyucu` →
+      "Savasta sinif degistirilemez" mesaji cikar, sinif Savasci kalir → **panel KAYBOLDU mu?**
+      Kod `bClassHintDismissed`'i sunucu cevabini beklemeden yerelde true yapiyor
+      (MMOCharacter.cpp:1253), bu yuzden panel kaybolur ve bir daha gelmez. Ayni durum olu iken
+      (`MMODamage 9999` → oluyken `MMOClass okcu`) icin de dene. Beklenen: sinif gercekten
+      degismediyse panel kalmali (ya da en azindan bu davranis kabul edilmeli).
+- [ ] **Panel acik pencerelerin USTUNE ciziliyor (HUD cakismasi):** Yeni karakterde panel
+      gorunurken (a) bir saticiya E ile konus → SATICI penceresi (ust-orta, y=90) acikken panel
+      "SATICI" basligini/Altin satirini ve sag ustteki X kapat dugmesinin yakinini ORTUYOR mu?
+      (b) Gorev penceresini ac (ust-orta-sol, y=90) → "GOREVLER" basligi ortuluyor mu?
+      (c) PIE penceresini kucuk boyutta (~1280 genislik) oynat → K (skill kitabi, sol, y=90) ve
+      envanter (sag, y=90) basliklariyla da cakisiyor mu? Panel y=84..~116 arasi ve pencerelerden
+      SONRA ciziliyor. Tiklamalar etkilenmez (sadece gorsel) ama baslik okunmuyorsa bildir.
+- [ ] **Hedef bari ile cakisma yok (dogrulama):** Yeni karakterde bir mob sec (tikla) → hedef bari
+      (y ~8-44) ile panel (y 84+) arasinda bosluk olmali, ust uste binmemeli.
+- [ ] **Eski kayitli Rahip (bu commit ONCESI kayit varsa):** Lv1 Rahip kaydiyla gir → hotbar'da
+      sadece Kutsal Isik var, Ceza YOK (ApplySaveData GrantStarterSkill cagirmiyor). K'da Ceza'ya
+      tikla → Lv1'de skill puani 0 oldugu icin "1 skill puani gerekli" → Ceza ancak Lv2'de puan
+      harcayarak gelir; yeni Rahip ise bedava aliyor. Ayrica Lv2+ eski Rahip'in Basic'e yatirdigi
+      1 rutbe artik "bosa" (iade yok, sinif degisimi disinda). Kabul mu, migrasyon mu karar ver.
+- [ ] **Turkce karakterli ad:** `MMOClass savaşçı`, `MMOClass okçu`, `MMOClass büyücü` →
+      "Gecersiz sinif" mesaji mi geliyor? (Kod sadece ASCII takma adlari taniyor.) Oyuncu panelde
+      ASCII yazili hali goruyor, ama Turkce klavyede refleksle ş/ç/ü yazilabilir — bildir.
+- [ ] **Rahip degistir-geri-degistir (Lv1):** Yeni karakter → `MMOClass rahip` → hotbar 1=Kutsal
+      Isik, 2=Ceza → 60 sn bekle → `MMOClass savasci` → hotbar'da SADECE slot 1=Guclu Vurus, slot 2
+      BOS olmali (Ceza kalmamali) → 60 sn bekle → `MMOClass rahip` → yine 1=Kutsal Isik, 2=Ceza;
+      K penceresinde her skil TEK kez gorunmeli, skill puani 0 kalmali.
+- [ ] **Kaydet-yukle Rahip hotbar'i:** Rahip sec → hotbar'da Ceza'yi slot 5'e tasi → `MMOSave` →
+      Stop → Play → Ceza slot 5'te olmali (PossessedBy'daki starter yerlestirmesi kaydi EZMEMELI),
+      slot 2 kayittaki hali neyse o.
+- [ ] **Onceki bolumdeki "Priest adi tutarsizligi" maddesi (fa1630f) bu commit ile kapanmis
+      olmali:** `MMOClass priest` → ekran mesaji, HUD sol ust ("Lv 1  Rahip"), K basligi, parti
+      paneli ve C/karakter penceresi basligi HEPSI "Rahip" demeli; `MMOClass rahip` calismali.
+
+### Saglam bulunanlar (b5d4567 kod incelemesi)
+- Enum `DisplayName "Priest"→"Rahip"`: sadece editor gosterimi; SaveGame/replikasyon/Blueprint
+  pinleri enum ADINI (`EMMOClass::Priest`) ve deger byte'ini kullanir → eski kayit uyumu bozulmaz.
+  Content'te `EMMOClass`/`MMOSkillComponent` referansi yok; kodda `GetDisplayValueAsText` vb.
+  enum DisplayName okuyan yer yok. Tum sinif adlari tek `GetMMOClassDisplayName`'den (5 kullanim).
+- `bClassChoicePending`: sadece otoritede yaziliyor (LoadCharacter `HasAuthority` korumali,
+  ChangeClass `HasAuthorityInternal` korumali), `COND_OwnerOnly` ile sadece sahibine gidiyor,
+  `FillSaveData`'ya girmiyor (kayda yazilmiyor). HUD her kare okudugu icin OnRep gerekmiyor.
+  Istemci bayragi sunucuda degistiremez; yerel `bClassHintDismissed` sadece kozmetik.
+- `GrantStarterSkill`: Savasci (Guclu Vurus Lv1 / Kalkan Vurusu Lv2), Okcu (Cabuk Atis Lv1 /
+  Guclu Atis Lv2), Buyucu (tek Basic: Buz Oku Lv1) → hepsi yine TEK starter, slot 0; davranis
+  degismedi. Rahip: Kutsal Isik + Ceza (ikisi Lv1). `AddUnique` + cagri oncesi `LearnedSkills.Reset`
+  / `Hotbar.Init` → cift ogrenme / hotbar cakismasi yok (SetupForClass ve ChangeClass'ta).
+- `RequiredMasteryRank <= RequiredLevel`: tum 61 skil tarandi, ihlal yok (Ceza 1<=1).
+- Yeni Rahip Basic'e yanlislikla puan yatiramaz: tek yatirim yolu HUD'da ogrenilMEMIS skile
+  tiklamak (`LearnSkill→CanLearn`), iki Basic skil de ogrenilmis → "Zaten ogrenildi"; bosa puan yok.
+- `ServerSetupForClass` gecersiz enum reddi ve 60 sn/savas/olum kapilari degismedi;
+  `LastClassChangeTime=-1000` → ilk secim bekleme mesajina takilmiyor.
+
+---
+
+# 2026-09-28 entegrasyon duzeltmeleri (PIE'de henuz oynanmadi)
+
+- [ ] Yeni karakterde `MMOClass buyucu` istegini savasta reddettir: sinif secim ipucu ekranda kalmali. Savas disinda gecerli secim yapinca ipucu kapanmali. Varsayilan `MMOClass savasci` secimi de ipucunu kapatmali.
+- [ ] Sinif secim ipucu gorunurken Gorev, Satici, Skill, Envanter ve Stat pencerelerini ayri ayri ac: acik pencerenin basligi ortulmemeli; pencereyi kapatinca ipucu geri gelmeli.
+- [ ] `MMOClass savaşçı`, `MMOClass okçu`, `MMOClass büyücü` ve `MMOClass rahip` yazimlarini dene; Turkce karakterli adlar kabul edilmeli.
+- [ ] Eski Lv1 Rahip kaydini yukle: Ceza ogrenilmis olmali; 2. hotbar yeri bossa oraya gelmeli, doluysa oyuncunun atamasi korunmali.
+- [ ] Sinif degistirip kaydet, cik ve 60 saniye dolmadan ayni slota baglan: ikinci sinif degisimi reddedilmeli. Bekleme bitince kabul edilmeli.
+- [ ] Uzun cooldown'lu bir skill kullanip hemen kaydet/cik/gir: skill sunucuda beklemeli, istemci HUD'unda kalan sure gorunmeli; sure bitince tekrar kullanilabilmeli.
+- [ ] Okcu ile uzaktan moba vurup hasar almadan `MMOClass buyucu` dene: saldiri sonrasi 5 saniye savasta sayilmali. Hasar skiliyle ayni kontrolu tekrarla.
+- [ ] Mob zehrini hub disinda alip 700 birimlik guvenli alana gir: alandaki periyodik mob hasari durmali. Guvenli alan disinda zehir hasari normal surmeli; oyuncunun moba attigi zehir etkilenmemeli.
+- [ ] Ekipman cantasini 12/12 doldurup ekipman odullu gorevi teslim et: XP/altin/ekipman verilmemeli, gorev teslim edilebilir kalmali ve neden oyuncuya gorunmeli. Bir yer bosaltip yeniden teslim edince odul tek kez verilmeli.
+- [ ] Bos bir seviye bandi (ornegin 25..30) ayarlanmis test spawner'i yarat: Goblin gibi baska seviyeden mob dogmamali, logda band hatasi bir kez gorunmeli. Mevcut dolu band spawner'lari normal calismali.

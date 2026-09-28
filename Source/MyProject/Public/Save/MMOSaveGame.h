@@ -78,6 +78,13 @@ struct FMMOCharacterSaveData
 	UPROPERTY(SaveGame)
 	TArray<int32> MasteryRanks;
 
+	// UTC Unix bitis saniyeleri. Eski kayitlarda 0/bos: aktif cooldown yok.
+	UPROPERTY(SaveGame)
+	int64 ClassChangeCooldownExpiryUtcSeconds = 0;
+
+	UPROPERTY(SaveGame)
+	TMap<FName, int64> SkillCooldownExpiryUtcSeconds;
+
 	// Gorevler
 	UPROPERTY(SaveGame)
 	TArray<FMMOQuestProgress> ActiveQuests;

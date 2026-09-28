@@ -70,10 +70,7 @@ public:
 	UPROPERTY(Replicated)
 	bool bClassChoicePending = false;
 
-	// Oyuncu MMOClass komutunu bir kez kullandiysa ipucu yerelde gizlenir (replike degil).
-	bool bClassHintDismissed = false;
-
-	bool ShouldShowClassHint() const { return bClassChoicePending && !bClassHintDismissed; }
+	bool ShouldShowClassHint() const { return bClassChoicePending; }
 
 	// --- Kalicilik (kaydet/yukle) ---
 	UFUNCTION(Exec)

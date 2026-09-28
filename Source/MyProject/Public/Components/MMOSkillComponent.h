@@ -156,6 +156,10 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerSetupForClass(EMMOClass NewClass);
 
+	// Kayittan yuklenen sunucu cooldown'larini sahip istemcinin dunya saatine uyarlar.
+	UFUNCTION(Client, Reliable)
+	void ClientRestoreSkillCooldowns(const TArray<FName>& SkillIds, const TArray<float>& RemainingSeconds);
+
 	// Sinif degisimleri arasi bekleme (sunucu, saniye) ve son degisim zamani.
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Skills", meta = (ClampMin = "0"))
 	float ClassChangeCooldownSec = 60.f;

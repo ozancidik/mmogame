@@ -74,12 +74,23 @@ void AMMOMobSpawner::SpawnOne()
 
 	// Spawn edilecek arketipi belirle:
 	//  - ForcedArchetypeId varsa onu kullan (world boss / elit).
-	//  - Yoksa ve seviye-bandi ayarliysa (Min>0 || Max>0) banddan sec.
+	//  - Yoksa ve seviye-bandi ayarliysa banddan sec; gecersiz/bos band spawn etmez.
 	//  - Hicbiri yoksa arketipi bos birak: mob kendi BeginPlay'inde rastgele secer (mevcut davranis).
 	FName ChosenArchetype = ForcedArchetypeId;
-	if (ChosenArchetype.IsNone() && (MinMobLevel > 0 || MaxMobLevel > 0))
+	if (ChosenArchetype.IsNone() && (MinMobLevel != 0 || MaxMobLevel != 0))
 	{
-		ChosenArchetype = FMMOMobDatabase::GetRandomInLevelRange(MinMobLevel, MaxMobLevel).ArchetypeId;
+		const FMMOMobArchetype* BandMob = FMMOMobDatabase::GetRandomInLevelRange(MinMobLevel, MaxMobLevel);
+		if (!BandMob)
+		{
+			if (!bInvalidBandReported)
+			{
+				UE_LOG(LogTemp, Error, TEXT("[MMODBG] Spawner %s: invalid or empty normal-mob level band [%d, %d]; spawning nothing"),
+					*GetName(), MinMobLevel, MaxMobLevel);
+				bInvalidBandReported = true;
+			}
+			return;
+		}
+		ChosenArchetype = BandMob->ArchetypeId;
 	}
 
 	AMMOMob* Mob = nullptr;

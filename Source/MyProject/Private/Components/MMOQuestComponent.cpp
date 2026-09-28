@@ -308,6 +308,24 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	}
 
 	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	// Tum odulleri vermeden once ekipman icin yer ayir; aksi halde XP/altin verilip
+	// gorev tamamlanirken AddEquipmentInstance dolu cantada sessizce basarisiz olur.
+	if (!Def->RewardEquipmentId.IsNone())
+	{
+		UMMOInventoryComponent* Inv = Owner ? Owner->GetInventory() : nullptr;
+		if (!Inv || !FMMOItemDatabase::Find(Def->RewardEquipmentId))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Quest %s has an unavailable equipment reward %s"),
+				*QuestId.ToString(), *Def->RewardEquipmentId.ToString());
+			ClientClaimRewardFailed(TEXT("Gorev ekipman odulu su an verilemiyor."));
+			return;
+		}
+		if (Inv->EquipmentBag.Num() >= UMMOInventoryComponent::MaxBagSize)
+		{
+			ClientClaimRewardFailed(TEXT("Ekipman cantasi dolu. Yer acip gorev odulunu tekrar al."));
+			return;
+		}
+	}
 	if (Owner)
 	{
 		if (Owner->GetStats() && Def->RewardXP > 0)
@@ -349,6 +367,14 @@ void UMMOQuestComponent::ServerClaimReward_Implementation(FName QuestId)
 		return;
 	}
 	ClaimReward(QuestId);
+}
+
+void UMMOQuestComponent::ClientClaimRewardFailed_Implementation(const FString& Reason)
+{
+	if (GEngine && IsLocallyControlledOwner())
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(255, 120, 80), Reason);
+	}
 }
 
 void UMMOQuestComponent::FillSaveData(FMMOCharacterSaveData& Out) const

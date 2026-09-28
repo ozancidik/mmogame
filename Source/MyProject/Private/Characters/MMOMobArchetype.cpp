@@ -283,8 +283,13 @@ const FMMOMobArchetype& FMMOMobDatabase::GetRandom()
 	return All[NormalIndices[FMath::RandRange(0, NormalIndices.Num() - 1)]];
 }
 
-const FMMOMobArchetype& FMMOMobDatabase::GetRandomInLevelRange(int32 MinLv, int32 MaxLv)
+const FMMOMobArchetype* FMMOMobDatabase::GetRandomInLevelRange(int32 MinLv, int32 MaxLv)
 {
+	if (MinLv < 0 || MaxLv < 0 || (MinLv > 0 && MaxLv > 0 && MinLv > MaxLv))
+	{
+		return nullptr;
+	}
+
 	// Non-elit + seviye bandina uyanlari topla (0 = o yonde sinir yok).
 	const TArray<FMMOMobArchetype>& All = GetAll();
 
@@ -306,10 +311,9 @@ const FMMOMobArchetype& FMMOMobDatabase::GetRandomInLevelRange(int32 MinLv, int3
 		BandIndices.Add(i);
 	}
 
-	// Banda uyan yoksa guvenli fallback: mevcut normal-havuz secimi.
 	if (BandIndices.Num() == 0)
 	{
-		return GetRandom();
+		return nullptr;
 	}
-	return All[BandIndices[FMath::RandRange(0, BandIndices.Num() - 1)]];
+	return &All[BandIndices[FMath::RandRange(0, BandIndices.Num() - 1)]];
 }

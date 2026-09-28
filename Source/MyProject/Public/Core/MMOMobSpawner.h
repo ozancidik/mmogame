@@ -33,7 +33,7 @@ public:
 	FName ForcedArchetypeId;
 
 	// Opsiyonel seviye-bandi filtresi (yalniz ForcedArchetypeId bosken rastgele secimde etkili).
-	// 0 = o yonde sinir yok (varsayilan; mevcut davranis aynen korunur). Ikisinden en az biri >0 ise
+	// 0 = o yonde sinir yok (varsayilan; mevcut davranis aynen korunur). Ikisinden biri sifir degilse
 	// GetRandomInLevelRange kullanilir.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	int32 MinMobLevel = 0;
@@ -52,6 +52,7 @@ protected:
 	TArray<TWeakObjectPtr<AMMOMob>> LiveMobs;
 
 	FTimerHandle TopUpTimer;
+	bool bInvalidBandReported = false;
 
 	void TopUp();
 	void SpawnOne();

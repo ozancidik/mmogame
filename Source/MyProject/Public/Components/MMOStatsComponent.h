@@ -254,7 +254,10 @@ public:
 	 */
 	void ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 SpentSkillPoints);
 
-	/** Son hasardan bu yana CombatDuration gecmediyse true (sadece otoritede anlamli; LastDamageTime replike degil). */
+	/** Sunucuda yapilan dusmanca eylemi savas zamanlayicisina isler. */
+	void MarkCombatActivity();
+
+	/** Son alinan hasar veya dusmanca eylemden beri CombatDuration gecmediyse true. */
 	bool IsInCombat() const;
 
 	// Belirli tipteki tum aktif efektlerin Magnitude toplami (turetilmis stat/hiz hesabi, mob vurusu icin).
@@ -326,8 +329,8 @@ protected:
 	float EquipmentAttackBonus = 0.f;
 	float EquipmentDefenseBonus = 0.f;
 
-	// Son hasar alma zamani (savaş içi/dışı yenilenme için; replike değil).
-	float LastDamageTime = -100.f;
+	// Son alinan hasar veya saldiri zamani (savas ici/disi yenilenme icin; replike degil).
+	float LastCombatActivityTime = -100.f;
 
 	// --- OnRep fonksiyonları: istemcide değer değişince UI delegate'lerini tetikler ---
 	UFUNCTION()

@@ -12,6 +12,7 @@
 #include "Engine/World.h"
 #include "UI/MMOHUD.h"
 #include "Save/MMOSaveGame.h"
+#include "Characters/MMOMob.h"
 
 UMMOStatsComponent::UMMOStatsComponent()
 {
@@ -51,7 +52,7 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		return;
 	}
 
-	const bool bInCombat = (World->GetTimeSeconds() - LastDamageTime) < CombatDuration;
+	const bool bInCombat = (World->GetTimeSeconds() - LastCombatActivityTime) < CombatDuration;
 	const float Mult = bInCombat ? CombatRegenMult : 1.f;
 
 	if (Health < MaxHealth)
@@ -233,7 +234,7 @@ float UMMOStatsComponent::ApplyDamage(float RawDamage, AActor* /*DamageInstigato
 
 	if (const UWorld* World = GetWorld())
 	{
-		LastDamageTime = World->GetTimeSeconds();
+		LastCombatActivityTime = World->GetTimeSeconds();
 	}
 
 	// Defense hasarı azaltır ama en az 1 hasar geçer.
@@ -478,7 +479,18 @@ void UMMOStatsComponent::ResetPointsForClassChange(int32 NewStrength, int32 NewD
 bool UMMOStatsComponent::IsInCombat() const
 {
 	const UWorld* World = GetWorld();
-	return World && (World->GetTimeSeconds() - LastDamageTime) < CombatDuration;
+	return World && (World->GetTimeSeconds() - LastCombatActivityTime) < CombatDuration;
+}
+
+void UMMOStatsComponent::MarkCombatActivity()
+{
+	if (HasAuthorityInternal())
+	{
+		if (const UWorld* World = GetWorld())
+		{
+			LastCombatActivityTime = World->GetTimeSeconds();
+		}
+	}
 }
 
 void UMMOStatsComponent::SetEquipmentBonuses(float AttackBonus, float DefenseBonus)
@@ -699,6 +711,19 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 		}
 		else // PeriodicDamage (DoT) — oldurme XP kredisi icin sahibin TakeDamage akisindan gecir.
 		{
+			// Mob zehiri guvenli bolgeye giren oyuncuyu oldurmemeli. Oyuncunun moba
+			// uyguladigi DoT bu kapidan etkilenmez.
+			if (const AMMOMob* SourceMob = Cast<AMMOMob>(P.Instigator))
+			{
+				if (const AMMOCharacter* Player = Cast<AMMOCharacter>(GetOwner()))
+				{
+					if (Player->IsPlayerControlled() && SourceMob->bHasHub && SourceMob->HubSafeRadius > 0.f
+						&& FVector::Dist2D(Player->GetActorLocation(), SourceMob->HubLocation) < SourceMob->HubSafeRadius)
+					{
+						continue;
+					}
+				}
+			}
 			AController* InstController = nullptr;
 			if (APawn* InstPawn = Cast<APawn>(P.Instigator))
 			{
