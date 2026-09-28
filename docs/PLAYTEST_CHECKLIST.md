@@ -2483,3 +2483,12 @@ UE 5.7 `MMOCharacter.cpp` yeniden derlendi; iki oyunculu PIE doğrulaması henü
 - [ ] Otomatik 60 saniyelik ve çıkıştaki kayıtlar manuel RPC sınırından etkilenmiyor.
 
 UE 5.7 `MMOCharacter.cpp/.h` yeniden derlendi; çok oyunculu PIE henüz yapılmadı. Oyuncu adı dosya adı olarak kullanıldığı için kalıcı hesap kimliği olmayan misafirlerin ad çakışması ayrıca çözülmeli.
+
+## Kayıt yuvası adının doğrulanması — 2026-09-29
+
+- [ ] `MMOSetName Ozan`, `MMOSetName Ozan Can` ve Türkçe harfli oyuncu adlarıyla kaydet/yükle akışı çalışıyor; boşluk eski `_` yuva biçimine dönüşüyor.
+- [ ] `MMOSetName` için boş, 24 karakterden uzun, `/`, `\\`, `..` veya kontrol karakteri içeren adlar reddediliyor.
+- [ ] Platformdan gelen beklenmedik PlayerState adında kayıt yuvası yol ayırıcı veya nokta içermiyor; boş güvenli ad `Default` oluyor.
+- [ ] Önceki geçerli adlarla oluşturulmuş kayıtlar aynı yuva adıyla okunuyor.
+
+UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE ve kayıt uyumu doğrulaması henüz yapılmadı. Bu biçim denetimi oyuncu kimlik doğrulaması sağlamaz: iki kişinin aynı geçerli adı seçip aynı kayda erişmesi için hesap kimliği tabanlı ayrı bir tasarım gerekir.

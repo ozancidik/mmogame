@@ -382,9 +382,26 @@ FString AMMOCharacter::GetSaveSlotName() const
 			Name = PlayerName;
 		}
 	}
-	// Slot adinda gecersiz karakter olmasin.
-	Name = Name.Replace(TEXT(" "), TEXT("_"));
-	return FString(TEXT("MMOSave_")) + Name;
+	// PlayerState adi bir platformdan da gelebilir. Yol ayirici/nokta gibi karakterleri
+	// save dosya adina tasima; bosluklarin eski kayitlardaki '_' eslemesini koru.
+	FString SafeName;
+	SafeName.Reserve(FMath::Min(Name.Len(), 32));
+	for (const TCHAR Ch : Name)
+	{
+		if (SafeName.Len() >= 32)
+		{
+			break;
+		}
+		if (FChar::IsAlnum(Ch) || Ch == TEXT('_') || Ch == TEXT('-'))
+		{
+			SafeName.AppendChar(Ch);
+		}
+		else if (Ch == TEXT(' '))
+		{
+			SafeName.AppendChar(TEXT('_'));
+		}
+	}
+	return FString(TEXT("MMOSave_")) + (SafeName.IsEmpty() ? TEXT("Default") : SafeName);
 }
 
 void AMMOCharacter::SaveCharacter()
@@ -584,9 +601,16 @@ void AMMOCharacter::MMOSetName(const FString& NewName)
 void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 {
 	const FString Trimmed = NewName.TrimStartAndEnd();
-	if (Trimmed.IsEmpty())
+	if (Trimmed.IsEmpty() || Trimmed.Len() > 24)
 	{
 		return;
+	}
+	for (const TCHAR Ch : Trimmed)
+	{
+		if (!FChar::IsAlnum(Ch) && Ch != TEXT('_') && Ch != TEXT('-') && Ch != TEXT(' '))
+		{
+			return;
+		}
 	}
 	if (APlayerState* PS = GetPlayerState())
 	{
