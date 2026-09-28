@@ -91,4 +91,7 @@ struct FMMOActiveEffect
 	float TickInterval = 0.f;
 	float TimeSinceLastTick = 0.f;
 	TWeakObjectPtr<AActor> Instigator;
+	// Mob yok edilse bile kaynak moba ait hub korumasini DoT suresince uygula.
+	FVector MobSourceHubLocation = FVector::ZeroVector;
+	float MobSourceHubRadius = 0.f;
 };

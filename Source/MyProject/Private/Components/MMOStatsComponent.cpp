@@ -569,6 +569,9 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	{
 		return;
 	}
+	const AMMOMob* SourceMob = Cast<AMMOMob>(EffectInstigator);
+	const float SourceHubRadius = (SourceMob && SourceMob->bHasHub) ? SourceMob->HubSafeRadius : 0.f;
+	const FVector SourceHubLocation = SourceMob ? SourceMob->HubLocation : FVector::ZeroVector;
 
 	// Ayni efekt zaten varsa: suresini tazele (KO tarzi yenileme; ust uste yigilmaz).
 	for (FMMOActiveEffect& E : ActiveEffects)
@@ -578,6 +581,8 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 			E.RemainingTime = Def->Duration;
 			E.TimeSinceLastTick = 0.f;
 			E.Instigator = EffectInstigator;
+			E.MobSourceHubLocation = SourceHubLocation;
+			E.MobSourceHubRadius = SourceHubRadius;
 			OnEffectsChanged.Broadcast();
 			return;
 		}
@@ -593,6 +598,8 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	A.TickInterval = Def->TickInterval;
 	A.TimeSinceLastTick = 0.f;
 	A.Instigator = EffectInstigator;
+	A.MobSourceHubLocation = SourceHubLocation;
+	A.MobSourceHubRadius = SourceHubRadius;
 	ActiveEffects.Add(A);
 
 	// Stat/hiz buff'lari aninda turetilmis degerlere yansimali.
@@ -665,6 +672,8 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 		EMMOEffectType Type;
 		float Magnitude;
 		AActor* Instigator;
+		float MobSourceHubRadius;
+		FVector MobSourceHubLocation;
 	};
 	TArray<FPendingTick> Pending;
 
@@ -679,7 +688,7 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 			while (E.TimeSinceLastTick >= E.TickInterval)
 			{
 				E.TimeSinceLastTick -= E.TickInterval;
-				Pending.Add({ E.Type, E.Magnitude, E.Instigator.Get() });
+				Pending.Add({ E.Type, E.Magnitude, E.Instigator.Get(), E.MobSourceHubRadius, E.MobSourceHubLocation });
 			}
 		}
 	}
@@ -713,12 +722,12 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 		{
 			// Mob zehiri guvenli bolgeye giren oyuncuyu oldurmemeli. Oyuncunun moba
 			// uyguladigi DoT bu kapidan etkilenmez.
-			if (const AMMOMob* SourceMob = Cast<AMMOMob>(P.Instigator))
+			if (P.MobSourceHubRadius > 0.f)
 			{
 				if (const AMMOCharacter* Player = Cast<AMMOCharacter>(GetOwner()))
 				{
-					if (Player->IsPlayerControlled() && SourceMob->bHasHub && SourceMob->HubSafeRadius > 0.f
-						&& FVector::Dist2D(Player->GetActorLocation(), SourceMob->HubLocation) < SourceMob->HubSafeRadius)
+					if (Player->IsPlayerControlled()
+						&& FVector::Dist2D(Player->GetActorLocation(), P.MobSourceHubLocation) < P.MobSourceHubRadius)
 					{
 						continue;
 					}
