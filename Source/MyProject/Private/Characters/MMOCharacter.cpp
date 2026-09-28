@@ -830,6 +830,10 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	{
 		return;
 	}
+	if (MMOTargeting::IsInsideHubSafeZone(this, GetActorLocation()))
+	{
+		return;
+	}
 
 	// Yerel cooldown kapisi (istemcide RPC spamini, sunucuda cift vurusu engeller).
 	const float Now = World->GetTimeSeconds();

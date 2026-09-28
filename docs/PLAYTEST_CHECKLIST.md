@@ -2528,3 +2528,12 @@ UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE henüz yapılmadı. Bu koruma ya
 - [ ] Mobların oyuncuya yönelik mevcut hub koruması ve uzak oyuncuların normal dövüşü korunuyor.
 
 UE 5.7 `MMOMob.cpp` ve `MMOSkillComponent.cpp` yeniden derlendi; PIE henüz yapılmadı. Güvenli alan içinden saldırı girişimi halen mana ve bekleme süresi harcayabilir; oyuncu geri bildirimi ayrıca gözlemlenmeli.
+
+## Hub saldırı girişiminde kaynak koruması — 2026-09-29
+
+- [ ] PlayerStart çevresindeki 700 birim içinde yakın dövüş saldırısı bekleme süresini başlatmıyor.
+- [ ] Aynı alanda hasar veren hedefli/AoE becerileri mana ve bekleme süresi harcamadan reddediliyor; ekranda güvenli bölge mesajı görülüyor.
+- [ ] Kendine şifa ve buff becerileri hub içinde çalışıyor.
+- [ ] Hub sınırının hemen dışında normal saldırı ve beceri kullanımı devam ediyor; istemci ve host sunucuda aynı sınırı uyguluyor.
+
+UE 5.7 `MMOTargeting.cpp`, `MMOCharacter.cpp` ve `MMOSkillComponent.cpp` yeniden derlendi; PIE henüz yapılmadı. Tasarımda mobun `HubSafeRadius` varsayılanı da 700; Blueprint'te başka bir değer verilirse bu ortak saldırı kapısı ayrıca uyarlanmalı.

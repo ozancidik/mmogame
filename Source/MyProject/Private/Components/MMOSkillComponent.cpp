@@ -565,6 +565,18 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 
 	const bool bLocalFeedback = IsLocallyControlledOwner();
 	const float Now = World->GetTimeSeconds();
+	const bool bOffensive = Def->Effect == EMMOSkillEffect::MeleeDamage
+		|| Def->Effect == EMMOSkillEffect::RangedDamage
+		|| Def->Effect == EMMOSkillEffect::AoESelf
+		|| Def->Effect == EMMOSkillEffect::AoETarget;
+	if (bOffensive && MMOTargeting::IsInsideHubSafeZone(Owner, Owner->GetActorLocation()))
+	{
+		if (GEngine && bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Guvenli bolgeden saldiramazsin"));
+		}
+		return false;
+	}
 
 	// Cooldown (her makine kendi kopyasini tutar; istemcide RPC spamini da keser).
 	const float* End = CooldownEndTimes.Find(SkillId);
