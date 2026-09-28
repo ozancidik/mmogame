@@ -2436,3 +2436,12 @@ UE 5.7 `MMOPlayerController.cpp` yeniden derlendi; PIE henüz yapılmadı.
 - [ ] Listen server ve istemci için yükleme sonrası konum replikasyonu doğru; yeni kayıt kaydedildiğinde harita adı yazılıyor.
 
 Kodda konum için zemin eğimi, kapsül yüksekliği ve navmesh projeksiyonu doğrulanıyor. UE 5.7 C++ derlemesi başarılı; PIE henüz yapılmadı.
+
+## Bozuk kayıt dosyasını otomatik kaydın ezmemesi — 2026-09-28
+
+- [ ] Geçerli eski ve yeni kayıtlar normal yükleniyor; otomatik ve manuel kaydetme çalışıyor.
+- [ ] Kayıt dosyası mevcut fakat okunamaz/`bValid=false` durumunda 60 sn otomatik kayıt, MMOSave ve EndPlay özgün dosyayı değiştirmiyor; logda hata görülüyor.
+- [ ] Kayıt dosyası hiç yoksa yeni karakter sınıf seçimiyle başlıyor ve sonrasında kaydediliyor.
+- [ ] Başarılı yüklemeden sonra manuel MMOLoad ile bozuk dosya denenirse sonraki otomatik/manuel kayıt dosyayı ezmiyor.
+
+UE 5.7 C++ derlemesi başarılı; bozuk dosya senaryoları PIE'de henüz uygulanmadı.

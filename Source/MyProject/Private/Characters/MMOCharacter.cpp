@@ -295,7 +295,7 @@ FString AMMOCharacter::GetSaveSlotName() const
 
 void AMMOCharacter::SaveCharacter()
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || !bInitialLoadComplete)
 	{
 		return;
 	}
@@ -343,13 +343,9 @@ bool AMMOCharacter::LoadCharacter()
 		return false;
 	}
 
-	// Bu noktadan sonra (bulunsun/bulunmasin) bir yukleme DENEMESI otoritede gerceklesti —
-	// component'ler ya diskten geldi ya da (kayit yoksa) zaten dogru varsayilanda. Bayragi
-	// burada (AutoLoadDeferred'a ozel degil) set etmek, manuel "MMOLoad" exec komutunun
-	// (0.6sn'lik gecikmeli otomatik yuklemeden ONCE calisabilir) de bInitialLoadComplete'i
-	// dogru isaretlemesini saglar — yoksa o yoldan yuklenen GERCEK veri, hemen ardindan
-	// disconnect olunca EndPlay'in save-guard'i tarafindan YANLISLIKLA atlanirdi.
-	bInitialLoadComplete = true;
+	// Manuel MMOLoad ve otomatik yukleme ayni guvenlik kapisindan gecer. Onceki bir
+	// yukleme basarili olsa bile simdiki dosya okunamazsa autosave onu ezmesin.
+	bInitialLoadComplete = false;
 
 	const FString Slot = GetSaveSlotName();
 	if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))
@@ -362,6 +358,7 @@ bool AMMOCharacter::LoadCharacter()
 		// Eskiden 8 sn'lik bir ekran mesajiydi (kacirilabiliyordu, istemcide hic cikmiyordu);
 		// artik replike bayrakla HUD'da sinif secilene kadar kalici bir ipucu paneli cizilir.
 		bClassChoicePending = true;
+		bInitialLoadComplete = true;
 		return false; // yeni karakter
 	}
 	bClassChoicePending = false;
@@ -369,6 +366,7 @@ bool AMMOCharacter::LoadCharacter()
 	UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
 	if (!SG || !SG->Data.bValid)
 	{
+		UE_LOG(LogTemp, Error, TEXT("Character save %s exists but could not be loaded; saving disabled"), *Slot);
 		return false;
 	}
 
@@ -434,6 +432,7 @@ bool AMMOCharacter::LoadCharacter()
 		UE_LOG(LogTemp, Warning, TEXT("Saved character position rejected for map %s; keeping PlayerStart"),
 			*UGameplayStatics::GetCurrentLevelName(this, true));
 	}
+	bInitialLoadComplete = true;
 
 	if (GEngine && IsLocallyControlled())
 	{

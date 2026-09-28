@@ -272,13 +272,9 @@ protected:
 	FTimerHandle AutoLoadTimerHandle;
 	FTimerHandle AutoSaveTimerHandle;
 
-	// LoadCharacter() otoritede EN AZ BIR KEZ calisip calismadigini isaretler (deferred
-	// auto-load timer'i VEYA manuel MMOLoad exec komutu — hangisi once gelirse; ikisi de
-	// LoadCharacter() icinde set eder). EndPlay'in SaveCharacter'i bu bayrak false iken
-	// calistirmasi engellenir — yoksa oyuncu possess olduktan hemen sonra (yukleme
-	// tamamlanmadan) baglantiyi keserse, hala varsayilan/bos component verileriyle
-	// SaveCharacter cagrilip GERCEK kayit dosyasi bos bir karakterle EZILIR
-	// (kalici ilerleme kaybi, bug-hunt bulgusu).
+	// Yalniz kayit yoksa veya var olan kayit basariyla okunduysa true olur.
+	// Basarisiz/bozuk yuklemede otomatik, manuel ve EndPlay kaydi mevcut dosyayi
+	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
 
 	// --- Server RPC'ler (istemci istegi -> sunucu uygular) ---
