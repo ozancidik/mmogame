@@ -231,6 +231,32 @@ void AMMOGameMode::SpawnMobArea()
 			ObsidianBossSpawner->bValidateSpawnOnNavGround = true;
 			UGameplayStatics::FinishSpawningActor(ObsidianBossSpawner, ObsidianBossTM);
 		}
+
+		// Headless Summer_scene probu: iki 250u halkada 32/32 duz, PlayerStart'a bagli nav noktasi.
+		// (-4100,-1400) zemin Z~-2.73; (-3200,1800) zemin Z~-33.2. Dogrulama her spawn'da tekrar calisir.
+		const FVector DuskLoc(-4100.f, -1400.f, 50.f);
+		const FTransform DuskTM(FRotator::ZeroRotator, DuskLoc);
+		if (AMMOMobSpawner* DuskSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), DuskTM))
+		{
+			DuskSpawner->MaxMobs = 5;
+			DuskSpawner->SpawnRadius = 225.f;
+			DuskSpawner->MinMobLevel = 31;
+			DuskSpawner->MaxMobLevel = 39;
+			DuskSpawner->bValidateSpawnOnNavGround = true;
+			UGameplayStatics::FinishSpawningActor(DuskSpawner, DuskTM);
+		}
+
+		const FVector DuskBossLoc(-3200.f, 1800.f, 50.f);
+		const FTransform DuskBossTM(FRotator::ZeroRotator, DuskBossLoc);
+		if (AMMOMobSpawner* DuskBossSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), DuskBossTM))
+		{
+			DuskBossSpawner->MaxMobs = 1;
+			DuskBossSpawner->SpawnRadius = 150.f;
+			DuskBossSpawner->TopUpInterval = 60.f;
+			DuskBossSpawner->ForcedArchetypeId = FName(TEXT("DuskOverlord"));
+			DuskBossSpawner->bValidateSpawnOnNavGround = true;
+			UGameplayStatics::FinishSpawningActor(DuskBossSpawner, DuskBossTM);
+		}
 	}
 
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).

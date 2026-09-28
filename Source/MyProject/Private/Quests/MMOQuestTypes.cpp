@@ -83,7 +83,7 @@ namespace
 		// Q_FrostLich (4500XP/3000g) zincirin ucuncu kademesini bitiriyordu; bu zincir Lv16-22
 		// mob'lari + Lv24 eliti ile bir sonraki kademeyi acar. Oduller Q_FrostLich'in uzerine
 		// kademeli cikar (5400 -> 12000 XP, 3500 -> 8000 altin) ve Adamantin tier'ini (Lv16)
-		// dagitir. NOT: Lv31-80 hala bos, bilerek boyle — kademeli ilerliyoruz.
+		// dagitir. Daha yuksek seviye zincirleri asagida devam eder.
 		Table.Add(MakeQuest(TEXT("Q_EmberHounds"), TEXT("Kor Tazilari"), TEXT("Alev Vadisi'nin gecidini ac: 5 Kor Tazisi oldur."),
 			T::KillSpecificMob, TEXT("EmberHound"), 5, 5400, 3500, 16, TEXT("Q_FrostLich")));
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
@@ -122,6 +122,28 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_ObsidianWarlord"), TEXT("Obsidyen Reisi"), TEXT("Obsidyen ordusunun reisini devir: Obsidyen Reisi'ni oldur."),
 			T::KillSpecificMob, TEXT("ObsidianWarlord"), 1, 17000, 18000, 30, TEXT("Q_ObsidianRaiders")));
 		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianBlade"));
+
+		// --- Altinci bolge zinciri (Lv31-40): Obsidyen Reisi'nden sonra ---
+		Table.Add(MakeQuest(TEXT("Q_DuskProwlers"), TEXT("Alacakaranlik Avcilari"), TEXT("Alacakaranlik avcilarini durdur: 5 Alacakaranlik Avcisi oldur."),
+			T::KillSpecificMob, TEXT("DuskProwler"), 5, 19000, 19000, 31, TEXT("Q_ObsidianWarlord")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 6;
+
+		Table.Add(MakeQuest(TEXT("Q_DuskGuardians"), TEXT("Alacakaranlik Muhafizlari"), TEXT("Gecidin muhafizlarini devir: 5 Alacakaranlik Muhafizi oldur."),
+			T::KillSpecificMob, TEXT("DuskGuardian"), 5, 22000, 22000, 33, TEXT("Q_DuskProwlers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("DuskBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_DuskReavers"), TEXT("Alacakaranlik Yagmacilari"), TEXT("Yagmacilari dagit: 5 Alacakaranlik Yagmacisi oldur."),
+			T::KillSpecificMob, TEXT("DuskReaver"), 5, 26000, 26000, 36, TEXT("Q_DuskGuardians")));
+		Table.Last().RewardEquipmentId = FName(TEXT("DuskHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_DuskWraiths"), TEXT("Alacakaranlik Hayaletleri"), TEXT("Hayaletleri kov: 5 Alacakaranlik Hayaleti oldur."),
+			T::KillSpecificMob, TEXT("DuskWraith"), 5, 30000, 30000, 39, TEXT("Q_DuskReavers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("DuskPlate"));
+
+		Table.Add(MakeQuest(TEXT("Q_DuskOverlord"), TEXT("Alacakaranlik Hukumdari"), TEXT("Alacakaranlik hukumdarini devir."),
+			T::KillSpecificMob, TEXT("DuskOverlord"), 1, 36000, 36000, 40, TEXT("Q_DuskWraiths")));
+		Table.Last().RewardEquipmentId = FName(TEXT("DuskBlade"));
 
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),

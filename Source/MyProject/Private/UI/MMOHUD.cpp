@@ -1272,9 +1272,13 @@ bool AMMOHUD::HandleInventoryRightClick(const FVector2D& Pos)
 void AMMOHUD::OpenShop()
 {
 	ShopBuyPage = 0;
+	ShopSellPage = 0;
 	ShopBuyRegions.Reset();
+	ShopSellRegions.Reset();
 	ShopBuyPrevRect = FBox2D(ForceInit);
 	ShopBuyNextRect = FBox2D(ForceInit);
+	ShopSellPrevRect = FBox2D(ForceInit);
+	ShopSellNextRect = FBox2D(ForceInit);
 	bShopOpen = true;
 }
 
@@ -1289,6 +1293,8 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	ShopSellRegions.Reset();
 	ShopBuyPrevRect = FBox2D(ForceInit);
 	ShopBuyNextRect = FBox2D(ForceInit);
+	ShopSellPrevRect = FBox2D(ForceInit);
+	ShopSellNextRect = FBox2D(ForceInit);
 	if (!Canvas || !PlayerChar)
 	{
 		return;
@@ -1366,7 +1372,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	}
 
 	const float NavY = BuyStartY + ShopBuyPageSize * RowH + 12.f;
-	const float NavW = 64.f;
+	const float NavW = 80.f;
 	const float NavH = 26.f;
 	const float NextX = LeftX + ColW - NavW;
 	const bool bHasPrev = ShopBuyPage > 0;
@@ -1390,9 +1396,11 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	DrawText(TEXT("SAT (sol tik)"), FLinearColor(1.f, 0.85f, 0.4f), RightX, PY + 68.f, nullptr, 0.95f);
 	float RY = PY + 90.f;
 
-	const int32 MaxRows = 12;
-	const int32 ShowCount = FMath::Min(Inv->EquipmentBag.Num(), MaxRows);
-	for (int32 i = 0; i < ShowCount; ++i)
+	const int32 SellPageCount = FMath::Max(1, FMath::DivideAndRoundUp(Inv->EquipmentBag.Num(), ShopSellPageSize));
+	ShopSellPage = FMath::Clamp(ShopSellPage, 0, SellPageCount - 1);
+	const int32 FirstSellIndex = ShopSellPage * ShopSellPageSize;
+	const int32 LastSellIndex = FMath::Min(FirstSellIndex + ShopSellPageSize, Inv->EquipmentBag.Num());
+	for (int32 i = FirstSellIndex; i < LastSellIndex; ++i)
 	{
 		const FMMOEquipmentInstance& Inst = Inv->EquipmentBag[i];
 		const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
@@ -1417,6 +1425,24 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	if (Inv->EquipmentBag.Num() == 0)
 	{
 		DrawText(TEXT("(satacak ekipman yok)"), FLinearColor(0.6f, 0.6f, 0.6f), RightX, RY, nullptr, 0.72f);
+	}
+
+	const float SellNextX = RightX + ColW - NavW;
+	const bool bHasSellPrev = ShopSellPage > 0;
+	const bool bHasSellNext = ShopSellPage + 1 < SellPageCount;
+	DrawRect(bHasSellPrev ? FLinearColor(0.16f, 0.32f, 0.48f, 0.95f) : FLinearColor(0.12f, 0.12f, 0.14f, 0.9f), RightX, NavY, NavW, NavH);
+	DrawText(TEXT("< Onceki"), bHasSellPrev ? FLinearColor::White : FLinearColor(0.45f, 0.45f, 0.48f), RightX + 4.f, NavY + 5.f, nullptr, 0.7f);
+	DrawText(FString::Printf(TEXT("%d / %d"), ShopSellPage + 1, SellPageCount), FLinearColor::White,
+		RightX + ColW * 0.5f - 20.f, NavY + 5.f, nullptr, 0.8f);
+	DrawRect(bHasSellNext ? FLinearColor(0.16f, 0.32f, 0.48f, 0.95f) : FLinearColor(0.12f, 0.12f, 0.14f, 0.9f), SellNextX, NavY, NavW, NavH);
+	DrawText(TEXT("Sonraki >"), bHasSellNext ? FLinearColor::White : FLinearColor(0.45f, 0.45f, 0.48f), SellNextX + 4.f, NavY + 5.f, nullptr, 0.7f);
+	if (bHasSellPrev)
+	{
+		ShopSellPrevRect = FBox2D(FVector2D(RightX, NavY), FVector2D(RightX + NavW, NavY + NavH));
+	}
+	if (bHasSellNext)
+	{
+		ShopSellNextRect = FBox2D(FVector2D(SellNextX, NavY), FVector2D(SellNextX + NavW, NavY + NavH));
 	}
 }
 
@@ -1447,6 +1473,22 @@ bool AMMOHUD::HandleShopClick(const FVector2D& Pos)
 		ShopBuyRegions.Reset();
 		ShopBuyPrevRect = FBox2D(ForceInit);
 		ShopBuyNextRect = FBox2D(ForceInit);
+		return true;
+	}
+	if (ShopSellPrevRect.bIsValid && ShopSellPrevRect.IsInside(Pos))
+	{
+		--ShopSellPage;
+		ShopSellRegions.Reset();
+		ShopSellPrevRect = FBox2D(ForceInit);
+		ShopSellNextRect = FBox2D(ForceInit);
+		return true;
+	}
+	if (ShopSellNextRect.bIsValid && ShopSellNextRect.IsInside(Pos))
+	{
+		++ShopSellPage;
+		ShopSellRegions.Reset();
+		ShopSellPrevRect = FBox2D(ForceInit);
+		ShopSellNextRect = FBox2D(ForceInit);
 		return true;
 	}
 

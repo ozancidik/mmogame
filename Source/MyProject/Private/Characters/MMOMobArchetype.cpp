@@ -165,6 +165,25 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
+		// --- Altinci bolge NORMAL moblari (Lv31-39; yalnizca kendi seviye bandinda spawn olur) ---
+		// Dar Summer_scene alani icin 600u aggro; varsayilan 450u wander / 1800u leash ile hub'dan uzak.
+		Table.Add(MakeMob(TEXT("DuskProwler"), TEXT("Alacakaranlik Avcisi"), 31, 78, 74, 107.f, 6800, 1100, 2200, 435.f, 600.f, 1.2f, FLinearColor(0.22f, 0.3f, 0.42f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("DuskGuardian"), TEXT("Alacakaranlik Muhafizi"), 33, 83, 86, 114.f, 8000, 1300, 2500, 255.f, 600.f, 1.5f, FLinearColor(0.28f, 0.36f, 0.48f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("DuskReaver"), TEXT("Alacakaranlik Yagmacisi"), 36, 91, 84, 125.f, 9800, 1550, 3000, 370.f, 600.f, 1.3f, FLinearColor(0.34f, 0.2f, 0.42f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
+		Table.Add(MakeMob(TEXT("DuskWraith"), TEXT("Alacakaranlik Hayaleti"), 39, 98, 90, 136.f, 12000, 1850, 3500, 410.f, 600.f, 1.35f, FLinearColor(0.42f, 0.26f, 0.55f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -263,6 +282,19 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 		// Iki bagimsiz %50 zar; Lv25 Obsidyen seti elitin ust-tier loot havuzudur.
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
+
+		// Alacakaranlik Hukumdari (Lv40): yeni bolgenin son eliti, 33. seviye setini dusurur.
+		Table.Add(MakeMob(TEXT("DuskOverlord"), TEXT("Alacakaranlik Hukumdari"), 40, 112, 128, 150.f, 19000, 2600, 4800, 285.f, 600.f, 1.95f, FLinearColor(0.26f, 0.14f, 0.42f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
 		Table.Last().EliteEquipDropChance = 0.5f;
 		Table.Last().EliteEquipDropCount = 2;
 		Table.Last().EliteMinItemPlus = 3;

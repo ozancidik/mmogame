@@ -185,6 +185,8 @@ protected:
 	FBox2D ShopCloseRect = FBox2D(ForceInit);
 	FBox2D ShopBuyPrevRect = FBox2D(ForceInit);
 	FBox2D ShopBuyNextRect = FBox2D(ForceInit);
+	FBox2D ShopSellPrevRect = FBox2D(ForceInit);
+	FBox2D ShopSellNextRect = FBox2D(ForceInit);
 	FBox2D QuestRect = FBox2D(ForceInit);
 	FBox2D QuestCloseRect = FBox2D(ForceInit);
 	FBox2D StatRect = FBox2D(ForceInit);
@@ -203,7 +205,9 @@ protected:
 	static constexpr int32 ShopBuyPageSize = 14;
 	int32 ShopBuyPage = 0;
 	TArray<FMMOClickRegion> ShopBuyRegions;
-	// Satma bolgeleri: Slot=canta index.
+	// Satma sayfasi ve bolgeleri: Slot=EquipmentBag icindeki mutlak canta index'i.
+	static constexpr int32 ShopSellPageSize = 12;
+	int32 ShopSellPage = 0;
 	TArray<FMMOClickRegion> ShopSellRegions;
 
 	// Gorev penceresi tiklama bolgeleri (SkillId=questId): kabul et ve odul al.

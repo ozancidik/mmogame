@@ -44,6 +44,8 @@ namespace
 		Table.Add(MakeItem(TEXT("AdamantineBlade"), TEXT("Adamantin Kilic"), S::Weapon, 62.f, 0.f, 16));
 		// Obsidyen tier (Lv25): Adamantin +1 civarinda; mevcut +2..+8 yatirimini gecersiz kilmaz.
 		Table.Add(MakeItem(TEXT("ObsidianBlade"), TEXT("Obsidyen Kilic"), S::Weapon, 76.f, 0.f, 25));
+		// Lv33 tier: Lv29 Obsidian normalleri (loot tavani 29+3=32) ve Lv30 eliti bunu dusuremez.
+		Table.Add(MakeItem(TEXT("DuskBlade"), TEXT("Alacakaranlik Kilici"), S::Weapon, 92.f, 0.f, 33));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -53,6 +55,7 @@ namespace
 		Table.Add(MakeItem(TEXT("MithrilPlate"), TEXT("Mithril Zirh"), S::Armor, 0.f, 28.f, 10));
 		Table.Add(MakeItem(TEXT("AdamantinePlate"), TEXT("Adamantin Zirh"), S::Armor, 0.f, 38.f, 16));
 		Table.Add(MakeItem(TEXT("ObsidianPlate"), TEXT("Obsidyen Zirh"), S::Armor, 0.f, 46.f, 25));
+		Table.Add(MakeItem(TEXT("DuskPlate"), TEXT("Alacakaranlik Zirh"), S::Armor, 0.f, 55.f, 33));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -62,6 +65,7 @@ namespace
 		Table.Add(MakeItem(TEXT("MithrilHelm"), TEXT("Mithril Kask"), S::Helmet, 0.f, 12.f, 10));
 		Table.Add(MakeItem(TEXT("AdamantineHelm"), TEXT("Adamantin Kask"), S::Helmet, 0.f, 16.f, 16));
 		Table.Add(MakeItem(TEXT("ObsidianHelm"), TEXT("Obsidyen Kask"), S::Helmet, 0.f, 19.f, 25));
+		Table.Add(MakeItem(TEXT("DuskHelm"), TEXT("Alacakaranlik Kask"), S::Helmet, 0.f, 23.f, 33));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
@@ -71,6 +75,7 @@ namespace
 		Table.Add(MakeItem(TEXT("MithrilBoots"), TEXT("Mithril Bot"), S::Boots, 0.f, 16.f, 10));
 		Table.Add(MakeItem(TEXT("AdamantineBoots"), TEXT("Adamantin Bot"), S::Boots, 0.f, 22.f, 16));
 		Table.Add(MakeItem(TEXT("ObsidianBoots"), TEXT("Obsidyen Bot"), S::Boots, 0.f, 26.f, 25));
+		Table.Add(MakeItem(TEXT("DuskBoots"), TEXT("Alacakaranlik Bot"), S::Boots, 0.f, 31.f, 33));
 
 		return Table;
 	}

@@ -2398,3 +2398,22 @@ UE 5.7 derlemesi basarili; PIE davranisi bekliyor.
 - [ ] Satma sütununun mevcut davranışı korunuyor. Dar ekranlarda uzun ürün adlarının görünümü ayrıca inceleniyor.
 
 Kod derlemesi başarılı (`MMOHUD.cpp` yeniden derlendi); PIE henüz yapılmadı.
+
+## Alacakaranlık bölgesi Lv31–40 — 2026-09-28
+
+- [ ] Obsidyen Reisi görevi tamamlanınca beş yeni öldürme görevi sırayla açılıyor; hedef ID'leri ve öldürme kredisi tutuyor.
+- [ ] Summer_scene'de (-4100,-1400) çevresinde Lv31/33/36/39 normal moblar, (-3200,1800) çevresinde Lv40 elit zeminde ve navmesh üzerinde doğuyor; oyuncu her iki alana ulaşabiliyor.
+- [ ] Yeni normal alanın eski Obsidyen boss alanına yaklaşık 1404u yakınlığında gezinme ve aggro örtüşmesi oyuncuya beklenmedik çift karşılaşma yaratmıyor.
+- [ ] Lv33 Alacakaranlık setinin dört parçası gereken seviyede kuşanılıyor; eski Lv29/30 düşüş havuzuna girmiyor ve Lv40 elitin ganimet havuzunda bulunuyor.
+- [ ] Savaş, zehir/yavaşlatma/öfke, görev ödülleri, altın ve XP akışı solo ile iki oyunculu PIE'de inceleniyor. Sayısal denge henüz onaylanmadı.
+
+Harita için headless zemin/navmesh probu ve UE 5.7 C++ derlemesi başarılı. PIE henüz yapılmadı.
+
+## Satıcı satma sayfalaması — 2026-09-28
+
+- [ ] Ekipman çantası 12'den fazla öğe içerdiğinde satma listesi 12 satırlık sayfalara ayrılıyor; önceki/sonraki düğmeleri çalışıyor.
+- [ ] İkinci sayfadaki bir öğe tıklandığında doğru mutlak çanta indeksi satılıyor; altın ve kalan öğeler doğru güncelleniyor.
+- [ ] Satış sonrası sayfa sınırı değişirse gösterge geçerli sayfaya dönüyor; satıcı yeniden açılınca ilk sayfa açılıyor.
+- [ ] Satın alma sayfalaması ve düğmelerin 80px genişliğindeki etiketleri korunuyor; küçük ekranda taşma kontrol ediliyor.
+
+UE 5.7 C++ derlemesi başarılı; PIE henüz yapılmadı.
