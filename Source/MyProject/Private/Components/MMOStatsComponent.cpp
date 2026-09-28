@@ -329,18 +329,25 @@ void UMMOStatsComponent::GainExperience(int32 Amount)
 		return;
 	}
 
-	Experience += Amount;
+	// Buyuk tek seferlik odul/debug XP'si int32 toplamayi tasirmasin. Ara bakiye
+	// seviye esikleri dusulene kadar 64 bit kalir; saklanan Experience tekrar
+	// ilgili seviyenin (int32) esiginin altina inince yazilir.
+	int64 PendingExperience = static_cast<int64>(Experience) + Amount;
 
 	// Tek seferde birden fazla level atlanabilir.
-	while (Level < MaxLevel && Experience >= ExperienceToNextLevel)
+	while (Level < MaxLevel && PendingExperience >= ExperienceToNextLevel)
 	{
-		Experience -= ExperienceToNextLevel;
+		PendingExperience -= ExperienceToNextLevel;
 		HandleLevelUp();
 	}
 
 	if (Level >= MaxLevel)
 	{
 		Experience = 0;
+	}
+	else
+	{
+		Experience = static_cast<int32>(PendingExperience);
 	}
 
 	OnExperienceChanged.Broadcast(Experience, ExperienceToNextLevel);
