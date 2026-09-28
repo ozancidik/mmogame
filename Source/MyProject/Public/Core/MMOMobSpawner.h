@@ -44,6 +44,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	float SpawnRadius = 500.f;
 
+	// Yalniz acildiginda rastgele noktayi yakin zemin ve navmesh uzerinde dogrular.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
+	bool bValidateSpawnOnNavGround = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	float TopUpInterval = 4.f;
 
@@ -53,6 +57,7 @@ protected:
 
 	FTimerHandle TopUpTimer;
 	bool bInvalidBandReported = false;
+	bool bSpawnLocationWarningReported = false;
 
 	void TopUp();
 	void SpawnOne();

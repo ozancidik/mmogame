@@ -79,7 +79,7 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 
 ### 2. Oynanabilir bir 25–30. seviye aralığı sun (P0 içerik)
 
-**Güncel durum:** Üç normal arketip (Lv25/27/29), bir Lv30 elit, dört Obsidyen eşya ve dört görevlik zincir kaynak koduna eklendi; derleme başarılı. `Summer_scene` üzerinde zemin, navmesh halkaları ve bağlantı yolları headless olarak ölçülüp normal/elit spawner'ları yerleştirildi. Gerçek PIE oynanışı ve denge doğrulaması bekliyor.
+**Güncel durum:** Üç normal arketip (Lv25/27/29), bir Lv30 elit, dört Obsidyen eşya ve dört görevlik zincir kaynak koduna eklendi; derleme başarılı. `Summer_scene` üzerinde zemin, navmesh halkaları ve bağlantı yolları headless olarak ölçülüp normal/elit spawner'ları yerleştirildi. Bu iki spawner rastgele doğum noktasında zemin ve navmesh katmanını sunucuda ayrıca doğruluyor. Gerçek PIE oynanışı ve denge doğrulaması bekliyor.
 
 - **Oyuncu kararı/deneyimi:** `Q_MagmaTyrant` sonrasında oyuncu yeni bir hedef seçebilir ve ana göreve devam ederken kullanışlı dört yuvalı bir seti yükseltebilir.
 - **Girdi → çıktı:** 25–29 arasında gerçek seviyeleri bulunan `[PLACEHOLDER]` 2–3 normal arketip ve bir 30. seviye elit ekle. `Q_MagmaTyrant` tamamlanmasını ön koşul yapan kısa ve sıralı bir `KillSpecificMob` zinciri ekle. Bu aralıkta gereken seviyesi açıkça tanımlı silah/zırh/kask/bot ekle. 25–30 normal spawner'ı ve zorunlu elit spawner'ını yalnızca zemin/navmesh doğrulanmış konumlara yerleştir. Görev ekipman ödülleri verildikleri anda kayıtlı olmalı ve doğru seviye koşuluyla kuşanılmalı.

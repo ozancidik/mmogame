@@ -207,7 +207,8 @@ void AMMOGameMode::SpawnMobArea()
 	// normal alandan 2163u uzakta. Baska haritalarda bu konumlar kullanilmaz.
 	if (World->GetMapName().Contains(TEXT("Summer_scene")))
 	{
-		const FVector ObsidianLoc(-2800.f, -1800.f, Origin.Z + 50.f);
+		// Bu iki merkezde olculen zemin Z yaklasik 0; spawner tabani zeminden 50u yukarida.
+		const FVector ObsidianLoc(-2800.f, -1800.f, 50.f);
 		const FTransform ObsidianTM(FRotator::ZeroRotator, ObsidianLoc);
 		if (AMMOMobSpawner* ObsidianSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ObsidianTM))
 		{
@@ -215,10 +216,11 @@ void AMMOGameMode::SpawnMobArea()
 			ObsidianSpawner->SpawnRadius = 225.f;
 			ObsidianSpawner->MinMobLevel = 25;
 			ObsidianSpawner->MaxMobLevel = 29;
+			ObsidianSpawner->bValidateSpawnOnNavGround = true;
 			UGameplayStatics::FinishSpawningActor(ObsidianSpawner, ObsidianTM);
 		}
 
-		const FVector ObsidianBossLoc(-4000.f, 0.f, Origin.Z + 50.f);
+		const FVector ObsidianBossLoc(-4000.f, 0.f, 50.f);
 		const FTransform ObsidianBossTM(FRotator::ZeroRotator, ObsidianBossLoc);
 		if (AMMOMobSpawner* ObsidianBossSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ObsidianBossTM))
 		{
@@ -226,6 +228,7 @@ void AMMOGameMode::SpawnMobArea()
 			ObsidianBossSpawner->SpawnRadius = 150.f;
 			ObsidianBossSpawner->TopUpInterval = 60.f;
 			ObsidianBossSpawner->ForcedArchetypeId = FName(TEXT("ObsidianWarlord"));
+			ObsidianBossSpawner->bValidateSpawnOnNavGround = true;
 			UGameplayStatics::FinishSpawningActor(ObsidianBossSpawner, ObsidianBossTM);
 		}
 	}

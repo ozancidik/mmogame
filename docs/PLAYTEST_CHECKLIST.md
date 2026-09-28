@@ -2356,3 +2356,16 @@ tasamaz. Degisen dosyalar UE 5.7'de yeniden derlendi; PIE/eski-kayit dogrulamasi
 
 - [ ] Normal Lv1 ve yuksek seviye kayitlarini yukle: mevcut rutbeler ve puanlar degismemeli.
 - [ ] Bozuk kayitta negatif veya INT32_MAX rutbe/puan yukle: rutbe seviyeyi, puanlar kazanilan toplami gecmemeli; sinif degisimi ve ustalik yatirimi tasma uretmemeli.
+
+## Obsidyen spawner zemin/navmesh dogrulamasi (2026-09-28)
+
+Yeni iki spawner icin opt-in guvenli konum modu acildi. Sunucu en fazla 8 rastgele
+noktada gorunurluk izi ile duz zemin, beklenen zemin yuksekligi ve yakindaki
+navmesh katmanini arar; uygun nokta yoksa o tur mob dogurmaz ve ilk hatada log yazar.
+Eski spawner'larin varsayilan davranisi degismedi. Normal ve elit merkezlerinde
+headless olculen zemin Z sirasiyla -3.52 ve -1.56 oldugundan, bu iki spawner'in
+tabani Z=50 ayarlandi. C++ derlemesi basarili; PIE oynanis dogrulamasi bekliyor.
+
+- [ ] Summer_scene PIE'de Obsidyen normal ve elit moblari doguyor, zemin uzerinde yuruyor ve bosluga dusmuyor olmali.
+- [ ] Spawn noktasi gecersiz olursa 8 denemeden sonra mob olusmamali; log uyarmali, oyun kilitlenmemeli.
+- [ ] Lv1-24 eski spawner'larin dogum ve respawn davranisi degismemeli.
