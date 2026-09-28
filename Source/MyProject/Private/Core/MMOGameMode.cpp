@@ -34,7 +34,7 @@ void AMMOGameMode::SpawnMobArea()
 		return;
 	}
 
-	// Bir PlayerStart bul; yoksa orijini kullan.
+	// Spawner ve hub yerlesimi PlayerStart'a bagli; yoksa rastgele orijinde uretme.
 	FVector Origin(0.f, 0.f, 200.f);
 	FRotator Facing(0.f, 0.f, 0.f);
 	bool bFoundStart = false;
@@ -44,6 +44,11 @@ void AMMOGameMode::SpawnMobArea()
 		Facing = It->GetActorRotation();
 		bFoundStart = true;
 		break;
+	}
+	if (!bFoundStart)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[MMODBG] SpawnMobArea skipped: map %s has no PlayerStart"), *World->GetMapName());
+		return;
 	}
 
 	// Ana mob alani: NPC hub'inin (Kael +400u) belirgin disinda kalsin diye 1.5x mesafede

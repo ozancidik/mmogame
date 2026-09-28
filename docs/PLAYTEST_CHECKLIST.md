@@ -2562,3 +2562,11 @@ UE 5.7 `MMOLootPickup.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz ya
 - [ ] Host görünümü, pickup toplama ve 30 saniyelik yok olma davranışı değişmesin.
 
 UE 5.7 `MMOLootPickup.h/.cpp` UHT dahil yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı.
+
+## PlayerStart olmayan haritada yanlış spawn engeli — 2026-09-29
+
+- [ ] Summer_scene üzerinde PlayerStart bulunurken mevcut mob ve hub NPC'leri her zamanki yerlerinde doğsun.
+- [ ] PlayerStart bulunmayan Winter_scene açıldığında GameMode orijinde mob/NPC üretmesin; günlükte `SpawnMobArea skipped` hatası görülsün.
+- [ ] Winter_scene için PlayerStart ve gezinme ağı eklendikten sonra o haritanın ayrı içerik yerleşimi ayrıca doğrulansın.
+
+UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Bu kontrol Winter_scene'i oynanabilir hâle getirmez; yalnızca geçersiz orijin yerleşimini önler.
