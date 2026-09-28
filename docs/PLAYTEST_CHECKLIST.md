@@ -2519,3 +2519,12 @@ UE 5.7 `MMOSkillComponent.cpp/.h` yeniden derlendi; çok oyunculu PIE henüz yap
 - [ ] Farklı geçerli adlar seçildiğinde her iki oyuncunun otomatik/çıkış kaydı ayrı dosyalarda kalıyor.
 
 UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE henüz yapılmadı. Bu koruma yalnızca aynı anda bağlı oyuncuların ad çakışmasını engeller; çevrimdışı karakter sahipliğini doğrulamak için kalıcı hesap kimliği hâlâ gerekli.
+
+## Hub güvenli alanından mob hasarı — 2026-09-29
+
+- [ ] PlayerStart çevresindeki 700 birim güvenli alanda Okçu/Büyücü menzilli saldırıları ve DoT mobun HP'sini düşürmüyor; XP/ganimet kazanılmıyor.
+- [ ] Sınırın dışına çıkınca aynı beceriler normal hasar ve zayıflatma uyguluyor; mob saldırganı hedefliyor.
+- [ ] Mob hasarı reddedildiğinde Poison/Slow gibi ikincil etkiler uygulanmıyor; eve dönen mob da hasar ve zayıflatma almıyor.
+- [ ] Mobların oyuncuya yönelik mevcut hub koruması ve uzak oyuncuların normal dövüşü korunuyor.
+
+UE 5.7 `MMOMob.cpp` ve `MMOSkillComponent.cpp` yeniden derlendi; PIE henüz yapılmadı. Güvenli alan içinden saldırı girişimi halen mana ve bekleme süresi harcayabilir; oyuncu geri bildirimi ayrıca gözlemlenmeli.

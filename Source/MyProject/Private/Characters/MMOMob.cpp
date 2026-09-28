@@ -139,17 +139,24 @@ float AMMOMob::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
 	{
 		return 0.f;
 	}
+	APawn* Attacker = Cast<APawn>(DamageCauser);
+	if (!Attacker && EventInstigator)
+	{
+		Attacker = EventInstigator->GetPawn();
+	}
+	// Hub'da mob oyuncuya vuramiyorsa oyuncu da hub'dan menzilli hasar/DoT
+	// verip karsiliksiz XP veya ganimet toplayamamali.
+	if (Attacker && Attacker->IsPlayerControlled() && bHasHub && HubSafeRadius > 0.f
+		&& FVector::Dist2D(Attacker->GetActorLocation(), HubLocation) < HubSafeRadius)
+	{
+		return 0.f;
+	}
 
 	const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	// Saldirgan bir oyuncuysa onu zorla hedefle (uzaktan vurulunca da mob tepki versin).
-	if (HasAuthority() && Stats && !Stats->bIsDead && !bReturningHome)
+	if (HasAuthority() && Applied > 0.f && Stats && !Stats->bIsDead && !bReturningHome)
 	{
-		APawn* Attacker = Cast<APawn>(DamageCauser);
-		if (!Attacker && EventInstigator)
-		{
-			Attacker = EventInstigator->GetPawn();
-		}
 		if (Attacker && Attacker->IsPlayerControlled())
 		{
 			ForcedTarget = Attacker;

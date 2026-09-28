@@ -926,10 +926,11 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 			{
 				Caster->SetActorRotation(Dir.Rotation());
 			}
-			UGameplayStatics::ApplyDamage(Target, Def.Power, Instigator, Caster, nullptr);
+			const float AppliedDamage = UGameplayStatics::ApplyDamage(Target, Def.Power, Instigator, Caster, nullptr);
 
 			// Vurulan hedefe debuff uygula (or. zehirli ok -> Poison DoT).
-			if (!Def.AppliedEffectId.IsNone() && Target->GetStats() && !Target->GetStats()->bIsDead)
+			if (AppliedDamage > 0.f && !Def.AppliedEffectId.IsNone()
+				&& Target->GetStats() && !Target->GetStats()->bIsDead)
 			{
 				Target->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 			}
@@ -973,10 +974,11 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 			}
 			if (FVector::Dist(Center, Other->GetActorLocation()) <= Def.Radius)
 			{
-				UGameplayStatics::ApplyDamage(Other, Def.Power, Instigator, Caster, nullptr);
+				const float AppliedDamage = UGameplayStatics::ApplyDamage(Other, Def.Power, Instigator, Caster, nullptr);
 
 				// Alan hasarina debuff da eslik edebilir (or. buz patlamasi -> Slow).
-				if (!Def.AppliedEffectId.IsNone() && Other->GetStats() && !Other->GetStats()->bIsDead)
+				if (AppliedDamage > 0.f && !Def.AppliedEffectId.IsNone()
+					&& Other->GetStats() && !Other->GetStats()->bIsDead)
 				{
 					Other->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 				}
