@@ -557,6 +557,22 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 
+	// Olumden onceki zemin tiklamasi veya otomatik saldiri, canlanmadan sonra
+	// oyuncuyu eski tehlikeli konuma geri goturmesin. Her istemci kendi yerel
+	// hareket hedefini temizler; sunucu canlanma/hasar kararlarini ayri verir.
+	if (const AMMOCharacter* MeChar = Cast<AMMOCharacter>(P))
+	{
+		if (const UMMOStatsComponent* MyStats = MeChar->GetStats(); MyStats && MyStats->bIsDead)
+		{
+			TargetEnemy.Reset();
+			SelectedTarget.Reset();
+			bHasMoveTarget = false;
+			bLeftPressed = false;
+			StopMovement();
+			return;
+		}
+	}
+
 	// --- WASD klavye hareketi (KO tarzi: W/S ileri-geri, A/D yerinde DONUS) ---
 	// Enhanced Input mapping'lerini temizledigimiz icin WASD'yi burada C++ ile suruyoruz.
 	// W/S = karakterin baktigi yonde ileri/geri. A/D = karakteri sola/saga dondur (yana KAYMAZ).

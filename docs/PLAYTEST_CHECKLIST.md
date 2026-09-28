@@ -2417,3 +2417,12 @@ Harita için headless zemin/navmesh probu ve UE 5.7 C++ derlemesi başarılı. P
 - [ ] Satın alma sayfalaması ve düğmelerin 80px genişliğindeki etiketleri korunuyor; küçük ekranda taşma kontrol ediliyor.
 
 UE 5.7 C++ derlemesi başarılı; PIE henüz yapılmadı.
+
+## Ölümden sonra eski hareket hedefini temizleme — 2026-09-28
+
+- [ ] Bir mob'a otomatik saldırırken öl ve canlan: karakter eski mob'a kendiliğinden yürümüyor; canlanma koruması saldırıyla istemsiz bitmiyor.
+- [ ] Zeminde uzak bir noktaya tıkla, yolda öl ve canlan: eski tıklama hedefi karakteri tekrar tehlikeli bölgeye götürmüyor.
+- [ ] Canlandıktan sonra yeni WASD ve yeni zemin tıklaması normal çalışıyor; ölüm sırasında açık UI penceresi çizilmeye devam ediyor.
+- [ ] Listen server ile istemci penceresinde aynı davranış gözleniyor.
+
+UE 5.7 `MMOPlayerController.cpp` yeniden derlendi; PIE henüz yapılmadı.
