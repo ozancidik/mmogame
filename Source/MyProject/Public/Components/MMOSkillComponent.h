@@ -111,6 +111,9 @@ public:
 protected:
 	// Skill id -> cooldown bitis zamani (dunya saati; her makine kendi kopyasini tutar).
 	TMap<FName, float> CooldownEndTimes;
+	// Yalnizca mevcut sunucu beceri cagrisi boyunca gecerli; istemcinin hedef onerisi
+	// FindNearestEnemy/HealTarget icinde tekrar dogrulanir.
+	TWeakObjectPtr<AMMOCharacter> RequestedTargetForCast;
 
 	AMMOCharacter* FindNearestEnemy(float Range) const;
 	void ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef& Def);
@@ -142,7 +145,7 @@ protected:
 
 	// --- Server RPC'ler ---
 	UFUNCTION(Server, Reliable)
-	void ServerUseSkill(FName SkillId);
+	void ServerUseSkill(FName SkillId, AMMOCharacter* RequestedTarget);
 
 	UFUNCTION(Server, Reliable)
 	void ServerInvestMastery(EMMOSkillTree Tree);

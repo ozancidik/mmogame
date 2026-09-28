@@ -2501,3 +2501,13 @@ UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE ve kayıt uyumu doğrulaması he
 - [ ] Canlanma korumasındaki oyuncuya saldırıldığında gerçek hasar 0 gösteriliyor.
 
 UE 5.7 `MMOCharacter.cpp` yeniden derlendi; PIE henüz yapılmadı.
+
+## İstemci beceri hedefinin sunucuda doğrulanması — 2026-09-29
+
+- [ ] İki oyunculu PIE'de istemci iki yakın mobdan ikincisini seçip tek hedefli beceri kullanınca seçilen mob etkileniyor; yakın olan başka mob hedefe geçmiyor.
+- [ ] İstemci bir takım arkadaşını seçip Rahip hedefli şifa kullanınca 800 birim içinde arkadaş iyileşiyor; host tarafında da aynı davranış görülüyor.
+- [ ] 800 birim dışındaki, ölü, başka dünyadaki veya mob türündeki hedef şifa almıyor; hedefli şifa kendine düşüyor.
+- [ ] Hileli istemcinin uzak/ölü düşman hedefi beceriye verilse bile sunucu menzili ve canlılığı doğruluyor; yakın geçerli hedefe düşüş davranışı korunuyor.
+- [ ] Mana ve cooldown sunucu tarafında tek kez uygulanıyor; AoE, kendine iyileştirme ve buff becerileri eski davranışını koruyor.
+
+UE 5.7 `MMOSkillComponent.cpp/.h` yeniden derlendi; çok oyunculu PIE henüz yapılmadı.

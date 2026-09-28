@@ -592,7 +592,8 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	if (!HasAuthorityInternal())
 	{
 		CooldownEndTimes.Add(SkillId, Now + Def->Cooldown);
-		ServerUseSkill(SkillId);
+		const AMMOPlayerController* PC = Cast<AMMOPlayerController>(Owner->GetController());
+		ServerUseSkill(SkillId, PC ? PC->GetSelectedTarget() : nullptr);
 		if (GEngine && bLocalFeedback)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 1.2f, FColor(120, 220, 120), FString::Printf(TEXT(">> %s"), *Def->Name));
@@ -637,7 +638,7 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	return true;
 }
 
-void UMMOSkillComponent::ServerUseSkill_Implementation(FName SkillId)
+void UMMOSkillComponent::ServerUseSkill_Implementation(FName SkillId, AMMOCharacter* RequestedTarget)
 {
 	// Sunucu-OTORITER cooldown: istemcinin dogru cadence'te gonderdigine GUVENME.
 	// (Eskiden kosulsuz Remove yapiliyordu => sunucuda cooldown yok, sadece mana
@@ -655,7 +656,9 @@ void UMMOSkillComponent::ServerUseSkill_Implementation(FName SkillId)
 	// UseSkill kendi kapisini yeniden uygular; cakismamasi icin kaydi temizle,
 	// UseSkill mana harcayip etkiyi calistirir ve cooldown'u yeniden yazar.
 	CooldownEndTimes.Remove(SkillId);
+	RequestedTargetForCast = RequestedTarget;
 	UseSkill(SkillId);
+	RequestedTargetForCast.Reset();
 }
 
 void UMMOSkillComponent::FillSaveData(FMMOCharacterSaveData& Out) const
@@ -810,16 +813,17 @@ AMMOCharacter* UMMOSkillComponent::FindNearestEnemy(float Range) const
 	// gidebiliyordu — oyuncu "su moba" nisan alip skill basinca baskasina vurma bug'i.
 	// Cast<AMMOMob> ile PvP-kapali invariant'i korunur: oyuncu baska bir OYUNCUYU
 	// secmisse bu yol atlanir, asagidaki mob-only fallback'e duser.
-	if (const AMMOPlayerController* MMOPc = Cast<AMMOPlayerController>(Self->GetController()))
+	AMMOMob* Selected = Cast<AMMOMob>(RequestedTargetForCast.Get());
+	if (!Selected)
 	{
-		if (AMMOMob* Selected = Cast<AMMOMob>(MMOPc->GetSelectedTarget()))
-		{
-			if (Selected->GetStats() && !Selected->GetStats()->bIsDead
-				&& FVector::Dist(Self->GetActorLocation(), Selected->GetActorLocation()) <= Range)
-			{
-				return Selected;
-			}
-		}
+		const AMMOPlayerController* PC = Cast<AMMOPlayerController>(Self->GetController());
+		Selected = PC ? Cast<AMMOMob>(PC->GetSelectedTarget()) : nullptr;
+	}
+	if (Selected && Selected->GetWorld() == GetWorld() && Selected->GetStats()
+		&& !Selected->GetStats()->bIsDead
+		&& FVector::Dist(Self->GetActorLocation(), Selected->GetActorLocation()) <= Range)
+	{
+		return Selected;
 	}
 
 	// Sadece moblari hedefle (PvP simdilik kapali).
@@ -872,16 +876,20 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 	{
 		// Secili hedef canli bir MUTTEFIK (baska oyuncu, mob degil) ise onu iyilestir;
 		// aksi halde HealSelf ile ayni sekilde kendini iyilestir (self-fallback).
-		AMMOCharacter* Ally = nullptr;
-		if (const AMMOPlayerController* PC = Cast<AMMOPlayerController>(Caster->GetController()))
+		AMMOCharacter* Ally = RequestedTargetForCast.Get();
+		if (!Ally)
 		{
-			if (AMMOCharacter* Sel = PC->GetSelectedTarget())
-			{
-				if (Sel != Caster && !Cast<AMMOMob>(Sel) && Sel->GetStats())
-				{
-					Ally = Sel;
-				}
-			}
+			const AMMOPlayerController* PC = Cast<AMMOPlayerController>(Caster->GetController());
+			Ally = PC ? PC->GetSelectedTarget() : nullptr;
+		}
+		// HealTarget tanimlarinin Range alani eskiden 0'di. Makul bir varsayilan
+		// mesafe kullan; istemcinin gonderdigi aktor referansina guvenme.
+		const float HealRange = Def.Range > 0.f ? Def.Range : 800.f;
+		if (!Ally || Ally == Caster || Cast<AMMOMob>(Ally) || Ally->GetWorld() != World
+			|| !Ally->GetStats() || Ally->GetStats()->bIsDead
+			|| FVector::Dist(CasterLoc, Ally->GetActorLocation()) > HealRange)
+		{
+			Ally = nullptr;
 		}
 
 		AMMOCharacter* Recipient = Ally ? Ally : Caster;
