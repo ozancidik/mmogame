@@ -7,23 +7,108 @@
 #include "World/MMOTalkerNPC.h"
 #include "World/MMOHealerNPC.h"
 #include "UI/MMOHUD.h"
+#include "Characters/MMOCharacter.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerController.h"
+#include "Components/MMOStatsComponent.h"
 
 AMMOGameMode::AMMOGameMode()
 {
 	// Varsay�lan HUD'u MMO HUD'�m�z yap.
 	HUDClass = AMMOHUD::StaticClass();
+	bUseSeamlessTravel = true;
 }
 
 void AMMOGameMode::StartPlay()
 {
 	Super::StartPlay();
+	// Blueprint CDO'su eski false degerini saklasa bile aktif GameMode'da gecis kesintisiz olsun.
+	bUseSeamlessTravel = true;
 	UE_LOG(LogTemp, Log, TEXT("[MMODBG] AMMOGameMode::StartPlay called"));
 	SpawnMobArea();
+}
+
+bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester)
+{
+	UWorld* World = GetWorld();
+	if (!World || !HasAuthority() || bZoneTravelInProgress || !Requester
+		|| Requester->GetWorld() != World || !Requester->IsLocalController())
+	{
+		return false;
+	}
+
+	const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(World, true);
+	FString TargetMap;
+	if (CurrentMap == TEXT("Summer_scene"))
+	{
+		TargetMap = TEXT("/Game/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene");
+	}
+	else if (CurrentMap == TEXT("Winter_scene"))
+	{
+		TargetMap = TEXT("/Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene");
+	}
+	else
+	{
+		return false;
+	}
+
+	TArray<AMMOCharacter*> Characters;
+	TSet<FString> SaveSlots;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PC = It->Get();
+		AMMOCharacter* Character = PC ? Cast<AMMOCharacter>(PC->GetPawn()) : nullptr;
+		if (!Character || !Character->GetStats() || Character->GetStats()->bIsDead
+			|| Character->GetStats()->IsInCombat())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Zone travel rejected: a player is missing, dead or in combat"));
+			return false;
+		}
+		const FString Slot = Character->GetSaveSlotName();
+		if (SaveSlots.Contains(Slot))
+		{
+			UE_LOG(LogTemp, Error, TEXT("Zone travel rejected: duplicate save slot %s"), *Slot);
+			return false;
+		}
+		SaveSlots.Add(Slot);
+		Characters.Add(Character);
+	}
+	if (Characters.IsEmpty())
+	{
+		return false;
+	}
+
+	bZoneTravelInProgress = true;
+	for (AMMOCharacter* Character : Characters)
+	{
+		if (!Character->SaveCharacterForTravel())
+		{
+			UE_LOG(LogTemp, Error, TEXT("Zone travel aborted: failed to save %s"), *Character->GetSaveSlotName());
+			bZoneTravelInProgress = false;
+			return false;
+		}
+	}
+	for (AMMOCharacter* Character : Characters)
+	{
+		Character->SetTravelSaveCommitted(true);
+	}
+	if (!World->ServerTravel(TargetMap))
+	{
+		for (AMMOCharacter* Character : Characters)
+		{
+			Character->SetTravelSaveCommitted(false);
+		}
+		bZoneTravelInProgress = false;
+		UE_LOG(LogTemp, Error, TEXT("Zone travel failed to start: %s"), *TargetMap);
+		return false;
+	}
+	UE_LOG(LogTemp, Log, TEXT("Zone travel started: %s -> %s (%d players)"),
+		*CurrentMap, *TargetMap, Characters.Num());
+	return true;
 }
 
 void AMMOGameMode::SpawnMobArea()

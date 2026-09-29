@@ -12,6 +12,7 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Engine/GameInstance.h"
 #include "Core/MMOTargeting.h"
+#include "Core/MMOGameMode.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -28,6 +29,20 @@ AMMOPlayerController::AMMOPlayerController()
 	// OS imlecini gizle (kendi imlecimizi HUD'da ciziyoruz) ama fare takibini surdur.
 	bShowMouseCursor = true;
 	DefaultMouseCursor = EMouseCursor::None;
+}
+
+void AMMOPlayerController::MMOTravel()
+{
+	// Uzak istemci bu komutla tum oturumu tasiyamaz. Host kontrolu GameMode'da da var.
+	if (!HasAuthority() || !IsLocalController())
+	{
+		return;
+	}
+	AMMOGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMMOGameMode>() : nullptr;
+	if (!GM || !GM->RequestZoneTravel(this))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("MMOTravel rejected; check map, players and save state"));
+	}
 }
 
 void AMMOPlayerController::BeginPlay()

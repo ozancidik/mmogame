@@ -91,6 +91,10 @@ public:
 
 	// Karakteri diske yazar / diskten yukler (sadece otorite; istemciden Exec cagrilirsa sunucuya yonlenir).
 	void SaveCharacter();
+	// Harita degisimi oncesi zorunlu kayit: yukleme bitmediyse veya disk yazimi
+	// basarisizsa false doner; GameMode bu durumda seyahati iptal eder.
+	bool SaveCharacterForTravel();
+	void SetTravelSaveCommitted(bool bCommitted);
 	bool LoadCharacter();
 	FString GetSaveSlotName() const;
 
@@ -284,6 +288,7 @@ protected:
 	// Basarisiz/bozuk yuklemede otomatik, manuel ve EndPlay kaydi mevcut dosyayi
 	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
+	bool bTravelSaveCommitted = false;
 	float LastRemoteManualSaveTime = -100.f;
 	static constexpr float RemoteManualSaveCooldown = 10.f;
 

@@ -20,11 +20,16 @@ public:
 
 	virtual void StartPlay() override;
 
+	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
+	// Her karakter basariyla kaydedilmeden harita degismez.
+	bool RequestZoneTravel(APlayerController* Requester);
+
 	// PvP acik mi? Acikken oyuncular birbirine vurabilir (sunucuda dogrulanir). Test icin varsayilan acik.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "MMO|GameMode")
 	bool bAllowPvP = true;
 
 protected:
+	bool bZoneTravelInProgress = false;
 	// Oyun basladiginda oyuncu dogus noktasinin yakinina bir mob spawner yerlestirir.
 	void SpawnMobArea();
 

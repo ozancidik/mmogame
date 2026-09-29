@@ -24,6 +24,10 @@ class MYPROJECT_API AMMOPlayerController : public APlayerController
 public:
 	AMMOPlayerController();
 
+	// Yalniz listen server hostu: butun oturumu Summer/Winter arasinda tasir.
+	UFUNCTION(Exec)
+	void MMOTravel();
+
 	// HUD imleci icin: su an bir dusmani hedefliyor muyuz (kilic imleci)?
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	bool IsInAttackMode() const;

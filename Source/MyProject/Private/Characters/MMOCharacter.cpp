@@ -358,7 +358,7 @@ void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		// calismadiysa component'ler hala varsayilan/bos durumda — bu haliyle kaydetmek
 		// gercek kayit dosyasini bos bir karakterle EZER (bkz. bInitialLoadComplete yorumu,
 		// bug-hunt bulgusu: possess sonrasi ~0.6sn icinde disconnect = ilerlemenin silinmesi).
-		if (bInitialLoadComplete)
+		if (bInitialLoadComplete && !bTravelSaveCommitted)
 		{
 			SaveCharacter();
 		}
@@ -411,15 +411,28 @@ FString AMMOCharacter::GetSaveSlotName() const
 
 void AMMOCharacter::SaveCharacter()
 {
+	SaveCharacterForTravel();
+}
+
+void AMMOCharacter::SetTravelSaveCommitted(bool bCommitted)
+{
+	if (HasAuthority())
+	{
+		bTravelSaveCommitted = bCommitted;
+	}
+}
+
+bool AMMOCharacter::SaveCharacterForTravel()
+{
 	if (!HasAuthority() || !bInitialLoadComplete)
 	{
-		return;
+		return false;
 	}
 
 	UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::CreateSaveGameObject(UMMOSaveGame::StaticClass()));
 	if (!SG)
 	{
-		return;
+		return false;
 	}
 
 	FMMOCharacterSaveData& D = SG->Data;
@@ -450,6 +463,7 @@ void AMMOCharacter::SaveCharacter()
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120), TEXT("Kaydedildi"));
 	}
+	return bOk;
 }
 
 bool AMMOCharacter::LoadCharacter()
