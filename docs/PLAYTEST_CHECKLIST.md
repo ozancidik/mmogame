@@ -2573,8 +2573,17 @@ UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yap�
 
 ## Winter_scene'e Summer_scene moblarının taşınmaması — 2026-09-29
 
-- [ ] Winter_scene'de PlayerStart yokken `SpawnMobArea skipped: ... no PlayerStart` günlüğü görünsün.
-- [ ] Winter_scene'e PlayerStart eklense bile Lv1–22 spawner'ları ve Summer hub NPC'leri doğmasın; `gameplay layout is not configured` uyarısı görünsün.
+- [ ] Winter_scene'de kaydedilen PlayerStart bulunsun; Lv1–22 spawner'ları ve Summer hub NPC'leri doğmasın, `gameplay layout is not configured` uyarısı görünsün.
 - [ ] Summer_scene'de mevcut tüm spawner ve hub NPC yerleşimi sürsün.
 
-UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Winter_scene için PlayerStart/navmesh ve ayrı Lv41+ yerleşimi hâlâ gereklidir.
+UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Winter_scene için PlayerStart ve NavMeshBoundsVolume kaydedildi; navmesh bağlantısı ve ayrı Lv41+ yerleşimi hâlâ doğrulanmalı.
+
+## Lv41–50 veri ve Winter_scene ilk yerleşimi — 2026-09-29
+
+- [ ] Winter_scene açıldığında `MMO_Winter_PlayerStart` `(0,-1500,150)` ve `MMO_Winter_NavBounds` `(0,-1500,0)` aktörleri yalnız birer kez bulunsun.
+- [ ] PlayerStart çevresinde zemin/çarpışma güvenli olsun; NavMeshBounds içinde yeşil navmesh ve aday `(-3000,-1500)` / `(3000,-1500)` merkezlerine tam yürüyüş yolu ayrıca doğrulansın.
+- [ ] Dört Winter normali (Lv42/44/46/48) ile Lv50 `WinterSovereign` arketipleri, dört Lv42 ekipman ve beş bağlı görev kimliği veri tablosunda görülsün.
+- [ ] Winter spawner'ları henüz eklenmediği için yeni öldürme görevleri oynanışta tamamlanabilir sayılmasın; bölge geçişi de henüz yok.
+- [ ] Harita görselinde mevcut ARSkyLight import uyarısının etkisi kontrol edilsin; kaydetmeden önceki haritanın kopyası `Saved/Winter_scene_before_navigation.umap` altında tutuldu.
+
+UE 5.7 üç C++ veri tablosu derlendi (`Result: Succeeded`); headless editör harita kaydetme işlemini başarılı bildirdi. PIE/navmesh yolu henüz doğrulanmadı.

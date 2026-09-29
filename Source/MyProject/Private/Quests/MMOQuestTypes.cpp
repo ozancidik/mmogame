@@ -145,6 +145,29 @@ namespace
 			T::KillSpecificMob, TEXT("DuskOverlord"), 1, 36000, 36000, 40, TEXT("Q_DuskWraiths")));
 		Table.Last().RewardEquipmentId = FName(TEXT("DuskBlade"));
 
+		// --- Yedinci bolge zinciri (Lv42-50, Winter): Q_DuskOverlord'dan sonra ---
+		// Lv31-40 gorev odullerinin ustune kademeli cikar; Winter ekipmani son dort gorevde dagitilir.
+		Table.Add(MakeQuest(TEXT("Q_WinterStalkers"), TEXT("Kis Izcileri"), TEXT("Kis izcilerini durdur: 5 Kis Izcisi oldur."),
+			T::KillSpecificMob, TEXT("WinterStalker"), 5, 40000, 40000, 42, TEXT("Q_DuskOverlord")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 7;
+
+		Table.Add(MakeQuest(TEXT("Q_WinterGuardians"), TEXT("Kis Muhafizlari"), TEXT("Gecidin muhafizlarini devir: 5 Kis Muhafizi oldur."),
+			T::KillSpecificMob, TEXT("WinterGuardian"), 5, 45000, 45000, 44, TEXT("Q_WinterStalkers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("WinterBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_WinterReavers"), TEXT("Kis Yagmacilari"), TEXT("Kis yagmacilarini dagit: 5 Kis Yagmacisi oldur."),
+			T::KillSpecificMob, TEXT("WinterReaver"), 5, 51000, 51000, 46, TEXT("Q_WinterGuardians")));
+		Table.Last().RewardEquipmentId = FName(TEXT("WinterHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_WinterWraiths"), TEXT("Kis Hayaletleri"), TEXT("Kis hayaletlerini kov: 5 Kis Hayaleti oldur."),
+			T::KillSpecificMob, TEXT("WinterWraith"), 5, 57000, 57000, 48, TEXT("Q_WinterReavers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("WinterPlate"));
+
+		Table.Add(MakeQuest(TEXT("Q_WinterSovereign"), TEXT("Kis Hukumdari"), TEXT("Kis hukumdarini devir."),
+			T::KillSpecificMob, TEXT("WinterSovereign"), 1, 68000, 68000, 50, TEXT("Q_WinterWraiths")));
+		Table.Last().RewardEquipmentId = FName(TEXT("WinterBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));

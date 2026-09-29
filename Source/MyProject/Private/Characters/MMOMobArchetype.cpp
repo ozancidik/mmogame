@@ -184,6 +184,25 @@ namespace
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.4f;
 
+		// --- Yedinci bolge NORMAL moblari (Lv42-48; Winter temali icerik verisi) ---
+		// Lv31-39 egrisinden olculu artis; spawner/harita yerlesimi ayri entegrasyon adimi.
+		Table.Add(MakeMob(TEXT("WinterStalker"), TEXT("Kis Izcisi"), 42, 104, 98, 144.f, 14000, 2100, 3900, 430.f, 600.f, 1.2f, FLinearColor(0.55f, 0.72f, 0.82f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("WinterGuardian"), TEXT("Kis Muhafizi"), 44, 109, 110, 151.f, 16000, 2350, 4300, 255.f, 600.f, 1.5f, FLinearColor(0.42f, 0.58f, 0.7f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("WinterReaver"), TEXT("Kis Yagmacisi"), 46, 115, 108, 160.f, 19000, 2650, 4800, 365.f, 600.f, 1.3f, FLinearColor(0.36f, 0.5f, 0.64f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
+		Table.Add(MakeMob(TEXT("WinterWraith"), TEXT("Kis Hayaleti"), 48, 120, 116, 169.f, 22000, 3000, 5300, 405.f, 600.f, 1.35f, FLinearColor(0.65f, 0.8f, 0.95f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -290,6 +309,18 @@ namespace
 		// Alacakaranlik Hukumdari (Lv40): yeni bolgenin son eliti, 33. seviye setini dusurur.
 		Table.Add(MakeMob(TEXT("DuskOverlord"), TEXT("Alacakaranlik Hukumdari"), 40, 112, 128, 150.f, 19000, 2600, 4800, 285.f, 600.f, 1.95f, FLinearColor(0.26f, 0.14f, 0.42f)));
 		SetWarrokVisual(Table.Last());
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
+
+		// Kis Hukumdari (Lv50): Winter kademesinin son eliti; Lv42 seti elit loot havuzunda.
+		Table.Add(MakeMob(TEXT("WinterSovereign"), TEXT("Kis Hukumdari"), 50, 136, 150, 184.f, 30000, 3900, 6900, 280.f, 600.f, 2.0f, FLinearColor(0.48f, 0.68f, 0.88f)));
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.5f;
