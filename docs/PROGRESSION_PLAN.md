@@ -73,7 +73,21 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 
 2026-09-29 çapraz incelemesinde 25/25 noktada zemin izi bulunduğu, fakat 0/25 noktada navmesh projeksiyonu olduğu teyit edildi. `(0,-1500)` civarı (zemin Z≈0) başlangıç/hub, `(-3000,-1500)` ve `(3000,-1500)` civarı ise uzak savaş alanı için yalnızca **aday** konumlardır; halka, çarpışma ve tam nav yolu ölçülmeden spawner etkinleştirilmemeli. `MMOGameMode::SpawnMobArea` Winter_scene'de şimdilik içerik üretmez: mevcut Lv1–22 Summer_scene yerleşimi Winter'a taşınmamalı. Sıradaki harita dilimi: kaydedilen NavMeshBounds ile bağlı navmesh'i ve hub/NPC ayak noktalarını ölç, Lv41–50 arketiplerinin ayrı Winter spawner'larını ekle, son olarak bölge geçişini tasarla. Bunlar henüz tamamlanmış sayılmıyor.
 
-## Sıradaki üç sınırları belirlenmiş kod dilimi
+## Sıradaki üç çalışma dilimi
+
+### 1. Winter yürünebilirliğini ve güvenli doğuşu tamamla
+
+`Winter_scene` içine PlayerStart ve NavMeshBoundsVolume kaydedildi. Önce navmesh'in gerçekten üretildiğini, başlangıçtan aday savaş alanlarına kesintisiz yol bulunduğunu ve başlangıcın zeminin üzerinde güvenli olduğunu editörde ölç. Yalnız kapsama hacminin kaydedilmiş olması yürünebilirlik kanıtı değildir. Ölçüm başarısızsa harita düzenini veya nav hacmini düzelt; eksik yolu olan konuma spawner koyma.
+
+### 2. Winter içeriğini dünyaya bağla
+
+Yol doğrulamasından sonra Lv42–48 normalleri ve Lv50 elit için Winter'a özgü, başlangıçtan ve NPC'lerden güvenli mesafedeki spawner'ları ekle. Görevli, satıcı ve şifacı için Winter yerleşimini ayrıca yap; Summer yerleşiminin Winter'da açılmasını engelleyen kapıyı koru. `Q_WinterStalkers`–`Q_WinterSovereign` zincirinin erişilebilirliği, sunucu ve istemci PIE oynanışına kadar açık iş olarak kalsın.
+
+### 3. Harita geçişi ve Lv51–80 içeriği
+
+Listen server'da bütün oyuncuların harita değiştirip değiştirmeyeceğine ilişkin geçiş kuralını belirleyip sunucu otoritesinde uygula; görev ve kayıt durumunu koru. Sonra 51–80 aralığını oynanabilir harita kapasitesiyle birlikte küçük mob/görev/ekipman dilimleri halinde genişlet. Yalnız veri tablosuna satır eklemek, oynanabilir seviye aralığı sayılmaz.
+
+## Önceki kod dilimleri ve kalan PIE doğrulaması
 
 ### 1. Tek seferlik ödül ve spawner aralığı hatalarını görünür kıl (kod tamamlandı; PIE bekliyor)
 
