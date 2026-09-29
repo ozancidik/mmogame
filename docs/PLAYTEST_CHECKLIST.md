@@ -2596,3 +2596,11 @@ UE 5.7 üç C++ veri tablosu derlendi (`Result: Succeeded`); headless editör ha
 - [ ] Bozuk/kaybolmuş kayıt dosyasının mevcut kaydı ezmesini önleyen `bInitialLoadComplete` koruması çalışmaya devam etsin.
 
 Bu yol kaynak kodda sınırlandı; PIE'de uygulanmış senaryo henüz doğrulanmadı.
+
+## Varsayılan harita ve paketleme yolu — 2026-09-29
+
+- [ ] Proje editörde açıldığında klasör yerine gerçek `/Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene` haritası yüklensin; boş Untitled haritasına düşmesin.
+- [ ] Paketleme ayarlarının harita listesinde Summer ve Winter sahneleri tam uzun paket adlarıyla bulunsun.
+- [ ] Paketlenmiş yapıda iki harita da mevcut olsun; Winter bölgesinin oynanabilirliği ayrı navmesh/spawner/harita geçişi işidir.
+
+Diskteki `.umap` yolları ile eski `DefaultEngine.ini` ayarları farklı klasörleri gösteriyordu; ayarlar dosya yollarına eşitlendi. Paketleme ve editör açılışı henüz çalıştırılarak doğrulanmadı.
