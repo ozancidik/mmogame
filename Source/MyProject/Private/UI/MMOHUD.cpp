@@ -152,19 +152,39 @@ void AMMOHUD::DrawHUD()
 	// Secim yapilmadiysa pencere kapatildiginda tekrar gorunur.
 	const bool bAnyWindowOpen = bQuestWindowOpen || bSkillBookOpen || bInventoryOpen ||
 		bShopOpen || bStatWindowOpen;
+	ClassChoiceRegions.Reset();
+	ClassChoicePanelRect = FBox2D(ForceInit);
 	if (MMOChar->ShouldShowClassHint() && !bAnyWindowOpen)
 	{
-		const FString Hint = TEXT("Sinifini sec: konsolda MMOClass savasci|okcu|buyucu|rahip (varsayilan: Savasci)");
-		const float HintScale = 1.1f;
-		float TW = 0.f, TH = 0.f;
-		GetTextSize(Hint, TW, TH, nullptr, HintScale);
-		const float PW = TW + 24.f;
-		const float PH = TH + 14.f;
+		constexpr float Gap = 8.f;
+		const float ButtonW = FMath::Clamp(((float)Canvas->SizeX - 48.f - 3.f * Gap) / 4.f, 60.f, 110.f);
+		const float PW = 4.f * ButtonW + 3.f * Gap + 24.f;
+		const float PH = 68.f;
 		const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
 		const float PY = 84.f;
+		ClassChoicePanelRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
 		DrawRect(FLinearColor(0.04f, 0.07f, 0.14f, 0.85f), PX, PY, PW, PH);
 		DrawRect(FLinearColor(0.35f, 0.6f, 1.f, 0.95f), PX, PY, PW, 2.f);
-		DrawText(Hint, FLinearColor(0.75f, 0.88f, 1.f), PX + 12.f, PY + 7.f, nullptr, HintScale);
+		DrawText(TEXT("Sinifini sec (varsayilan: Savasci)"), FLinearColor(0.75f, 0.88f, 1.f),
+			PX + 12.f, PY + 6.f, nullptr, 0.85f);
+		const EMMOClass Classes[] = { EMMOClass::Warrior, EMMOClass::Archer, EMMOClass::Mage, EMMOClass::Priest };
+		for (int32 i = 0; i < UE_ARRAY_COUNT(Classes); ++i)
+		{
+			const float BX = PX + 12.f + i * (ButtonW + Gap);
+			const float BY = PY + 29.f;
+			DrawRect(Classes[i] == EMMOClass::Warrior ? FLinearColor(0.2f, 0.35f, 0.55f) : FLinearColor(0.13f, 0.22f, 0.35f),
+				BX, BY, ButtonW, 30.f);
+			const FString Name = GetMMOClassDisplayName(Classes[i]);
+			const float TextScale = ButtonW < 90.f ? 0.7f : 0.9f;
+			float TextW = 0.f, TextH = 0.f;
+			GetTextSize(Name, TextW, TextH, nullptr, TextScale);
+			DrawText(Name, FLinearColor::White, BX + (ButtonW - TextW) * 0.5f,
+				BY + (30.f - TextH) * 0.5f, nullptr, TextScale);
+			FMMOClickRegion Region;
+			Region.Slot = i;
+			Region.Rect = FBox2D(FVector2D(BX, BY), FVector2D(BX + ButtonW, BY + 30.f));
+			ClassChoiceRegions.Add(Region);
+		}
 	}
 
 	// Olum ekrani: karartma + OLDUN + geri sayim.
@@ -2098,6 +2118,29 @@ FBox2D AMMOHUD::DrawCloseButton(float PX, float PY, float PW)
 	DrawRect(FLinearColor(0.85f, 0.3f, 0.3f, 1.f), BX, BY, S, 2.f);
 	DrawText(TEXT("X"), FLinearColor::White, BX + 6.f, BY + 2.f, nullptr, 1.05f);
 	return FBox2D(FVector2D(BX, BY), FVector2D(BX + S, BY + S));
+}
+
+bool AMMOHUD::HandleClassChoiceClick(const FVector2D& Pos)
+{
+	AMMOCharacter* Char = Cast<AMMOCharacter>(GetOwningPawn());
+	if (!Char || !Char->ShouldShowClassHint() || IsAnyWindowOpen()
+		|| !ClassChoicePanelRect.IsInside(Pos))
+	{
+		return false;
+	}
+
+	for (const FMMOClickRegion& Region : ClassChoiceRegions)
+	{
+		if (Region.Rect.IsInside(Pos) && Region.Slot >= 0 && Region.Slot <= (int32)EMMOClass::Priest)
+		{
+			if (UMMOSkillComponent* Skills = Char->GetSkillComponent())
+			{
+				Skills->RequestSetupForClass((EMMOClass)Region.Slot);
+			}
+			break;
+		}
+	}
+	return true; // Panelin bos alanina tiklama da karakteri hareket ettirmez.
 }
 
 bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)

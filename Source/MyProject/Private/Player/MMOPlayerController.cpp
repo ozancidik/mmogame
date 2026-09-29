@@ -236,10 +236,14 @@ void AMMOPlayerController::OnLeftClickPressed()
 	// UI penceresi acikken tiklama pencereye gider, karakteri hareket ettirmez.
 	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
+		float MX = 0.f, MY = 0.f;
+		if (GetMousePosition(MX, MY) && H->HandleClassChoiceClick(FVector2D(MX, MY)))
+		{
+			return;
+		}
 		if (H->IsAnyWindowOpen())
 		{
 			// Tiklama, imlecin ustundeki acik pencereye gider (X ile kapatma dahil); karakter hareket etmez.
-			float MX = 0.f, MY = 0.f;
 			if (GetMousePosition(MX, MY))
 			{
 				H->HandleWindowClick(FVector2D(MX, MY));

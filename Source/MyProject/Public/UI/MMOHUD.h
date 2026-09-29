@@ -93,6 +93,8 @@ public:
 	bool HandleWindowClick(const FVector2D& Pos);
 	// Acik pencereye sag-tiklandiysa isler (skill ata / ekipman yukselt). Tuketti ise true.
 	bool HandleWindowRightClick(const FVector2D& Pos);
+	// Yeni karakterin sinif secimi panelindeki tiklamayi isler; dunyaya hareketi engeller.
+	bool HandleClassChoiceClick(const FVector2D& Pos);
 	// Herhangi bir pencere acik mi?
 	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen; }
 
@@ -175,6 +177,8 @@ protected:
 
 	// Stat penceresi [+] tiklama bolgeleri (SkillId = "STR"/"DEX"/"INT"/"VIT").
 	TArray<FMMOClickRegion> StatPlusRegions;
+	FBox2D ClassChoicePanelRect = FBox2D(ForceInit);
+	TArray<FMMOClickRegion> ClassChoiceRegions;
 
 	// Her pencerenin cerceve dikdortgeni + X-kapat buton dikdortgeni (her kare Draw'da guncellenir).
 	FBox2D SkillBookRect = FBox2D(ForceInit);

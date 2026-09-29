@@ -2604,3 +2604,12 @@ Bu yol kaynak kodda sınırlandı; PIE'de uygulanmış senaryo henüz doğrulanm
 - [ ] Paketlenmiş yapıda iki harita da mevcut olsun; Winter bölgesinin oynanabilirliği ayrı navmesh/spawner/harita geçişi işidir.
 
 Diskteki `.umap` yolları ile eski `DefaultEngine.ini` ayarları farklı klasörleri gösteriyordu; ayarlar dosya yollarına eşitlendi. Paketleme ve editör açılışı henüz çalıştırılarak doğrulanmadı.
+
+## Yeni karakter için tıklanabilir sınıf seçimi — 2026-09-29
+
+- [ ] Yeni sunucu ve istemci karakterinde üstte Savaşçı, Okçu, Büyücü ve Rahip düğmeleri görünsün; seçilen sınıfın statları ve başlangıç skilleri gelsin.
+- [ ] Varsayılan Savaşçı düğmesine tıklamak da seçim ipucunu kapatsın; panelde boş alana tıklamak karakteri yürütmesin.
+- [ ] Satıcı/görev/envanter gibi pencere açıkken sınıf paneli gizlensin; pencere kapanınca seçim yapılmadıysa geri gelsin.
+- [ ] Kayıtlı karakterde seçim paneli görünmesin; konsoldaki `MMOClass` yolu ve sunucu tarafı savaş/cooldown kısıtları çalışmaya devam etsin.
+
+HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C++ derlemesi başarılı; PIE etkileşimi henüz doğrulanmadı.
