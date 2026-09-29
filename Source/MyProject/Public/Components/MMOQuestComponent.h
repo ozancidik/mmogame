@@ -72,11 +72,11 @@ protected:
 	// menzilde degilse tam tarama yapilir, sonuc degismez).
 	mutable TWeakObjectPtr<class AMMOQuestGiverNPC> CachedNearGiver;
 
-	// Server RPC hiz siniri: ayni oyuncudan QuestRpcMinInterval icinde gelen ikinci istek yoksayilir.
+	// Server RPC hiz siniri: kabul ve odul istekleri ayri ayri sinirlanir; ardisik kabul/odul engellenmez.
 	static constexpr float QuestRpcMinInterval = 0.25f;
-	float LastAcceptRpcTime = -1.f;
-	float LastClaimRpcTime = -1.f;
-	bool PassesRpcRateLimit(float& LastTime);
+	double LastAcceptRpcTime = -1.0;
+	double LastClaimRpcTime = -1.0;
+	bool PassesRpcRateLimit(double& LastTime);
 
 	UFUNCTION(Server, Reliable)
 	void ServerAcceptQuest(FName QuestId);

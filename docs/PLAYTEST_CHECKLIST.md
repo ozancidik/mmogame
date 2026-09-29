@@ -2573,8 +2573,9 @@ UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yap�
 
 ## Winter_scene'e Summer_scene moblarının taşınmaması — 2026-09-29
 
-- [ ] Winter_scene'de kaydedilen PlayerStart bulunsun; Lv1–22 spawner'ları ve Summer hub NPC'leri doğmasın, `gameplay layout is not configured` uyarısı görünsün.
+- [ ] Winter_scene'de kaydedilen PlayerStart bulunsun; Lv1–22 spawner'ları ve Summer hub NPC'leri doğmasın, `no configured gameplay layout` uyarısı görünsün.
 - [ ] Summer_scene'de mevcut tüm spawner ve hub NPC yerleşimi sürsün.
+- [ ] PlayerStart içeren başka bir harita açıldığında da Summer mob/NPC yerleşimi oluşmasın; yalnız Summer_scene (PIE adı dâhil) bu yerleşimi kullansın.
 
 UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yapılmadı. Winter_scene için PlayerStart ve NavMeshBoundsVolume kaydedildi; navmesh bağlantısı ve ayrı Lv41+ yerleşimi hâlâ doğrulanmalı.
 

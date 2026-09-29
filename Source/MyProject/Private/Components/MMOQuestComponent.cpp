@@ -11,6 +11,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/PlatformTime.h"
 #include "World/MMOQuestGiverNPC.h"
 
 UMMOQuestComponent::UMMOQuestComponent()
@@ -165,6 +166,11 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 		return;
 	}
 
+	if (IsQuestActive(QuestId) || IsCompleted(QuestId))
+	{
+		return;
+	}
+
 	// Sunucu-otoriter dogrulama: vendor/healer/talker'in aksine bu akista mesafe kontrolu
 	// yoktu — hileli istemci gorevliye hic yaklasmadan gorev kabul edebiliyordu (bug-hunt).
 	if (!IsOwnerNearQuestGiver())
@@ -173,11 +179,6 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Gorevli yakininda degilsin"));
 		}
-		return;
-	}
-
-	if (IsQuestActive(QuestId) || IsCompleted(QuestId))
-	{
 		return;
 	}
 
@@ -214,14 +215,10 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	}
 }
 
-bool UMMOQuestComponent::PassesRpcRateLimit(float& LastTime)
+bool UMMOQuestComponent::PassesRpcRateLimit(double& LastTime)
 {
-	const UWorld* World = GetWorld();
-	if (!World)
-	{
-		return false;
-	}
-	const float Now = World->GetTimeSeconds();
+	// Monotonik gercek zaman, dunya zaman olceginden ve float hassasiyet kaybindan etkilenmez.
+	const double Now = FPlatformTime::Seconds();
 	if (Now - LastTime < QuestRpcMinInterval)
 	{
 		return false;
@@ -291,6 +288,12 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		return;
 	}
 
+	FMMOQuestProgress* P = FindActive(QuestId);
+	if (!P || !IsQuestComplete(*Def, *P))
+	{
+		return;
+	}
+
 	// Sunucu-otoriter dogrulama: odul alma da gorevliye yakinlik istemeli (bug-hunt).
 	if (!IsOwnerNearQuestGiver())
 	{
@@ -298,12 +301,6 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Gorevli yakininda degilsin"));
 		}
-		return;
-	}
-
-	FMMOQuestProgress* P = FindActive(QuestId);
-	if (!P || !IsQuestComplete(*Def, *P))
-	{
 		return;
 	}
 

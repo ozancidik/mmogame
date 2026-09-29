@@ -50,11 +50,12 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Error, TEXT("[MMODBG] SpawnMobArea skipped: map %s has no PlayerStart"), *World->GetMapName());
 		return;
 	}
-	// Winter_scene icin ayri Lv41+ yerlesim/navmesh henuz hazir degil. Bu haritaya
-	// PlayerStart eklense bile Summer_scene'in Lv1-22 moblarini ve hub NPC'lerini tasima.
-	if (World->GetMapName().Contains(TEXT("Winter_scene")))
+	// Bu fonksiyondaki tum konumlar Summer_scene'e ozgu. Winter veya yeni bir harita
+	// PlayerStart kazandiginda Summer moblarini ve hub NPC'lerini oraya tasima.
+	// PIE'deki UEDPIE_0_ on eki nedeniyle harita adinin sonunu karsilastir.
+	if (!World->GetMapName().EndsWith(TEXT("Summer_scene")))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[MMODBG] SpawnMobArea skipped: Winter_scene gameplay layout is not configured"));
+		UE_LOG(LogTemp, Warning, TEXT("[MMODBG] SpawnMobArea skipped: map %s has no configured gameplay layout"), *World->GetMapName());
 		return;
 	}
 
