@@ -73,6 +73,55 @@ Her kademe bir tasarım varsayımıdır. `[PLACEHOLDER]` Eşya statları, mob ha
 
 2026-09-29 çapraz incelemesinde 25/25 noktada zemin izi bulunduğu, fakat 0/25 noktada navmesh projeksiyonu olduğu teyit edildi. `(0,-1500)` civarı (zemin Z≈0) başlangıç/hub, `(-3000,-1500)` ve `(3000,-1500)` civarı ise uzak savaş alanı için yalnızca **aday** konumlardır; halka, çarpışma ve tam nav yolu ölçülmeden spawner etkinleştirilmemeli. `MMOGameMode::SpawnMobArea` Winter_scene'de şimdilik içerik üretmez: mevcut Lv1–22 Summer_scene yerleşimi Winter'a taşınmamalı. Sıradaki harita dilimi: kaydedilen NavMeshBounds ile bağlı navmesh'i ve hub/NPC ayak noktalarını ölç, Lv41–50 arketiplerinin ayrı Winter spawner'larını ekle, son olarak bölge geçişini tasarla. Bunlar henüz tamamlanmış sayılmıyor.
 
+## Lv51–80 içerik genişletmesi: uygulanabilir tasarım dilimleri `[PROPOSED]`
+
+### Mevcut sınır ve bu bölümün varsayımları
+
+`[IMPLEMENTED]` `WinterSovereign` Lv50 / 30.000 XP, normal Kış mobları Lv42–48 / 14.000–22.000 XP. Ana öldürme zinciri `Q_WinterSovereign` ile biter. `Q_Level65` ve `Q_Level80` yalnızca `ReachLevel` kilometre taşlarıdır; ilki 55.000, ikincisi 90.000 XP verir. En yüksek temel ekipman `Winter` setidir (gereken seviye 42; silah 108 saldırı, zırh/kask/bot 65/27/36 savunma). 58. seviyede dört sınıfın yeni becerileri, 70 ve 80'de dört sınıfın `Special3` becerileri tanımlıdır. 51–80 için mob, ana öldürme görevi, temel ekipman veya yerleşik spawner yoktur. Bunlar kaynak tablo durumlarıdır; aşağıdaki adlar, sayılar ve bölgeler henüz oyunda mevcut değildir.
+
+`[PROPOSED]` Lv51'e geçiş kapısı, önce Winter'ın yürünebilirliğinin ve `Q_WinterSovereign` tamamlanabilirliğinin sağlanmasıdır. Ana zincir bu görevi ön koşul alır. Ayrı harita mı aynı haritada genişleme mi yapılacağı, listen server bölge geçişi ve kayıt durumunun nasıl korunacağı karara bağlanmadan konum veya harita adı kesinleştirilmez. Yeni görev ve düşman kimlikleri aşağıda **ayrılmış öneri adlarıdır**; veri tablosu kaydı değildir.
+
+### Dünya kapasitesi ve görev zinciri `[PROPOSED]`
+
+Her satır için oyuncunun ulaşabildiği bir görev veren/güvenli dönüş noktası, birbirinden ayrılmış iki normal mob alanı ve zorunlu elit alanı gerekir: en az **8 normal spawner + 4 elit spawner**. İlk kapasite taslağı her normal alanda en çok 5 eşzamanlı mob, her elit alanda 1 elittir; bu sayı sunucu yükü, doğma aralığı ve eşzamanlı oyuncu sayısı ölçülünce değişir. Her doğum halkası zemine ve bağlı navmesh'e oturmalı; NPC/yeniden doğuş noktası aggro dışında kalmalı. Elit tek bir zorunlu hedefse bekleme ve parti paylaşımı, görevin tamamlanmasını tıkamamalı. Bu koşullar doğrulanmadan salt tablo satırı bir seviye bandını oynanabilir yapmaz.
+
+| Bant / sıra | Normal hedefler ve elit (önerilen ID, Lv) | Dört görevlik ana zincir (önerilen ID; hedef/adet; açılış) | Alan ve oyuncu kararı |
+| --- | --- | --- | --- |
+| 51–57, `Q_WinterSovereign` sonrası | `FrostboundScout` 51, `FrostboundSentinel` 55; `FrostboundWarden` 57 elit | `Q_FrostboundScouts` 5×Scout / Lv51 → `Q_FrostboundSentinels` 5×Sentinel / Lv55 → `Q_FrostboundLine` 6×Sentinel / Lv55 → `Q_FrostboundWarden` 1×Warden / Lv57 | Winter çıkışı için iki ayrı savaş cebi ve kapı eliti; Lv51 oyuncusu önce mevcut Kış setiyle başlayabilir. |
+| 58–65, önceki elit sonrası | `RiftSeeker` 58, `RiftKeeper` 62; `RiftHerald` 65 elit | `Q_RiftSeekers` 5×Seeker / Lv58 → `Q_RiftKeepers` 5×Keeper / Lv62 → `Q_RiftWatch` 6×Keeper / Lv62 → `Q_RiftHerald` 1×Herald / Lv65 | 58 becerileri için normal ve çoklu hedef karşılaşması; `Q_Level65` ana zincirden bağımsız kilometre taşı olarak kalır. |
+| 66–70, önceki elit sonrası | `AshVanguard` 66, `AshBinder` 68; `AshTyrant` 70 elit | `Q_AshVanguard` 5×Vanguard / Lv66 → `Q_AshBinders` 5×Binder / Lv68 → `Q_AshLine` 6×Binder / Lv68 → `Q_AshTyrant` 1×Tyrant / Lv70 | 70 becerisini deneyecek normal/elit yoğunluğu; elit alanı normal mob doğum halkasıyla çakışmaz. |
+| 71–80, önceki elit sonrası | `AbyssStrider` 72, `AbyssGuardian` 76; `AbyssRegent` 80 elit | `Q_AbyssStriders` 5×Strider / Lv72 → `Q_AbyssGuardians` 5×Guardian / Lv76 → `Q_AbyssLine` 6×Guardian / Lv76 → `Q_AbyssRegent` 1×Regent / Lv80 | Lv71'de önceki alan erişilebilir kalır; Lv76 normali 79→80 için tekrarlanabilir hedef olur. Lv80 elit, 80 becerisi için son karşılaşmadır; `Q_Level80` ayrı varış görevidir. |
+
+Her ok, bir önceki **görevin tamamlanmasını** ön koşul yapar; satır başındaki görev önceki satırın elit görevine bağlanır. Normal hedefler kendi seviyelerinde üretilebilir olmalı; 51/58/66/72 başlangıçları arasında erişilemez bir XP veya seyahat boşluğu oluşmamalı. Dört görev/bant, tek seferlik 5+5+6 normal ve 1 elit öldürme hedefidir; tekrar eden günlük görev veya yeni görev tipi varsayılmaz. Ödül NPC'sine gidiş dönüş ve dolu ekipman çantasında ödül alma akışı da bu zincirin parçasıdır. Ödül XP'si ve altını aşağıdaki denge çalışmasıyla belirlenir.
+
+### Ekipman kademeleri `[PROPOSED]` ve değer varsayımları `[PLACEHOLDER]`
+
+Her bantta silah, zırh, kask ve bot için dört yeni **temel eşya tanımı** gerekir; önerilen gereken seviyeler sırasıyla 51, 58, 66 ve 72'dir. Her bandın ilk iki normal görevi bot/kaskı, üçüncü normal görevi zırhı, elit görevi silahı garanti ödül olarak verecek şekilde tasarlanır. Böylece dört yuvaya erişim rastgele düşüşe bağlı olmaz ve ilk ödül alındığında kuşanılabilir. Normal/elit ganimet havuzları ve satıcı fiyatları ayrıca incelenir; mevcut düşüş olasılığı otomatik olarak yeni ekonomiye uygun sayılmaz.
+
+| Gereken Lv | Kademe için geçici silah temel saldırısı | Geçici zırh / kask / bot temel savunması | Karşılaştırma amacı |
+| ---: | ---: | ---: | --- |
+| 51 | 124 | 75 / 31 / 41 | 42 Kış setinden küçük artış; mevcut yükseltilmiş eşyayı hemen değersizleştirmeme. |
+| 58 | 142 | 86 / 36 / 47 | 58 becerilerinin mana ve hasar ihtiyacıyla birlikte ölçme. |
+| 66 | 164 | 99 / 42 / 55 | 70 becerisi öncesi hayatta kalma ve saldırı hızını ayrı ölçme. |
+| 72 | 188 | 114 / 48 / 64 | 79→80 ve Lv80 elit için son temel kademe; +8 yükseltmeyle yeniden karşılaştırma. |
+
+Bu rakamlar **uygulanmış denge değildir**. Mevcut +8 yükseltme temel değere toplam %160 eklediğinden, çıplak yeni silahı yükseltilmiş eski silahla değil aynı yükseltme düzeyinde de karşılaştır. Sınıfın tercih ettiği statlar, iksir/mana gideri, ekipman satış geliri ve yükseltme altın çıkışı birlikte değerlendirilir. Kesin eşya adları/ID'leri, görev ödülü kayıtları ve satıcı erişimi içerik diliminde belirlenir.
+
+### XP, dövüş ve ekonomi kabul varsayımları `[PLACEHOLDER]`
+
+Mevcut XP eğrisi korunur. Aşağıdaki mob XP değerleri, **görev XP'si yokmuş gibi** tek seviye eşiğini yaklaşık 12–25 normal öldürmede karşılamak için başlangıç hipotezidir; elit XP'si bunlardan ayrı tasarlanır. Gerçek hedef, her seviyede o seviyeye dek alınabilecek tek seferlik görev XP'si çıkarılarak `ceil((eşik − görev XP'si) / uygun normal mob XP'si)` ile tekrar hesaplanır. Görevlerin dört adımlı olması her seviyeye görev XP'si geleceği anlamına gelmez.
+
+| Bant | Geçici normal XP/öldürme | Hesap örneği (görev XP'si = 0) | İncelenecek diğer maliyet |
+| --- | ---: | --- | --- |
+| 51–57 | 30.000–38.000 | 51→52: 543.542 / 30.000 ≈ 19 öldürme | Winter'dan yol süresi, görev NPC'sine dönüş. |
+| 58–65 | 45.000–55.000 | 65→66: 1.155.776 / 55.000 ≈ 22 öldürme | 58 becerileriyle mana/iksir tüketimi. |
+| 66–70 | 60.000–72.000 | 70→71: 1.430.576 / 72.000 ≈ 20 öldürme | 70 becerisi ve parti ile elit öldürme süresi. |
+| 71–80 | 80.000–100.000 | 79→80: 1.999.682 / 100.000 ≈ 20 öldürme | Lv76 hedefinin tekrar yoğunluğu, ölüm XP kaybı ve son kademe maliyeti. |
+
+XP sayıları `FMMOMobArchetype` kayıtları için öneridir; can/hasar, elit XP'si, görev XP/altını, düşüş/satış fiyatları ve yeniden doğuş süreleri **açık denge kararı** olarak kalır. Tam mob XP'si yakındaki uygun parti üyelerine de verildiği ve seviye farkı indirimi bulunmadığı için aynı değerlerin solo, parti ve düşük seviye çiftlik koşularında nasıl davrandığı gözlenmeli. Her bantta dört sınıfla öldürme süresi, can/mana tüketimi, ölüm, çanta doluluğu, altın girişi/çıkışı ve görev başına gidiş dönüş süresi kaydedilmeden değerler kilitlenmez. `Q_Level80` 80'e ulaştıktan sonra alınırsa XP bölümü `GainExperience` tarafından kullanılmaz; bu görev 79→80 açığını kapatıyor gibi bütçelenmez.
+
+**Uygulama sırası:** Winter erişimi ve geçiş kuralı → 51–57 için arketip/görev/dört eşya ve erişilebilir 2+1 alan → ölçüm → aynı kalıbı sırasıyla 58–65, 66–70, 71–80 için açma. Bir sonraki banda geçmeden önce görev hedefi arketipinin gerçekten üretildiği, zincir/ödül kimliklerinin bulunduğu ve tekli/partili akışın ilerlediği gösterilir.
+
 ## Sıradaki üç çalışma dilimi
 
 ### 1. Winter yürünebilirliğini ve güvenli doğuşu tamamla
