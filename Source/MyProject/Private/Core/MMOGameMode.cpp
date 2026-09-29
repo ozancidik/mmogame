@@ -50,8 +50,54 @@ void AMMOGameMode::SpawnMobArea()
 		UE_LOG(LogTemp, Error, TEXT("[MMODBG] SpawnMobArea skipped: map %s has no PlayerStart"), *World->GetMapName());
 		return;
 	}
-	// Bu fonksiyondaki tum konumlar Summer_scene'e ozgu. Winter veya yeni bir harita
-	// PlayerStart kazandiginda Summer moblarini ve hub NPC'lerini oraya tasima.
+	// Winter_scene ayri bir harita ve ayri bir Lv42-50 yerlesimi kullanir. Kaydedilmis
+	// Recast navmesh uzerinde (-3000,-1500) ve (-3000,0) ceplerinin 150/225u
+	// halkalarindaki 64 ornegin tamami hub'a tam yolla bagli; zemin farki <10u.
+	// Dogudaki (3000,-1500) yol kismi oldugu icin oraya mob yerlestirme.
+	if (World->GetMapName().EndsWith(TEXT("Winter_scene")))
+	{
+		const FVector WinterMobLoc(-3000.f, -1500.f, 42.f); // zemin ~-8u, taban +50u
+		const FTransform WinterMobTM(FRotator::ZeroRotator, WinterMobLoc);
+		if (AMMOMobSpawner* WinterSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(
+			AMMOMobSpawner::StaticClass(), WinterMobTM))
+		{
+			WinterSpawner->MaxMobs = 6;
+			WinterSpawner->SpawnRadius = 225.f;
+			WinterSpawner->MinMobLevel = 42;
+			WinterSpawner->MaxMobLevel = 48;
+			WinterSpawner->bValidateSpawnOnNavGround = true;
+			UGameplayStatics::FinishSpawningActor(WinterSpawner, WinterMobTM);
+		}
+
+		const FVector WinterBossLoc(-3000.f, 0.f, 50.f); // zemin ~0u
+		const FTransform WinterBossTM(FRotator::ZeroRotator, WinterBossLoc);
+		if (AMMOMobSpawner* WinterBoss = World->SpawnActorDeferred<AMMOMobSpawner>(
+			AMMOMobSpawner::StaticClass(), WinterBossTM))
+		{
+			WinterBoss->MaxMobs = 1;
+			WinterBoss->SpawnRadius = 150.f;
+			WinterBoss->TopUpInterval = 60.f;
+			WinterBoss->ForcedArchetypeId = FName(TEXT("WinterSovereign"));
+			WinterBoss->bValidateSpawnOnNavGround = true;
+			UGameplayStatics::FinishSpawningActor(WinterBoss, WinterBossTM);
+		}
+
+		// Kis hub'inda gorev kabul/teslimi, satis ve iyilesme ayni servislerle
+		// acilir. Kayitli PlayerStart merkezinden 250u ote, mob cebinden >=2750u.
+		FActorSpawnParameters WinterNpcParams;
+		WinterNpcParams.SpawnCollisionHandlingOverride =
+			ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		World->SpawnActor<AMMOVendorNPC>(AMMOVendorNPC::StaticClass(),
+			Origin + FVector(250.f, 200.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
+		World->SpawnActor<AMMOQuestGiverNPC>(AMMOQuestGiverNPC::StaticClass(),
+			Origin + FVector(250.f, -200.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
+		World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(),
+			Origin + FVector(250.f, -350.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
+		UE_LOG(LogTemp, Log, TEXT("[MMODBG] Winter_scene Lv42-50 layout spawned"));
+		return;
+	}
+	// Bundan sonraki konumlar Summer_scene'e ozgu. Yeni bir harita PlayerStart
+	// kazandiginda Summer moblarini ve hub NPC'lerini oraya tasima.
 	// PIE'deki UEDPIE_0_ on eki nedeniyle harita adinin sonunu karsilastir.
 	if (!World->GetMapName().EndsWith(TEXT("Summer_scene")))
 	{
