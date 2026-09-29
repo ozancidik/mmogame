@@ -330,7 +330,7 @@ void AMMOCharacter::RetrySavedLocationRestore()
 	{
 		bInitialLoadComplete = true;
 	}
-	else if (bNavPending)
+	else if (bNavPending && ++SavedLocationRetryCount < MaxSavedLocationRetries)
 	{
 		GetWorldTimerManager().SetTimer(SavedLocationRetryTimerHandle, this,
 			&AMMOCharacter::RetrySavedLocationRestore, 1.f, false);
@@ -338,6 +338,11 @@ void AMMOCharacter::RetrySavedLocationRestore()
 	}
 	else
 	{
+		if (bNavPending)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Character navigation unavailable after %d retries; using PlayerStart and enabling saves"),
+				SavedLocationRetryCount);
+		}
 		MoveToPlayerStart();
 		bInitialLoadComplete = true;
 	}
@@ -458,6 +463,7 @@ bool AMMOCharacter::LoadCharacter()
 	// yukleme basarili olsa bile simdiki dosya okunamazsa autosave onu ezmesin.
 	bInitialLoadComplete = false;
 	GetWorldTimerManager().ClearTimer(SavedLocationRetryTimerHandle);
+	SavedLocationRetryCount = 0;
 
 	const FString Slot = GetSaveSlotName();
 	if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))

@@ -277,6 +277,8 @@ protected:
 	FTimerHandle SavedLocationRetryTimerHandle;
 	FVector PendingSavedLocation = FVector::ZeroVector;
 	FRotator PendingSavedRotation = FRotator::ZeroRotator;
+	int32 SavedLocationRetryCount = 0;
+	static constexpr int32 MaxSavedLocationRetries = 15;
 
 	// Yalniz kayit yoksa veya var olan kayit basariyla okunduysa true olur.
 	// Basarisiz/bozuk yuklemede otomatik, manuel ve EndPlay kaydi mevcut dosyayi

@@ -2588,3 +2588,11 @@ UE 5.7 `MMOGameMode.cpp` yeniden derlendi (`Result: Succeeded`); PIE henüz yap�
 - [ ] Harita görselinde mevcut ARSkyLight import uyarısının etkisi kontrol edilsin; kaydetmeden önceki haritanın kopyası `Saved/Winter_scene_before_navigation.umap` altında tutuldu.
 
 UE 5.7 üç C++ veri tablosu derlendi (`Result: Succeeded`); headless editör harita kaydetme işlemini başarılı bildirdi. PIE/navmesh yolu henüz doğrulanmadı.
+
+## Kayıt konumu: navmesh hiç oluşmazsa sonsuz beklemeyi bitir — 2026-09-29
+
+- [ ] Kaydedilen konumun haritasında navmesh geç açıldığında konum en fazla 15 adet bir saniyelik denemede geri yüklensin.
+- [ ] Navmesh hiç oluşmazsa 15. denemeden sonra karakter PlayerStart'a alınsın; sonraki otomatik ve çıkış kaydı kalıcı olarak kilitlenmesin.
+- [ ] Bozuk/kaybolmuş kayıt dosyasının mevcut kaydı ezmesini önleyen `bInitialLoadComplete` koruması çalışmaya devam etsin.
+
+Bu yol kaynak kodda sınırlandı; PIE'de uygulanmış senaryo henüz doğrulanmadı.
