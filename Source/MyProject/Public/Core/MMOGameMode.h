@@ -22,7 +22,7 @@ public:
 
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
-	bool RequestZoneTravel(APlayerController* Requester);
+	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
 
 	// PvP acik mi? Acikken oyuncular birbirine vurabilir (sunucuda dogrulanir). Test icin varsayilan acik.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "MMO|GameMode")

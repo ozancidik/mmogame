@@ -39,9 +39,18 @@ void AMMOPlayerController::MMOTravel()
 		return;
 	}
 	AMMOGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMMOGameMode>() : nullptr;
-	if (!GM || !GM->RequestZoneTravel(this))
+	FString FailureReason;
+	if (!GM || !GM->RequestZoneTravel(this, FailureReason))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("MMOTravel rejected; check map, players and save state"));
+		if (FailureReason.IsEmpty())
+		{
+			FailureReason = TEXT("Oyun modu gecis icin hazir degil");
+		}
+		UE_LOG(LogTemp, Warning, TEXT("MMOTravel rejected: %s"), *FailureReason);
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FailureReason);
+		}
 	}
 }
 

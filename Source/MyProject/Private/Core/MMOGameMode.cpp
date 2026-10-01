@@ -32,12 +32,14 @@ void AMMOGameMode::StartPlay()
 	SpawnMobArea();
 }
 
-bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester)
+bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason)
 {
+	OutFailureReason.Reset();
 	UWorld* World = GetWorld();
 	if (!World || !HasAuthority() || bZoneTravelInProgress || !Requester
 		|| Requester->GetWorld() != World || !Requester->IsLocalController())
 	{
+		OutFailureReason = TEXT("Gecis su anda kullanilamiyor");
 		return false;
 	}
 
@@ -53,6 +55,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester)
 	}
 	else
 	{
+		OutFailureReason = TEXT("Bu haritadan bolge gecisi yok");
 		return false;
 	}
 
@@ -66,19 +69,24 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester)
 			|| Character->GetStats()->IsInCombat())
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Zone travel rejected: a player is missing, dead or in combat"));
+			OutFailureReason = TEXT("Tum oyuncular canli ve savas disinda olmali");
 			return false;
 		}
 		const FString Slot = Character->GetSaveSlotName();
-		if (SaveSlots.Contains(Slot))
+		// Windows save dosyalari buyuk/kucuk harf ayirt etmez.
+		const FString NormalizedSlot = Slot.ToLower();
+		if (SaveSlots.Contains(NormalizedSlot))
 		{
 			UE_LOG(LogTemp, Error, TEXT("Zone travel rejected: duplicate save slot %s"), *Slot);
+			OutFailureReason = TEXT("Iki oyuncunun kayit adi ayni");
 			return false;
 		}
-		SaveSlots.Add(Slot);
+		SaveSlots.Add(NormalizedSlot);
 		Characters.Add(Character);
 	}
 	if (Characters.IsEmpty())
 	{
+		OutFailureReason = TEXT("Tasinacak oyuncu bulunamadi");
 		return false;
 	}
 
@@ -88,6 +96,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester)
 		if (!Character->SaveCharacterForTravel())
 		{
 			UE_LOG(LogTemp, Error, TEXT("Zone travel aborted: failed to save %s"), *Character->GetSaveSlotName());
+			OutFailureReason = TEXT("Bir karakter kaydedilemedi; gecis iptal edildi");
 			bZoneTravelInProgress = false;
 			return false;
 		}
@@ -104,6 +113,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester)
 		}
 		bZoneTravelInProgress = false;
 		UE_LOG(LogTemp, Error, TEXT("Zone travel failed to start: %s"), *TargetMap);
+		OutFailureReason = TEXT("Harita gecisi baslatilamadi");
 		return false;
 	}
 	UE_LOG(LogTemp, Log, TEXT("Zone travel started: %s -> %s (%d players)"),
