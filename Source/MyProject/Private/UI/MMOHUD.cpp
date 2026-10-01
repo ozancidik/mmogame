@@ -152,6 +152,27 @@ void AMMOHUD::DrawHUD()
 	// Secim yapilmadiysa pencere kapatildiginda tekrar gorunur.
 	const bool bAnyWindowOpen = bQuestWindowOpen || bSkillBookOpen || bInventoryOpen ||
 		bShopOpen || bStatWindowOpen;
+	ZoneTravelRect = FBox2D(ForceInit);
+	const AMMOPlayerController* LocalPC = Cast<AMMOPlayerController>(GetOwningPlayerController());
+	const FString MapName = GetWorld() ? GetWorld()->GetMapName() : FString();
+	const bool bSupportedMap = MapName.EndsWith(TEXT("Summer_scene")) || MapName.EndsWith(TEXT("Winter_scene"));
+	if (!bAnyWindowOpen && !S->bIsDead && LocalPC && LocalPC->HasAuthority()
+		&& LocalPC->IsLocalController() && bSupportedMap)
+	{
+		const float BW = FMath::Min(262.f, FMath::Max(180.f, (float)Canvas->SizeX - 32.f));
+		const float BH = 34.f;
+		const float BX = ((float)Canvas->SizeX - BW) * 0.5f;
+		const float BY = (float)Canvas->SizeY - 154.f;
+		ZoneTravelRect = FBox2D(FVector2D(BX, BY), FVector2D(BX + BW, BY + BH));
+		DrawRect(FLinearColor(0.07f, 0.23f, 0.35f, 0.9f), BX, BY, BW, BH);
+		DrawRect(FLinearColor(0.3f, 0.8f, 1.f, 0.95f), BX, BY, BW, 2.f);
+		const FString Label = MapName.EndsWith(TEXT("Summer_scene"))
+			? TEXT("Tum oyunculari Kis'a tasi") : TEXT("Tum oyunculari Yaz'a tasi");
+		float LabelW = 0.f, LabelH = 0.f;
+		GetTextSize(Label, LabelW, LabelH, nullptr, 0.9f);
+		DrawText(Label, FLinearColor::White, BX + (BW - LabelW) * 0.5f,
+			BY + (BH - LabelH) * 0.5f, nullptr, 0.9f);
+	}
 	ClassChoiceRegions.Reset();
 	ClassChoicePanelRect = FBox2D(ForceInit);
 	if (MMOChar->ShouldShowClassHint() && !bAnyWindowOpen)
@@ -2141,6 +2162,20 @@ bool AMMOHUD::HandleClassChoiceClick(const FVector2D& Pos)
 		}
 	}
 	return true; // Panelin bos alanina tiklama da karakteri hareket ettirmez.
+}
+
+bool AMMOHUD::HandleZoneTravelClick(const FVector2D& Pos)
+{
+	if (!ZoneTravelRect.bIsValid || !ZoneTravelRect.IsInside(Pos) || IsAnyWindowOpen())
+	{
+		return false;
+	}
+	AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetOwningPlayerController());
+	if (PC && PC->HasAuthority() && PC->IsLocalController())
+	{
+		PC->MMOTravel();
+	}
+	return true;
 }
 
 bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)

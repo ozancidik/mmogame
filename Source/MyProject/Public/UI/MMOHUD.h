@@ -95,6 +95,8 @@ public:
 	bool HandleWindowRightClick(const FVector2D& Pos);
 	// Yeni karakterin sinif secimi panelindeki tiklamayi isler; dunyaya hareketi engeller.
 	bool HandleClassChoiceClick(const FVector2D& Pos);
+	// Listen server host'unun tum oturumu diger bolgeye tasima dugmesi.
+	bool HandleZoneTravelClick(const FVector2D& Pos);
 	// Herhangi bir pencere acik mi?
 	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen; }
 
@@ -179,6 +181,7 @@ protected:
 	TArray<FMMOClickRegion> StatPlusRegions;
 	FBox2D ClassChoicePanelRect = FBox2D(ForceInit);
 	TArray<FMMOClickRegion> ClassChoiceRegions;
+	FBox2D ZoneTravelRect = FBox2D(ForceInit);
 
 	// Her pencerenin cerceve dikdortgeni + X-kapat buton dikdortgeni (her kare Draw'da guncellenir).
 	FBox2D SkillBookRect = FBox2D(ForceInit);

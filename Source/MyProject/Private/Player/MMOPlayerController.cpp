@@ -256,6 +256,10 @@ void AMMOPlayerController::OnLeftClickPressed()
 		{
 			return;
 		}
+		if (GetMousePosition(MX, MY) && H->HandleZoneTravelClick(FVector2D(MX, MY)))
+		{
+			return;
+		}
 		if (H->IsAnyWindowOpen())
 		{
 			// Tiklama, imlecin ustundeki acik pencereye gider (X ile kapatma dahil); karakter hareket etmez.
