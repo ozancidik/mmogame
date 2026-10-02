@@ -234,7 +234,7 @@ namespace
 			T::KillSpecificMob, TEXT("AbyssGuardian"), 6, 320000, 320000, 75, TEXT("Q_AbyssGuardians")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssPlate"));
 
-		// Lv80'de XP kullanilmaz (GainExperience tavanda XP kabul etmez); odul altin + silah.
+		// Lv79'da alinir: Naip (Lv80 elit) Lv79 oyuncuya da kredi verir; odul XP'si Lv79'da kullanilir.
 		Table.Add(MakeQuest(TEXT("Q_AbyssRegent"), TEXT("Ucurum Naibi"), TEXT("Dogu yaylasindaki ucurum naibini devir."),
 			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 79, TEXT("Q_AbyssLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBlade"));

@@ -2682,3 +2682,65 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 - [ ] **[KÜÇÜK] Yukarıdaki eski maddeler güncel değil.** "Lv51–57 Frostbound" bölümündeki Spawner maddesi Nöbetçi'yi `(-3800,1200)`'de, Muhafız'ı `(-2000,1000)`'de gösteriyor. `c040e18` sonrası doğru konumlar şunlar: **Nöbetçi `(-2800,4400)`, Muhafız `(2000,2800)`**. Ayrıca 627e79a QA'sındaki iki ORTA madde (Hükümdar–Muhafız/Nöbetçi örtüşmesi ve Nöbetçi'nin nav kenarında olması) bu taşımayla kapanmış görünüyor. Yeni çiftler Nöbetçi–Gezgin 2530u (+420u pay) ve Muhafız–Koruyucu 2530u (+495u). **Test:** Winter'da Nöbetçi'yi yeni konumda bul. Kış Hükümdarı'yla 2 dk savaşırken hiçbir Lv55/57 mob'u savaşa katılmamalı.
 - [ ] **Bant/elit doğrulaması (PIE):** Summer'da Yarık cebinde yalnız Arayıcı (Lv58) ya da yalnız Bekçi (Lv62) doğmalı. Winter'da 4 Kül/Uçurum cebinin her birinde tek tür mob (66/68/72/76) doğmalı, eskiden 5 olan cep başına 6 mob bulunmalı. Kül Tiranı'nı 4–6 kez öldür: yalnız Kül (Lv66) seti +3..+5 düşmeli. Uçurum Naibi'nden yalnız Uçurum (Lv72) seti +4..+6 düşmeli. Yarık Habercisi'nden yalnız Yarık (Lv58) seti düşmeli, Buzbağlı seti düşmemeli.
 - [ ] **Bölge geçişiyle zincir:** Winter'da `Q_FrostboundWarden`'ı teslim et ve Lv58'e çık (`MMOGainXP`). `Q_RiftSeekers`'ı Winter hub'ında al, host düğmesiyle Summer'a geç: görev ilerlemesi korunmalı ve Arayıcı kill'leri sayılmalı. `Q_RiftHerald` bitince Lv66'da `Q_AshVanguard`'ı alıp Winter'a dön; Kül Öncüsü kill'leri sayılmalı.
+
+# Lv61–80 grind aralığı yan görevleri — 2026-10-03
+
+> Derleme temiz, PIE yok. 7 yeni yan görev; ana zinciri kilitlemez.
+
+- [ ] **Görünürlük:** Lv61'de `Q_RiftWatch` teslim edilince görev NPC'sinde hem `Q_RiftHerald` (Lv65'te) hem `Q_RiftPurge` ("Yarık Temizliği") görünmeli; Purge bitince Lv63'te `Q_RiftDepths` açılmalı.
+- [ ] **Uçurum yan zinciri:** `Q_AbyssStriders` bitince Lv71'de `Q_AbyssPatrol`, Lv73'te `Q_AbyssEdge`; `Q_AbyssLine` bitince Lv75'te `Q_AbyssVigil` → Lv77 `Q_AbyssDescent` → Lv78 `Q_AbyssBastion` alınabilmeli.
+- [ ] **Çift sayım:** `Q_AbyssStriders` ile `Q_AbyssPatrol` aynı anda aktifken bir Gezgin kill'i ikisine de sayılıyor mu? (Beklenen: evet, zararsız.) Not al.
+- [ ] **Ödül:** Her yan görev altın + 5 Büyük Can/Mana İksiri vermeli; çanta doluyken iksirler kayboluyor mu, kontrol et.
+- [ ] **Kayıt uyumu:** Eski kayıtta (Lv75+, `Q_AbyssLine` tamamlanmış) yükleyince `Q_AbyssVigil` hemen alınabilir olmalı.
+
+## QA denetimi: `f9d3b30` Rift taşıma + Naip — 2026-10-03
+
+> **Yeniden derlenmedi.** Commit derlenmiş olarak bildirildi; bu denetimde yapılan C++ değişikliği yalnız sabit koordinatlar ve bir tamsayı.
+>
+> **Erişim modeli:** Rift mob'unun oyuncuyu fark etme erişimi = spawn yarıçapı + 450 (gezinme) + 600 (aggro). Bu, r225 ceplerde 1275u, Haberci'de 1200u eder. Erken cepte savaşan oyuncunun alanı = o cebin yarıçapı + 450 + 160. Summer konumları `MobAreaDistance=700` (`MMOGameMode.h:38`), PlayerStart (0,0), Facing +X, RightDir +Y varsayımıyla hesaplandı.
+>
+> **Sağlam bulunanlar:**
+> - **Summer – Rift ile 14 erken/orta cep:** Örtüşme kalmadı. En dar üç pay şöyle:
+>   - Bekçi – Alacakaranlık Hükümdarı: 3400u, **+1365u pay**
+>   - Arayıcı – Magma Tiranı: 3502u, +1467u
+>   - Arayıcı – Dördüncü bölge (r400): 3788u, +1503u
+>
+>   Haberci'ye en yakın cep Alacakaranlık cebi: 3883u, +1848u. Commit'teki "~3500 / ~3400 / ~3880u" iddiaları doğru. Önceki QA'nın ORTA bulgusu kapandı: Suikastçı–Arayıcı, Alacakaranlık–Arayıcı, Hükümdar–Bekçi ve Ork Reisi–Haberci örtüşmeleri artık yok.
+> - **Summer – hub:** Rift cepleri hub'a en az 4866u uzakta. 700u güvenli yarıçapa göre pay ≥ +2891u. Hub'dan erken ceplere giden düz yollar hiçbir Rift erişimine girmiyor (en dar pay +2125u).
+> - **Summer – navmesh sınırı (±8500):** Ev + gezinme mesafesi sınırdan ≥3025u içeride. 1800u leash bile sınıra ≥1675u pay bırakıyor.
+> - **Winter – Naip `(6800,2000)` r150:** En yakın cep Uçurum Koruyucusu `(4400,3600)`, aradaki mesafe 2884u.
+>   - Naip, Koruyucu cebindeki oyuncuya +849u pay bırakıyor. Ters yönde Koruyucu mob'u da Naip'le savaşan oyuncuya +849u pay bırakıyor; örtüşme yok.
+>   - Diğer cepler ≥4294u uzakta, hub 7648u uzakta.
+>   - Hub'dan Koruyucu cebine giden yol Naip'e en fazla 2884u yaklaşıyor; erişim 1200u, güvenli.
+>   - Nav sınırı (X ±8000, Y −8500..5500): ev + gezinme X 7400'e kadar uzanıyor, doğu kenarına 600u pay var. Y ve Z (629, sınır ±1500) rahat.
+> - **`Q_AbyssRegent` Lv79:** Ön koşul (`Q_AbyssLine`, Lv75) değişmedi. Seviye kontrolü `MMOQuestComponent.cpp:113/198`'de `Level < RequiredLevel` ile yapılıyor. `AbyssBlade` Lv72 istiyor, yani kuşanılabilir. Kodda başka `Q_AbyssRegent` referansı yok. Görev tanımı yeni yan zincirle çakışmıyor: `Q_AbyssBastion` Lv78'de ayrı bir dal. Lv79'da teslim edilen 350K görev XP'si ve Naip'in 140K kill XP'si artık işe yarıyor; ikisi birlikte Lv79→80 ihtiyacının (~2.0M) ~%24'ü. Görev açıklaması `f658894`'te "Doğu yaylası" olarak düzeltildi; Lore.md de tutarlı.
+> - **`Scripts/ExtendSummerNavigation.py`:** Editör logu (`Saved/Logs/MyProject-backup-2026.10.02-21.37.12.log`) şunları doğruluyor:
+>   - Eski hacim `(-490,30,30)` merkezli, ölçek (40,40,10). Yeni sınır uzanımı tam olarak (8500, 8500, 1500).
+>   - `UNavigationSystemV1::Build` senkron çalışıyor: "total execution time" satırı Python kontrolünden önce basılıyor.
+>   - `far` kontrolü (−6000,4000) z≈541'de navmesh buldu; kayıt yalnız bu kontrol geçince yapılıyor.
+>
+>   Mantık hatası bulunmadı. **Önceki QA düzeltmesi:** `ExtendWinterNavigation.py` için yazılan "RebuildNavigation asenkron" bulgusu büyük olasılıkla yanlıştı. Winter logunda da `far` noktası aynı koşuda bulunuyor; build senkron.
+> - **Yukarıda artık geçersiz olan maddeler:** "Uçurum Naibi cebi navmesh sınırını aşıyor", "Lv80 kapısı" ve "Summer'daki Rift cepleri düşük seviyeli bölgelerle örtüşüyor". Bu commit üçünü de kapattı; PIE'de doğrulandığında işaretlenebilir.
+
+- [ ] **[KÜÇÜK, doğrulanmalı] Naip doğu nav kenarında "kiting" riski.** Naip'in evi nav kenarına (X=8000) yalnız 1200u uzakta, leash ise 1800u. Oyuncu doğuya kaçıp X>8000'de navmesh dışındaki araziye çıkarsa `MoveToActor` hedefi navmesh'e iz düşüremeyebilir. Bu durumda Naip kenarda durur ve menzilli bir sınıf onu karşılıksız vurabilir. Eski batı konumundaki riskin çok daha hafif hâli. **Test:** Lv79+ menzilli karakterle (`MMOClass`) Naibi çek, doğuya (+X) koşup X≈8300'e geç. Naip seni kovalamaya devam ediyor mu, kenarda takılıyor mu? Takılıyorsa oradan büyüyle hasar verilebiliyor mu ve 1800u'dan sonra eve dönüp tam can yeniliyor mu, not al.
+- [ ] **[KÜÇÜK] Eski yorum ve doküman satırları.** `MMOQuestTypes.cpp:237`'deki "Lv80'de XP kullanilmaz" yorumu artık yanlış; görev Lv79'da teslim edilebiliyor ve XP sayılıyor. `docs/PROGRESSION_PLAN.md:101` tablosu hâlâ "`Q_AbyssRegent` … / Lv80" diyor. İşlevsel etkisi yok; mmo-developer düzeltebilir.
+- [ ] **[BİLGİ] Script ilk koşuda başarısız olmuş.** 21:36'daki ilk koşuda `far=None` çıktı ve harita kaydedilmedi; 21:37'deki koşu geçti. Aradaki farkın script'teki `far` sorgu uzanımının büyütülmesi olduğu düşünülüyor; commit'teki sürüm geçen sürüm. Script, varsayılan 200u fırça boyutuna güveniyor (ölçek 85 → 8500); uzanımı yazdırıyor ama assert etmiyor. `far` kontrolü yalnız iz düşümü yapıyor, hub'a yol aramıyor; commit'te ayrı probla 48/48 yol bildiriliyor. Kayıt sırasında çıkan "Revizyon kontrolünden kullanıma alınamıyor" iletisi zararsız, dosya yazıldı.
+- [ ] **[BİLGİ, doğrulanmalı] Hub iz düşümü z=30.** `(0,0,300)` noktasının navmesh'e iz düşümü z=30 çıkıyor. PlayerStart gerçekten Z≈302'deyse hub'ın üstü navmesh'siz bir platform olabilir. Mob'lar hub'a girmediği için oynanışı etkilemez. **Test:** Editörde `P` ile hub'a bak; görev, satıcı ve şifacı NPC'leri ile doğuş noktası çevresinde yeşil alan olup olmadığını not al.
+- [ ] **Summer navmesh (editör):** Summer_scene'i aç ve `P`'ye bas. Yeşil alan ±8500'e kadar uzanmalı. Hub'dan `(800,-4800)`, `(-4800,4800)` ve `(4800,4000)`'e (yüksek arazi, Z≈500) giden yollar kesintisiz olmalı. "NAVMESH NEEDS TO BE REBUILT" uyarısı çıkmamalı.
+- [ ] **Rift cepleri (PIE):** `MMOGainXP` ile Lv58'e çık. Hub'dan yürüyerek üç cebe ulaş. Her cepte doğru mob doğmalı: 6 Arayıcı, 6 Bekçi ve 1 Haberci. Output Log'da `skipping spawn` çıkmamalı. Haberci'nin yüksek arazisine yürüyerek çıkılabilmeli.
+- [ ] **Erken bölge güvenliği (yeni en dar çiftler):**
+  1. Lv24 karakterle Magma Tiranı `(1400,-1350)`'yi öldür. Dövüşü güneye (−Y) doğru 1–2 dk sürdür; hiçbir Yarık Arayıcısı gelmemeli.
+  2. Lv40'ta Alacakaranlık Hükümdarı `(-3200,1800)` ile savaşırken Yarık Bekçisi gelmemeli.
+  3. Lv31'de Alacakaranlık cebinde `(1000,3200)` 5 dk farm yaparken Haberci gelmemeli.
+- [ ] **Regresyon – Obsidyen Reisi `(-4000,0)`:** Bu elit eski nav kenarına (X −4490) ~490u mesafedeydi; artık batıya serbestçe gezinip kovalayabilir ve aggro'su 1200u. Lv30 karakterle onu batıya doğru çek. 1800u'dan sonra eve dönüp tam can yenilemeli, takılmamalı. Hub'a ya da Obsidyen cebine istenmeyen bir yaklaşma olmamalı.
+- [ ] **Naip (PIE):** Winter'da Lv79'a çık. Görev NPC'sinde `Q_AbyssRegent` ("[Lv79]") görünmeli ve alınabilmeli. `(6800,2000)`'e yürüyerek ulaşabilmelisin (Z≈580 yüksek arazi). Naibi öldür; görev tamamlanmalı, teslimde 350K XP Lv79'da sayılmalı ve `AbyssBlade` kuşanılabilmeli. Ayrıca Koruyucu cebinde `(4400,3600)` 3 dk farm yaparken Naip savaşa katılmamalı.
+
+# Seviye farkı XP ayarı + "+N EXP" göstergesi — 2026-10-03
+
+> `31acd21` + `9f42532`. Derleme temiz, PIE yok.
+
+- [ ] **Gösterge:** Mob öldürünce karakterin üstünde mavi "+N EXP" yazısı yükselip solmalı (host'ta ve istemcide, yalnız XP'yi alan oyuncunun ekranında). Lv80'de çıkmamalı.
+- [ ] **Gri mob:** `MMOGainXP` ile Lv12 ol, Lv1–5 bölgesinde Goblin (Lv1) öldür: yazı "+N EXP (%10)" civarı olmalı ve EXP barı ona göre az dolmalı. Lv10'da Lv4 Haydut → %90.
+- [ ] **Bant içi tam XP:** Lv55 karakter Lv51 Gözcü öldürünce yüzde yazmamalı (fark 4 ≤ 5).
+- [ ] **Parti leech:** Lv1 karakter Lv76 partiyle Uçurum Koruyucusu (Lv76) kesimine katılırsa (3000u içinde) "+19000 EXP (%20)" civarı almalı; parti üyesi Lv70 ise tam XP.
+- [ ] **Görev kredisi değişmedi:** Gri mob öldürmek görev sayacını yine artırmalı; altın düşüşü değişmemeli.
