@@ -130,6 +130,8 @@ XP sayıları `FMMOMobArchetype` kayıtları için öneridir; can/hasar, elit XP
 
 **Uygulama sırası:** Winter erişimi ve geçiş kuralı → 51–57 için arketip/görev/dört eşya ve erişilebilir 2+1 alan → ölçüm → aynı kalıbı sırasıyla 58–65, 66–70, 71–80 için açma. Bir sonraki banda geçmeden önce görev hedefi arketipinin gerçekten üretildiği, zincir/ödül kimliklerinin bulunduğu ve tekli/partili akışın ilerlediği gösterilir.
 
+**3 Ekim Lv51–57 Frostbound dilimi `[IMPLEMENTED, PIE bekliyor]`:** `FrostboundScout` (Lv51, 30.000 XP), `FrostboundSentinel` (Lv55, 36.000 XP), elit `FrostboundWarden` (Lv57, 52.000 XP), Lv51 `Frostbound` dört parça seti (124 / 75 / 31 / 41, plandaki geçici değerler) ve `Q_WinterSovereign` sonrası dört görevlik zincir (`Q_FrostboundScouts` → `Q_FrostboundSentinels` → `Q_FrostboundLine` → `Q_FrostboundWarden`; ödüller bot → kask → zırh → silah) eklendi. Winter_scene'de üç spawner: Gözcü cebi doğu `(3000,0,Z210)`, Nöbetçi cebi kuzeybatı `(-3800,1200,Z45)`, Muhafız eliti `(-2000,1000,Z48)`. Headless probla spawner'ın kendi kontrolünün aynısı (zemin ±60u, eğim, navmesh 50/35u sapma, hub'a tam yol) halkalarda ölçüldü: Gözcü 48/48, Nöbetçi 48/48, Muhafız 16/16 (ilk aday `(-2200,1200)` 8/16 navmesh sapması verdiği için taşındı). Cepler birbirinden ve Lv42–50 ceplerinden ≥1400u. Derleme başarılı; dövüş, denge ve görev akışı **PIE'de henüz oynanmadı**.
+
 ## Sıradaki üç çalışma dilimi
 
 ### 1. Winter yürünebilirliğini ve güvenli doğuşu tamamla

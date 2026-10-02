@@ -203,6 +203,18 @@ namespace
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.4f;
 
+		// --- Sekizinci kademe NORMAL moblari (Lv51-55; Frostbound, Winter_scene) ---
+		// PROGRESSION_PLAN Lv51-57 dilimi. XP'ler plan hipotezi (seviye basina ~12-25 kill):
+		// 51->52 esigi ~543K / 30K ~= 19 kill. Denge PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("FrostboundScout"), TEXT("Buzbagli Gozcu"), 51, 128, 122, 182.f, 30000, 3300, 5800, 440.f, 600.f, 1.25f, FLinearColor(0.7f, 0.85f, 1.f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("FrostboundSentinel"), TEXT("Buzbagli Nobetci"), 55, 138, 140, 198.f, 36000, 3800, 6600, 260.f, 600.f, 1.55f, FLinearColor(0.45f, 0.62f, 0.85f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -321,6 +333,18 @@ namespace
 
 		// Kis Hukumdari (Lv50): Winter kademesinin son eliti; Lv42 seti elit loot havuzunda.
 		Table.Add(MakeMob(TEXT("WinterSovereign"), TEXT("Kis Hukumdari"), 50, 136, 150, 184.f, 30000, 3900, 6900, 280.f, 600.f, 2.0f, FLinearColor(0.48f, 0.68f, 0.88f)));
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
+
+		// Buzbagli Muhafiz (Lv57): Frostbound kademesinin kapi eliti; Lv51 seti elit loot havuzunda.
+		Table.Add(MakeMob(TEXT("FrostboundWarden"), TEXT("Buzbagli Muhafiz"), 57, 152, 168, 210.f, 52000, 5000, 9000, 285.f, 600.f, 2.05f, FLinearColor(0.38f, 0.55f, 0.9f)));
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.5f;

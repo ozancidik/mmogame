@@ -2613,3 +2613,14 @@ Diskteki `.umap` yolları ile eski `DefaultEngine.ini` ayarları farklı klasör
 - [ ] Kayıtlı karakterde seçim paneli görünmesin; konsoldaki `MMOClass` yolu ve sunucu tarafı savaş/cooldown kısıtları çalışmaya devam etsin.
 
 HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C++ derlemesi başarılı; PIE etkileşimi henüz doğrulanmadı.
+
+---
+
+# Lv51–57 Frostbound dilimi (Winter_scene) — 2026-10-03
+
+> Derleme temiz. PIE'de hiç oynanmadı. Winter'a geçmek için host HUD'undaki "Tüm oyuncuları Kış'a taşı" düğmesi.
+
+- [ ] **Spawner'lar görünüyor mu:** Winter'da doğudaki `(3000,0)` cebinde 5 Buzbağlı Gözcü (Lv51), kuzeybatı `(-3800,1200)` cebinde 5 Buzbağlı Nöbetçi (Lv55), `(-2000,1000)`'de tek Buzbağlı Muhafız elit (Lv57) zemin üzerinde doğmalı. Output Log'da `Spawner ... skipping spawn` uyarısı çıkmamalı.
+- [ ] **Hub güvenliği:** Winter hub'ında (PlayerStart çevresi) beklerken hiçbir yeni mob saldırmamalı.
+- [ ] **Görev zinciri:** `Q_WinterSovereign` tamamlandıktan sonra Lv51'de `Q_FrostboundScouts` alınabilmeli → Buzbağlı Bot; ardından Sentinels (Kask), Line (Zırh, 6 Nöbetçi), Warden (Kılıç). Her ödül alındığında Lv51 seti kuşanılabilmeli.
+- [ ] **Denge gözlemi (not al):** Lv51 bir karakterle Gözcü öldürme süresi, alınan hasar, seviye başına kill (hedef 12–25).

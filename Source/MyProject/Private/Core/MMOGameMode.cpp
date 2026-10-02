@@ -177,6 +177,40 @@ void AMMOGameMode::SpawnMobArea()
 			UGameplayStatics::FinishSpawningActor(WinterBoss, WinterBossTM);
 		}
 
+		// Lv51-57 Frostbound dilimi. 2026-10-03 headless Winter grid probu: asagidaki uc cebin
+		// 150/225u halkalarindaki 16/16 ornek zeminde + navmesh'te ve hub'a TAM yolla bagli.
+		// Cepler birbirinden ve Lv42-50 ceplerinden >=1400u (yaricap+gezinme 450+aggro 600
+		// erisimi ~1275u). Z = zemin ortasi + 50u (spawner +-60u zemin toleransi).
+		//  - Gozcu (Lv51) dogu (3000,0): zemin 141..178u, hub yolu ~4740u.
+		//  - Nobetci (Lv55) kuzeybati (-3800,1200): zemin -10..-2u, hub yolu ~4990u.
+		//  - Muhafiz elit (Lv57) (-2000,1000): 150u halkasi 16/16 spawner-esdeger kontrol OK;
+		//    (-2200,1200) adayinda 8/16 navmesh sapmasi vardi. Kis Hukumdari ~1414u, Nobetci ~1811u.
+		auto SpawnFrostbound = [&](const FVector& Loc, int32 MinLv, int32 MaxLv, float Radius,
+			int32 MaxMobs, FName Forced, float TopUp)
+		{
+			const FTransform TM(FRotator::ZeroRotator, Loc);
+			if (AMMOMobSpawner* S = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), TM))
+			{
+				S->MaxMobs = MaxMobs;
+				S->SpawnRadius = Radius;
+				if (Forced.IsNone())
+				{
+					S->MinMobLevel = MinLv;
+					S->MaxMobLevel = MaxLv;
+				}
+				else
+				{
+					S->ForcedArchetypeId = Forced;
+					S->TopUpInterval = TopUp;
+				}
+				S->bValidateSpawnOnNavGround = true;
+				UGameplayStatics::FinishSpawningActor(S, TM);
+			}
+		};
+		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-3800.f, 1200.f, 45.f), 55, 55, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-2000.f, 1000.f, 48.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
+
 		// Kis hub'inda gorev kabul/teslimi, satis ve iyilesme ayni servislerle
 		// acilir. Kayitli PlayerStart merkezinden 250u ote, mob cebinden >=2750u.
 		FActorSpawnParameters WinterNpcParams;
@@ -188,7 +222,7 @@ void AMMOGameMode::SpawnMobArea()
 			Origin + FVector(250.f, -200.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
 		World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(),
 			Origin + FVector(250.f, -350.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
-		UE_LOG(LogTemp, Log, TEXT("[MMODBG] Winter_scene Lv42-50 layout spawned"));
+		UE_LOG(LogTemp, Log, TEXT("[MMODBG] Winter_scene Lv42-57 layout spawned"));
 		return;
 	}
 	// Bundan sonraki konumlar Summer_scene'e ozgu. Yeni bir harita PlayerStart

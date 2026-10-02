@@ -168,6 +168,24 @@ namespace
 			T::KillSpecificMob, TEXT("WinterSovereign"), 1, 68000, 68000, 50, TEXT("Q_WinterWraiths")));
 		Table.Last().RewardEquipmentId = FName(TEXT("WinterBlade"));
 
+		// --- Frostbound zinciri (Lv51-57, Winter_scene; PROGRESSION_PLAN Lv51-57 dilimi) ---
+		// Odul XP/altin gecici: Winter zincirinin olcegini surdurur, PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_FrostboundScouts"), TEXT("Buzbagli Gozculer"), TEXT("Dogudaki buzbagli gozculeri durdur: 5 Buzbagli Gozcu oldur."),
+			T::KillSpecificMob, TEXT("FrostboundScout"), 5, 75000, 75000, 51, TEXT("Q_WinterSovereign")));
+		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_FrostboundSentinels"), TEXT("Buzbagli Nobetciler"), TEXT("Kuzeybatidaki nobetcileri devir: 5 Buzbagli Nobetci oldur."),
+			T::KillSpecificMob, TEXT("FrostboundSentinel"), 5, 82000, 82000, 55, TEXT("Q_FrostboundScouts")));
+		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_FrostboundLine"), TEXT("Buz Hatti"), TEXT("Nobetci hattini kir: 6 Buzbagli Nobetci daha oldur."),
+			T::KillSpecificMob, TEXT("FrostboundSentinel"), 6, 88000, 88000, 55, TEXT("Q_FrostboundSentinels")));
+		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundPlate"));
+
+		Table.Add(MakeQuest(TEXT("Q_FrostboundWarden"), TEXT("Buzbagli Muhafiz"), TEXT("Buz kapisinin muhafizini devir."),
+			T::KillSpecificMob, TEXT("FrostboundWarden"), 1, 100000, 100000, 57, TEXT("Q_FrostboundLine")));
+		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));
