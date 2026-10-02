@@ -2740,7 +2740,7 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 > `31acd21` + `9f42532`. Derleme temiz, PIE yok.
 
 - [ ] **Gösterge:** Mob öldürünce karakterin üstünde mavi "+N EXP" yazısı yükselip solmalı (host'ta ve istemcide, yalnız XP'yi alan oyuncunun ekranında). Lv80'de çıkmamalı.
-- [ ] **Gri mob:** `MMOGainXP` ile Lv12 ol, Lv1–5 bölgesinde Goblin (Lv1) öldür: yazı "+N EXP (%10)" civarı olmalı ve EXP barı ona göre az dolmalı. Lv10'da Lv4 Haydut → %90.
+- [ ] **Gri mob:** `MMOGainXP` ile Lv12 ol, Lv1–5 bölgesinde Goblin (Lv1) öldür: yazı "+N EXP (%40)" olmalı (Lv16+ ise %10 taban) ve EXP barı ona göre az dolmalı. Lv10'da Lv4 Haydut → %90.
 - [ ] **Bant içi tam XP:** Lv55 karakter Lv51 Gözcü öldürünce yüzde yazmamalı (fark 4 ≤ 5).
 - [ ] **Parti leech:** Lv1 karakter Lv76 partiyle Uçurum Koruyucusu (Lv76) kesimine katılırsa (3000u içinde) "+19000 EXP (%20)" civarı almalı; parti üyesi Lv70 ise tam XP.
 - [ ] **Görev kredisi değişmedi:** Gri mob öldürmek görev sayacını yine artırmalı; altın düşüşü değişmemeli.
