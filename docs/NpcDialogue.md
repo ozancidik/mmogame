@@ -131,3 +131,34 @@ tebrik replikleri. Unvan, görevin oyun-içi adıdır.*
   Keseciler adını fısıldıyor. Ben fısıldamam, açık söylerim: harca şunu, çürütme."
 - **Altın Çağın Efendisi** *(Q_Gold50000)* — Satıcı Merek: "Altın Çağın Efendisi.
   Ömrümde bir kesede bu kadar altın görmedim. Bari bir kılıç al, hayrını gör."
+
+---
+
+## Yeni Bölge Replikleri: Buzbağlı Sınır, Yarık, Kül Hattı, Uçurum Yaylası
+
+*Hub NPC'lerinin Lv51-80 bölgelerine dair ek replikleri. Yukarıdaki her NPC'nin
+"Yeni bölgeler" listesinin devamıdır; aynı ses ve karakterle okunmalıdır.*
+
+**Satıcı Merek**
+
+- Buzbağlı nöbetçilerin çeliğini gördüm; ölüler iyi demir dövmüş, hakkını vereyim. Senin getirdiğin hurdaya benzemiyor.
+- Yarık kasabanın dibinde açıldı, müşterim ikiye katlandı. Sevinmiyorum, yiğit; ölü müşteri borç ödemez.
+- Kül Hattı'ndan dönenlerin zırhı kurum kokar; Uçurum'dan dönenlerinki hiçbir şey kokmaz. İkincisi beni daha çok korkutuyor.
+
+**Yaşlı Doran**
+
+- Yaz'dan Kış'a, Kış'tan Yaz'a… Yol seni gidip getiriyor sanırsın, evlat; oysa her dönüşte başka biri dönüyor.
+- Buz Kapısı neyi kapalı tutuyordu, bilmiyorum. Bazı kapıları açmak değil, ardına bakabilmek cesaret ister.
+- Naib, birinin yerine oturandır. Tahtın sahibi hâlâ aşağıdaysa işimiz bitmedi; yalnızca soluklanıyoruz.
+
+**Muhafız Kael**
+
+- Yarık surların dibinde açıldı. Dış yamaçlara tek gitme; mor ışık gözünü alır, arayıcılar sırtını.
+- Kuzey Yolu açılınca kafileyle geç. Kış'ta yolunu yitiren, Yaz'a bir daha dönmez.
+- Buzbağlılar ölümden sonra da nöbet tutuyormuş. Saygı duyarım. Yine de yolumu keserlerse devirir geçerim.
+
+**Şifacı Lyra**
+
+- Yarık'tan gelen zehir başka, evlat; ne bitkiye benzer ne yılana. Otur, sabırla temizleyelim.
+- Kül Hattı'ndan dönenlerin yarası hem yanmış hem donmuş oluyor. Hangisini önce saracağımı bilemiyorum; ikisine birden dua ediyorum.
+- Uçurum'a bakanların gözünde bir boşluk kalıyor. Yarayı ben sararım; o boşluğu ancak sen doldurabilirsin.
