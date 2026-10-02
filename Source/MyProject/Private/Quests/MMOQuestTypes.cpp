@@ -235,9 +235,48 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssPlate"));
 
 		// Lv80'de XP kullanilmaz (GainExperience tavanda XP kabul etmez); odul altin + silah.
-		Table.Add(MakeQuest(TEXT("Q_AbyssRegent"), TEXT("Ucurum Naibi"), TEXT("Bati yaylasindaki ucurum naibini devir."),
+		Table.Add(MakeQuest(TEXT("Q_AbyssRegent"), TEXT("Ucurum Naibi"), TEXT("Dogu yaylasindaki ucurum naibini devir."),
 			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 79, TEXT("Q_AbyssLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBlade"));
+
+		// --- Lv61-80 grind araligi yan gorevleri (QA 2026-10-03: Lv61->65 ~80, Lv71->74 ~48,
+		// Lv75->80 ~92 gorevsiz kill). Ana zincirden dallanir, zinciri kilitlemez; her biri
+		// bir sonrakini acar. Odul XP'si o seviyenin ihtiyacinin ~%40-50'si, kill'lerle birlikte
+		// araliktaki kill ihtiyacini yaklasik yariya indirir.
+		Table.Add(MakeQuest(TEXT("Q_RiftPurge"), TEXT("Yarik Temizligi"), TEXT("Yarigin agzindaki arayicilari seyrelt: 10 Yarik Arayicisi oldur."),
+			T::KillSpecificMob, TEXT("RiftSeeker"), 10, 450000, 140000, 61, TEXT("Q_RiftWatch")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_RiftDepths"), TEXT("Yarigin Derinligi"), TEXT("Bekcilerin arkasindaki derinligi kapat: 10 Yarik Bekcisi oldur."),
+			T::KillSpecificMob, TEXT("RiftKeeper"), 10, 550000, 150000, 63, TEXT("Q_RiftPurge")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssPatrol"), TEXT("Ucurum Devriyesi"), TEXT("Gezginlerin yolunu kes: 10 Ucurum Gezgini oldur."),
+			T::KillSpecificMob, TEXT("AbyssStrider"), 10, 650000, 200000, 71, TEXT("Q_AbyssStriders")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssEdge"), TEXT("Ucurumun Kiyisi"), TEXT("Kiyiya tirmanan gezginleri geri it: 12 Ucurum Gezgini oldur."),
+			T::KillSpecificMob, TEXT("AbyssStrider"), 12, 750000, 210000, 73, TEXT("Q_AbyssPatrol")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssVigil"), TEXT("Ucurum Nobeti"), TEXT("Yayladaki koruyuculari bekle ve devir: 10 Ucurum Koruyucusu oldur."),
+			T::KillSpecificMob, TEXT("AbyssGuardian"), 10, 850000, 240000, 75, TEXT("Q_AbyssLine")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssDescent"), TEXT("Asagi Inis"), TEXT("Kuzeybatidaki gezgin yuvasini dagit: 12 Ucurum Gezgini oldur."),
+			T::KillSpecificMob, TEXT("AbyssStrider"), 12, 900000, 250000, 77, TEXT("Q_AbyssVigil")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssBastion"), TEXT("Son Siper"), TEXT("Naibe giden yolu ac: 12 Ucurum Koruyucusu oldur."),
+			T::KillSpecificMob, TEXT("AbyssGuardian"), 12, 1000000, 260000, 78, TEXT("Q_AbyssDescent")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
 
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),

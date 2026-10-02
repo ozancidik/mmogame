@@ -454,7 +454,7 @@ maceracının ayak bastığı son yerdir.
 - **Uçurum Koruyucusu** *(AbyssGuardian, Lv76)* — Uçuruma inen yolu tutan iri,
   ağır bekçiler. Kolay devrilmezler; canları azaldıkça öfkelenirler.
 
-**Elit — Uçurum Naibi** *(AbyssRegent, Lv80)* — Yaylanın batısında oturan gölge.
+**Elit — Uçurum Naibi** *(AbyssRegent, Lv80)* — Yaylanın doğu ucunda oturan gölge.
 *Naib*, sahibinin yerine hüküm sürendir: Uçurum Naibi de dibinde bekleyen,
 adı unutulmuş gücün yeryüzündeki sesidir. Solgun Fısıltı'yı ormana, buza,
 ateşe ve yarığa dağıtan odur. Dokunuşu bedeni ağırlaştırır; sona yaklaştıkça

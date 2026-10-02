@@ -140,6 +140,8 @@ XP sayıları `FMMOMobArchetype` kayıtları için öneridir; can/hasar, elit XP
 
 **3 Ekim QA düzeltmeleri (Rift/Kül/Uçurum denetimi):** Rift cepleri Summer'da erken bölgelere 1450–1660u mesafedeydi; Rift mob'u spawn+gezinme+aggro ile ~1275u'dan oyuncuyu fark ettiği için Lv7–40 oyuncular Lv58+ mob çekebiliyordu. Summer NavMeshBoundsVolume `Scripts/ExtendSummerNavigation.py` ile X/Y ±8500'e genişletildi (harita kaydedildi) ve cepler taşındı: Arayıcı `(800,-4800)`, Bekçi `(-4800,4800)`, Haberci eliti `(4800,4000)` — en yakın eski cebe ≥~3400u, probda 48/48, 48/48, 16/16. Uçurum Naibi gezinmesi Winter nav sınırını aştığı için `(-7600,-1200)` → `(6800,2000)` taşındı. `Q_AbyssRegent` kapısı Lv80 → Lv79 (Lv79 oyuncu Naibi kesip kredi alabilsin). Açık kalan: Lv61→65, Lv71→74, Lv75→80 görevsiz grind aralıkları.
 
+**Grind aralığı yan görevleri `[IMPLEMENTED, PIE yok]`:** Ana zincirden dallanan, zinciri kilitlemeyen 7 yan görev: `Q_RiftPurge` (Lv61, 10 Arayıcı, 450K) → `Q_RiftDepths` (Lv63, 10 Bekçi, 550K); `Q_AbyssPatrol` (Lv71, 10 Gezgin, 650K) → `Q_AbyssEdge` (Lv73, 12 Gezgin, 750K); `Q_AbyssVigil` (Lv75, 10 Koruyucu, 850K) → `Q_AbyssDescent` (Lv77, 12 Gezgin, 900K) → `Q_AbyssBastion` (Lv78, 12 Koruyucu, 1.0M). Ödül: altın + 5 büyük iksir, ekipman yok. Görevsiz kill ihtiyacı tahmini: Lv61→65 ~80 → ~43, Lv71→74 ~48 → ~18, Lv75→80 ~92 → ~37.
+
 ## Sıradaki üç çalışma dilimi
 
 ### 1. Winter yürünebilirliğini ve güvenli doğuşu tamamla
