@@ -186,6 +186,23 @@ namespace
 			T::KillSpecificMob, TEXT("FrostboundWarden"), 1, 100000, 100000, 57, TEXT("Q_FrostboundLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundBlade"));
 
+		// --- Rift zinciri (Lv58-65, Summer_scene dis cepleri; PROGRESSION_PLAN) ---
+		Table.Add(MakeQuest(TEXT("Q_RiftSeekers"), TEXT("Yarik Arayicilari"), TEXT("Yaz vadisinde acilan yariktan cikan arayicilari durdur: 5 Yarik Arayicisi oldur."),
+			T::KillSpecificMob, TEXT("RiftSeeker"), 5, 110000, 110000, 58, TEXT("Q_FrostboundWarden")));
+		Table.Last().RewardEquipmentId = FName(TEXT("RiftBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_RiftKeepers"), TEXT("Yarik Bekcileri"), TEXT("Kuzeybatidaki yarik bekcilerini devir: 5 Yarik Bekcisi oldur."),
+			T::KillSpecificMob, TEXT("RiftKeeper"), 5, 120000, 120000, 62, TEXT("Q_RiftSeekers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("RiftHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_RiftWatch"), TEXT("Yarik Nobeti"), TEXT("Bekci hattini dagit: 6 Yarik Bekcisi daha oldur."),
+			T::KillSpecificMob, TEXT("RiftKeeper"), 6, 130000, 130000, 62, TEXT("Q_RiftKeepers")));
+		Table.Last().RewardEquipmentId = FName(TEXT("RiftPlate"));
+
+		Table.Add(MakeQuest(TEXT("Q_RiftHerald"), TEXT("Yarik Habercisi"), TEXT("Yarigi acan habercisini devir."),
+			T::KillSpecificMob, TEXT("RiftHerald"), 1, 150000, 150000, 65, TEXT("Q_RiftWatch")));
+		Table.Last().RewardEquipmentId = FName(TEXT("RiftBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));

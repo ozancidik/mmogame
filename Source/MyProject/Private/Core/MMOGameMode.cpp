@@ -448,6 +448,37 @@ void AMMOGameMode::SpawnMobArea()
 			DuskBossSpawner->bValidateSpawnOnNavGround = true;
 			UGameplayStatics::FinishSpawningActor(DuskBossSpawner, DuskBossTM);
 		}
+
+		// Lv58-65 Rift dilimi (PROGRESSION_PLAN). 2026-10-03 headless Summer grid probu
+		// (spawner'in kendi zemin+-60u / egim / nav 50/35u / PlayerStart'a tam yol kontrolu):
+		//  - Arayici (Lv58) (2400,2400): zemin ~155, 150/225u halkasi 15/16.
+		//  - Bekci (Lv62) (-4000,3200): zemin ~-170, halka 16/16.
+		//  - Haberci elit (Lv65) (3200,0): zemin ~166, halka 16/16.
+		// Mevcut tum Summer ceplerinden >=1400u; dogus noktasina >=3200u.
+		auto SpawnRift = [&](const FVector& Loc, int32 Lv, float Radius, int32 MaxMobs, FName Forced)
+		{
+			const FTransform TM(FRotator::ZeroRotator, Loc);
+			if (AMMOMobSpawner* S = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), TM))
+			{
+				S->MaxMobs = MaxMobs;
+				S->SpawnRadius = Radius;
+				if (Forced.IsNone())
+				{
+					S->MinMobLevel = Lv;
+					S->MaxMobLevel = Lv;
+				}
+				else
+				{
+					S->ForcedArchetypeId = Forced;
+					S->TopUpInterval = 60.f;
+				}
+				S->bValidateSpawnOnNavGround = true;
+				UGameplayStatics::FinishSpawningActor(S, TM);
+			}
+		};
+		SpawnRift(FVector(2400.f, 2400.f, 205.f), 58, 225.f, 5, NAME_None);
+		SpawnRift(FVector(-4000.f, 3200.f, -120.f), 62, 225.f, 5, NAME_None);
+		SpawnRift(FVector(3200.f, 0.f, 216.f), 0, 150.f, 1, FName(TEXT("RiftHerald")));
 	}
 
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).

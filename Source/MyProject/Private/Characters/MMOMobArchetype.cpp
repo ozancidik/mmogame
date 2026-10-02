@@ -215,6 +215,17 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
+		// --- Dokuzuncu kademe NORMAL moblari (Lv58-62; Rift, Summer_scene dis cepleri) ---
+		// XP plan hipotezi: 65->66 esigi ~1.16M / 52K ~= 22 kill. PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("RiftSeeker"), TEXT("Yarik Arayicisi"), 58, 160, 154, 222.f, 45000, 4300, 7500, 440.f, 600.f, 1.25f, FLinearColor(0.6f, 0.3f, 0.85f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("RiftKeeper"), TEXT("Yarik Bekcisi"), 62, 172, 178, 238.f, 52000, 4800, 8300, 265.f, 600.f, 1.55f, FLinearColor(0.45f, 0.22f, 0.7f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -347,6 +358,18 @@ namespace
 		Table.Add(MakeMob(TEXT("FrostboundWarden"), TEXT("Buzbagli Muhafiz"), 57, 152, 168, 210.f, 52000, 5000, 9000, 285.f, 600.f, 2.05f, FLinearColor(0.38f, 0.55f, 0.9f)));
 		Table.Last().bIsElite = true;
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
+
+		// Yarik Habercisi (Lv65): Rift kademesinin eliti; Lv58 seti elit loot havuzunda.
+		Table.Add(MakeMob(TEXT("RiftHerald"), TEXT("Yarik Habercisi"), 65, 186, 200, 255.f, 75000, 6500, 11500, 290.f, 600.f, 2.1f, FLinearColor(0.55f, 0.18f, 0.8f)));
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.5f;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;

@@ -2624,3 +2624,12 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 - [ ] **Hub güvenliği:** Winter hub'ında (PlayerStart çevresi) beklerken hiçbir yeni mob saldırmamalı.
 - [ ] **Görev zinciri:** `Q_WinterSovereign` tamamlandıktan sonra Lv51'de `Q_FrostboundScouts` alınabilmeli → Buzbağlı Bot; ardından Sentinels (Kask), Line (Zırh, 6 Nöbetçi), Warden (Kılıç). Her ödül alındığında Lv51 seti kuşanılabilmeli.
 - [ ] **Denge gözlemi (not al):** Lv51 bir karakterle Gözcü öldürme süresi, alınan hasar, seviye başına kill (hedef 12–25).
+
+# Lv58–65 Rift dilimi (Summer_scene dış cepleri) — 2026-10-03
+
+> Derleme temiz, PIE yok. `Q_FrostboundWarden` bitince oyuncu Summer'a döner (host düğmesi).
+
+- [ ] **Spawner'lar:** Summer'da `(2400,2400)` Yarık Arayıcısı (Lv58), `(-4000,3200)` Yarık Bekçisi (Lv62), `(3200,0)` tek Yarık Habercisi elit (Lv65) zeminde doğmalı.
+- [ ] **Arayıcı cebi:** Probda 48 örnekten 2'si hub'a yol bulamadı — bir Arayıcı ara sıra ulaşılamaz bir yerde doğabilir; görülürse not al.
+- [ ] **Erken oyun güvenliği:** Yeni Lv1 karakterle Ork Reisi (`(1540,0)`) çevresinde dolaşırken `(3200,0)`'daki Lv65 elit seni fark etmemeli (aralarında ~1660u var).
+- [ ] **Görev zinciri:** `Q_RiftSeekers` (Bot) → `Q_RiftKeepers` (Kask) → `Q_RiftWatch` (Zırh) → `Q_RiftHerald` (Kılıç); Lv58 seti kuşanılabilmeli.
