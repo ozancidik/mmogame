@@ -142,6 +142,8 @@ XP sayıları `FMMOMobArchetype` kayıtları için öneridir; can/hasar, elit XP
 
 **Grind aralığı yan görevleri `[IMPLEMENTED, PIE yok]`:** Ana zincirden dallanan, zinciri kilitlemeyen 7 yan görev: `Q_RiftPurge` (Lv61, 10 Arayıcı, 450K) → `Q_RiftDepths` (Lv63, 10 Bekçi, 550K); `Q_AbyssPatrol` (Lv71, 10 Gezgin, 650K) → `Q_AbyssEdge` (Lv73, 12 Gezgin, 750K); `Q_AbyssVigil` (Lv75, 10 Koruyucu, 850K) → `Q_AbyssDescent` (Lv77, 12 Gezgin, 900K) → `Q_AbyssBastion` (Lv78, 12 Koruyucu, 1.0M). Ödül: altın + 5 büyük iksir, ekipman yok. Görevsiz kill ihtiyacı tahmini: Lv61→65 ~80 → ~43, Lv71→74 ~48 → ~18, Lv75→80 ~92 → ~37.
 
+**Seviye farkı XP ayarı `[IMPLEMENTED, PIE yok]`:** Yukarıdaki envanterde "seviye farkı indirimi yok" diye geçen açık kapatıldı. `AMMOMob::ScaleXPForLevelGap` mob ölümünde her alıcı için ayrı uygulanır: oyuncu mob'dan >5 seviye yüksekse her ek seviye −%10 (taban %10, "gri mob"); mob oyuncudan >10 seviye yüksekse (parti ile power-leveling) her ek seviye −%10 (taban %20). Görev kredisi ve altın değişmez. Etkisi: karışık bantlarda üst sınırdaki oyuncu en düşük mob'dan daha az alır (ör. Lv40 → Lv31 Alacakaranlık %60, Lv50 → Lv42 Kış %70); Lv1 karakterin Lv76 partide aldığı XP %20'ye iner. Tasarlanmış bant/görev akışında (oyuncu ≤ mob+5) değişiklik yok.
+
 ## Sıradaki üç çalışma dilimi
 
 ### 1. Winter yürünebilirliğini ve güvenli doğuşu tamamla

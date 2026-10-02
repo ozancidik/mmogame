@@ -79,6 +79,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	int32 XPReward = 40;
 
+	/**
+	 * Seviye farkina gore XP (KO tarzi, sunucu tarafi). Oyuncu mob'dan 5'ten fazla seviye
+	 * yuksekse her ek seviye icin -%10 (taban %10: "gri mob" farmi); mob oyuncudan 10'dan
+	 * fazla seviye yuksekse (parti ile power-leveling) her ek seviye icin -%10 (taban %20).
+	 * Fark bu bantlarin icindeyse tam XP. Gorev kredisi ve altin etkilenmez.
+	 */
+	static int32 ScaleXPForLevelGap(int32 BaseXP, int32 PlayerLevel, int32 InMobLevel);
+
 	// --- Loot ---
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob|Loot")
 	TSubclassOf<AMMOLootPickup> LootPickupClass;

@@ -606,6 +606,22 @@ void AMMOMob::IdleWander()
 	AI->MoveToLocation(Dest, 40.f, /*bStopOnOverlap=*/true, /*bUsePathfinding=*/true);
 }
 
+int32 AMMOMob::ScaleXPForLevelGap(int32 BaseXP, int32 PlayerLevel, int32 InMobLevel)
+{
+	const int32 GrayGap = PlayerLevel - InMobLevel - 5;
+	const int32 LeechGap = InMobLevel - PlayerLevel - 10;
+	float Mult = 1.f;
+	if (GrayGap > 0)
+	{
+		Mult = FMath::Max(0.1f, 1.f - 0.1f * GrayGap);
+	}
+	else if (LeechGap > 0)
+	{
+		Mult = FMath::Max(0.2f, 1.f - 0.1f * LeechGap);
+	}
+	return FMath::Max(1, FMath::RoundToInt(BaseXP * Mult));
+}
+
 void AMMOMob::HandleDeath()
 {
 	Super::HandleDeath(); // Blueprint OnCharacterDied olayini tetikler.
@@ -643,7 +659,7 @@ void AMMOMob::HandleDeath()
 			{
 				continue;
 			}
-			R->GetStats()->GainExperience(XPReward);
+			R->GetStats()->GainExperience(ScaleXPForLevelGap(XPReward, R->GetStats()->Level, MobLevel));
 			if (R->GetQuestComponent())
 			{
 				R->GetQuestComponent()->NotifyMobKilled(ArchetypeId);
