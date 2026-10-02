@@ -14,6 +14,8 @@ struct FMMOFloatingText
 	float Amount = 0.f;
 	float SpawnTime = 0.f;
 	bool bIsHeal = false;
+	// Bos degilse sayi yerine bu metin cizilir (orn. "+12000 EXP").
+	FString Label;
 };
 
 /** HUD uzerinde tiklanabilir bir bolge (skill kitabi satiri veya hotbar slotu). */
@@ -41,6 +43,9 @@ public:
 	// (hasar=kirmizimsi altin, iyilesme=yesil +N). bIsHeal=false varsayilan - eski cagri
 	// yerleri (sadece hasar biliyordu) degismeden calismaya devam eder.
 	void AddDamageNumber(const FVector& WorldLocation, float Amount, bool bIsHeal = false);
+
+	// Ucan serbest metin (XP kazanci vb.); hasar sayisindan biraz daha uzun kalir.
+	void AddFloatingLabel(const FVector& WorldLocation, const FString& Label);
 
 	// --- NPC diyalog balonu (konusan NPC'ye tiklaninca alt-ortada gosterilir) ---
 	// Pencere DEGILDIR: hareketi engellemez, sadece bir sure gorunur ve solar.

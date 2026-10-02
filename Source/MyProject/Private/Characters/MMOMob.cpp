@@ -659,7 +659,12 @@ void AMMOMob::HandleDeath()
 			{
 				continue;
 			}
-			R->GetStats()->GainExperience(ScaleXPForLevelGap(XPReward, R->GetStats()->Level, MobLevel));
+			const int32 ScaledXP = ScaleXPForLevelGap(XPReward, R->GetStats()->Level, MobLevel);
+			if (R->GetStats()->Level < R->GetStats()->MaxLevel)
+			{
+				R->ClientNotifyXPGain(ScaledXP, XPReward > 0 ? FMath::RoundToInt(100.f * ScaledXP / XPReward) : 100);
+			}
+			R->GetStats()->GainExperience(ScaledXP);
 			if (R->GetQuestComponent())
 			{
 				R->GetQuestComponent()->NotifyMobKilled(ArchetypeId);

@@ -1148,6 +1148,20 @@ void AMMOCharacter::MMOStat(const FString& StatName)
 	RequestSpendStat(FName(*StatName));
 }
 
+void AMMOCharacter::ClientNotifyXPGain_Implementation(int32 Amount, int32 Percent)
+{
+	const APlayerController* PC = Cast<APlayerController>(GetController());
+	AMMOHUD* HUD = PC ? Cast<AMMOHUD>(PC->GetHUD()) : nullptr;
+	if (!HUD || Amount <= 0)
+	{
+		return;
+	}
+	const FString Label = Percent < 100
+		? FString::Printf(TEXT("+%d EXP (%%%d)"), Amount, Percent)
+		: FString::Printf(TEXT("+%d EXP"), Amount);
+	HUD->AddFloatingLabel(GetActorLocation() + FVector(0.f, 0.f, 130.f), Label);
+}
+
 void AMMOCharacter::MMONpcTalk()
 {
 	// Bu Exec komutu client-side calisir (RPC degil), o yuzden kendi cooldown'unu

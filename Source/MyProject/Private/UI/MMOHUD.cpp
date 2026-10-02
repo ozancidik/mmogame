@@ -420,6 +420,15 @@ void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount, bool b
 	FloatingTexts.Add(FT);
 }
 
+void AMMOHUD::AddFloatingLabel(const FVector& WorldLocation, const FString& Label)
+{
+	FMMOFloatingText FT;
+	FT.WorldLocation = WorldLocation;
+	FT.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	FT.Label = Label;
+	FloatingTexts.Add(FT);
+}
+
 void AMMOHUD::ShowNpcDialogue(const FString& SpeakerName, const FString& Text)
 {
 	NpcDialogueSpeaker = SpeakerName;
@@ -659,6 +668,12 @@ void AMMOHUD::DrawFloatingTexts()
 		const FVector Screen = Canvas->Project(RisenLoc);
 		if (Screen.Z <= 0.f)
 		{
+			continue;
+		}
+
+		if (!FT.Label.IsEmpty())
+		{
+			DrawText(FT.Label, FLinearColor(0.6f, 0.8f, 1.f, Alpha), Screen.X - 30.f, Screen.Y, nullptr, 1.2f);
 			continue;
 		}
 

@@ -237,6 +237,11 @@ public:
 	UFUNCTION(Exec)
 	void MMONpcTalk();
 
+	// Sunucu mob XP'si verdiginde sahibi istemciye bildirir: karakterin ustunde "+N EXP"
+	// ucar; Percent < 100 ise seviye farki indirimi "(%P)" olarak eklenir. Yalniz gorsel.
+	UFUNCTION(Client, Unreliable)
+	void ClientNotifyXPGain(int32 Amount, int32 Percent);
+
 protected:
 	// "MMONpcTalk" debug komutunun spam korumasi (client-side, RPC olmadigi icin
 	// sunucu-tarafi mesafe/cooldown guard'lari devreye girmiyor — bkz. MMONpcTalk).
