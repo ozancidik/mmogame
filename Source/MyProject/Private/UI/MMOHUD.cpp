@@ -57,6 +57,7 @@ void AMMOHUD::DrawHUD()
 	DrawPlayerNameplates();
 	DrawFloatingTexts();
 	DrawTargetBar();
+	DrawChat();
 
 	AMMOCharacter* MMOChar = Cast<AMMOCharacter>(GetOwningPawn());
 	if (!MMOChar)
@@ -418,6 +419,64 @@ void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount, bool b
 	FT.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	FT.bIsHeal = bIsHeal;
 	FloatingTexts.Add(FT);
+}
+
+void AMMOHUD::AddChatLine(const FString& Line, const FLinearColor& Color)
+{
+	FMMOChatLine L;
+	L.Text = Line;
+	L.Color = Color;
+	L.Time = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	ChatLines.Add(L);
+	if (ChatLines.Num() > 50)
+	{
+		ChatLines.RemoveAt(0, ChatLines.Num() - 50);
+	}
+}
+
+void AMMOHUD::DrawChat()
+{
+	if (!Canvas || !GetWorld())
+	{
+		return;
+	}
+	const AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetOwningPlayerController());
+	const bool bOpen = PC && PC->IsChatInputOpen();
+	if (ChatLines.Num() == 0 && !bOpen)
+	{
+		return;
+	}
+
+	// Kutu kapaliyken satirlar 15 sn sonra 5 sn'de solar; kutu acikken son 8 satir hep gorunur.
+	const float Now = GetWorld()->GetTimeSeconds();
+	const int32 MaxLines = 8;
+	const float LineH = 18.f;
+	const float X = 16.f;
+	const float BottomY = (float)Canvas->SizeY - 132.f;
+
+	if (bOpen)
+	{
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.45f), X - 6.f, BottomY - MaxLines * LineH - 4.f, 412.f, MaxLines * LineH + 8.f);
+	}
+
+	const int32 First = FMath::Max(0, ChatLines.Num() - MaxLines);
+	for (int32 i = ChatLines.Num() - 1, Row = 0; i >= First; --i, ++Row)
+	{
+		const FMMOChatLine& L = ChatLines[i];
+		const float Age = Now - L.Time;
+		float Alpha = 1.f;
+		if (!bOpen)
+		{
+			Alpha = Age < 15.f ? 1.f : 1.f - (Age - 15.f) / 5.f;
+		}
+		if (Alpha <= 0.f)
+		{
+			continue;
+		}
+		FLinearColor Col = L.Color;
+		Col.A = Alpha;
+		DrawText(L.Text, Col, X, BottomY - (Row + 1) * LineH, nullptr, 1.f);
+	}
 }
 
 void AMMOHUD::AddFloatingLabel(const FVector& WorldLocation, const FString& Label)

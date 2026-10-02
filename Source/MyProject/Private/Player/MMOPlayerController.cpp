@@ -23,6 +23,12 @@
 #include "NavigationSystem.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/MMOPartyComponent.h"
+#include "GameFramework/PlayerState.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Input/SEditableTextBox.h"
 
 AMMOPlayerController::AMMOPlayerController()
 {
@@ -90,7 +96,178 @@ void AMMOPlayerController::SetupInputComponent()
 		// Space = ziplama.
 		InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &AMMOPlayerController::OnJumpPressed);
 		InputComponent->BindKey(EKeys::SpaceBar, IE_Released, this, &AMMOPlayerController::OnJumpReleased);
+
+		// Enter = sohbet yazi kutusu.
+		InputComponent->BindKey(EKeys::Enter, IE_Pressed, this, &AMMOPlayerController::OnChatKey);
 	}
+}
+
+void AMMOPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	CloseChatInput();
+	Super::EndPlay(EndPlayReason);
+}
+
+void AMMOPlayerController::Say(const FString& Message)
+{
+	ServerSendChat(Message);
+}
+
+void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	const float Now = World->GetTimeSeconds();
+	if (Now - LastChatServerTime < 0.7f)
+	{
+		return;
+	}
+
+	FString Msg = Message.Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" ")).TrimStartAndEnd();
+	uint8 Channel = 0;
+	if (Msg.StartsWith(TEXT("/p "), ESearchCase::IgnoreCase))
+	{
+		Channel = 1;
+		Msg = Msg.RightChop(3).TrimStart();
+	}
+	Msg = Msg.Left(120);
+	if (Msg.IsEmpty())
+	{
+		return;
+	}
+	LastChatServerTime = Now;
+
+	const FString Sender = PlayerState ? PlayerState->GetPlayerName() : FString(TEXT("?"));
+
+	if (Channel == 1)
+	{
+		AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn());
+		UMMOPartyComponent* Party = Me ? Me->GetPartyComponent() : nullptr;
+		if (!Party || !Party->IsInParty())
+		{
+			ClientReceiveChat(FString(), TEXT("Bir partide degilsin; mesaj gonderilmedi."), 2);
+			return;
+		}
+		TArray<AMMOCharacter*> Members;
+		Party->GetPartyInRange(Me->GetActorLocation(), 1.0e7f, Members);
+		Members.AddUnique(Me);
+		for (AMMOCharacter* M : Members)
+		{
+			if (AMMOPlayerController* PC = M ? Cast<AMMOPlayerController>(M->GetController()) : nullptr)
+			{
+				PC->ClientReceiveChat(Sender, Msg, 1);
+			}
+		}
+		return;
+	}
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(It->Get()))
+		{
+			PC->ClientReceiveChat(Sender, Msg, 0);
+		}
+	}
+}
+
+void AMMOPlayerController::ClientReceiveChat_Implementation(const FString& Sender, const FString& Message, uint8 Channel)
+{
+	AMMOHUD* HUD = Cast<AMMOHUD>(GetHUD());
+	if (!HUD)
+	{
+		return;
+	}
+	FLinearColor Col = FLinearColor::White;
+	FString Line;
+	if (Channel == 2 || Sender.IsEmpty())
+	{
+		Col = FLinearColor(1.f, 0.65f, 0.2f);
+		Line = Message;
+	}
+	else if (Channel == 1)
+	{
+		Col = FLinearColor(0.45f, 0.85f, 1.f);
+		Line = FString::Printf(TEXT("[Parti] %s: %s"), *Sender, *Message);
+	}
+	else
+	{
+		Line = FString::Printf(TEXT("%s: %s"), *Sender, *Message);
+	}
+	HUD->AddChatLine(Line, Col);
+}
+
+void AMMOPlayerController::OnChatKey()
+{
+	if (!ChatBox.IsValid())
+	{
+		bChatOpenRequested = true;
+	}
+}
+
+void AMMOPlayerController::OpenChatInput()
+{
+	if (!IsLocalController() || ChatBox.IsValid() || !FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	UGameViewportClient* VC = World ? World->GetGameViewport() : nullptr;
+	if (!VC)
+	{
+		return;
+	}
+
+	SAssignNew(ChatContainer, SBox)
+		.HAlign(HAlign_Left)
+		.VAlign(VAlign_Bottom)
+		.Padding(FMargin(16.f, 0.f, 0.f, 96.f))
+		[
+			SNew(SBox)
+			.WidthOverride(400.f)
+			[
+				SAssignNew(ChatBox, SEditableTextBox)
+				.HintText(FText::FromString(TEXT("Mesaj yaz - Enter gonder, Esc iptal, /p parti")))
+				.ClearKeyboardFocusOnCommit(false)
+				.OnTextCommitted(FOnTextCommitted::CreateUObject(this, &AMMOPlayerController::OnChatCommitted))
+			]
+		];
+	VC->AddViewportWidgetContent(ChatContainer.ToSharedRef(), 50);
+	FSlateApplication::Get().SetKeyboardFocus(ChatBox, EFocusCause::SetDirectly);
+}
+
+void AMMOPlayerController::CloseChatInput()
+{
+	if (ChatContainer.IsValid())
+	{
+		UWorld* World = GetWorld();
+		if (UGameViewportClient* VC = World ? World->GetGameViewport() : nullptr)
+		{
+			VC->RemoveViewportWidgetContent(ChatContainer.ToSharedRef());
+		}
+		if (FSlateApplication::IsInitialized())
+		{
+			FSlateApplication::Get().SetAllUserFocusToGameViewport();
+		}
+	}
+	ChatContainer.Reset();
+	ChatBox.Reset();
+}
+
+void AMMOPlayerController::OnChatCommitted(const FText& Text, ETextCommit::Type CommitType)
+{
+	if (CommitType == ETextCommit::OnEnter)
+	{
+		const FString Msg = Text.ToString().TrimStartAndEnd();
+		if (!Msg.IsEmpty())
+		{
+			ServerSendChat(Msg);
+		}
+	}
+	// Enter, Esc (OnCleared) ya da odak kaybi: her durumda kutuyu kapat.
+	bChatCloseRequested = true;
 }
 
 void AMMOPlayerController::OnJumpPressed()
@@ -571,6 +748,18 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
 
+	// Sohbet kutusu ac/kapa istekleri (callback/tus olayinin disinda guvenle).
+	if (bChatCloseRequested)
+	{
+		bChatCloseRequested = false;
+		CloseChatInput();
+	}
+	if (bChatOpenRequested)
+	{
+		bChatOpenRequested = false;
+		OpenChatInput();
+	}
+
 	APawn* P = GetPawn();
 	if (!P)
 	{
@@ -608,7 +797,7 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 	// --- WASD klavye hareketi (KO tarzi: W/S ileri-geri, A/D yerinde DONUS) ---
 	// Enhanced Input mapping'lerini temizledigimiz icin WASD'yi burada C++ ile suruyoruz.
 	// W/S = karakterin baktigi yonde ileri/geri. A/D = karakteri sola/saga dondur (yana KAYMAZ).
-	if (!bBookOpen)
+	if (!bBookOpen && !ChatBox.IsValid())
 	{
 		float ForwardAxis = 0.f;
 		float TurnAxis = 0.f;

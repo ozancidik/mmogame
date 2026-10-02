@@ -26,6 +26,8 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
+#include "UI/MMOHUD.h"
+#include "GameFramework/PlayerController.h"
 
 AMMOMob::AMMOMob()
 {
@@ -343,6 +345,15 @@ void AMMOMob::MulticastEliteDeathAnnounce_Implementation(const FString& MobDispl
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor(255, 160, 40),
 			FString::Printf(TEXT("[DUNYA] %s, %s tarafindan devrildi!"), *MobDisplayName, *KillerDisplayName));
+	}
+	// Sohbet kaydina da sistem satiri olarak dus (debug mesajlari paketli oyunda gorunmez).
+	if (APlayerController* LocalPC = GEngine ? GEngine->GetFirstLocalPlayerController(GetWorld()) : nullptr)
+	{
+		if (AMMOHUD* HUD = Cast<AMMOHUD>(LocalPC->GetHUD()))
+		{
+			HUD->AddChatLine(FString::Printf(TEXT("[Dunya] %s, %s tarafindan devrildi!"), *MobDisplayName, *KillerDisplayName),
+				FLinearColor(1.f, 0.65f, 0.2f));
+		}
 	}
 }
 

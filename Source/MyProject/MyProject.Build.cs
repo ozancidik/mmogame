@@ -22,6 +22,9 @@ public class MyProject : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"NetCore",
+			// Sohbet yazi kutusu (SEditableTextBox) icin.
+			"Slate",
+			"SlateCore",
 			// Oyun ici LLM (NPC diyalogu) icin: HTTP istegi + JSON kur/coz.
 			"HTTP",
 			"Json",

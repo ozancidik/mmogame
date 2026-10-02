@@ -2744,3 +2744,17 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 - [ ] **Bant içi tam XP:** Lv55 karakter Lv51 Gözcü öldürünce yüzde yazmamalı (fark 4 ≤ 5).
 - [ ] **Parti leech:** Lv1 karakter Lv76 partiyle Uçurum Koruyucusu (Lv76) kesimine katılırsa (3000u içinde) "+19000 EXP (%20)" civarı almalı; parti üyesi Lv70 ise tam XP.
 - [ ] **Görev kredisi değişmedi:** Gri mob öldürmek görev sayacını yine artırmalı; altın düşüşü değişmemeli.
+
+# Sohbet (genel + parti) — 2026-10-03
+
+> Derleme temiz, PIE yok. Slate `SEditableTextBox` + Canvas kaydı; sunucu üzerinden dağıtılır.
+
+- [ ] **Açma/gönderme:** Enter'a bas → sol altta yazı kutusu açılmalı ve imleç içinde olmalı. "merhaba" yaz, Enter → kutu kapanmalı; host'ta ve istemcide sol altta "İsim: merhaba" görünmeli.
+- [ ] **Yazarken oyun tuşları:** Kutu açıkken W/A/S/D, 1–0, K, I, Z, R, Space karakteri hareket ettirmemeli / skill atmamalı / pencere açmamalı.
+- [ ] **Kapatma:** Boş Enter ya da oyun alanına tıklama kutuyu kapatmalı. ⚠ Editör PIE'de Esc oturumu durdurabilir — Esc'i en son dene.
+- [ ] **Parti:** `MMOInvite`/`MMOPartyAccept` ile parti kur; "/p selam" yalnız parti üyelerinde açık mavi "[Parti] İsim: selam" olarak görünmeli; partide olmayan üçüncü oyuncu görmemeli. Partisizken "/p" → turuncu "Bir partide değilsin" uyarısı.
+- [ ] **Solma:** Kutu kapalıyken satırlar ~15 sn sonra solmalı; Enter ile açınca son 8 satır yarı saydam zeminde geri gelmeli.
+- [ ] **Spam/uzunluk:** Arka arkaya hızlı mesajlarda 0.7 sn içindeki ikinci mesaj düşmeli; 120 karakterden uzun mesaj kesilmeli.
+- [ ] **Dünya duyurusu:** Bir elit (ör. Ork Reisi) öldüğünde tüm oyuncuların sohbet kaydında turuncu "[Dunya] ... devrildi!" satırı çıkmalı.
+- [ ] **Konum:** Kutu ve kayıt sol altta hotbar'ın soluna/üstüne binmemeli (dar pencerede kontrol et; gerekirse konum ayarı yapılacak).
+- [ ] **Bölge geçişi:** Summer↔Winter geçişinden sonra Enter ile sohbet yine çalışmalı; açık kutu geçişte ekranda asılı kalmamalı.

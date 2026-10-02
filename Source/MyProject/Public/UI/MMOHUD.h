@@ -18,6 +18,14 @@ struct FMMOFloatingText
 	FString Label;
 };
 
+/** Sohbet kaydi satiri (sol altta cizilir). */
+struct FMMOChatLine
+{
+	FString Text;
+	FLinearColor Color = FLinearColor::White;
+	float Time = 0.f;
+};
+
 /** HUD uzerinde tiklanabilir bir bolge (skill kitabi satiri veya hotbar slotu). */
 struct FMMOClickRegion
 {
@@ -46,6 +54,9 @@ public:
 
 	// Ucan serbest metin (XP kazanci vb.); hasar sayisindan biraz daha uzun kalir.
 	void AddFloatingLabel(const FVector& WorldLocation, const FString& Label);
+
+	// Sohbet satiri ekler (sunucudan gelen genel/parti/sistem mesaji). Son 50 satir tutulur.
+	void AddChatLine(const FString& Line, const FLinearColor& Color);
 
 	// --- NPC diyalog balonu (konusan NPC'ye tiklaninca alt-ortada gosterilir) ---
 	// Pencere DEGILDIR: hareketi engellemez, sadece bir sure gorunur ve solar.
@@ -114,9 +125,11 @@ protected:
 
 	// Aktif ucan hasar sayilarini cizer/gunceller.
 	void DrawFloatingTexts();
+	void DrawChat();
 
 	// Aktif hasar sayilari.
 	TArray<FMMOFloatingText> FloatingTexts;
+	TArray<FMMOChatLine> ChatLines;
 
 	// Tek bir bar �izer: koyu zemin + �er�eve + doluluk oran�na g�re renkli dolgu.
 	void DrawStatBar(float X, float Y, float Width, float Height, float Percent, const FLinearColor& FillColor);

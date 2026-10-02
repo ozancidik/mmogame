@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Types/SlateEnums.h"
 #include "MMOPlayerController.generated.h"
 
 class AMMOCharacter;
@@ -36,8 +37,39 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	AMMOCharacter* GetSelectedTarget() const;
 
+	// --- Sohbet (KO tarzi genel + parti) ---
+	// Enter: sol altta yazi kutusu acar; Enter gonderir, Esc/odak kaybi kapatir.
+	// "/p mesaj" yalniz parti uyelerine gider. Konsol yedegi: "Say merhaba".
+	UFUNCTION(Exec)
+	void Say(const FString& Message);
+
+	// Sunucu -> istemci: sohbet satiri. Channel 0 = genel, 1 = parti, 2 = sistem.
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveChat(const FString& Sender, const FString& Message, uint8 Channel);
+
+	bool IsChatInputOpen() const { return ChatBox.IsValid(); }
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	UFUNCTION(Server, Reliable)
+	void ServerSendChat(const FString& Message);
+
+	// Sunucu tarafi sohbet spam korumasi.
+	float LastChatServerTime = -100.f;
+
+	void OnChatKey();
+	void OpenChatInput();
+	void CloseChatInput();
+	void OnChatCommitted(const FText& Text, ETextCommit::Type CommitType);
+
+	TSharedPtr<class SWidget> ChatContainer;
+	TSharedPtr<class SEditableTextBox> ChatBox;
+	// Enter'in ayni tusa basisi yazi kutusuna gitmesin, kapatma da kendi callback'i
+	// icinde widget'i yok etmesin diye ac/kapa bir sonraki PlayerTick'te yapilir.
+	bool bChatOpenRequested = false;
+	bool bChatCloseRequested = false;
 	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaTime) override;
 
