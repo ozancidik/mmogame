@@ -203,6 +203,42 @@ namespace
 			T::KillSpecificMob, TEXT("RiftHerald"), 1, 150000, 150000, 65, TEXT("Q_RiftWatch")));
 		Table.Last().RewardEquipmentId = FName(TEXT("RiftBlade"));
 
+		// --- Kul Hatti zinciri (Lv66-70, Winter_scene guney; PROGRESSION_PLAN) ---
+		Table.Add(MakeQuest(TEXT("Q_AshVanguard"), TEXT("Kul Onculeri"), TEXT("Kisin guneyine inen kul onculerini durdur: 5 Kul Oncusu oldur."),
+			T::KillSpecificMob, TEXT("AshVanguard"), 5, 170000, 170000, 66, TEXT("Q_RiftHerald")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AshenBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_AshBinders"), TEXT("Kul Baglayicilari"), TEXT("Guneybatidaki baglayicilari devir: 5 Kul Baglayici oldur."),
+			T::KillSpecificMob, TEXT("AshBinder"), 5, 185000, 185000, 68, TEXT("Q_AshVanguard")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AshenHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_AshLine"), TEXT("Kul Hatti"), TEXT("Baglayici hattini kir: 6 Kul Baglayici daha oldur."),
+			T::KillSpecificMob, TEXT("AshBinder"), 6, 200000, 200000, 68, TEXT("Q_AshBinders")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AshenPlate"));
+
+		Table.Add(MakeQuest(TEXT("Q_AshTyrant"), TEXT("Kul Tirani"), TEXT("Kul hattinin tiranini devir."),
+			T::KillSpecificMob, TEXT("AshTyrant"), 1, 230000, 230000, 70, TEXT("Q_AshLine")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AshenBlade"));
+
+		// --- Ucurum zinciri (Lv71-80, Winter_scene kuzey/dogu; PROGRESSION_PLAN) ---
+		// Lv71'de alinabilir (plan 72 diyordu): 70->71 sonrasi bos seviye kalmasin.
+		Table.Add(MakeQuest(TEXT("Q_AbyssStriders"), TEXT("Ucurum Gezginleri"), TEXT("Kuzeybatidaki ucurum gezginlerini durdur: 5 Ucurum Gezgini oldur."),
+			T::KillSpecificMob, TEXT("AbyssStrider"), 5, 260000, 260000, 71, TEXT("Q_AshTyrant")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssGuardians"), TEXT("Ucurum Koruyuculari"), TEXT("Kuzeydogu yaylasindaki koruyuculari devir: 5 Ucurum Koruyucusu oldur."),
+			T::KillSpecificMob, TEXT("AbyssGuardian"), 5, 290000, 290000, 76, TEXT("Q_AbyssStriders")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AbyssHelm"));
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssLine"), TEXT("Ucurum Hatti"), TEXT("Koruyucu hattini dagit: 6 Ucurum Koruyucusu daha oldur."),
+			T::KillSpecificMob, TEXT("AbyssGuardian"), 6, 320000, 320000, 76, TEXT("Q_AbyssGuardians")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AbyssPlate"));
+
+		// Lv80'de XP kullanilmaz (GainExperience tavanda XP kabul etmez); odul altin + silah.
+		Table.Add(MakeQuest(TEXT("Q_AbyssRegent"), TEXT("Ucurum Naibi"), TEXT("Bati yaylasindaki ucurum naibini devir."),
+			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 80, TEXT("Q_AbyssLine")));
+		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBlade"));
+
 		// --- Bagimsiz (yan) gorevler ---
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));

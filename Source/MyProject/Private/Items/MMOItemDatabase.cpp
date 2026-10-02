@@ -52,6 +52,9 @@ namespace
 		Table.Add(MakeItem(TEXT("FrostboundBlade"), TEXT("Buzbagli Kilic"), S::Weapon, 124.f, 0.f, 51));
 		// Lv58 Rift kademesi (PROGRESSION_PLAN, gecici deger).
 		Table.Add(MakeItem(TEXT("RiftBlade"), TEXT("Yarik Kilici"), S::Weapon, 142.f, 0.f, 58));
+		// Lv66 Kul (Ashen) ve Lv72 Ucurum (Abyss) kademeleri (PROGRESSION_PLAN, gecici deger).
+		Table.Add(MakeItem(TEXT("AshenBlade"), TEXT("Kul Kilici"), S::Weapon, 164.f, 0.f, 66));
+		Table.Add(MakeItem(TEXT("AbyssBlade"), TEXT("Ucurum Kilici"), S::Weapon, 188.f, 0.f, 72));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -65,6 +68,8 @@ namespace
 		Table.Add(MakeItem(TEXT("WinterPlate"), TEXT("Kis Zirhi"), S::Armor, 0.f, 65.f, 42));
 		Table.Add(MakeItem(TEXT("FrostboundPlate"), TEXT("Buzbagli Zirh"), S::Armor, 0.f, 75.f, 51));
 		Table.Add(MakeItem(TEXT("RiftPlate"), TEXT("Yarik Zirhi"), S::Armor, 0.f, 86.f, 58));
+		Table.Add(MakeItem(TEXT("AshenPlate"), TEXT("Kul Zirhi"), S::Armor, 0.f, 99.f, 66));
+		Table.Add(MakeItem(TEXT("AbyssPlate"), TEXT("Ucurum Zirhi"), S::Armor, 0.f, 114.f, 72));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -78,6 +83,8 @@ namespace
 		Table.Add(MakeItem(TEXT("WinterHelm"), TEXT("Kis Kaski"), S::Helmet, 0.f, 27.f, 42));
 		Table.Add(MakeItem(TEXT("FrostboundHelm"), TEXT("Buzbagli Kask"), S::Helmet, 0.f, 31.f, 51));
 		Table.Add(MakeItem(TEXT("RiftHelm"), TEXT("Yarik Kaski"), S::Helmet, 0.f, 36.f, 58));
+		Table.Add(MakeItem(TEXT("AshenHelm"), TEXT("Kul Kaski"), S::Helmet, 0.f, 42.f, 66));
+		Table.Add(MakeItem(TEXT("AbyssHelm"), TEXT("Ucurum Kaski"), S::Helmet, 0.f, 48.f, 72));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
@@ -91,6 +98,8 @@ namespace
 		Table.Add(MakeItem(TEXT("WinterBoots"), TEXT("Kis Botu"), S::Boots, 0.f, 36.f, 42));
 		Table.Add(MakeItem(TEXT("FrostboundBoots"), TEXT("Buzbagli Bot"), S::Boots, 0.f, 41.f, 51));
 		Table.Add(MakeItem(TEXT("RiftBoots"), TEXT("Yarik Botu"), S::Boots, 0.f, 47.f, 58));
+		Table.Add(MakeItem(TEXT("AshenBoots"), TEXT("Kul Botu"), S::Boots, 0.f, 55.f, 66));
+		Table.Add(MakeItem(TEXT("AbyssBoots"), TEXT("Ucurum Botu"), S::Boots, 0.f, 64.f, 72));
 
 		return Table;
 	}

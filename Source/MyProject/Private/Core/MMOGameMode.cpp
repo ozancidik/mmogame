@@ -211,6 +211,19 @@ void AMMOGameMode::SpawnMobArea()
 		SpawnFrostbound(FVector(-3800.f, 1200.f, 45.f), 55, 55, 225.f, 5, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-2000.f, 1000.f, 48.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
 
+		// Lv66-80 Kul + Ucurum dilimleri. Winter NavMeshBoundsVolume 2026-10-03'te
+		// Scripts/ExtendWinterNavigation.py ile X+-8000 / Y -8500..5500'e genisletildi.
+		// Yeni grid probunda (spawner-esdeger kontrol, hub'a tam yol) halkalar 16/16;
+		// tum cepler birbirinden ve onceki Winter ceplerinden >=1800u, hub'dan >=3800u.
+		//  Kul Oncusu Lv66 (1200,-5200) | Kul Baglayici Lv68 (-2000,-6800) | Kul Tirani elit Lv70 (4400,-5200)
+		//  Ucurum Gezgini Lv72 (-5200,3600) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (-7600,-1200, yayla Z~1150)
+		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
+		SpawnFrostbound(FVector(-5200.f, 3600.f, -115.f), 72, 72, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-7600.f, -1200.f, 1197.f), 0, 0, 150.f, 1, FName(TEXT("AbyssRegent")), 60.f);
+
 		// Kis hub'inda gorev kabul/teslimi, satis ve iyilesme ayni servislerle
 		// acilir. Kayitli PlayerStart merkezinden 250u ote, mob cebinden >=2750u.
 		FActorSpawnParameters WinterNpcParams;
@@ -222,7 +235,7 @@ void AMMOGameMode::SpawnMobArea()
 			Origin + FVector(250.f, -200.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
 		World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(),
 			Origin + FVector(250.f, -350.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
-		UE_LOG(LogTemp, Log, TEXT("[MMODBG] Winter_scene Lv42-57 layout spawned"));
+		UE_LOG(LogTemp, Log, TEXT("[MMODBG] Winter_scene Lv42-80 layout spawned"));
 		return;
 	}
 	// Bundan sonraki konumlar Summer_scene'e ozgu. Yeni bir harita PlayerStart

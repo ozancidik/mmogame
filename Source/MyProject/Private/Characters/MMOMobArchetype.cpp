@@ -226,6 +226,30 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
+		// --- Onuncu kademe NORMAL moblari (Lv66-68; Kul Hatti, Winter_scene guney) ---
+		// XP plan hipotezi: 70->71 esigi ~1.43M / 66K ~= 22 kill. PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("AshVanguard"), TEXT("Kul Oncusu"), 66, 190, 196, 262.f, 60000, 5500, 9300, 440.f, 600.f, 1.3f, FLinearColor(0.5f, 0.42f, 0.38f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("AshBinder"), TEXT("Kul Baglayici"), 68, 198, 214, 272.f, 66000, 6000, 10000, 270.f, 600.f, 1.55f, FLinearColor(0.38f, 0.32f, 0.3f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
+		// --- On birinci kademe NORMAL moblari (Lv72-76; Ucurum, Winter_scene kuzey/dogu) ---
+		// XP plan hipotezi: 79->80 esigi ~2.0M / 95K ~= 21 kill. PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("AbyssStrider"), TEXT("Ucurum Gezgini"), 72, 208, 222, 300.f, 82000, 7000, 11500, 445.f, 600.f, 1.3f, FLinearColor(0.2f, 0.18f, 0.35f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.4f;
+
+		Table.Add(MakeMob(TEXT("AbyssGuardian"), TEXT("Ucurum Koruyucusu"), 76, 224, 252, 322.f, 95000, 8000, 13000, 275.f, 600.f, 1.6f, FLinearColor(0.16f, 0.14f, 0.3f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));
@@ -377,6 +401,30 @@ namespace
 		Table.Last().EliteEquipDropCount = 2;
 		Table.Last().EliteMinItemPlus = 3;
 		Table.Last().EliteMaxItemPlus = 5;
+
+		// Kul Tirani (Lv70): Kul Hatti eliti; Lv66 Kul seti elit loot havuzunda.
+		Table.Add(MakeMob(TEXT("AshTyrant"), TEXT("Kul Tirani"), 70, 214, 240, 290.f, 100000, 8000, 14000, 295.f, 600.f, 2.15f, FLinearColor(0.45f, 0.25f, 0.15f)));
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 3;
+		Table.Last().EliteMaxItemPlus = 5;
+
+		// Ucurum Naibi (Lv80): oyunun son eliti (80 becerileri icin son karsilasma); Lv72 seti havuzda.
+		Table.Add(MakeMob(TEXT("AbyssRegent"), TEXT("Ucurum Naibi"), 80, 245, 285, 350.f, 140000, 11000, 19000, 300.f, 600.f, 2.3f, FLinearColor(0.12f, 0.08f, 0.25f)));
+		Table.Last().bIsElite = true;
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.5f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+		Table.Last().EliteEquipDropChance = 0.5f;
+		Table.Last().EliteEquipDropCount = 2;
+		Table.Last().EliteMinItemPlus = 4;
+		Table.Last().EliteMaxItemPlus = 6;
 
 		return Table;
 	}
