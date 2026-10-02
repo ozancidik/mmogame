@@ -138,6 +138,8 @@ XP sayıları `FMMOMobArchetype` kayıtları için öneridir; can/hasar, elit XP
 
 **3 Ekim QA düzeltmeleri (Frostbound denetimi):** Nöbetçi cebi `(-3800,1200)` → `(-2800,4400)`, Muhafız eliti `(-2000,1000)` → `(2000,2800)` taşındı (Kış Hükümdarı'na ~1400u'luk yakınlık, gezinme+aggro ile istenmeyen çekişlere yol açabiliyordu; Nöbetçi eski navmesh kenarındaydı). Yeni konumlar probda 47/48 ve 16/16. Bant içi seviye boşluklarını kapatmak için ikinci normal görevlerin seviye kapısı indirildi: `Q_FrostboundSentinels` 53, `Q_FrostboundLine` 54, `Q_RiftKeepers` 60, `Q_RiftWatch` 61, `Q_AshBinders` 67, `Q_AbyssGuardians` 74, `Q_AbyssLine` 75. Tüm Lv51+ normal ceplerinde eşzamanlı mob 5 → 6.
 
+**3 Ekim QA düzeltmeleri (Rift/Kül/Uçurum denetimi):** Rift cepleri Summer'da erken bölgelere 1450–1660u mesafedeydi; Rift mob'u spawn+gezinme+aggro ile ~1275u'dan oyuncuyu fark ettiği için Lv7–40 oyuncular Lv58+ mob çekebiliyordu. Summer NavMeshBoundsVolume `Scripts/ExtendSummerNavigation.py` ile X/Y ±8500'e genişletildi (harita kaydedildi) ve cepler taşındı: Arayıcı `(800,-4800)`, Bekçi `(-4800,4800)`, Haberci eliti `(4800,4000)` — en yakın eski cebe ≥~3400u, probda 48/48, 48/48, 16/16. Uçurum Naibi gezinmesi Winter nav sınırını aştığı için `(-7600,-1200)` → `(6800,2000)` taşındı. `Q_AbyssRegent` kapısı Lv80 → Lv79 (Lv79 oyuncu Naibi kesip kredi alabilsin). Açık kalan: Lv61→65, Lv71→74, Lv75→80 görevsiz grind aralıkları.
+
 ## Sıradaki üç çalışma dilimi
 
 ### 1. Winter yürünebilirliğini ve güvenli doğuşu tamamla

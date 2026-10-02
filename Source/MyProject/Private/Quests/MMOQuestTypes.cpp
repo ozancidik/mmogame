@@ -236,7 +236,7 @@ namespace
 
 		// Lv80'de XP kullanilmaz (GainExperience tavanda XP kabul etmez); odul altin + silah.
 		Table.Add(MakeQuest(TEXT("Q_AbyssRegent"), TEXT("Ucurum Naibi"), TEXT("Bati yaylasindaki ucurum naibini devir."),
-			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 80, TEXT("Q_AbyssLine")));
+			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 79, TEXT("Q_AbyssLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBlade"));
 
 		// --- Bagimsiz (yan) gorevler ---

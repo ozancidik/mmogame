@@ -217,13 +217,14 @@ void AMMOGameMode::SpawnMobArea()
 		// Yeni grid probunda (spawner-esdeger kontrol, hub'a tam yol) halkalar 16/16;
 		// tum cepler birbirinden ve onceki Winter ceplerinden >=1800u, hub'dan >=3800u.
 		//  Kul Oncusu Lv66 (1200,-5200) | Kul Baglayici Lv68 (-2000,-6800) | Kul Tirani elit Lv70 (4400,-5200)
-		//  Ucurum Gezgini Lv72 (-5200,3600) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (-7600,-1200, yayla Z~1150)
+		//  Ucurum Gezgini Lv72 (-5200,3600) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
+		//  (Naib ilk (-7600,-1200)'deydi; gezinmeyle navmesh sinirini -8000 asiyordu, QA ile tasindi.)
 		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
 		SpawnFrostbound(FVector(-5200.f, 3600.f, -115.f), 72, 72, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 6, NAME_None, 0.f);
-		SpawnFrostbound(FVector(-7600.f, -1200.f, 1197.f), 0, 0, 150.f, 1, FName(TEXT("AbyssRegent")), 60.f);
+		SpawnFrostbound(FVector(6800.f, 2000.f, 629.f), 0, 0, 150.f, 1, FName(TEXT("AbyssRegent")), 60.f);
 
 		// Kis hub'inda gorev kabul/teslimi, satis ve iyilesme ayni servislerle
 		// acilir. Kayitli PlayerStart merkezinden 250u ote, mob cebinden >=2750u.
@@ -465,10 +466,13 @@ void AMMOGameMode::SpawnMobArea()
 
 		// Lv58-65 Rift dilimi (PROGRESSION_PLAN). 2026-10-03 headless Summer grid probu
 		// (spawner'in kendi zemin+-60u / egim / nav 50/35u / PlayerStart'a tam yol kontrolu):
-		//  - Arayici (Lv58) (2400,2400): zemin ~155, 150/225u halkasi 15/16.
-		//  - Bekci (Lv62) (-4000,3200): zemin ~-170, halka 16/16.
-		//  - Haberci elit (Lv65) (3200,0): zemin ~166, halka 16/16.
-		// Mevcut tum Summer ceplerinden >=1400u; dogus noktasina >=3200u.
+		// QA (527ca1f): ilk konumlar erken bolgelere ~1450-1660u'daydi; Rift mob'u
+		// spawn 225 + gezinme 450 + aggro 600 ile ~1275u'dan oyuncu fark ediyor, Lv7-40
+		// oyuncular Lv58+ mob cekebiliyordu. Summer NavMeshBoundsVolume
+		// (Scripts/ExtendSummerNavigation.py) X/Y +-8500'e genisletildi, cepler uzaklastirildi:
+		//  - Arayici (Lv58) (800,-4800): zemin ~0, halka 16/16, en yakin eski cep ~3500u.
+		//  - Bekci (Lv62) (-4800,4800): zemin ~-170, halka 16/16, ~3400u.
+		//  - Haberci elit (Lv65) (4800,4000): zemin ~500, halka 16/16, ~3880u.
 		auto SpawnRift = [&](const FVector& Loc, int32 Lv, float Radius, int32 MaxMobs, FName Forced)
 		{
 			const FTransform TM(FRotator::ZeroRotator, Loc);
@@ -490,9 +494,9 @@ void AMMOGameMode::SpawnMobArea()
 				UGameplayStatics::FinishSpawningActor(S, TM);
 			}
 		};
-		SpawnRift(FVector(2400.f, 2400.f, 205.f), 58, 225.f, 6, NAME_None);
-		SpawnRift(FVector(-4000.f, 3200.f, -120.f), 62, 225.f, 6, NAME_None);
-		SpawnRift(FVector(3200.f, 0.f, 216.f), 0, 150.f, 1, FName(TEXT("RiftHerald")));
+		SpawnRift(FVector(800.f, -4800.f, 50.f), 58, 225.f, 6, NAME_None);
+		SpawnRift(FVector(-4800.f, 4800.f, -120.f), 62, 225.f, 6, NAME_None);
+		SpawnRift(FVector(4800.f, 4000.f, 550.f), 0, 150.f, 1, FName(TEXT("RiftHerald")));
 	}
 
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).
