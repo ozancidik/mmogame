@@ -177,14 +177,15 @@ void AMMOGameMode::SpawnMobArea()
 			UGameplayStatics::FinishSpawningActor(WinterBoss, WinterBossTM);
 		}
 
-		// Lv51-57 Frostbound dilimi. 2026-10-03 headless Winter grid probu: asagidaki uc cebin
-		// 150/225u halkalarindaki 16/16 ornek zeminde + navmesh'te ve hub'a TAM yolla bagli.
-		// Cepler birbirinden ve Lv42-50 ceplerinden >=1400u (yaricap+gezinme 450+aggro 600
-		// erisimi ~1275u). Z = zemin ortasi + 50u (spawner +-60u zemin toleransi).
-		//  - Gozcu (Lv51) dogu (3000,0): zemin 141..178u, hub yolu ~4740u.
-		//  - Nobetci (Lv55) kuzeybati (-3800,1200): zemin -10..-2u, hub yolu ~4990u.
-		//  - Muhafiz elit (Lv57) (-2000,1000): 150u halkasi 16/16 spawner-esdeger kontrol OK;
-		//    (-2200,1200) adayinda 8/16 navmesh sapmasi vardi. Kis Hukumdari ~1414u, Nobetci ~1811u.
+		// Lv51-57 Frostbound dilimi. Headless Winter grid probu (spawner-esdeger kontrol:
+		// zemin +-60u, egim, nav 50/35u sapma, hub'a TAM yol) ile secildi. Z = zemin + 50u.
+		// QA (627e79a): ilk Nobetci (-3800,1200) ve Muhafiz (-2000,1000) cepleri Kis
+		// Hukumdari'na ~1400u idi; gezinme 450u + aggro 600u ile mob'lar 200-500u'ya kadar
+		// yaklasip istenmeyen cekisler yaratabiliyordu, Nobetci ayrica eski navmesh
+		// kenarindaydi. Navmesh genisletmesinden sonra ikisi de >=2400u uzaga tasindi.
+		//  - Gozcu (Lv51) dogu (3000,0): zemin 141..178u.
+		//  - Nobetci (Lv55) kuzey (-2800,4400): zemin ~-170u, halka 16/16.
+		//  - Muhafiz elit (Lv57) (2000,2800): zemin ~186u, halka 16/16.
 		auto SpawnFrostbound = [&](const FVector& Loc, int32 MinLv, int32 MaxLv, float Radius,
 			int32 MaxMobs, FName Forced, float TopUp)
 		{
@@ -207,9 +208,9 @@ void AMMOGameMode::SpawnMobArea()
 				UGameplayStatics::FinishSpawningActor(S, TM);
 			}
 		};
-		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 5, NAME_None, 0.f);
-		SpawnFrostbound(FVector(-3800.f, 1200.f, 45.f), 55, 55, 225.f, 5, NAME_None, 0.f);
-		SpawnFrostbound(FVector(-2000.f, 1000.f, 48.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
+		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-2800.f, 4400.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(2000.f, 2800.f, 236.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
 
 		// Lv66-80 Kul + Ucurum dilimleri. Winter NavMeshBoundsVolume 2026-10-03'te
 		// Scripts/ExtendWinterNavigation.py ile X+-8000 / Y -8500..5500'e genisletildi.
@@ -217,11 +218,11 @@ void AMMOGameMode::SpawnMobArea()
 		// tum cepler birbirinden ve onceki Winter ceplerinden >=1800u, hub'dan >=3800u.
 		//  Kul Oncusu Lv66 (1200,-5200) | Kul Baglayici Lv68 (-2000,-6800) | Kul Tirani elit Lv70 (4400,-5200)
 		//  Ucurum Gezgini Lv72 (-5200,3600) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (-7600,-1200, yayla Z~1150)
-		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 5, NAME_None, 0.f);
-		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
-		SpawnFrostbound(FVector(-5200.f, 3600.f, -115.f), 72, 72, 225.f, 5, NAME_None, 0.f);
-		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 5, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-5200.f, 3600.f, -115.f), 72, 72, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-7600.f, -1200.f, 1197.f), 0, 0, 150.f, 1, FName(TEXT("AbyssRegent")), 60.f);
 
 		// Kis hub'inda gorev kabul/teslimi, satis ve iyilesme ayni servislerle
@@ -489,8 +490,8 @@ void AMMOGameMode::SpawnMobArea()
 				UGameplayStatics::FinishSpawningActor(S, TM);
 			}
 		};
-		SpawnRift(FVector(2400.f, 2400.f, 205.f), 58, 225.f, 5, NAME_None);
-		SpawnRift(FVector(-4000.f, 3200.f, -120.f), 62, 225.f, 5, NAME_None);
+		SpawnRift(FVector(2400.f, 2400.f, 205.f), 58, 225.f, 6, NAME_None);
+		SpawnRift(FVector(-4000.f, 3200.f, -120.f), 62, 225.f, 6, NAME_None);
 		SpawnRift(FVector(3200.f, 0.f, 216.f), 0, 150.f, 1, FName(TEXT("RiftHerald")));
 	}
 

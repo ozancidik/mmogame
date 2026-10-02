@@ -175,11 +175,11 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundBoots"));
 
 		Table.Add(MakeQuest(TEXT("Q_FrostboundSentinels"), TEXT("Buzbagli Nobetciler"), TEXT("Kuzeybatidaki nobetcileri devir: 5 Buzbagli Nobetci oldur."),
-			T::KillSpecificMob, TEXT("FrostboundSentinel"), 5, 82000, 82000, 55, TEXT("Q_FrostboundScouts")));
+			T::KillSpecificMob, TEXT("FrostboundSentinel"), 5, 82000, 82000, 53, TEXT("Q_FrostboundScouts")));
 		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundHelm"));
 
 		Table.Add(MakeQuest(TEXT("Q_FrostboundLine"), TEXT("Buz Hatti"), TEXT("Nobetci hattini kir: 6 Buzbagli Nobetci daha oldur."),
-			T::KillSpecificMob, TEXT("FrostboundSentinel"), 6, 88000, 88000, 55, TEXT("Q_FrostboundSentinels")));
+			T::KillSpecificMob, TEXT("FrostboundSentinel"), 6, 88000, 88000, 54, TEXT("Q_FrostboundSentinels")));
 		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundPlate"));
 
 		Table.Add(MakeQuest(TEXT("Q_FrostboundWarden"), TEXT("Buzbagli Muhafiz"), TEXT("Buz kapisinin muhafizini devir."),
@@ -192,11 +192,11 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("RiftBoots"));
 
 		Table.Add(MakeQuest(TEXT("Q_RiftKeepers"), TEXT("Yarik Bekcileri"), TEXT("Kuzeybatidaki yarik bekcilerini devir: 5 Yarik Bekcisi oldur."),
-			T::KillSpecificMob, TEXT("RiftKeeper"), 5, 120000, 120000, 62, TEXT("Q_RiftSeekers")));
+			T::KillSpecificMob, TEXT("RiftKeeper"), 5, 120000, 120000, 60, TEXT("Q_RiftSeekers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("RiftHelm"));
 
 		Table.Add(MakeQuest(TEXT("Q_RiftWatch"), TEXT("Yarik Nobeti"), TEXT("Bekci hattini dagit: 6 Yarik Bekcisi daha oldur."),
-			T::KillSpecificMob, TEXT("RiftKeeper"), 6, 130000, 130000, 62, TEXT("Q_RiftKeepers")));
+			T::KillSpecificMob, TEXT("RiftKeeper"), 6, 130000, 130000, 61, TEXT("Q_RiftKeepers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("RiftPlate"));
 
 		Table.Add(MakeQuest(TEXT("Q_RiftHerald"), TEXT("Yarik Habercisi"), TEXT("Yarigi acan habercisini devir."),
@@ -209,7 +209,7 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("AshenBoots"));
 
 		Table.Add(MakeQuest(TEXT("Q_AshBinders"), TEXT("Kul Baglayicilari"), TEXT("Guneybatidaki baglayicilari devir: 5 Kul Baglayici oldur."),
-			T::KillSpecificMob, TEXT("AshBinder"), 5, 185000, 185000, 68, TEXT("Q_AshVanguard")));
+			T::KillSpecificMob, TEXT("AshBinder"), 5, 185000, 185000, 67, TEXT("Q_AshVanguard")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AshenHelm"));
 
 		Table.Add(MakeQuest(TEXT("Q_AshLine"), TEXT("Kul Hatti"), TEXT("Baglayici hattini kir: 6 Kul Baglayici daha oldur."),
@@ -227,11 +227,11 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBoots"));
 
 		Table.Add(MakeQuest(TEXT("Q_AbyssGuardians"), TEXT("Ucurum Koruyuculari"), TEXT("Kuzeydogu yaylasindaki koruyuculari devir: 5 Ucurum Koruyucusu oldur."),
-			T::KillSpecificMob, TEXT("AbyssGuardian"), 5, 290000, 290000, 76, TEXT("Q_AbyssStriders")));
+			T::KillSpecificMob, TEXT("AbyssGuardian"), 5, 290000, 290000, 74, TEXT("Q_AbyssStriders")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssHelm"));
 
 		Table.Add(MakeQuest(TEXT("Q_AbyssLine"), TEXT("Ucurum Hatti"), TEXT("Koruyucu hattini dagit: 6 Ucurum Koruyucusu daha oldur."),
-			T::KillSpecificMob, TEXT("AbyssGuardian"), 6, 320000, 320000, 76, TEXT("Q_AbyssGuardians")));
+			T::KillSpecificMob, TEXT("AbyssGuardian"), 6, 320000, 320000, 75, TEXT("Q_AbyssGuardians")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssPlate"));
 
 		// Lv80'de XP kullanilmaz (GainExperience tavanda XP kabul etmez); odul altin + silah.
