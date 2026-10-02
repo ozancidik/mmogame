@@ -162,3 +162,33 @@ tebrik replikleri. Unvan, görevin oyun-içi adıdır.*
 - Yarık'tan gelen zehir başka, evlat; ne bitkiye benzer ne yılana. Otur, sabırla temizleyelim.
 - Kül Hattı'ndan dönenlerin yarası hem yanmış hem donmuş oluyor. Hangisini önce saracağımı bilemiyorum; ikisine birden dua ediyorum.
 - Uçurum'a bakanların gözünde bir boşluk kalıyor. Yarayı ben sararım; o boşluğu ancak sen doldurabilirsin.
+
+---
+
+## Lv61-80 Yan Görev Replikleri
+
+*Yarık ve Uçurum yan görevleri için görev NPC'sinin kısa alış ve teslim
+replikleri. Uzun anlatı metni `docs/Lore.md` içindedir; buradakiler ekran
+baloncuğuna sığacak kısalıktadır.*
+
+- **Yarık Temizliği** *(Q_RiftPurge)* — Yaşlı Doran:
+  - *Alırken:* "Arayıcılar yarığın ağzına yeniden doluşuyor, evlat. Onunu seyrelt."
+  - *Teslimde:* "Ağız nefes aldı. Şu iksirler zehrin götürdüğünü geri getirir."
+- **Yarığın Derinliği** *(Q_RiftDepths)* — Yaşlı Doran:
+  - *Alırken:* "Mor ışık her gece daha derinden geliyor. On bekçi devir, yolunu daralt."
+  - *Teslimde:* "Işık sönükleşti. Derine bakan gücünü çabuk tüketir; bunları sakla."
+- **Uçurum Devriyesi** *(Q_AbyssPatrol)* — Yaşlı Doran:
+  - *Alırken:* "Gezginler devriye gibi döner; biri gider, öbürü gelir. Onunun yolunu kes."
+  - *Teslimde:* "Devriye bozuldu. Kenarda yaralanan aşağı bakar; sar yaranı."
+- **Uçurumun Kıyısı** *(Q_AbyssEdge)* — Yaşlı Doran:
+  - *Alırken:* "Kıyıdan yukarı tırmanıyorlar, evlat. On ikisini geri it, yaylayı verme."
+  - *Teslimde:* "Kıyı yine bizim. Dibi görünmeyen yerde gücün tükenmesin."
+- **Uçurum Nöbeti** *(Q_AbyssVigil)* — Yaşlı Doran:
+  - *Alırken:* "Koruyucular sahipleri dönecekmiş gibi nöbet tutuyor. Sabırla bekle, onunu devir."
+  - *Teslimde:* "Nöbet düştü. Nöbetçiyi ancak nöbetçi yener; sen de öyle yaptın."
+- **Aşağı İniş** *(Q_AbyssDescent)* — Yaşlı Doran:
+  - *Alırken:* "Kuzeybatıda gezgin yuvası var. On ikisini dağıt; aşağı inen yola bakma."
+  - *Teslimde:* "Yuva dağıldı. Gözün hâlâ o yoldaysa şu iksiri iç de kendine gel."
+- **Son Siper** *(Q_AbyssBastion)* — Yaşlı Doran:
+  - *Alırken:* "Yaylanın doğusunda Naibin son siperi duruyor. On iki koruyucu devir, yol açılsın."
+  - *Teslimde:* "Siper yıkıldı, doğu açık. Soluklan, evlat; Naibin karşısına yorgun çıkma."

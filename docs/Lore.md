@@ -622,9 +622,51 @@ Tiranı'nı devirenlere açılır.*
   - *Dönüşte:* "Yol açık. Al şu Uçurum Zırhı'nı. Yıllar önce sana taşıyabileceğinden
     ağırını vermem demiştim; sözümü tuttum mu, artık bilemiyorum."
 - **Uçurum Naibi** *(Q_AbyssRegent)* — "Naib, sahibinin yerine hüküm sürendir,
-  evlat. Yaylanın batısında oturan o gölge kimin adına konuşuyorsa, fısıltıyı da
+  evlat. Yaylanın doğusunda oturan o gölge kimin adına konuşuyorsa, fısıltıyı da
   onun adına yayıyor. Devir onu; dokunuşu bedenini ağırlaştırır, öfkesi sona
   yaklaştıkça büyür. Ve dönmeyi unutma."
   - *Dönüşte:* "Duyuyor musun? Hiçbir şey. Fısıltı sustu, evlat… şimdilik. Al şu
     Uçurum Kılıcı'nı; naib düştü ama taht boş kalmaz. O gün geldiğinde kılıcın
     elinde olsun."
+
+## Görevler (Anlatı): Yarık ve Uçurum Yan Görevleri
+
+*Ana zincirin kenarında Doran'ın verdiği ek işler. Zinciri kilitlemezler; biri
+bitince ardındaki açılır. Yarık yan görevleri Yarık Nöbeti'ni, Uçurum yan
+görevleri Uçurum Gezginleri'ni ve Uçurum Hattı'nı bitirenlere açılır.*
+
+- **Yarık Temizliği** *(Q_RiftPurge)* — "Nöbet dağıldı ama yarığın ağzı boş
+  kalmadı, evlat; arayıcılar yeniden toplanıyor. Onunu seyrelt ki habercinin
+  yolunu açarken sırtın güvende olsun."
+  - *Dönüşte:* "Ağız seyreldi. Al şu Büyük Can İksirleri'ni; zehrin götürdüğünü
+    bunlar geri getirir."
+- **Yarığın Derinliği** *(Q_RiftDepths)* — "Bekçilerin ardında yarık
+  derinleşiyor; mor ışık her gece biraz daha aşağıdan geliyor. On bekçi devir.
+  Derinliği kapatamayız belki, ama yolunu daraltabiliriz."
+  - *Dönüşte:* "Işık sönükleşti. Bu Büyük Mana İksirleri'ni sakla; derine
+    bakan, gücünü çabuk tüketir."
+- **Uçurum Devriyesi** *(Q_AbyssPatrol)* — "Kenar temiz dedik, ama gezginler
+  devriye gibi döner durur; biri gidince öbürü gelir. Onunun yolunu kes, evlat,
+  kenarı biraz daha biz tutalım."
+  - *Dönüşte:* "Devriye bozuldu. Al şu iksirleri; kenarda yaralanan, gözünü
+    aşağıya dikmeye başlar."
+- **Uçurumun Kıyısı** *(Q_AbyssEdge)* — "Gezginler kıyıdan yukarı tırmanıyor;
+  yaylanın bize kalan yarısını da istiyorlar. On ikisini geri it — kıyıda
+  adımını ağırlaştırmalarına izin verme."
+  - *Dönüşte:* "Kıyı yeniden bizim. Bu Büyük Mana İksirleri senin; dibi
+    görünmeyen yerde gücün tükenmesin."
+- **Uçurum Nöbeti** *(Q_AbyssVigil)* — "Hat kırıldı ama koruyucular yaylada
+  nöbetini sürdürüyor; sahipleri dönecekmiş gibi. Onunu bekle ve devir. Sabırlı
+  ol, evlat; nöbetçiyi ancak nöbetçi yener."
+  - *Dönüşte:* "Nöbet düştü. Al şu Büyük Can İksirleri'ni; Naibe giden yolda
+    hepsine ihtiyacın olacak."
+- **Aşağı İniş** *(Q_AbyssDescent)* — "Kuzeybatıda gezginlerin yuvası var;
+  uçurumdan oraya tırmanıp yaylaya oradan yayılıyorlar. On ikisini dağıt.
+  Aşağıya inen yolu göreceksin — bakma, yalnız dağıt."
+  - *Dönüşte:* "Yuva dağıldı. Gözün hâlâ o yola takılıyorsa şu Büyük Mana
+    İksirleri'ni iç de kendine gel."
+- **Son Siper** *(Q_AbyssBastion)* — "Naibin önünde son bir siper var, evlat:
+  yaylanın doğusuna dizilmiş koruyucular. On ikisini devir; ardında yalnız o
+  gölge kalacak."
+  - *Dönüşte:* "Siper yıkıldı, doğunun yolu açık. Al şu Büyük Can İksirleri'ni
+    ve soluklan; Naibin karşısına yorgun çıkma."
