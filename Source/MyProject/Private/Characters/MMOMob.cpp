@@ -12,6 +12,8 @@
 #include "Items/MMOItemDatabase.h"
 #include "Components/MMOQuestComponent.h"
 #include "Components/MMOPartyComponent.h"
+#include "Components/MMOTradeComponent.h"
+#include "Components/MMOClanComponent.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 #include "Engine/SkeletalMesh.h"
@@ -35,6 +37,10 @@ AMMOMob::AMMOMob()
 
 	// Yerlestirilince/spawn olunca varsayilan AI controller onu ele gecirsin (hareket icin).
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+
+	// Mob oyuncu ticaret/klan bilesenlerini tasimaz (QA): gereksiz replike alt nesneleri kapat.
+	if (GetTradeComponent()) { GetTradeComponent()->SetIsReplicated(false); }
+	if (GetClanComponent()) { GetClanComponent()->SetIsReplicated(false); }
 
 	// Hareket yonune donsun.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())

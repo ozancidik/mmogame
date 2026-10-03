@@ -366,7 +366,7 @@ void AMMOPlayerController::ClientReceiveChat_Implementation(const FString& Sende
 	}
 	FLinearColor Col = FLinearColor::White;
 	FString Line;
-	if (Channel == 2 || Sender.IsEmpty())
+	if (Channel == 2)
 	{
 		Col = FLinearColor(1.f, 0.65f, 0.2f);
 		Line = Message;

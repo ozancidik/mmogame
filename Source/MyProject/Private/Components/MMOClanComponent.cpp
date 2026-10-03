@@ -9,6 +9,9 @@
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
+#include "Kismet/GameplayStatics.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 
 namespace
 {
@@ -36,6 +39,28 @@ namespace
 	UMMOClanComponent* ClanCompOf(const AMMOCharacter* C)
 	{
 		return C ? C->GetClanComponent() : nullptr;
+	}
+
+	// Disk kayitlarinda (baska bir karakter yuvasinda) bu klan adi kullaniliyor mu?
+	// Yalniz klan kurarken (nadir) calisir; her kayit yuvasi senkron okunur.
+	bool SavedClanNameInUse(const FString& Name, const FString& ExcludeSlot)
+	{
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(FPaths::ProjectSavedDir() / TEXT("SaveGames") / TEXT("MMOSave_*.sav")), true, false);
+		for (const FString& File : Files)
+		{
+			const FString Slot = FPaths::GetBaseFilename(File);
+			if (Slot.Equals(ExcludeSlot, ESearchCase::IgnoreCase))
+			{
+				continue;
+			}
+			const UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
+			if (SG && SG->Data.ClanName.Equals(Name, ESearchCase::IgnoreCase))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 }
 
@@ -177,6 +202,7 @@ void UMMOClanComponent::EnsureLeader(const FString& InClanName, bool bExcludeSel
 		return; // cevrimici uye yok; klan kayitlarda kalir
 	}
 	Best->bIsLeader = true;
+	Best->bActingLeader = true;
 	Best->MarkChanged();
 	Best->NotifyClan(Best->ClanName, FString::Printf(TEXT("%s artik klan lideri."), *ClanPlayerNameOf(Best->GetOwnerCharacter())), false);
 }
@@ -219,11 +245,21 @@ void UMMOClanComponent::CmdCreate(const FString& Name)
 		return;
 	}
 
+	// Kayitlarda (cevrimdisi uyeler) bu adi tasiyan baska bir karakter varsa da reddet:
+	// aksi halde ad kapan, geri donen eski uyeleri/lideri devralirdi (QA ORTA).
+	if (SavedClanNameInUse(N, Self->GetSaveSlotName()))
+	{
+		NotifyOwner(TEXT("Bu klan adi kullanimda (cevrimdisi uyeleri var)."));
+		return;
+	}
+
 	ClanName = N;
 	bIsLeader = true;
+	bActingLeader = false;
 	JoinSeq = ++GClanJoinCounter;
 	MarkChanged();
 	NotifyOwner(FString::Printf(TEXT("Klan kuruldu: [%s]. Davet: /klan davet"), *ClanName));
+	Self->SaveCharacter();
 }
 
 void UMMOClanComponent::CmdInvite()
@@ -269,6 +305,12 @@ void UMMOClanComponent::CmdInvite()
 		{
 			continue;
 		}
+		// Zaten klandaki yakin oyuncular adayligi engellemesin (QA): yalniz klansizlar aday.
+		const UMMOClanComponent* CandClan = ClanCompOf(C);
+		if (!CandClan || CandClan->IsInClan())
+		{
+			continue;
+		}
 		const float D = FVector::Dist(Self->GetActorLocation(), C->GetActorLocation());
 		if (D < BestDist)
 		{
@@ -279,12 +321,15 @@ void UMMOClanComponent::CmdInvite()
 	UMMOClanComponent* TC = ClanCompOf(Target);
 	if (!TC)
 	{
-		NotifyOwner(TEXT("Yakinda davet edilecek oyuncu yok."));
+		NotifyOwner(TEXT("Yakinda klansiz davet edilecek oyuncu yok."));
 		return;
 	}
-	if (TC->IsInClan())
+
+	// Ayni davet eden ayni hedefe yenilerse sureyi uzatma (hedefi baska liderlere kilitlemesin).
+	if (TC->PendingInviteFrom.Get() == Self && TC->PendingInviteTime >= 0.f
+		&& Now - TC->PendingInviteTime < InviteExpirySeconds)
 	{
-		NotifyOwner(TEXT("Oyuncu zaten bir klanda."));
+		NotifyOwner(TEXT("Bu oyuncuya davet zaten gonderildi; yanitini bekle."));
 		return;
 	}
 
@@ -349,9 +394,11 @@ void UMMOClanComponent::CmdAccept()
 
 	ClanName = IC->ClanName;
 	bIsLeader = false;
+	bActingLeader = false;
 	JoinSeq = ++GClanJoinCounter;
 	MarkChanged();
 	NotifyClan(ClanName, FString::Printf(TEXT("%s klana katildi."), *ClanPlayerNameOf(Self)), false);
+	Self->SaveCharacter();
 }
 
 void UMMOClanComponent::CmdLeave()
@@ -376,6 +423,7 @@ void UMMOClanComponent::CmdLeave()
 	const bool bWasLeader = bIsLeader;
 	ClanName.Empty();
 	bIsLeader = false;
+	bActingLeader = false;
 	JoinSeq = 0;
 	MarkChanged();
 	NotifyOwner(FString::Printf(TEXT("[%s] klanindan ayrildin."), *OldName));
@@ -384,6 +432,7 @@ void UMMOClanComponent::CmdLeave()
 	{
 		EnsureLeader(OldName, true);
 	}
+	Self->SaveCharacter();
 }
 
 void UMMOClanComponent::CmdKick(const FString& TargetName)
@@ -438,10 +487,12 @@ void UMMOClanComponent::CmdKick(const FString& TargetName)
 	const FString VictimName = ClanPlayerNameOf(Victim);
 	VC->ClanName.Empty();
 	VC->bIsLeader = false;
+	VC->bActingLeader = false;
 	VC->JoinSeq = 0;
 	VC->MarkChanged();
 	VC->NotifyOwner(FString::Printf(TEXT("[%s] klanindan atildin."), *OldName));
 	NotifyClan(OldName, FString::Printf(TEXT("%s klandan atildi."), *VictimName), false);
+	Victim->SaveCharacter();
 }
 
 void UMMOClanComponent::CmdList()
@@ -510,7 +561,7 @@ void UMMOClanComponent::CmdChat(const FString& Text)
 void UMMOClanComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 {
 	Out.ClanName = ClanName;
-	Out.bClanLeader = IsInClan() && bIsLeader;
+	Out.bClanLeader = IsInClan() && bIsLeader && !bActingLeader;
 }
 
 void UMMOClanComponent::ApplySaveData(const FMMOCharacterSaveData& In)
@@ -539,20 +590,51 @@ void UMMOClanComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// (lider ayrilmis / kimse cevrimici degil) lider olur.
 	TArray<AMMOCharacter*> Others;
 	GatherOnlineMembers(N, Others, true);
-	bool bOtherLeader = false;
+	bool bOtherRealLeader = false;
+	bool bOtherAnyLeader = false;
+	UMMOClanComponent* OtherActing = nullptr;
 	for (const AMMOCharacter* M : Others)
 	{
 		UMMOClanComponent* CC = ClanCompOf(M);
 		if (CC && CC->bIsLeader)
 		{
-			bOtherLeader = true;
-			if (In.bClanLeader)
+			bOtherAnyLeader = true;
+			if (CC->bActingLeader)
 			{
-				CC->bIsLeader = false;
-				CC->MarkChanged();
+				OtherActing = CC;
+			}
+			else
+			{
+				bOtherRealLeader = true;
 			}
 		}
 	}
-	bIsLeader = In.bClanLeader || !bOtherLeader;
+
+	if (In.bClanLeader && !bOtherRealLeader)
+	{
+		// Asil lider geri dondu: cevrimici vekil lider (varsa) liderligi birakir ve haberdar edilir.
+		if (OtherActing)
+		{
+			OtherActing->bIsLeader = false;
+			OtherActing->bActingLeader = false;
+			OtherActing->MarkChanged();
+			OtherActing->NotifyOwner(TEXT("Asil klan lideri geri dondu; liderlik ona gecti."));
+		}
+		bIsLeader = true;
+		bActingLeader = false;
+	}
+	else if (In.bClanLeader)
+	{
+		// Baska bir asil lider zaten cevrimici (ad cakismasi / bozuk kayit): uye olarak katil,
+		// onun liderligini ezme.
+		bIsLeader = false;
+		bActingLeader = false;
+	}
+	else
+	{
+		// Lider degil: yalniz cevrimici hic lider yoksa vekil olarak terfi eder (kayda yazilmaz).
+		bIsLeader = !bOtherAnyLeader;
+		bActingLeader = bIsLeader;
+	}
 	MarkChanged();
 }

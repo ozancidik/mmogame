@@ -93,6 +93,10 @@ protected:
 	// Katilma sirasi (sunucu durumu, replike degil): lider devrinde "en eski uye" icin.
 	int64 JoinSeq = 0;
 
+	// Calisma zamani: bu lider kayitli degil, yalniz cevrimici lider olmadigi icin vekil terfi etti.
+	// Kayda yazilmaz; asil lider geri donerse liderlik ona doner.
+	bool bActingLeader = false;
+
 	// Bekleyen davet (sunucu durumu, replike degil).
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
 	FString PendingInviteClan;
