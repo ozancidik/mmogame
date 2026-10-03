@@ -770,12 +770,13 @@ void AMMOHUD::DrawFloatingTexts()
 	}
 
 	const float Now = World->GetTimeSeconds();
-	const float Lifetime = 1.1f;
+	// Serbest etiketler (XP kazanci vb.) hasar sayisindan uzun kalir.
 
 	// Geriye dogru gez (suresi dolani guvenle sil).
 	for (int32 i = FloatingTexts.Num() - 1; i >= 0; --i)
 	{
 		const FMMOFloatingText& FT = FloatingTexts[i];
+		const float Lifetime = FT.Label.IsEmpty() ? 1.1f : 2.0f;
 		const float Age = Now - FT.SpawnTime;
 		if (Age >= Lifetime)
 		{
