@@ -12,6 +12,7 @@ class UMMOSkillComponent;
 class UMMOQuestComponent;
 class UMMOPartyComponent;
 class UMMOTradeComponent;
+class UMMOClanComponent;
 
 /**
  * MMO karakterleri (oyuncu ve NPC/mob) için C++ temel sınıfı.
@@ -44,6 +45,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
 	TObjectPtr<UMMOTradeComponent> TradeComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
+	TObjectPtr<UMMOClanComponent> ClanComponent;
+
 	// Unreal'in standart hasar akışı (UGameplayStatics::ApplyDamage) buraya düşer;
 	// biz de stat bileşenine yönlendiririz. Sadece otoritede etki eder.
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
@@ -66,6 +70,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOTradeComponent* GetTradeComponent() const { return TradeComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MMO")
+	UMMOClanComponent* GetClanComponent() const { return ClanComponent; }
 
 	// Sinif degistirme konsol komutu: "MMOClass savasci|okcu|buyucu|rahip"
 	// (Ingilizce warrior|archer|mage|priest de calisir).

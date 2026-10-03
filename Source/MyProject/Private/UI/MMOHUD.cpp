@@ -7,6 +7,7 @@
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
+#include "Components/MMOClanComponent.h"
 #include "Effects/MMOEffectDatabase.h"
 #include "Items/MMOConsumableTypes.h"
 #include "Components/MMOInventoryComponent.h"
@@ -2038,6 +2039,16 @@ void AMMOHUD::DrawPlayerNameplates()
 
 		DrawText(FString::Printf(TEXT("%s  Lv%d"), *PS->GetPlayerName(), S->Level),
 			FLinearColor(0.5f, 0.85f, 1.f), Screen.X - 40.f, Screen.Y - 14.f, nullptr, 0.78f);
+
+		// Klan adi (varsa) isim satirinin ustunde.
+		if (const UMMOClanComponent* Clan = C->GetClanComponent())
+		{
+			if (Clan->IsInClan())
+			{
+				DrawText(FString::Printf(TEXT("[%s]"), *Clan->ClanName),
+					FLinearColor(0.4f, 0.9f, 0.4f), Screen.X - 40.f, Screen.Y - 28.f, nullptr, 0.72f);
+			}
+		}
 
 		const float BarW = 62.f;
 		const float BarH = 6.f;

@@ -8,6 +8,7 @@
 #include "Components/MMOQuestComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
+#include "Components/MMOClanComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
@@ -51,6 +52,7 @@ AMMOCharacter::AMMOCharacter()
 	QuestComponent = CreateDefaultSubobject<UMMOQuestComponent>(TEXT("QuestComponent"));
 	PartyComponent = CreateDefaultSubobject<UMMOPartyComponent>(TEXT("PartyComponent"));
 	TradeComponent = CreateDefaultSubobject<UMMOTradeComponent>(TEXT("TradeComponent"));
+	ClanComponent = CreateDefaultSubobject<UMMOClanComponent>(TEXT("ClanComponent"));
 
 	// Saldiri animasyonlari. Sira onemli: 0..2 = yakin dovus varyasyonlari, 3 = buyu okuma.
 	// Kilic savurma Mixamo'dan alinip Manny iskeletine retarget edildi (RT_ onekli).
@@ -455,6 +457,10 @@ bool AMMOCharacter::SaveCharacterForTravel()
 	{
 		QuestComponent->FillSaveData(D);
 	}
+	if (ClanComponent)
+	{
+		ClanComponent->FillSaveData(D);
+	}
 	D.MapName = UGameplayStatics::GetCurrentLevelName(this, true);
 	D.Location = GetActorLocation();
 	D.Rotation = GetActorRotation();
@@ -522,6 +528,10 @@ bool AMMOCharacter::LoadCharacter()
 	if (QuestComponent)
 	{
 		QuestComponent->ApplySaveData(D);
+	}
+	if (ClanComponent)
+	{
+		ClanComponent->ApplySaveData(D);
 	}
 
 	// Eski/bozuk kayit koordinati harita disinda, boslukta veya navmesh disinda olabilir.

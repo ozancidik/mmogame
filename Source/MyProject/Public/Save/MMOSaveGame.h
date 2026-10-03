@@ -96,6 +96,13 @@ struct FMMOCharacterSaveData
 	UPROPERTY(SaveGame)
 	TArray<FName> CompletedQuests;
 
+	// Klan (karakter basina). Eski kayitlarda bos/false gelir.
+	UPROPERTY(SaveGame)
+	FString ClanName;
+
+	UPROPERTY(SaveGame)
+	bool bClanLeader = false;
+
 	// Konum
 	// Eski kayitlarda bos gelir; yeni kayitlarda konumu hangi haritada aldigimizi tutar.
 	UPROPERTY(SaveGame)

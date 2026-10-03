@@ -26,6 +26,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
+#include "Components/MMOClanComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -145,7 +146,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
 		LastChatServerTime = Now;
-		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /yardim"), 2);
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
@@ -198,6 +199,78 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		{
 			ClientReceiveChat(FString(), TEXT("Kullanim: /trade, /trade kabul, /trade iptal"), 2);
 		}
+		return;
+	}
+	// Klan: "/klan kur <ad>", "/klan davet", "/klan kabul", "/klan ayril", "/klan at <isim>", "/klan liste".
+	if (Msg.Equals(TEXT("/klan"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/klan "), ESearchCase::IgnoreCase))
+	{
+		LastChatServerTime = Now;
+		UMMOClanComponent* Clan = nullptr;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			Clan = Me->GetClanComponent();
+		}
+		const FString Rest = Msg.RightChop(5).TrimStartAndEnd();
+		FString Sub = Rest;
+		FString Arg;
+		Rest.Split(TEXT(" "), &Sub, &Arg);
+		Arg = Arg.TrimStartAndEnd();
+		if (!Clan)
+		{
+			ClientReceiveChat(FString(), TEXT("Klan su an kullanilamaz."), 2);
+		}
+		else if (Sub.Equals(TEXT("kur"), ESearchCase::IgnoreCase))
+		{
+			Clan->CmdCreate(Arg);
+		}
+		else if (Sub.Equals(TEXT("davet"), ESearchCase::IgnoreCase))
+		{
+			Clan->CmdInvite();
+		}
+		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase))
+		{
+			Clan->CmdAccept();
+		}
+		else if (Sub.Equals(TEXT("ayril"), ESearchCase::IgnoreCase))
+		{
+			Clan->CmdLeave();
+		}
+		else if (Sub.Equals(TEXT("at"), ESearchCase::IgnoreCase))
+		{
+			Clan->CmdKick(Arg);
+		}
+		else if (Sub.Equals(TEXT("liste"), ESearchCase::IgnoreCase))
+		{
+			Clan->CmdList();
+		}
+		else
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /klan kur ad, /klan davet, /klan kabul, /klan ayril, /klan at isim, /klan liste"), 2);
+		}
+		return;
+	}
+	// Klan sohbeti: "/g mesaj" (yalniz ayni klan adindaki cevrimici oyunculara).
+	if (Msg.Equals(TEXT("/g"), ESearchCase::IgnoreCase))
+	{
+		return; // bos klan mesaji: genel sohbete "/g" olarak sizmasin
+	}
+	if (Msg.StartsWith(TEXT("/g "), ESearchCase::IgnoreCase))
+	{
+		const FString ClanText = Msg.RightChop(3).TrimStart().Left(120);
+		if (ClanText.IsEmpty())
+		{
+			return;
+		}
+		LastChatServerTime = Now;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			if (UMMOClanComponent* Clan = Me->GetClanComponent())
+			{
+				Clan->CmdChat(ClanText);
+				return;
+			}
+		}
+		ClientReceiveChat(FString(), TEXT("Klan su an kullanilamaz."), 2);
 		return;
 	}
 	if (Msg.StartsWith(TEXT("/p "), ESearchCase::IgnoreCase))
@@ -312,6 +385,11 @@ void AMMOPlayerController::ClientReceiveChat_Implementation(const FString& Sende
 	{
 		Col = FLinearColor(1.f, 0.55f, 0.85f);
 		Line = FString::Printf(TEXT("[%s adli oyuncuya] %s"), *Sender, *Message);
+	}
+	else if (Channel == 5)
+	{
+		Col = FLinearColor(0.4f, 0.9f, 0.4f);
+		Line = FString::Printf(TEXT("[Klan] %s: %s"), *Sender, *Message);
 	}
 	else
 	{
