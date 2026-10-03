@@ -698,8 +698,8 @@ birbirini izler. Yan görevler zinciri kilitlemez.*
 - **Haydutları Temizle** *(Q_Bandits)* — "Kırık Zincir'in artıkları ticaret yolunu
   kesiyor. Çoğu Uzun Kış'ta her şeyini kaybetmiş adamlar; yine de kervana el
   kaldıranın hakkı dörttür. Dördünü temizle."
-  - *Dönüşte:* "Yol açıldı, kervanlar yeniden gelir. Acıma çok yersiz değil,
-    ama yol da yolcudur."
+  - *Dönüşte:* "Yol açıldı, kervanlar yeniden gelir. Onlara kin tutma, evlat;
+    yoksulluk da bir fısıltıdır."
 - **Ork Reisini Yen** *(Q_Boss)* — "Dağınık orkları tek bir yumruk altında toplayan
   biri var: Ork Reisi. Fısıltının ilk büyük kılıcı o. Onu devir, evlat; Akçakule'ye
   yürüyüşü başsız kalsın."
