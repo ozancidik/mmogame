@@ -140,6 +140,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Warehouse")
 	void WithdrawEquipment(int32 InstanceId);
 
+	// --- Ticaret yardimcilari (UMMOTradeComponent kullanir; sadece otorite) ---
+	/** Cantadan InstanceId ile ekipmani cikarir ve Out'a yazar. Bulunamazsa false. */
+	bool TakeEquipmentByInstanceId(int32 InstanceId, FMMOEquipmentInstance& Out);
+
+	/** Baska oyuncudan gelen ekipmani YENI bir InstanceId ile cantaya ekler (kimlik cakismasi/cogaltma olmasin). Canta doluysa false. */
+	bool ReceiveTradedEquipment(const FMMOEquipmentInstance& Src);
+
 	// Kalicilik: envanter/ekipman/cuzdan verisini kayda yazar / kayittan uygular (sadece otorite).
 	void FillSaveData(struct FMMOCharacterSaveData& Out) const;
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);

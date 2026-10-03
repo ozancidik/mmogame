@@ -11,6 +11,7 @@ class UMMOInventoryComponent;
 class UMMOSkillComponent;
 class UMMOQuestComponent;
 class UMMOPartyComponent;
+class UMMOTradeComponent;
 
 /**
  * MMO karakterleri (oyuncu ve NPC/mob) için C++ temel sınıfı.
@@ -40,6 +41,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
 	TObjectPtr<UMMOPartyComponent> PartyComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
+	TObjectPtr<UMMOTradeComponent> TradeComponent;
+
 	// Unreal'in standart hasar akışı (UGameplayStatics::ApplyDamage) buraya düşer;
 	// biz de stat bileşenine yönlendiririz. Sadece otoritede etki eder.
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
@@ -59,6 +63,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOPartyComponent* GetPartyComponent() const { return PartyComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MMO")
+	UMMOTradeComponent* GetTradeComponent() const { return TradeComponent; }
 
 	// Sinif degistirme konsol komutu: "MMOClass savasci|okcu|buyucu|rahip"
 	// (Ingilizce warrior|archer|mage|priest de calisir).
@@ -220,6 +227,22 @@ public:
 
 	UFUNCTION(Exec)
 	void MMOPartyKick();     // secili parti uyesini partiden cikar (sadece lider)
+
+	// --- Oyuncular arasi ticaret konsol komutlari ---
+	UFUNCTION(Exec)
+	void MMOTrade();         // en yakin oyuncuya ticaret daveti gonder
+
+	UFUNCTION(Exec)
+	void MMOTradeAccept();   // gelen ticaret davetini kabul et
+
+	UFUNCTION(Exec)
+	void MMOTradeCancel();   // ticareti iptal et
+
+	UFUNCTION(Exec)
+	void MMOTradeGold(int32 Amount);   // teklifteki altini ayarla
+
+	UFUNCTION(Exec)
+	void MMOTradeConfirm();  // teklifi onayla
 
 	// Bir ana stata 1 puan harcar (stat penceresi / konsol). Istemciden -> Server RPC.
 	// StatName: "STR"/"DEX"/"INT"/"VIT" veya tam ad.

@@ -7,6 +7,7 @@
 #include "Components/MMOSkillComponent.h"
 #include "Components/MMOQuestComponent.h"
 #include "Components/MMOPartyComponent.h"
+#include "Components/MMOTradeComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
@@ -49,6 +50,7 @@ AMMOCharacter::AMMOCharacter()
 	SkillComponent = CreateDefaultSubobject<UMMOSkillComponent>(TEXT("SkillComponent"));
 	QuestComponent = CreateDefaultSubobject<UMMOQuestComponent>(TEXT("QuestComponent"));
 	PartyComponent = CreateDefaultSubobject<UMMOPartyComponent>(TEXT("PartyComponent"));
+	TradeComponent = CreateDefaultSubobject<UMMOTradeComponent>(TEXT("TradeComponent"));
 
 	// Saldiri animasyonlari. Sira onemli: 0..2 = yakin dovus varyasyonlari, 3 = buyu okuma.
 	// Kilic savurma Mixamo'dan alinip Manny iskeletine retarget edildi (RT_ onekli).
@@ -1099,6 +1101,46 @@ void AMMOCharacter::MMOPartyKick()
 	}
 
 	PartyComponent->RequestKick(Target);
+}
+
+void AMMOCharacter::MMOTrade()
+{
+	if (TradeComponent)
+	{
+		TradeComponent->RequestInviteNearest();
+	}
+}
+
+void AMMOCharacter::MMOTradeAccept()
+{
+	if (TradeComponent)
+	{
+		TradeComponent->RequestAccept();
+	}
+}
+
+void AMMOCharacter::MMOTradeCancel()
+{
+	if (TradeComponent)
+	{
+		TradeComponent->RequestCancel();
+	}
+}
+
+void AMMOCharacter::MMOTradeGold(int32 Amount)
+{
+	if (TradeComponent)
+	{
+		TradeComponent->RequestSetGold(Amount);
+	}
+}
+
+void AMMOCharacter::MMOTradeConfirm()
+{
+	if (TradeComponent)
+	{
+		TradeComponent->RequestConfirm();
+	}
 }
 
 namespace

@@ -697,6 +697,41 @@ void UMMOInventoryComponent::ServerWithdrawEquipment_Implementation(int32 Instan
 	WithdrawEquipment(InstanceId);
 }
 
+bool UMMOInventoryComponent::TakeEquipmentByInstanceId(int32 InstanceId, FMMOEquipmentInstance& Out)
+{
+	if (!HasAuthorityInternal() || InstanceId == 0)
+	{
+		return false;
+	}
+	const int32 Index = EquipmentBag.IndexOfByPredicate([InstanceId](const FMMOEquipmentInstance& I)
+	{
+		return I.InstanceId == InstanceId;
+	});
+	if (Index == INDEX_NONE || !EquipmentBag[Index].IsValidInstance())
+	{
+		return false;
+	}
+	Out = EquipmentBag[Index];
+	EquipmentBag.RemoveAt(Index);
+	OnInventoryChanged.Broadcast();
+	return true;
+}
+
+bool UMMOInventoryComponent::ReceiveTradedEquipment(const FMMOEquipmentInstance& Src)
+{
+	if (!HasAuthorityInternal() || !Src.IsValidInstance() || !FMMOItemDatabase::Find(Src.ItemId)
+		|| EquipmentBag.Num() >= MaxBagSize)
+	{
+		return false;
+	}
+	FMMOEquipmentInstance Inst = Src;
+	// Gonderenin kimligi bu oyuncunun mevcut bir kimligiyle cakisabilir: her zaman yeni kimlik ver.
+	Inst.InstanceId = NextInstanceId++;
+	EquipmentBag.Add(Inst);
+	OnInventoryChanged.Broadcast();
+	return true;
+}
+
 void UMMOInventoryComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 {
 	Out.Gold = Gold;

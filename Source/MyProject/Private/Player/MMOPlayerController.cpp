@@ -25,6 +25,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/MMOPartyComponent.h"
+#include "Components/MMOTradeComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -165,6 +166,38 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 			++Count;
 		}
 		ClientReceiveChat(FString(), FString::Printf(TEXT("Cevrimici (%d): %s"), Count, *List), 2);
+		return;
+	}
+	// Ticaret: "/trade" (en yakin oyuncuya davet), "/trade kabul", "/trade iptal".
+	if (Msg.Equals(TEXT("/trade"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/trade "), ESearchCase::IgnoreCase))
+	{
+		LastChatServerTime = Now;
+		UMMOTradeComponent* Trade = nullptr;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			Trade = Me->GetTradeComponent();
+		}
+		const FString Sub = Msg.RightChop(6).TrimStartAndEnd();
+		if (!Trade)
+		{
+			ClientReceiveChat(FString(), TEXT("Ticaret su an kullanilamaz."), 2);
+		}
+		else if (Sub.IsEmpty())
+		{
+			Trade->RequestInviteNearest();
+		}
+		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
+		{
+			Trade->RequestAccept();
+		}
+		else if (Sub.Equals(TEXT("iptal"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("cancel"), ESearchCase::IgnoreCase))
+		{
+			Trade->RequestCancel();
+		}
+		else
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /trade, /trade kabul, /trade iptal"), 2);
+		}
 		return;
 	}
 	if (Msg.StartsWith(TEXT("/p "), ESearchCase::IgnoreCase))
@@ -485,7 +518,7 @@ bool AMMOPlayerController::IsAnyUIWindowOpen() const
 {
 	if (const AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		return H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen() || H->IsWarehouseOpen();
+		return H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen() || H->IsWarehouseOpen() || H->IsTradeOpen();
 	}
 	return false;
 }

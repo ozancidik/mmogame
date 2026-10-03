@@ -6,6 +6,7 @@
 #include "Characters/MMOMobArchetype.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOPartyComponent.h"
+#include "Components/MMOTradeComponent.h"
 #include "Effects/MMOEffectDatabase.h"
 #include "Items/MMOConsumableTypes.h"
 #include "Components/MMOInventoryComponent.h"
@@ -149,6 +150,10 @@ void AMMOHUD::DrawHUD()
 	{
 		DrawWarehouse(MMOChar);
 	}
+	if (IsTradeOpen())
+	{
+		DrawTrade(MMOChar);
+	}
 	if (bStatWindowOpen)
 	{
 		DrawStatWindow(MMOChar);
@@ -157,7 +162,7 @@ void AMMOHUD::DrawHUD()
 	// Acik pencerelerin basliklarini kapatmamasi icin ipucunu pencereler kapanana kadar gizle.
 	// Secim yapilmadiysa pencere kapatildiginda tekrar gorunur.
 	const bool bAnyWindowOpen = bQuestWindowOpen || bSkillBookOpen || bInventoryOpen ||
-		bShopOpen || bStatWindowOpen || bWarehouseOpen;
+		bShopOpen || bStatWindowOpen || bWarehouseOpen || IsTradeOpen();
 	ZoneTravelRect = FBox2D(ForceInit);
 	const AMMOPlayerController* LocalPC = Cast<AMMOPlayerController>(GetOwningPlayerController());
 	const FString MapName = GetWorld() ? GetWorld()->GetMapName() : FString();
@@ -1674,6 +1679,203 @@ bool AMMOHUD::HandleWarehouseClick(const FVector2D& Pos)
 	return true;
 }
 
+namespace
+{
+	// Ticaret penceresi altin dugmeleri: son dugme (indeks = sayi) altini sifirlar.
+	const int32 TradeGoldDeltas[] = { 100, 1000, 10000, 100000 };
+	const TCHAR* TradeGoldLabels[] = { TEXT("+100"), TEXT("+1K"), TEXT("+10K"), TEXT("+100K"), TEXT("Sifirla") };
+}
+
+bool AMMOHUD::IsTradeOpen() const
+{
+	const AMMOCharacter* Char = Cast<AMMOCharacter>(GetOwningPawn());
+	const UMMOTradeComponent* Trade = Char ? Char->GetTradeComponent() : nullptr;
+	return Trade && Trade->IsTrading();
+}
+
+void AMMOHUD::DrawTrade(AMMOCharacter* PlayerChar)
+{
+	TradeBagRegions.Reset();
+	TradeOfferRegions.Reset();
+	TradeGoldRegions.Reset();
+	if (!Canvas || !PlayerChar)
+	{
+		return;
+	}
+	UMMOInventoryComponent* Inv = PlayerChar->GetInventory();
+	UMMOTradeComponent* Trade = PlayerChar->GetTradeComponent();
+	if (!Inv || !Trade)
+	{
+		return;
+	}
+
+	const float PW = 700.f;
+	const float PH = 380.f;
+	const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
+	const float PY = 90.f;
+	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
+	DrawRect(FLinearColor(0.3f, 0.75f, 0.45f, 0.95f), PX, PY, PW, 4.f);
+	TradeRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	TradeCloseRect = DrawCloseButton(PX, PY, PW);
+
+	DrawText(FString::Printf(TEXT("TICARET - %s"), *Trade->PartnerName), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.4f);
+	DrawText(TEXT("Cantandan esyaya tikla: teklife eklenir. Teklif degisirse iki onay da sifirlanir. X = iptal."),
+		FLinearColor(0.7f, 0.7f, 0.75f), PX + 14.f, PY + 38.f, nullptr, 0.8f);
+
+	const float RowH = 18.f;
+	const float X1 = PX + 14.f;
+	const float W1 = 220.f;
+	const float X2 = PX + 248.f;
+	const float W2 = 210.f;
+	const float X3 = PX + 472.f;
+	const float W3 = 214.f;
+	const float StartY = PY + 90.f;
+
+	auto DrawEntry = [&](const FMMOEquipmentInstance& Inst, float X, float Y, float W, TArray<FMMOClickRegion>* Out)
+	{
+		const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
+		if (!Def)
+		{
+			return;
+		}
+		DrawRect(FLinearColor(0.12f, 0.14f, 0.12f, 0.9f), X, Y, W, RowH - 2.f);
+		if (Out)
+		{
+			FMMOClickRegion R;
+			R.Slot = Inst.InstanceId;
+			R.Rect = FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + RowH - 2.f));
+			Out->Add(R);
+		}
+		DrawText(FString::Printf(TEXT("[%s] %s +%d"), *FMMOItemDatabase::GetRarityName(Inst.Rarity), *Def->Name, Inst.Plus),
+			FMMOItemDatabase::GetRarityColor(Inst.Rarity), X + 6.f, Y + 2.f, nullptr, 0.65f);
+	};
+
+	// Sol: canta (zaten teklifteki esyalar gizlenir).
+	DrawText(FString::Printf(TEXT("CANTA %d/%d"), Inv->EquipmentBag.Num(), UMMOInventoryComponent::MaxBagSize),
+		FLinearColor(1.f, 0.85f, 0.4f), X1, PY + 68.f, nullptr, 0.9f);
+	int32 BagRow = 0;
+	for (const FMMOEquipmentInstance& Inst : Inv->EquipmentBag)
+	{
+		const bool bOffered = Trade->MyOffer.Items.ContainsByPredicate([&Inst](const FMMOEquipmentInstance& O)
+		{
+			return O.InstanceId == Inst.InstanceId;
+		});
+		if (bOffered)
+		{
+			continue;
+		}
+		DrawEntry(Inst, X1, StartY + BagRow * RowH, W1, &TradeBagRegions);
+		++BagRow;
+	}
+	if (BagRow == 0)
+	{
+		DrawText(TEXT("(teklif edilecek ekipman yok)"), FLinearColor(0.6f, 0.6f, 0.6f), X1, StartY, nullptr, 0.72f);
+	}
+
+	// Orta: senin teklifin.
+	DrawText(TEXT("SENIN TEKLIFIN (tikla: cikar)"), FLinearColor(0.6f, 0.9f, 0.6f), X2, PY + 68.f, nullptr, 0.9f);
+	for (int32 i = 0; i < Trade->MyOffer.Items.Num(); ++i)
+	{
+		DrawEntry(Trade->MyOffer.Items[i], X2, StartY + i * RowH, W2, &TradeOfferRegions);
+	}
+	const float GoldY = StartY + UMMOTradeComponent::MaxOfferItems * RowH + 8.f;
+	DrawText(FString::Printf(TEXT("Altin: %d  (cuzdan: %d)"), Trade->MyOffer.Gold, Inv->Gold),
+		FLinearColor(1.f, 0.85f, 0.3f), X2, GoldY, nullptr, 0.8f);
+	{
+		const float BtnW = 38.f;
+		const float BtnH = 20.f;
+		const float BtnY = GoldY + 22.f;
+		for (int32 b = 0; b < 5; ++b)
+		{
+			const float BX = X2 + b * (BtnW + 4.f);
+			DrawRect(FLinearColor(0.2f, 0.18f, 0.08f, 0.95f), BX, BtnY, BtnW, BtnH);
+			DrawText(TradeGoldLabels[b], FLinearColor(1.f, 0.9f, 0.5f), BX + 3.f, BtnY + 4.f, nullptr, 0.6f);
+			FMMOClickRegion R;
+			R.Slot = b;
+			R.Rect = FBox2D(FVector2D(BX, BtnY), FVector2D(BX + BtnW, BtnY + BtnH));
+			TradeGoldRegions.Add(R);
+		}
+	}
+	DrawText(Trade->MyOffer.bConfirmed ? TEXT("Sen: ONAYLADIN") : TEXT("Sen: onay bekliyor"),
+		Trade->MyOffer.bConfirmed ? FLinearColor(0.4f, 1.f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f),
+		X2, GoldY + 54.f, nullptr, 0.85f);
+
+	// Sag: karsi tarafin teklifi.
+	DrawText(FString::Printf(TEXT("%s TEKLIFI"), *Trade->PartnerName.ToUpper()), FLinearColor(0.6f, 0.8f, 1.f), X3, PY + 68.f, nullptr, 0.9f);
+	for (int32 i = 0; i < Trade->TheirOffer.Items.Num(); ++i)
+	{
+		DrawEntry(Trade->TheirOffer.Items[i], X3, StartY + i * RowH, W3, nullptr);
+	}
+	DrawText(FString::Printf(TEXT("Altin: %d"), Trade->TheirOffer.Gold), FLinearColor(1.f, 0.85f, 0.3f), X3, GoldY, nullptr, 0.8f);
+	DrawText(Trade->TheirOffer.bConfirmed ? TEXT("Karsi taraf: ONAYLADI") : TEXT("Karsi taraf: onay bekliyor"),
+		Trade->TheirOffer.bConfirmed ? FLinearColor(0.4f, 1.f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f),
+		X3, GoldY + 54.f, nullptr, 0.85f);
+
+	// Alt dugmeler: onayla / iptal.
+	const float BtnY = PY + PH - 46.f;
+	TradeConfirmRect = FBox2D(FVector2D(X2, BtnY), FVector2D(X2 + 200.f, BtnY + 34.f));
+	DrawRect(Trade->MyOffer.bConfirmed ? FLinearColor(0.12f, 0.12f, 0.14f, 0.95f) : FLinearColor(0.1f, 0.4f, 0.18f, 0.95f), X2, BtnY, 200.f, 34.f);
+	DrawText(Trade->MyOffer.bConfirmed ? TEXT("Onaylandi") : TEXT("ONAYLA"), FLinearColor::White, X2 + 56.f, BtnY + 8.f, nullptr, 1.05f);
+	TradeCancelRect = FBox2D(FVector2D(X3, BtnY), FVector2D(X3 + 200.f, BtnY + 34.f));
+	DrawRect(FLinearColor(0.45f, 0.12f, 0.12f, 0.95f), X3, BtnY, 200.f, 34.f);
+	DrawText(TEXT("IPTAL"), FLinearColor::White, X3 + 72.f, BtnY + 8.f, nullptr, 1.05f);
+}
+
+bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
+{
+	AMMOCharacter* Char = Cast<AMMOCharacter>(GetOwningPawn());
+	UMMOTradeComponent* Trade = Char ? Char->GetTradeComponent() : nullptr;
+	if (!Trade)
+	{
+		return true;
+	}
+	if (TradeConfirmRect.IsInside(Pos))
+	{
+		Trade->RequestConfirm();
+		return true;
+	}
+	if (TradeCancelRect.IsInside(Pos))
+	{
+		Trade->RequestCancel();
+		return true;
+	}
+	for (const FMMOClickRegion& R : TradeBagRegions)
+	{
+		if (R.Rect.IsInside(Pos))
+		{
+			Trade->RequestAddItem(R.Slot);
+			return true;
+		}
+	}
+	for (const FMMOClickRegion& R : TradeOfferRegions)
+	{
+		if (R.Rect.IsInside(Pos))
+		{
+			Trade->RequestRemoveItem(R.Slot);
+			return true;
+		}
+	}
+	for (const FMMOClickRegion& R : TradeGoldRegions)
+	{
+		if (R.Rect.IsInside(Pos))
+		{
+			const int32 NumDeltas = UE_ARRAY_COUNT(TradeGoldDeltas);
+			if (R.Slot >= NumDeltas)
+			{
+				Trade->RequestSetGold(0);
+			}
+			else
+			{
+				// Sunucu cuzdana gore tekrar sikistirir; burada yalnizca tasmayi onle.
+				const int64 Next = (int64)Trade->MyOffer.Gold + TradeGoldDeltas[R.Slot];
+				Trade->RequestSetGold((int32)FMath::Min<int64>(Next, MAX_int32));
+			}
+			return true;
+		}
+	}
+	return true;
+}
+
 bool AMMOHUD::HandleShopClick(const FVector2D& Pos)
 {
 	if (!bShopOpen)
@@ -2400,6 +2602,22 @@ bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)
 		if (StatCloseRect.IsInside(Pos)) { bStatWindowOpen = false; } else { HandleStatClick(Pos); }
 		return true;
 	}
+	if (IsTradeOpen() && TradeRect.IsInside(Pos))
+	{
+		if (TradeCloseRect.IsInside(Pos))
+		{
+			// X = ticareti iptal et.
+			if (AMMOCharacter* TC = Cast<AMMOCharacter>(GetOwningPawn()))
+			{
+				if (UMMOTradeComponent* T = TC->GetTradeComponent()) { T->RequestCancel(); }
+			}
+		}
+		else
+		{
+			HandleTradeClick(Pos);
+		}
+		return true;
+	}
 	if (bWarehouseOpen && WarehouseRect.IsInside(Pos))
 	{
 		if (WarehouseCloseRect.IsInside(Pos)) { bWarehouseOpen = false; } else { HandleWarehouseClick(Pos); }
@@ -2448,6 +2666,7 @@ bool AMMOHUD::HandleWindowRightClick(const FVector2D& Pos)
 {
 	// Sag tik: skill kitabinda skili hotbara ata; envanterde ekipmani yukselt (imlecin ustundeki pencereye gore).
 	if (bStatWindowOpen && StatRect.IsInside(Pos)) { return true; }
+	if (IsTradeOpen() && TradeRect.IsInside(Pos)) { return true; }
 	if (bWarehouseOpen && WarehouseRect.IsInside(Pos)) { return true; }
 	if (bShopOpen && ShopRect.IsInside(Pos)) { return true; }
 	if (bInventoryOpen && InventoryRect.IsInside(Pos)) { HandleInventoryRightClick(Pos); return true; }

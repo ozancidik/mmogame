@@ -2812,3 +2812,25 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 - [ ] **Lv79 → Lv80 geçişi:** Lv79'da öldürülen mob son seviyeyi atlatırsa yazı çıkmalı, Lv80'de sonraki öldürmelerde çıkmamalı; XP barı Lv80'de sıfırlanmış kalmalı.
 - [ ] **Çok oyunculu görünürlük:** İstemci mob öldürdüğünde yazı yalnız XP alan oyuncuların ekranında çıkmalı; menzil dışı (3000u+) parti üyesinde çıkmamalı.
 - [ ] **Q_AbyssDescent sınırı:** Lv77'de Gezgin kes (yüzdesiz), Lv78'de (%90). Görev sayacı iki durumda da aynı hızla artmalı.
+
+# Oyuncular arası ticaret — 2026-10-03
+
+> **Derleme:** `Result: Succeeded`. Yeni `UMMOTradeComponent` (sunucu-otoriter, durum yalnız iki tarafa replike), `AMMOCharacter`'a takıldı. Komutlar: `MMOTrade`, `MMOTradeAccept`, `MMOTradeCancel`, `MMOTradeGold <n>`, `MMOTradeConfirm`; sohbette `/trade`, `/trade kabul`, `/trade iptal`. **İki oyunculu (host + istemci) test gerekir**; tek kişiyle yalnız pencere görünmez.
+
+- [ ] **Davet:** İki oyuncu 600u içinde. A sohbette `/trade` yazar → A'ya "ticaret daveti gönderildi", B'ye "A seninle ticaret etmek istiyor. Kabul: /trade kabul" sistem satırı. 601u+ uzakta `/trade` → "Yakında ticaret edilecek oyuncu yok". 3 sn içinde ikinci `/trade` sessizce yok sayılmalı.
+- [ ] **Kabul:** B `/trade kabul` (ya da konsol `MMOTradeAccept`) → iki ekranda da TİCARET penceresi açılır (üstte karşı tarafın adı). 30 sn'den eski davet "süresi doldu" demeli; davet yokken kabul "Bekleyen ticaret daveti yok".
+- [ ] **Pencere:** Açıkken WASD/zıplama/tıkla-git kilitli (diğer pencereler gibi). Sol: çanta (teklifteki eşyalar gizlenir); orta: senin teklifin; sağ: karşı tarafın teklifi.
+- [ ] **Eşya teklifi:** Çantadan eşyaya tıkla → ortada belirir, karşı tarafta sağ sütunda anında görünür. Teklifteki eşyaya tıkla → çıkar. 5. eşya eklenmeye çalışılınca "En fazla 4 ekipman" mesajı. Hızlı arka arkaya tıklama (0.3 sn içinde) bazı tıklamaları yutabilir (rate limit; beklenen).
+- [ ] **Altın:** `+100/+1K/+10K/+100K` düğmeleri toplar, `Sifirla` sıfırlar; cüzdandan fazlası otomatik cüzdana kırpılır (`MMOTradeGold 99999999` ile de dene). Karşı tarafta "Altın: N" güncellenir.
+- [ ] **Onay sıfırlama:** A onaylar ("Sen: ONAYLADIN", B'de "Karşı taraf: ONAYLADI"). Sonra B teklifte eşya/altın değiştirir → iki onay da sıfırlanmalı. A onaylayıp B'nin değiştirmesini ve tersini dene.
+- [ ] **Başarılı takas:** İki tarafta da teklif var, ikisi de ONAYLA → pencereler kapanır, "Ticaret tamamlandı." Eşyalar karşı çantaya geçmiş (Plus/nadirlik korunmuş), gönderenin çantasından silinmiş; altınlar karşılıklı aktarılmış. Çıkıştan sonra tekrar girince (kayıt) durum aynı olmalı.
+- [ ] **Boş takas:** İki teklif de boşken ONAYLA → "Teklifte hiçbir şey yok", takas tamamlanmamalı.
+- [ ] **Çanta dolu:** B'nin çantası 12/12, A tek eşya verip hiçbir şey almıyor → onayda "bir tarafın çantasında yer yok", takas iptal, kimse bir şey kaybetmemeli. B de bir eşya verirse (net yer açılır) takas başarılı olmalı.
+- [ ] **Yeniden doğrulama (kötüye kullanım):** A eşyayı teklif edip onayladıktan sonra, B onaylamadan önce A (a) eşyayı satıcıya satsın, (b) kuşansın, (c) +1 yükseltmeyi denesin, (d) altını harcasın. B onaylayınca takas "teklif edilen eşya veya altın değişti" ile iptal olmalı; hiçbir eşya çoğalmamalı/kaybolmamalı.
+- [ ] **İptal:** `IPTAL` düğmesi, `X`, `/trade iptal`, `MMOTradeCancel` — herhangi biri iki tarafta da pencereyi kapatmalı ("Ticaret iptal edildi."), hiçbir şey taşınmamalı.
+- [ ] **Uzaklaşma:** Ticaret açıkken biri 800u+ uzaklaşırsa (ya da ışınlanırsa) ~0.25 sn içinde "oyuncular birbirinden uzaklaştı" ile iptal.
+- [ ] **Ölüm:** Ticaret açıkken bir taraf ölürse iptal ("bir taraf öldü"). Ölü oyuncu `/trade` ile davet edememeli, ölü hedef davet alamamalı.
+- [ ] **Bağlantı / bölge:** Ticaret açıkken istemci oyundan çıkarsa ya da host bölge değiştirirse (Summer↔Winter) diğer tarafta pencere kapanmalı, takılı kalmamalı.
+- [ ] **Meşgul:** A–B ticarette iken C, A'ya `/trade` atsın → "Oyuncu şu an başka bir ticarette". C'nin `/trade kabul` ile ticarete sızamaması gerekir. Ticaretteyken `/trade` atan taraf "Zaten bir ticaretin içindesin" görmeli.
+- [ ] **Gizlilik (replikasyon):** Üçüncü bir oyuncu (C) iki tarafın teklifini görememeli (pencere yok); teklif durumu yalnız A ve B'de.
+- [ ] **Çakışan InstanceId:** İki karakterde de aynı InstanceId'li eşya olacak şekilde (ör. ikisi de yeni karakter) takas et; alıcıdaki mevcut eşya silinmemeli/üzerine yazılmamalı, gelen eşya yeni kimlik almalı. Gelen eşyayı kuşan/sat/yükselt sorunsuz çalışmalı.

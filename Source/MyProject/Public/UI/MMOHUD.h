@@ -95,6 +95,9 @@ public:
 	void OpenWarehouse();
 	bool IsWarehouseOpen() const { return bWarehouseOpen; }
 	void CloseWarehouse() { bWarehouseOpen = false; }
+
+	// Ticaret penceresi: yerel oyuncunun ticaret bileseni aktifken (replike durumdan) acik sayilir.
+	bool IsTradeOpen() const;
 	bool HandleShopClick(const FVector2D& Pos);
 
 	// --- Gorev penceresi (gorevli NPC'ye tiklaninca acilir) ---
@@ -119,7 +122,7 @@ public:
 	// Listen server host'unun tum oturumu diger bolgeye tasima dugmesi.
 	bool HandleZoneTravelClick(const FVector2D& Pos);
 	// Herhangi bir pencere acik mi?
-	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen || bWarehouseOpen; }
+	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen || bWarehouseOpen || IsTradeOpen(); }
 
 protected:
 	// Sahnedeki dusmanlarin tepesine saglik bari cizer (dunya->ekran projeksiyonu).
@@ -166,6 +169,10 @@ protected:
 	void DrawWarehouse(class AMMOCharacter* PlayerChar);
 	bool HandleWarehouseClick(const FVector2D& Pos);
 
+	// Oyuncular arasi ticaret penceresi (teklif ekle/cikar, altin, onayla, iptal).
+	void DrawTrade(class AMMOCharacter* PlayerChar);
+	bool HandleTradeClick(const FVector2D& Pos);
+
 	// Sahnedeki saticilarin/gorevlilerin tepesine isim plakasi.
 	void DrawVendorNameplates();
 
@@ -204,6 +211,15 @@ protected:
 	FBox2D WarehouseCloseRect = FBox2D(ForceInit);
 	TArray<FMMOClickRegion> WarehouseBagRegions;
 	TArray<FMMOClickRegion> WarehouseStoreRegions;
+
+	// Ticaret penceresi cerceveleri + tiklama bolgeleri (Slot = InstanceId; altin dugmelerinde delta indeksi).
+	FBox2D TradeRect = FBox2D(ForceInit);
+	FBox2D TradeCloseRect = FBox2D(ForceInit);
+	FBox2D TradeConfirmRect = FBox2D(ForceInit);
+	FBox2D TradeCancelRect = FBox2D(ForceInit);
+	TArray<FMMOClickRegion> TradeBagRegions;
+	TArray<FMMOClickRegion> TradeOfferRegions;
+	TArray<FMMOClickRegion> TradeGoldRegions;
 	bool bQuestWindowOpen = false;
 	bool bStatWindowOpen = false;
 
