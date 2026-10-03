@@ -109,6 +109,14 @@ void AMMOPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void AMMOPlayerController::SeamlessTravelTo(APlayerController* NewPC)
+{
+	// Seamless travel'da kontrolcu EndPlay almayabilir; acik sohbet kutusu yeni haritada
+	// asili kalip hareketi kilitlemesin.
+	CloseChatInput();
+	Super::SeamlessTravelTo(NewPC);
+}
+
 void AMMOPlayerController::Say(const FString& Message)
 {
 	ServerSendChat(Message);
@@ -129,6 +137,10 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 
 	FString Msg = Message.Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" ")).TrimStartAndEnd();
 	uint8 Channel = 0;
+	if (Msg.Equals(TEXT("/p"), ESearchCase::IgnoreCase))
+	{
+		return; // bos parti mesaji: genel sohbete "/p" olarak sizmasin
+	}
 	if (Msg.StartsWith(TEXT("/p "), ESearchCase::IgnoreCase))
 	{
 		Channel = 1;
@@ -398,7 +410,7 @@ bool AMMOPlayerController::IsAnyUIWindowOpen() const
 {
 	if (const AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		return H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen();
+		return H->IsSkillBookOpen() || H->IsInventoryOpen() || H->IsShopOpen() || H->IsQuestWindowOpen() || H->IsStatWindowOpen() || H->IsWarehouseOpen();
 	}
 	return false;
 }
@@ -771,6 +783,27 @@ void AMMOPlayerController::DrivePawnTowardActor(AActor* Goal)
 void AMMOPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+
+	// Depo penceresi: depocudan uzaklasinca (sunucu tasimayi reddeder) kendiliginden kapansin.
+	if (AMMOHUD* WH = Cast<AMMOHUD>(GetHUD()); WH && WH->IsWarehouseOpen())
+	{
+		bool bNear = false;
+		if (const APawn* WP = GetPawn())
+		{
+			for (TActorIterator<AMMOWarehouseNPC> It(GetWorld()); It; ++It)
+			{
+				if (FVector::DistSquared(WP->GetActorLocation(), It->GetActorLocation()) <= 700.f * 700.f)
+				{
+					bNear = true;
+					break;
+				}
+			}
+		}
+		if (!bNear)
+		{
+			WH->CloseWarehouse();
+		}
+	}
 
 	// Sohbet kutusu ac/kapa istekleri (callback/tus olayinin disinda guvenle).
 	if (bChatCloseRequested)

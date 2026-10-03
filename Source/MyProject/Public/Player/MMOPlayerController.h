@@ -52,6 +52,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void SeamlessTravelTo(APlayerController* NewPC) override;
 
 	UFUNCTION(Server, Reliable)
 	void ServerSendChat(const FString& Message);

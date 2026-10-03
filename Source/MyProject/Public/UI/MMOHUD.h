@@ -94,6 +94,7 @@ public:
 	// Depo penceresi (depocu NPC tiklaninca). Sol: canta -> depoya koy, sag: depo -> cantaya al.
 	void OpenWarehouse();
 	bool IsWarehouseOpen() const { return bWarehouseOpen; }
+	void CloseWarehouse() { bWarehouseOpen = false; }
 	bool HandleShopClick(const FVector2D& Pos);
 
 	// --- Gorev penceresi (gorevli NPC'ye tiklaninca acilir) ---
