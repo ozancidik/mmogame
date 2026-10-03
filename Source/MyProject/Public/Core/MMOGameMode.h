@@ -20,6 +20,16 @@ public:
 
 	virtual void StartPlay() override;
 
+	// Gelistirici araci: spawner dogrulamasini (zemin izi + navmesh) verilen konumda 64 kez calistirir ve
+	// sonucu "[MMOPROBE]" satiri olarak loglar. Smoke test (Scripts/SmokeTest.ps1 -Probe) kullanir.
+	// Konsol: MMOProbeSpawn X Y Z [Radius]. Yalniz sunucuda anlamlidir; oyunu etkilemez.
+	UFUNCTION(Exec)
+	void MMOProbeSpawn(float X, float Y, float Z, float Radius = 225.f);
+
+	// Z'yi kendisi bulur (yukaridan asagi ilk yuzey + 50) ve MMOProbeSpawn calistirir. Grid taramasi icin.
+	UFUNCTION(Exec)
+	void MMOProbeSurface(float X, float Y, float Radius = 225.f);
+
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);

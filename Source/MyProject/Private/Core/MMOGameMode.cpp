@@ -2,6 +2,8 @@
 
 #include "Core/MMOGameMode.h"
 #include "Core/MMOMobSpawner.h"
+#include "Characters/MMOMob.h"
+#include "Components/CapsuleComponent.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
@@ -22,6 +24,49 @@ AMMOGameMode::AMMOGameMode()
 	// Varsay�lan HUD'u MMO HUD'�m�z yap.
 	HUDClass = AMMOHUD::StaticClass();
 	bUseSeamlessTravel = true;
+}
+
+void AMMOGameMode::MMOProbeSpawn(float X, float Y, float Z, float Radius)
+{
+	UWorld* World = GetWorld();
+	const AMMOMob* MobDefaults = AMMOMob::StaticClass()->GetDefaultObject<AMMOMob>();
+	const UCapsuleComponent* Capsule = MobDefaults ? MobDefaults->GetCapsuleComponent() : nullptr;
+	if (!World || !Capsule || !HasAuthority())
+	{
+		return;
+	}
+	const float HalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+	constexpr int32 Samples = 64;
+	int32 Ok = 0;
+	AMMOMobSpawner::FSpawnProbeStats Stats;
+	for (int32 i = 0; i < Samples; ++i)
+	{
+		FVector Out;
+		if (AMMOMobSpawner::FindSafeSpawnLocation(World, nullptr, FVector(X, Y, Z), Radius, HalfHeight, 1, Out, Stats))
+		{
+			++Ok;
+		}
+	}
+	UE_LOG(LogTemp, Display, TEXT("[MMOPROBE] (%.0f,%.0f,%.0f) r=%.0f ok=%d/%d trace_miss=%d egim_yukseklik=%d [son zemin Z=%.1f nz=%.2f] nav=%d"),
+		X, Y, Z, Radius, Ok, Samples, Stats.TraceMiss, Stats.SlopeOrHeight, Stats.LastGroundZ, Stats.LastNormalZ, Stats.Nav);
+}
+
+void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
+{
+	UWorld* World = GetWorld();
+	if (!World || !HasAuthority())
+	{
+		return;
+	}
+	// Yukaridan asagi ilk engelleyen yuzey; yuzey Z + 50 spawner taban yuksekligidir.
+	FHitResult Top;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(MMOProbeSurface), false);
+	if (!World->LineTraceSingleByChannel(Top, FVector(X, Y, 4000.f), FVector(X, Y, -4000.f), ECC_Visibility, Params))
+	{
+		UE_LOG(LogTemp, Display, TEXT("[MMOPROBE] (%.0f,%.0f) yuzey yok"), X, Y);
+		return;
+	}
+	MMOProbeSpawn(X, Y, Top.ImpactPoint.Z + 50.f, Radius);
 }
 
 void AMMOGameMode::StartPlay()
@@ -209,8 +254,13 @@ void AMMOGameMode::SpawnMobArea()
 				UGameplayStatics::FinishSpawningActor(S, TM);
 			}
 		};
+		// 2026-10-03 calisma zamani duman testi (Scripts/SmokeTest.ps1 + MMOProbeSpawn): editor probu
+		// "gecti" dese de Nobetci (-2800,4400,-120) cebi oyunda 2/64, Ucurum Gezgini (-5200,3600,-115)
+		// 23/64 verdi (iz surme baslangicinda cokus: dag cikintisinin basit carpismasi). Yeni konumlar
+		// MMOProbeSurface gridiyle olculdu: Nobetci (-3500,3000) 64/64, Gezgin (-5500,4500) 64/64;
+		// hub'dan tam navmesh yolu var; Kis Hukumdari'ndan 3041u, birbirinden 2500u.
 		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 6, NAME_None, 0.f);
-		SpawnFrostbound(FVector(-2800.f, 4400.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-3500.f, 3000.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(2000.f, 2800.f, 236.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
 
 		// Lv66-80 Kul + Ucurum dilimleri. Winter NavMeshBoundsVolume 2026-10-03'te
@@ -223,7 +273,7 @@ void AMMOGameMode::SpawnMobArea()
 		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
-		SpawnFrostbound(FVector(-5200.f, 3600.f, -115.f), 72, 72, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-5500.f, 4500.f, -92.f), 72, 72, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(6800.f, 2000.f, 629.f), 0, 0, 150.f, 1, FName(TEXT("AbyssRegent")), 60.f);
 

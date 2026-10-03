@@ -2620,7 +2620,7 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 
 > Derleme temiz. PIE'de hiç oynanmadı. Winter'a geçmek için host HUD'undaki "Tüm oyuncuları Kış'a taşı" düğmesi.
 
-- [ ] **Spawner'lar görünüyor mu:** Winter'da doğudaki `(3000,0)` cebinde 5 Buzbağlı Gözcü (Lv51), kuzey `(-2800,4400)` cebinde 6 Buzbağlı Nöbetçi (Lv55), `(2000,2800)`'de tek Buzbağlı Muhafız elit (Lv57) zemin üzerinde doğmalı. Output Log'da `Spawner ... skipping spawn` uyarısı çıkmamalı.
+- [ ] **Spawner'lar görünüyor mu:** Winter'da doğudaki `(3000,0)` cebinde 5 Buzbağlı Gözcü (Lv51), kuzeybatı `(-3500,3000)` cebinde (3 Ekim duman testi sonrası taşındı) 6 Buzbağlı Nöbetçi (Lv55), `(2000,2800)`'de tek Buzbağlı Muhafız elit (Lv57) zemin üzerinde doğmalı. Output Log'da `Spawner ... skipping spawn` uyarısı çıkmamalı.
 - [ ] **Hub güvenliği:** Winter hub'ında (PlayerStart çevresi) beklerken hiçbir yeni mob saldırmamalı.
 - [ ] **Görev zinciri:** `Q_WinterSovereign` tamamlandıktan sonra Lv51'de `Q_FrostboundScouts` alınabilmeli → Buzbağlı Bot; ardından Sentinels (Kask), Line (Zırh, 6 Nöbetçi), Warden (Kılıç). Her ödül alındığında Lv51 seti kuşanılabilmeli.
 - [ ] **Denge gözlemi (not al):** Lv51 bir karakterle Gözcü öldürme süresi, alınan hasar, seviye başına kill (hedef 12–25).
@@ -2639,7 +2639,7 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 > Winter_scene haritası (umap) yeniden kaydedildi: navmesh sınırı X±8000 / Y −8500..5500'e büyüdü. Derleme temiz, PIE yok.
 
 - [ ] **Navmesh sağlam mı:** Editörde Winter_scene'i aç, `P` ile navmesh'i göster — hub çevresi ve yeni uzak bölgeler yeşil olmalı; eski Lv42–57 cepleri bozulmamış olmalı.
-- [ ] **Spawner'lar:** Kül Öncüsü `(1200,-5200)`, Kül Bağlayıcı `(-2000,-6800)`, Kül Tiranı elit `(4400,-5200)`, Uçurum Gezgini `(-5200,3600)`, Uçurum Koruyucusu `(4400,3600)` (yüksek arazi), Uçurum Naibi elit `(6800,2000)` (Z~580 yüksek arazi; ilk konum `(-7600,-1200)` navmesh kenarındaydı, QA sonrası taşındı — oraya yürüyerek çıkılabilmeli).
+- [ ] **Spawner'lar:** Kül Öncüsü `(1200,-5200)`, Kül Bağlayıcı `(-2000,-6800)`, Kül Tiranı elit `(4400,-5200)`, Uçurum Gezgini `(-5500,4500)` (duman testi sonrası taşındı), Uçurum Koruyucusu `(4400,3600)` (yüksek arazi), Uçurum Naibi elit `(6800,2000)` (Z~580 yüksek arazi; ilk konum `(-7600,-1200)` navmesh kenarındaydı, QA sonrası taşındı — oraya yürüyerek çıkılabilmeli).
 - [ ] **Görev zincirleri:** `Q_RiftHerald` → Kül zinciri (Lv66 set) → `Q_AshTyrant` → Uçurum zinciri (Lv71'de açılır, Lv72 set) → `Q_AbyssRegent` (Lv79'da alınır; Naip Lv80).
 - [ ] **Lv80 son elit:** Uçurum Naibi loot'u +4..+6 Lv72 setinden düşmeli.
 

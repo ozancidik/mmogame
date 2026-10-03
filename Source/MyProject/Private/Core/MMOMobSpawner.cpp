@@ -58,6 +58,56 @@ void AMMOMobSpawner::TopUp()
 	}
 }
 
+bool AMMOMobSpawner::FindSafeSpawnLocation(UWorld* World, const AActor* Ignore, const FVector& Base, float InSpawnRadius,
+	float CapsuleHalfHeight, int32 MaxAttempts, FVector& OutLocation, FSpawnProbeStats& Stats)
+{
+	const UNavigationSystemV1* Nav = World ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
+	if (!Nav || !Nav->GetMainNavData())
+	{
+		return false;
+	}
+
+	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(MMOMobSpawnGround), false, Ignore);
+	for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
+	{
+		const float Angle = FMath::FRandRange(0.f, 2.f * PI);
+		const float Radius = FMath::FRandRange(150.f, InSpawnRadius);
+		const FVector SpawnLoc = Base + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, 100.f);
+
+		FHitResult GroundHit;
+		const FVector TraceStart(SpawnLoc.X, SpawnLoc.Y, Base.Z + 200.f);
+		const FVector TraceEnd(SpawnLoc.X, SpawnLoc.Y, Base.Z - 200.f);
+		if (!World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams))
+		{
+			++Stats.TraceMiss;
+			continue;
+		}
+		if (GroundHit.ImpactNormal.Z < 0.7f
+			|| FMath::Abs(GroundHit.ImpactPoint.Z - (Base.Z - 50.f)) > 60.f)
+		{
+			++Stats.SlopeOrHeight;
+			Stats.LastGroundZ = GroundHit.ImpactPoint.Z;
+			Stats.LastNormalZ = GroundHit.ImpactNormal.Z;
+			continue;
+		}
+
+		FNavLocation NavLocation;
+		const FVector GroundPoint = GroundHit.ImpactPoint;
+		if (!Nav->ProjectPointToNavigation(GroundPoint + FVector(0.f, 0.f, 20.f),
+			NavLocation, FVector(50.f, 50.f, 60.f))
+			|| FVector::Dist2D(NavLocation.Location, GroundPoint) > 50.f
+			|| FMath::Abs(NavLocation.Location.Z - GroundPoint.Z) > 35.f)
+		{
+			++Stats.Nav;
+			continue;
+		}
+
+		OutLocation = NavLocation.Location + FVector(0.f, 0.f, CapsuleHalfHeight + 2.f);
+		return true;
+	}
+	return false;
+}
+
 void AMMOMobSpawner::SpawnOne()
 {
 	UWorld* World = GetWorld();
@@ -89,53 +139,22 @@ void AMMOMobSpawner::SpawnOne()
 		}
 
 		constexpr int32 MaxAttempts = 8;
-		bool bFoundSafeLocation = false;
-		FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(MMOMobSpawnGround), false, this);
-		for (int32 Attempt = 0; Attempt < MaxAttempts; ++Attempt)
-		{
-			if (Attempt > 0)
-			{
-				const float RetryAngle = FMath::FRandRange(0.f, 2.f * PI);
-				const float RetryRadius = FMath::FRandRange(150.f, SpawnRadius);
-				SpawnLoc = Base + FVector(FMath::Cos(RetryAngle) * RetryRadius,
-					FMath::Sin(RetryAngle) * RetryRadius, 100.f);
-			}
-
-			FHitResult GroundHit;
-			const FVector TraceStart(SpawnLoc.X, SpawnLoc.Y, Base.Z + 200.f);
-			const FVector TraceEnd(SpawnLoc.X, SpawnLoc.Y, Base.Z - 200.f);
-			if (!World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams)
-				|| GroundHit.ImpactNormal.Z < 0.7f
-				|| FMath::Abs(GroundHit.ImpactPoint.Z - (Base.Z - 50.f)) > 60.f)
-			{
-				continue;
-			}
-
-			FNavLocation NavLocation;
-			const FVector GroundPoint = GroundHit.ImpactPoint;
-			if (!Nav->ProjectPointToNavigation(GroundPoint + FVector(0.f, 0.f, 20.f),
-				NavLocation, FVector(50.f, 50.f, 60.f))
-				|| FVector::Dist2D(NavLocation.Location, GroundPoint) > 50.f
-				|| FMath::Abs(NavLocation.Location.Z - GroundPoint.Z) > 35.f)
-			{
-				continue;
-			}
-
-			SpawnLoc = NavLocation.Location + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 2.f);
-			bFoundSafeLocation = true;
-			break;
-		}
+		FSpawnProbeStats Stats;
+		FVector FoundLoc = FVector::ZeroVector;
+		const bool bFoundSafeLocation = FindSafeSpawnLocation(World, this, Base, SpawnRadius,
+			Capsule->GetScaledCapsuleHalfHeight(), MaxAttempts, FoundLoc, Stats);
 
 		if (!bFoundSafeLocation)
 		{
 			if (!bSpawnLocationWarningReported)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMODBG] Spawner %s @ %s: no nearby ground/nav location after %d attempts; skipping spawn"),
-					*GetName(), *Base.ToCompactString(), MaxAttempts);
+				UE_LOG(LogTemp, Warning, TEXT("[MMODBG] Spawner %s @ %s: no nearby ground/nav location after %d attempts; skipping spawn (trace iskaladi=%d, egim/yukseklik=%d [son zemin Z=%.1f, normal Z=%.2f], navmesh=%d)"),
+					*GetName(), *Base.ToCompactString(), MaxAttempts, Stats.TraceMiss, Stats.SlopeOrHeight, Stats.LastGroundZ, Stats.LastNormalZ, Stats.Nav);
 				bSpawnLocationWarningReported = true;
 			}
 			return;
 		}
+		SpawnLoc = FoundLoc;
 		bSpawnLocationWarningReported = false;
 	}
 

@@ -22,6 +22,13 @@ public:
 
 	virtual void BeginPlay() override;
 
+	// Spawner dogrulamasinin (zemin izi + egim + yukseklik + navmesh) tek yerde toplanmis hali.
+	// SpawnOne ve GameMode MMOProbeSpawn komutu ayni kodu kullanir (olcum = gercek davranis).
+	// Base: spawner konumu; SpawnRadius: halka yaricapi; CapsuleHalfHeight: mob kapsulu.
+	struct FSpawnProbeStats { int32 TraceMiss = 0; int32 SlopeOrHeight = 0; int32 Nav = 0; float LastGroundZ = 0.f; float LastNormalZ = 0.f; };
+	static bool FindSafeSpawnLocation(UWorld* World, const AActor* Ignore, const FVector& Base, float InSpawnRadius,
+		float CapsuleHalfHeight, int32 MaxAttempts, FVector& OutLocation, FSpawnProbeStats& Stats);
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Spawner")
 	TSubclassOf<AMMOMob> MobClass;
 
