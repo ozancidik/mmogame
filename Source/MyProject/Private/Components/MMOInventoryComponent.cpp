@@ -587,6 +587,14 @@ bool UMMOInventoryComponent::IsOwnerNearWarehouse(float MaxDist) const
 	{
 		return false;
 	}
+	// Olu karakter depoyu kullanamaz (canlanma beklerken esya tasimasin).
+	if (const AMMOCharacter* Char = Cast<AMMOCharacter>(OwnerActor))
+	{
+		if (const UMMOStatsComponent* St = Char->GetStats(); St && St->bIsDead)
+		{
+			return false;
+		}
+	}
 	const FVector Loc = OwnerActor->GetActorLocation();
 	const float MaxDistSq = MaxDist * MaxDist;
 	for (TActorIterator<AMMOWarehouseNPC> It(World); It; ++It)
