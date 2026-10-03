@@ -14,7 +14,7 @@ $slog = Join-Path $env:TEMP "mmo_net_server_$stamp.log"
 $clog = Join-Path $env:TEMP "mmo_net_client_$stamp.log"
 $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
 
-$srv = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "$mapPath?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$slog", "-port=7777") -PassThru -WindowStyle Hidden
+$srv = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "${mapPath}?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$slog", "-port=7777") -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 $cli = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "127.0.0.1:7777", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$clog") -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds $ClientSeconds
