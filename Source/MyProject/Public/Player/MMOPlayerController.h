@@ -43,7 +43,7 @@ public:
 	UFUNCTION(Exec)
 	void Say(const FString& Message);
 
-	// Sunucu -> istemci: sohbet satiri. Channel 0 = genel, 1 = parti, 2 = sistem.
+	// Sunucu -> istemci: sohbet satiri. Channel 0 = genel, 1 = parti, 2 = sistem, 3 = gelen fisilti, 4 = giden fisilti.
 	UFUNCTION(Client, Reliable)
 	void ClientReceiveChat(const FString& Sender, const FString& Message, uint8 Channel);
 

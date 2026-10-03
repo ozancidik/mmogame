@@ -146,6 +146,45 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		Channel = 1;
 		Msg = Msg.RightChop(3).TrimStart();
 	}
+
+	// Fisilti: "/w Isim mesaj" (ya da /f). Hedef ada gore bulunur; yalniz hedefe ve gondericiye gider.
+	if (Msg.StartsWith(TEXT("/w "), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/f "), ESearchCase::IgnoreCase))
+	{
+		FString Rest = Msg.RightChop(3).TrimStart();
+		FString TargetName, WhisperText;
+		if (!Rest.Split(TEXT(" "), &TargetName, &WhisperText))
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /w Isim mesaj"), 2);
+			return;
+		}
+		WhisperText = WhisperText.TrimStart().Left(120);
+		if (TargetName.IsEmpty() || WhisperText.IsEmpty())
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /w Isim mesaj"), 2);
+			return;
+		}
+		LastChatServerTime = Now;
+
+		const FString From = PlayerState ? PlayerState->GetPlayerName() : FString(TEXT("?"));
+		AMMOPlayerController* Target = nullptr;
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			AMMOPlayerController* PC = Cast<AMMOPlayerController>(It->Get());
+			if (PC && PC != this && PC->PlayerState && PC->PlayerState->GetPlayerName().Equals(TargetName, ESearchCase::IgnoreCase))
+			{
+				Target = PC;
+				break;
+			}
+		}
+		if (!Target)
+		{
+			ClientReceiveChat(FString(), FString::Printf(TEXT("%s adli oyuncu bulunamadi."), *TargetName), 2);
+			return;
+		}
+		Target->ClientReceiveChat(From, WhisperText, 3);
+		ClientReceiveChat(Target->PlayerState->GetPlayerName(), WhisperText, 4);
+		return;
+	}
 	Msg = Msg.Left(120);
 	if (Msg.IsEmpty())
 	{
@@ -205,6 +244,16 @@ void AMMOPlayerController::ClientReceiveChat_Implementation(const FString& Sende
 		Col = FLinearColor(0.45f, 0.85f, 1.f);
 		Line = FString::Printf(TEXT("[Parti] %s: %s"), *Sender, *Message);
 	}
+	else if (Channel == 3)
+	{
+		Col = FLinearColor(1.f, 0.55f, 0.85f);
+		Line = FString::Printf(TEXT("[%s fisildiyor] %s"), *Sender, *Message);
+	}
+	else if (Channel == 4)
+	{
+		Col = FLinearColor(1.f, 0.55f, 0.85f);
+		Line = FString::Printf(TEXT("[%s adli oyuncuya] %s"), *Sender, *Message);
+	}
 	else
 	{
 		Line = FString::Printf(TEXT("%s: %s"), *Sender, *Message);
@@ -242,7 +291,7 @@ void AMMOPlayerController::OpenChatInput()
 			.WidthOverride(400.f)
 			[
 				SAssignNew(ChatBox, SEditableTextBox)
-				.HintText(FText::FromString(TEXT("Mesaj yaz - Enter gonder, Esc iptal, /p parti")))
+				.HintText(FText::FromString(TEXT("Mesaj yaz - Enter gonder, Esc iptal, /p parti, /w isim mesaj")))
 				.ClearKeyboardFocusOnCommit(false)
 				.OnTextCommitted(FOnTextCommitted::CreateUObject(this, &AMMOPlayerController::OnChatCommitted))
 			]
