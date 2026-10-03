@@ -145,7 +145,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
 		LastChatServerTime = Now;
-		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /yardim"), 2);
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))

@@ -791,6 +791,17 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	}
 	EquippedItems.SetNum(MaxSlots);
 
+	// Bozuk/eski kayitta kayitli sayac en buyuk kimligin gerisinde kalmis olabilir: yeni
+	// (ticaret/loot) kimlikleri mevcut bir esyayla cakismasin diye Max(Id)+1'e cek.
+	for (const FMMOEquipmentInstance& Inst : EquipmentBag)
+	{
+		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
+	}
+	for (const FMMOEquipmentInstance& Inst : EquippedItems)
+	{
+		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
+	}
+
 	RecomputeEquipmentBonuses();
 	OnGoldChanged.Broadcast(Gold);
 	OnInventoryChanged.Broadcast();

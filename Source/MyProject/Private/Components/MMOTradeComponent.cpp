@@ -44,7 +44,7 @@ namespace
 		TArray<int32, TInlineAllocator<UMMOTradeComponent::MaxOfferItems>> Seen;
 		for (const FMMOEquipmentInstance& Offered : Offer.Items)
 		{
-			if (!Offered.IsValidInstance() || Seen.Contains(Offered.InstanceId))
+			if (!Offered.IsValidInstance() || Seen.Contains(Offered.InstanceId) || !FMMOItemDatabase::Find(Offered.ItemId))
 			{
 				return false;
 			}
@@ -76,6 +76,7 @@ void UMMOTradeComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, PartnerName, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, MyOffer, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, TheirOffer, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOTradeComponent, OfferRevision, COND_OwnerOnly);
 }
 
 void UMMOTradeComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -199,7 +200,7 @@ void UMMOTradeComponent::RequestSetGold(int32 NewGold)
 
 void UMMOTradeComponent::RequestConfirm()
 {
-	if (HasAuthorityInternal()) { ServerConfirm_Implementation(); } else { ServerConfirm(); }
+	if (HasAuthorityInternal()) { ServerConfirm_Implementation(OfferRevision); } else { ServerConfirm(OfferRevision); }
 }
 
 // ----------------------------------------------------------------------
@@ -246,6 +247,13 @@ void UMMOTradeComponent::ServerInviteNearest_Implementation()
 		return;
 	}
 
+	// Davet kapma korumasi: hedefin gecerli baska bir bekleyen daveti varsa ezme.
+	if (TC->PendingInviteFrom.IsValid() && TC->PendingInviteFrom.Get() != Self
+		&& TC->PendingInviteTime >= 0.f && Now - TC->PendingInviteTime < InviteExpirySeconds)
+	{
+		NotifyOwner(TEXT("Oyuncunun bekleyen baska bir daveti var; biraz sonra tekrar dene."));
+		return;
+	}
 	TC->PendingInviteFrom = Self;
 	TC->PendingInviteTime = Now;
 	TC->NotifyOwner(FString::Printf(TEXT("%s seninle ticaret etmek istiyor. Kabul: /trade kabul"), *TradeNameOf(Self)));
@@ -395,13 +403,33 @@ void UMMOTradeComponent::ServerSetGold_Implementation(int32 NewGold)
 	OnMyOfferChanged();
 }
 
-void UMMOTradeComponent::ServerConfirm_Implementation()
+void UMMOTradeComponent::ServerConfirm_Implementation(int32 SeenRevision)
 {
 	UMMOTradeComponent* PC = GetValidPartnerComp();
 	if (!PC || MyOffer.bConfirmed)
 	{
 		return;
 	}
+
+	// Onay, oyuncunun GORDUGU teklife baglidir: arada teklif degistiyse reddet.
+	if (SeenRevision != OfferRevision)
+	{
+		NotifyOwner(TEXT("Teklif degisti; yeni teklifi gorup tekrar onayla."));
+		return;
+	}
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	// Son degisiklikten hemen sonra onay kilidi + onay hiz siniri (spam / kapma yarisi).
+	if (Now - LastTradeChangeTime < ConfirmLockSeconds)
+	{
+		NotifyOwner(TEXT("Teklif az once degisti; bir saniye bekleyip tekrar onayla."));
+		return;
+	}
+	if (Now - LastConfirmTime < ConfirmCooldown)
+	{
+		return;
+	}
+	LastConfirmTime = Now;
+
 	const bool bNothing = MyOffer.Items.Num() == 0 && MyOffer.Gold == 0
 		&& PC->MyOffer.Items.Num() == 0 && PC->MyOffer.Gold == 0;
 	if (bNothing)
@@ -439,6 +467,8 @@ void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 		Self->PartnerName = TradeNameOf(Other);
 		Self->MyOffer = FMMOTradeOffer();
 		Self->TheirOffer = FMMOTradeOffer();
+		Self->OfferRevision = 0;
+		Self->LastTradeChangeTime = Self->GetWorld() ? Self->GetWorld()->GetTimeSeconds() : 0.f;
 		Self->PendingInviteFrom.Reset();
 		Self->PendingInviteTime = -1.f;
 		if (UWorld* World = Self->GetWorld())
@@ -491,10 +521,15 @@ void UMMOTradeComponent::OnMyOfferChanged()
 {
 	// Teklif degisti: iki tarafin onayi sifirlanir (surpriz degisikligi onlemek icin).
 	MyOffer.bConfirmed = false;
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	++OfferRevision;
+	LastTradeChangeTime = Now;
 	if (UMMOTradeComponent* PC = GetValidPartnerComp())
 	{
 		PC->MyOffer.bConfirmed = false;
 		PC->TheirOffer = MyOffer;
+		PC->OfferRevision = OfferRevision; // iki tarafta ayni revizyon
+		PC->LastTradeChangeTime = Now;
 		PC->OnTradeChanged.Broadcast();
 	}
 	TheirOffer.bConfirmed = false;
@@ -585,6 +620,8 @@ void UMMOTradeComponent::TryExecuteTrade()
 	}
 
 	// Atomik takas: once ikisinden de cikar, sonra karsiliklu ekle (ayni sunucu karesinde).
+	const TArray<FMMOEquipmentInstance> BagBackupA = IA->EquipmentBag;
+	const TArray<FMMOEquipmentInstance> BagBackupB = IB->EquipmentBag;
 	TArray<FMMOEquipmentInstance> FromA, FromB;
 	bool bTookAll = true;
 	for (const FMMOEquipmentInstance& I : OfferA.Items)
@@ -606,8 +643,18 @@ void UMMOTradeComponent::TryExecuteTrade()
 		return;
 	}
 
-	for (const FMMOEquipmentInstance& I : FromA) { IB->ReceiveTradedEquipment(I); }
-	for (const FMMOEquipmentInstance& I : FromB) { IA->ReceiveTradedEquipment(I); }
+	// Alma basarisiz olursa (beklenmez; on dogrulama kapasiteyi ve veritabanini kontrol etti)
+	// iki cantayi da takas oncesi haline dondur: kimse esya kaybetmesin.
+	bool bReceivedAll = true;
+	for (const FMMOEquipmentInstance& I : FromA) { bReceivedAll &= IB->ReceiveTradedEquipment(I); }
+	for (const FMMOEquipmentInstance& I : FromB) { bReceivedAll &= IA->ReceiveTradedEquipment(I); }
+	if (!bReceivedAll)
+	{
+		IA->EquipmentBag = BagBackupA;
+		IB->EquipmentBag = BagBackupB;
+		EndTradeServer(TEXT("Ticaret iptal edildi: esyalar teslim edilemedi."));
+		return;
+	}
 	IA->AddGold(-OfferA.Gold);
 	IB->AddGold(-OfferB.Gold);
 	IA->AddGold(OfferB.Gold);

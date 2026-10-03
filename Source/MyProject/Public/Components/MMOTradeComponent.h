@@ -60,6 +60,11 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_Trade, BlueprintReadOnly, Category = "MMO|Trade")
 	FMMOTradeOffer MyOffer;
 
+	// Teklif her degistiginde artar (iki tarafta ayni deger). Onay, gorulen revizyona baglidir:
+	// gecikmeli bir onay, sonradan degisen teklife onay sayilmaz (QA YUKSEK).
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "MMO|Trade")
+	int32 OfferRevision = 0;
+
 	UPROPERTY(ReplicatedUsing = OnRep_Trade, BlueprintReadOnly, Category = "MMO|Trade")
 	FMMOTradeOffer TheirOffer;
 
@@ -106,7 +111,7 @@ protected:
 	void ServerSetGold(int32 NewGold);
 
 	UFUNCTION(Server, Reliable)
-	void ServerConfirm();
+	void ServerConfirm(int32 SeenRevision);
 
 	// --- Sunucu durumu (replike degil) ---
 	TWeakObjectPtr<AMMOCharacter> Partner;
@@ -114,6 +119,10 @@ protected:
 	float PendingInviteTime = -1.f;
 	float LastInviteTime = -100.f;
 	float LastOfferChangeTime = -100.f;
+	float LastTradeChangeTime = -100.f;   // iki taraftan herhangi birinin son teklif degisikligi
+	float LastConfirmTime = -100.f;
+	static constexpr float ConfirmLockSeconds = 1.0f;
+	static constexpr float ConfirmCooldown = 0.5f;
 	FTimerHandle ValidateTimerHandle;
 
 	static constexpr float InviteCooldown = 3.f;
