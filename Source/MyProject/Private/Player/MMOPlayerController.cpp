@@ -7,6 +7,7 @@
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
 #include "World/MMOHealerNPC.h"
+#include "World/MMOWarehouseNPC.h"
 #include "AI/MMODialogueSubsystem.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
@@ -567,6 +568,29 @@ void AMMOPlayerController::DoLeftClickAction()
 		else if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("Sifaciya yaklas"));
+		}
+		return;
+	}
+
+	// Depocuya tiklandi mi? (menzil icindeyse depo penceresini ac; tasima sunucuda dogrulanir)
+	if (AMMOWarehouseNPC* Keeper = Cast<AMMOWarehouseNPC>(Hit.GetActor()))
+	{
+		APawn* MyPawn = GetPawn();
+		if (MyPawn && FVector::Dist(MyPawn->GetActorLocation(), Keeper->GetActorLocation()) <= 500.f)
+		{
+			if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
+			{
+				H->OpenWarehouse();
+				const FString Greet = Keeper->PickGreeting();
+				if (!Greet.IsEmpty())
+				{
+					H->ShowNpcDialogue(Keeper->WarehouseName, Greet);
+				}
+			}
+		}
+		else if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("Depocuya yaklas"));
 		}
 		return;
 	}

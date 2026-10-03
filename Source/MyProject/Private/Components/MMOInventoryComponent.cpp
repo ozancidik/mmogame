@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "World/MMOVendorNPC.h"
+#include "World/MMOWarehouseNPC.h"
 
 UMMOInventoryComponent::UMMOInventoryComponent()
 {
@@ -31,6 +32,7 @@ void UMMOInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(UMMOInventoryComponent, Items);
 	DOREPLIFETIME(UMMOInventoryComponent, EquipmentBag);
 	DOREPLIFETIME(UMMOInventoryComponent, EquippedItems);
+	DOREPLIFETIME_CONDITION(UMMOInventoryComponent, Warehouse, COND_OwnerOnly);
 }
 
 bool UMMOInventoryComponent::HasAuthorityInternal() const
@@ -577,6 +579,116 @@ void UMMOInventoryComponent::ServerSellEquipment_Implementation(int32 BagIndex)
 	SellEquipment(BagIndex);
 }
 
+bool UMMOInventoryComponent::IsOwnerNearWarehouse(float MaxDist) const
+{
+	const AActor* OwnerActor = GetOwner();
+	const UWorld* World = GetWorld();
+	if (!OwnerActor || !World)
+	{
+		return false;
+	}
+	const FVector Loc = OwnerActor->GetActorLocation();
+	const float MaxDistSq = MaxDist * MaxDist;
+	for (TActorIterator<AMMOWarehouseNPC> It(World); It; ++It)
+	{
+		if (*It && FVector::DistSquared(Loc, (*It)->GetActorLocation()) <= MaxDistSq)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void UMMOInventoryComponent::DepositEquipment(int32 InstanceId)
+{
+	if (!HasAuthorityInternal())
+	{
+		ServerDepositEquipment(InstanceId);
+		return;
+	}
+
+	auto Notify = [this](const TCHAR* Msg)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, Msg);
+		}
+	};
+
+	if (!IsOwnerNearWarehouse())
+	{
+		Notify(TEXT("Depocu yakininda degilsin"));
+		return;
+	}
+	const int32 BagIndex = EquipmentBag.IndexOfByPredicate([InstanceId](const FMMOEquipmentInstance& I)
+	{
+		return I.InstanceId == InstanceId;
+	});
+	if (BagIndex == INDEX_NONE || !EquipmentBag[BagIndex].IsValidInstance())
+	{
+		return;
+	}
+	if (Warehouse.Num() >= MaxWarehouseSize)
+	{
+		Notify(TEXT("Depo dolu!"));
+		return;
+	}
+
+	Warehouse.Add(EquipmentBag[BagIndex]);
+	EquipmentBag.RemoveAt(BagIndex);
+	OnInventoryChanged.Broadcast();
+}
+
+void UMMOInventoryComponent::ServerDepositEquipment_Implementation(int32 InstanceId)
+{
+	DepositEquipment(InstanceId);
+}
+
+void UMMOInventoryComponent::WithdrawEquipment(int32 InstanceId)
+{
+	if (!HasAuthorityInternal())
+	{
+		ServerWithdrawEquipment(InstanceId);
+		return;
+	}
+
+	auto Notify = [this](const TCHAR* Msg)
+	{
+		if (GEngine && IsLocallyControlledOwner())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, Msg);
+		}
+	};
+
+	if (!IsOwnerNearWarehouse())
+	{
+		Notify(TEXT("Depocu yakininda degilsin"));
+		return;
+	}
+	const int32 StoreIndex = Warehouse.IndexOfByPredicate([InstanceId](const FMMOEquipmentInstance& I)
+	{
+		return I.InstanceId == InstanceId;
+	});
+	if (StoreIndex == INDEX_NONE)
+	{
+		return;
+	}
+	if (EquipmentBag.Num() >= MaxBagSize)
+	{
+		Notify(TEXT("Canta dolu!"));
+		return;
+	}
+
+	EquipmentBag.Add(Warehouse[StoreIndex]);
+	Warehouse.RemoveAt(StoreIndex);
+	OnInventoryChanged.Broadcast();
+}
+
+void UMMOInventoryComponent::ServerWithdrawEquipment_Implementation(int32 InstanceId)
+{
+	WithdrawEquipment(InstanceId);
+}
+
 void UMMOInventoryComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 {
 	Out.Gold = Gold;
@@ -584,6 +696,7 @@ void UMMOInventoryComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 	Out.EquipmentBag = EquipmentBag;
 	Out.EquippedItems = EquippedItems;
 	Out.NextInstanceId = NextInstanceId;
+	Out.Warehouse = Warehouse;
 }
 
 void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
@@ -605,6 +718,17 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
 	}
 	NextInstanceId = FMath::Max(1, In.NextInstanceId);
+
+	// Depo: gecersiz girdileri at, arti seviyesini sinirla. Kapasite asilmissa (bozuk/eski
+	// kayit) hicbir item silinmez; yalniz yeni depolama reddedilir.
+	Warehouse = In.Warehouse;
+	Warehouse.RemoveAll([](const FMMOEquipmentInstance& Inst) { return !Inst.IsValidInstance(); });
+	for (FMMOEquipmentInstance& Inst : Warehouse)
+	{
+		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+		// Ornek kimligi cakismasin: NextInstanceId depodaki en buyuk kimligin ustunde kalsin.
+		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
+	}
 
 	// Kusanilan dizi her zaman MAX (4) slot olmali. Kayittaki dizi daha uzunsa (bozuk/
 	// eski-surum kayit), fazla girdileri sessizce ATMA — gecerliyse cantaya geri koy

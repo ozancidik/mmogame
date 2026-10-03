@@ -18,6 +18,7 @@
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
 #include "World/MMOHealerNPC.h"
+#include "World/MMOWarehouseNPC.h"
 #include "Player/MMOPlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
@@ -144,6 +145,10 @@ void AMMOHUD::DrawHUD()
 	{
 		DrawShop(MMOChar);
 	}
+	if (bWarehouseOpen)
+	{
+		DrawWarehouse(MMOChar);
+	}
 	if (bStatWindowOpen)
 	{
 		DrawStatWindow(MMOChar);
@@ -152,7 +157,7 @@ void AMMOHUD::DrawHUD()
 	// Acik pencerelerin basliklarini kapatmamasi icin ipucunu pencereler kapanana kadar gizle.
 	// Secim yapilmadiysa pencere kapatildiginda tekrar gorunur.
 	const bool bAnyWindowOpen = bQuestWindowOpen || bSkillBookOpen || bInventoryOpen ||
-		bShopOpen || bStatWindowOpen;
+		bShopOpen || bStatWindowOpen || bWarehouseOpen;
 	ZoneTravelRect = FBox2D(ForceInit);
 	const AMMOPlayerController* LocalPC = Cast<AMMOPlayerController>(GetOwningPlayerController());
 	const FString MapName = GetWorld() ? GetWorld()->GetMapName() : FString();
@@ -1561,6 +1566,114 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	}
 }
 
+void AMMOHUD::OpenWarehouse()
+{
+	WarehouseBagRegions.Reset();
+	WarehouseStoreRegions.Reset();
+	bWarehouseOpen = true;
+}
+
+void AMMOHUD::DrawWarehouse(AMMOCharacter* PlayerChar)
+{
+	WarehouseBagRegions.Reset();
+	WarehouseStoreRegions.Reset();
+	if (!Canvas || !PlayerChar)
+	{
+		return;
+	}
+	UMMOInventoryComponent* Inv = PlayerChar->GetInventory();
+	if (!Inv)
+	{
+		return;
+	}
+
+	const float PW = 640.f;
+	const float PH = 548.f;
+	const float PX = ((float)Canvas->SizeX - PW) * 0.5f;
+	const float PY = 90.f;
+	DrawRect(FLinearColor(0.03f, 0.03f, 0.05f, 0.94f), PX, PY, PW, PH);
+	DrawRect(FLinearColor(0.75f, 0.5f, 0.25f, 0.95f), PX, PY, PW, 4.f);
+	WarehouseRect = FBox2D(FVector2D(PX, PY), FVector2D(PX + PW, PY + PH));
+	WarehouseCloseRect = DrawCloseButton(PX, PY, PW);
+
+	DrawText(TEXT("DEPO"), FLinearColor::White, PX + 14.f, PY + 10.f, nullptr, 1.4f);
+	DrawText(TEXT("Depodaki esyalar Yaz ve Kis hub'indaki depocularda ortaktir."),
+		FLinearColor(0.7f, 0.7f, 0.75f), PX + 14.f, PY + 38.f, nullptr, 0.8f);
+
+	// 24 depo satiri pencereye sigsin diye satirlar dukkandan daha ince.
+	const float RowH = 18.f;
+	const float ColW = (PW - 42.f) * 0.5f;
+	const float LeftX = PX + 14.f;
+	const float RightX = PX + 28.f + ColW;
+	const float StartY = PY + 90.f;
+
+	auto DrawEntry = [&](const FMMOEquipmentInstance& Inst, float X, float Y, TArray<FMMOClickRegion>& Out)
+	{
+		const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
+		if (!Def)
+		{
+			return;
+		}
+		DrawRect(FLinearColor(0.14f, 0.12f, 0.1f, 0.9f), X, Y, ColW, RowH - 2.f);
+		FMMOClickRegion R;
+		R.Slot = Inst.InstanceId;
+		R.Rect = FBox2D(FVector2D(X, Y), FVector2D(X + ColW, Y + RowH - 2.f));
+		Out.Add(R);
+		DrawText(FString::Printf(TEXT("[%s] %s +%d (Lv%d)"), *FMMOItemDatabase::GetRarityName(Inst.Rarity),
+			*Def->Name, Inst.Plus, Def->RequiredLevel),
+			FMMOItemDatabase::GetRarityColor(Inst.Rarity), X + 6.f, Y + 2.f, nullptr, 0.65f);
+	};
+
+	DrawText(FString::Printf(TEXT("CANTA %d/%d (tikla: depoya koy)"), Inv->EquipmentBag.Num(), UMMOInventoryComponent::MaxBagSize),
+		FLinearColor(1.f, 0.85f, 0.4f), LeftX, PY + 68.f, nullptr, 0.9f);
+	for (int32 i = 0; i < Inv->EquipmentBag.Num(); ++i)
+	{
+		DrawEntry(Inv->EquipmentBag[i], LeftX, StartY + i * RowH, WarehouseBagRegions);
+	}
+	if (Inv->EquipmentBag.Num() == 0)
+	{
+		DrawText(TEXT("(canta bos)"), FLinearColor(0.6f, 0.6f, 0.6f), LeftX, StartY, nullptr, 0.72f);
+	}
+
+	DrawText(FString::Printf(TEXT("DEPO %d/%d (tikla: cantaya al)"), Inv->Warehouse.Num(), UMMOInventoryComponent::MaxWarehouseSize),
+		FLinearColor(0.6f, 0.9f, 0.6f), RightX, PY + 68.f, nullptr, 0.9f);
+	for (int32 i = 0; i < Inv->Warehouse.Num(); ++i)
+	{
+		DrawEntry(Inv->Warehouse[i], RightX, StartY + i * RowH, WarehouseStoreRegions);
+	}
+	if (Inv->Warehouse.Num() == 0)
+	{
+		DrawText(TEXT("(depo bos)"), FLinearColor(0.6f, 0.6f, 0.6f), RightX, StartY, nullptr, 0.72f);
+	}
+}
+
+bool AMMOHUD::HandleWarehouseClick(const FVector2D& Pos)
+{
+	AMMOCharacter* Char = Cast<AMMOCharacter>(GetOwningPawn());
+	UMMOInventoryComponent* Inv = Char ? Char->GetInventory() : nullptr;
+	if (!Inv)
+	{
+		return true;
+	}
+	for (const FMMOClickRegion& R : WarehouseBagRegions)
+	{
+		if (R.Rect.IsInside(Pos))
+		{
+			Inv->DepositEquipment(R.Slot);
+			return true;
+		}
+	}
+	for (const FMMOClickRegion& R : WarehouseStoreRegions)
+	{
+		if (R.Rect.IsInside(Pos))
+		{
+			Inv->WithdrawEquipment(R.Slot);
+			return true;
+		}
+	}
+	return true;
+}
+
 bool AMMOHUD::HandleShopClick(const FVector2D& Pos)
 {
 	if (!bShopOpen)
@@ -1761,6 +1874,24 @@ void AMMOHUD::DrawVendorNameplates()
 		DrawText(FString::Printf(TEXT("+ %s [iyilesme]"), *Npc->HealerName),
 			FLinearColor(0.4f, 1.f, 0.7f), Screen.X - 34.f, Screen.Y, nullptr, 0.8f);
 	}
+
+	// Depocu NPC (toprak rengi): tiklaninca depo penceresi.
+	for (TActorIterator<AMMOWarehouseNPC> It(World); It; ++It)
+	{
+		AMMOWarehouseNPC* Npc = *It;
+		if (!Npc)
+		{
+			continue;
+		}
+		const FVector Head = Npc->GetActorLocation() + FVector(0.f, 0.f, 110.f);
+		const FVector Screen = Canvas->Project(Head);
+		if (Screen.Z <= 0.f)
+		{
+			continue;
+		}
+		DrawText(FString::Printf(TEXT("%s [depo]"), *Npc->WarehouseName),
+			FLinearColor(0.95f, 0.75f, 0.45f), Screen.X - 34.f, Screen.Y, nullptr, 0.8f);
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -1854,6 +1985,14 @@ void AMMOHUD::DrawMinimap(AMMOCharacter* PlayerChar)
 		if (*It)
 		{
 			PlotDot((*It)->GetActorLocation(), FLinearColor(0.4f, 1.f, 0.7f), 5.f);
+		}
+	}
+	// Depocular (toprak)
+	for (TActorIterator<AMMOWarehouseNPC> It(World); It; ++It)
+	{
+		if (*It)
+		{
+			PlotDot((*It)->GetActorLocation(), FLinearColor(0.95f, 0.75f, 0.45f), 5.f);
 		}
 	}
 	// Konusan NPC'ler (mor)
@@ -2261,6 +2400,11 @@ bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)
 		if (StatCloseRect.IsInside(Pos)) { bStatWindowOpen = false; } else { HandleStatClick(Pos); }
 		return true;
 	}
+	if (bWarehouseOpen && WarehouseRect.IsInside(Pos))
+	{
+		if (WarehouseCloseRect.IsInside(Pos)) { bWarehouseOpen = false; } else { HandleWarehouseClick(Pos); }
+		return true;
+	}
 	if (bShopOpen && ShopRect.IsInside(Pos))
 	{
 		if (ShopCloseRect.IsInside(Pos)) { bShopOpen = false; } else { HandleShopClick(Pos); }
@@ -2304,6 +2448,7 @@ bool AMMOHUD::HandleWindowRightClick(const FVector2D& Pos)
 {
 	// Sag tik: skill kitabinda skili hotbara ata; envanterde ekipmani yukselt (imlecin ustundeki pencereye gore).
 	if (bStatWindowOpen && StatRect.IsInside(Pos)) { return true; }
+	if (bWarehouseOpen && WarehouseRect.IsInside(Pos)) { return true; }
 	if (bShopOpen && ShopRect.IsInside(Pos)) { return true; }
 	if (bInventoryOpen && InventoryRect.IsInside(Pos)) { HandleInventoryRightClick(Pos); return true; }
 	if (bSkillBookOpen && SkillBookRect.IsInside(Pos)) { HandleSkillBookRightClick(Pos); return true; }

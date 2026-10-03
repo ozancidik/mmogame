@@ -67,6 +67,10 @@ struct FMMOCharacterSaveData
 	UPROPERTY(SaveGame)
 	int32 NextInstanceId = 1;
 
+	// Depo (depocu NPC). Eski kayitlarda bos gelir.
+	UPROPERTY(SaveGame)
+	TArray<FMMOEquipmentInstance> Warehouse;
+
 	// Skiller
 	UPROPERTY(SaveGame)
 	TArray<FName> LearnedSkills;

@@ -125,6 +125,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Shop")
 	void SellEquipment(int32 BagIndex);
 
+	// --- Depo (KO "Inn" deposu): canta disinda kalici ekipman saklama ---
+	// Yalniz sahibine replike edilir. Kayitla birlikte saklanir; haritalar arasi ortaktir.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Items, Category = "MMO|Warehouse")
+	TArray<FMMOEquipmentInstance> Warehouse;
+
+	static constexpr int32 MaxWarehouseSize = 24;
+
+	/** Cantadaki ekipmani (InstanceId ile) depoya koyar. Depocu yakininda; istemciden -> Server RPC. */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Warehouse")
+	void DepositEquipment(int32 InstanceId);
+
+	/** Depodaki ekipmani (InstanceId ile) cantaya alir (canta doluysa reddeder). Istemciden -> Server RPC. */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Warehouse")
+	void WithdrawEquipment(int32 InstanceId);
+
 	// Kalicilik: envanter/ekipman/cuzdan verisini kayda yazar / kayittan uygular (sadece otorite).
 	void FillSaveData(struct FMMOCharacterSaveData& Out) const;
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);
@@ -142,6 +157,15 @@ protected:
 	// Sahip, MaxDist icinde bir satici NPC'ye yakin mi? Satin-al/sat RPC'lerinin
 	// sunucu-tarafi dogrulamasi (client satici olmadan her yerden alisveris yapamasin).
 	bool IsOwnerNearVendor(float MaxDist = 800.f) const;
+
+	// Depo RPC'lerinin sunucu dogrulamasi: sahip bir depocu NPC'ye MaxDist icinde mi.
+	bool IsOwnerNearWarehouse(float MaxDist = 800.f) const;
+
+	UFUNCTION(Server, Reliable)
+	void ServerDepositEquipment(int32 InstanceId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerWithdrawEquipment(int32 InstanceId);
 
 	// Kusanilanlarin toplam bonusunu stat bilesenine isler (sunucu).
 	void RecomputeEquipmentBonuses();

@@ -6,6 +6,7 @@
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
 #include "World/MMOHealerNPC.h"
+#include "World/MMOWarehouseNPC.h"
 #include "UI/MMOHUD.h"
 #include "Characters/MMOCharacter.h"
 #include "EngineUtils.h"
@@ -237,6 +238,8 @@ void AMMOGameMode::SpawnMobArea()
 			Origin + FVector(250.f, -200.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
 		World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(),
 			Origin + FVector(250.f, -350.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
+		World->SpawnActor<AMMOWarehouseNPC>(AMMOWarehouseNPC::StaticClass(),
+			Origin + FVector(250.f, 350.f, 60.f), FRotator(0.f, 180.f, 0.f), WinterNpcParams);
 		UE_LOG(LogTemp, Log, TEXT("[MMODBG] Winter_scene Lv42-80 layout spawned"));
 		return;
 	}
@@ -538,4 +541,8 @@ void AMMOGameMode::SpawnMobArea()
 	// tasindi, R=-350 ile digerleriyle cakismasin diye ayri konumlandirildi.
 	const FVector HealerLoc = Origin + FVector(250.f, -350.f, 60.f);
 	World->SpawnActor<AMMOHealerNPC>(AMMOHealerNPC::StaticClass(), HealerLoc, FRotator(0.f, 180.f, 0.f), NpcParams);
+
+	// Depocu (KO "Inn" deposu): saticinin karsi tarafinda, sifaciyla simetrik.
+	const FVector WarehouseLoc = Origin + FVector(250.f, 350.f, 60.f);
+	World->SpawnActor<AMMOWarehouseNPC>(AMMOWarehouseNPC::StaticClass(), WarehouseLoc, FRotator(0.f, 180.f, 0.f), NpcParams);
 }

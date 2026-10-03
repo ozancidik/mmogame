@@ -90,6 +90,10 @@ public:
 	void OpenShop();
 	void CloseShop();
 	bool IsShopOpen() const { return bShopOpen; }
+
+	// Depo penceresi (depocu NPC tiklaninca). Sol: canta -> depoya koy, sag: depo -> cantaya al.
+	void OpenWarehouse();
+	bool IsWarehouseOpen() const { return bWarehouseOpen; }
 	bool HandleShopClick(const FVector2D& Pos);
 
 	// --- Gorev penceresi (gorevli NPC'ye tiklaninca acilir) ---
@@ -114,7 +118,7 @@ public:
 	// Listen server host'unun tum oturumu diger bolgeye tasima dugmesi.
 	bool HandleZoneTravelClick(const FVector2D& Pos);
 	// Herhangi bir pencere acik mi?
-	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen; }
+	bool IsAnyWindowOpen() const { return bSkillBookOpen || bInventoryOpen || bShopOpen || bQuestWindowOpen || bStatWindowOpen || bWarehouseOpen; }
 
 protected:
 	// Sahnedeki dusmanlarin tepesine saglik bari cizer (dunya->ekran projeksiyonu).
@@ -158,6 +162,8 @@ protected:
 
 	// Satici dukkani penceresi.
 	void DrawShop(class AMMOCharacter* PlayerChar);
+	void DrawWarehouse(class AMMOCharacter* PlayerChar);
+	bool HandleWarehouseClick(const FVector2D& Pos);
 
 	// Sahnedeki saticilarin/gorevlilerin tepesine isim plakasi.
 	void DrawVendorNameplates();
@@ -192,6 +198,11 @@ protected:
 	bool bSkillBookOpen = false;
 	bool bInventoryOpen = false;
 	bool bShopOpen = false;
+	bool bWarehouseOpen = false;
+	FBox2D WarehouseRect = FBox2D(ForceInit);
+	FBox2D WarehouseCloseRect = FBox2D(ForceInit);
+	TArray<FMMOClickRegion> WarehouseBagRegions;
+	TArray<FMMOClickRegion> WarehouseStoreRegions;
 	bool bQuestWindowOpen = false;
 	bool bStatWindowOpen = false;
 
