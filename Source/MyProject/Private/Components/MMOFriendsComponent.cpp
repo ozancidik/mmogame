@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
+#include "HAL/PlatformTime.h"
 
 namespace
 {
@@ -140,6 +141,13 @@ void UMMOFriendsComponent::CmdAdd(const FString& Name)
 	}
 	// Kayit icin gercek (buyuk/kucuk harfli) oyuncu adi kullanilir.
 	const FString Canonical = FriendPlayerNameOf(Target);
+	// Oturumdan oturuma degisen misafir adlari ("Player123") baska birini gosterebilir (QA).
+	if (Canonical.StartsWith(TEXT("Player"), ESearchCase::IgnoreCase)
+		&& Canonical.RightChop(6).IsNumeric())
+	{
+		NotifyOwner(TEXT("Misafir adli oyuncu eklenemez; once MMOSetName ile kalici bir ad almali."));
+		return;
+	}
 	if (Canonical.IsEmpty() || Canonical.Len() > MaxNameLength)
 	{
 		NotifyOwner(TEXT("Bu oyuncu eklenemez."));
@@ -152,7 +160,7 @@ void UMMOFriendsComponent::CmdAdd(const FString& Name)
 	}
 	Friends.Add(Canonical);
 	NotifyOwner(FString::Printf(TEXT("%s arkadas listene eklendi."), *Canonical));
-	Me->SaveCharacter();
+	SaveThrottled(Me);
 }
 
 void UMMOFriendsComponent::CmdRemove(const FString& Name)
@@ -175,11 +183,24 @@ void UMMOFriendsComponent::CmdRemove(const FString& Name)
 			const FString Removed = Friends[i];
 			Friends.RemoveAt(i);
 			NotifyOwner(FString::Printf(TEXT("%s arkadas listenden silindi."), *Removed));
-			Me->SaveCharacter();
+			SaveThrottled(Me);
 			return;
 		}
 	}
 	NotifyOwner(FString::Printf(TEXT("%s arkadas listende yok."), *N.Left(MaxNameLength)));
+}
+
+void UMMOFriendsComponent::SaveThrottled(AMMOCharacter* Me)
+{
+	// Tam diske kayit pahali: ekle/sil spam'i saniyede onlarca yazma uretmesin. Arada kalan
+	// degisiklikler 60 sn'lik otomatik kayitla ve cikista yazilir.
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (Me && Now - LastFriendSaveTime >= FriendSaveCooldown)
+	{
+		LastFriendSaveTime = Now;
+		Me->SaveCharacter();
+	}
 }
 
 void UMMOFriendsComponent::CmdList()
@@ -209,7 +230,7 @@ void UMMOFriendsComponent::CmdList()
 	}
 }
 
-void UMMOFriendsComponent::AnnouncePresence(bool bOnline) const
+void UMMOFriendsComponent::AnnouncePresence(bool bOnline, const FString& NameOverride) const
 {
 	const UWorld* World = GetWorld();
 	const AMMOCharacter* Me = GetOwnerCharacter();
@@ -217,11 +238,30 @@ void UMMOFriendsComponent::AnnouncePresence(bool bOnline) const
 	{
 		return;
 	}
-	const FString MyName = FriendPlayerNameOf(Me);
+	const FString MyName = NameOverride.IsEmpty() ? FriendPlayerNameOf(Me) : NameOverride;
 	if (MyName.IsEmpty())
 	{
 		return;
 	}
+
+	// Durum tekrari bastirma: ayni ad icin ayni durum zaten duyurulduysa sus. Bolge gecisinde
+	// eski pawn "cevrimdisi" duyurmaz, yeni pawn tekrar "cevrimici" demez. Guvenlik: 5 dk'dan eski
+	// "cevrimici" kaydi (kopma sirasinda cevrimdisi kacmis olabilir) yenilenebilir.
+	static TMap<FString, TPair<bool, double>> GAnnounced;
+	const FString Key = MyName.ToLower();
+	const double NowSec = FPlatformTime::Seconds();
+	if (const TPair<bool, double>* Last = GAnnounced.Find(Key))
+	{
+		if (Last->Key == bOnline && (NowSec - Last->Value) < 300.0)
+		{
+			return;
+		}
+	}
+	if (!bOnline && !GAnnounced.Contains(Key))
+	{
+		return; // hic cevrimici duyurulmamis ad icin cevrimdisi duyuru gitmez
+	}
+	GAnnounced.Add(Key, TPair<bool, double>(bOnline, NowSec));
 	const FString Text = FString::Printf(TEXT("%s %s"), *MyName, bOnline ? TEXT("cevrimici oldu.") : TEXT("cevrimdisi oldu."));
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{

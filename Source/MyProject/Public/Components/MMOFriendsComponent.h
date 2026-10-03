@@ -42,7 +42,9 @@ public:
 
 	// Sahibi cevrimici oldu/cikti: listesinde bu karakter olan diger cevrimici oyunculara sistem satiri.
 	// Yalniz otorite. (Giris: AMMOCharacter::AutoLoadDeferred, cikis: AMMOCharacter::EndPlay.)
-	void AnnouncePresence(bool bOnline) const;
+	// NameOverride bos degilse o ad icin duyurur (ad degisiminde eski adi cevrimdisi yapmak icin).
+	// Ayni durum tekrar duyurulmaz (bolge gecisinde sahte "cevrimici oldu" yok; QA ORTA-1).
+	void AnnouncePresence(bool bOnline, const FString& NameOverride = FString()) const;
 
 	// --- Kalicilik (yalniz otorite) ---
 	void FillSaveData(struct FMMOCharacterSaveData& Out) const;
@@ -54,4 +56,9 @@ protected:
 
 	// Sahibin ekranina sistem sohbet satiri gonderir.
 	void NotifyOwner(const FString& Text) const;
+
+	// Ekle/sil sonrasi tam kayit en fazla 5 sn'de bir; arada otomatik kayit (60 sn) tutar (QA ORTA-4).
+	float LastFriendSaveTime = -100.f;
+	void SaveThrottled(AMMOCharacter* Me);
+	static constexpr float FriendSaveCooldown = 5.f;
 };

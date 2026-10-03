@@ -683,7 +683,14 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	}
 	if (APlayerState* PS = GetPlayerState())
 	{
+		const FString OldName = PS->GetPlayerName();
 		PS->SetPlayerName(Trimmed);
+		// Ad degisince arkadaslar eski adi cevrimdisi, yeni adi cevrimici gorsun (QA ORTA-2).
+		if (FriendsComponent && IsPlayerControlled() && !OldName.Equals(Trimmed, ESearchCase::IgnoreCase))
+		{
+			FriendsComponent->AnnouncePresence(false, OldName);
+			FriendsComponent->AnnouncePresence(true);
+		}
 	}
 	if (GEngine && IsLocallyControlled())
 	{
