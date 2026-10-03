@@ -671,6 +671,147 @@ görevleri Uçurum Gezginleri'ni ve Uçurum Hattı'nı bitirenlere açılır.*
   - *Dönüşte:* "Siper yıkıldı, doğunun yolu açık. Al şu Büyük Can İksirleri'ni
     ve soluklan; Naibin karşısına yorgun çıkma."
 
+## Görevler (Anlatı): Başlangıç ve Orta Bölge Görevleri (Lv1–50)
+
+*Yaşlı Doran'ın Akçakule'de ilk verdiği işlerden Kış Diyarı'nın fırtınasına kadar
+uzanan görevler. Başlangıç zinciri Akçakule'nin çevresinden Ork Reisi'ne dek
+sürer; ardından Obsidyen Sırtları, Alacakaranlık Korusu ve Kış Diyarı zincirleri
+birbirini izler. Yan görevler zinciri kilitlemez.*
+
+### Başlangıç Zinciri: Akçakule'den Ork Reisi'ne
+
+- **Goblin Avı** *(Q_Goblins)* — "Hoş geldin, evlat. Çakılı vadilerde goblin
+  çeteleri pusu kuruyor; tek başına zayıftırlar ama sayıları çoktur. Beşini temizle
+  ki kasabanın etrafı biraz nefes alsın."
+  - *Dönüşte:* "İlk işin hayırlı olsun. Al şu Can İksirleri'ni; yara almadan büyüyen
+    maceracı görmedim."
+- **Kurt Sürüsü** *(Q_Wolves)* — "Kuzey tepelerinin kurtları yola inmeye başladı;
+  geceleri ulumaları muhafızların uykusunu kaçırıyor. Beşini avla, ama sürüden ayrı
+  düşenleri seç."
+  - *Dönüşte:* "Yollar sessiz. Al şu Mana İksirleri'ni; bundan sonra kafanı da
+    yormak zorunda kalacaksın."
+- **Ork Tehdidi** *(Q_Orcs)* — "Doğu geçitlerinden orklar sızıyor. Goblinlere
+  benzemezler, evlat; iri, öfkeli ve vuruşları ağırdır. Üçünü devir, ama onlara
+  çok yaklaşma."
+  - *Dönüşte:* "Üçünü de yendin demek. Fısıltının ordusu yavaş yavaş görünüyor
+    artık."
+- **Haydutları Temizle** *(Q_Bandits)* — "Kırık Zincir'in artıkları ticaret yolunu
+  kesiyor. Çoğu Uzun Kış'ta her şeyini kaybetmiş adamlar; yine de kervana el
+  kaldıranın hakkı dörttür. Dördünü temizle."
+  - *Dönüşte:* "Yol açıldı, kervanlar yeniden gelir. Acıma çok yersiz değil,
+    ama yol da yolcudur."
+- **Ork Reisini Yen** *(Q_Boss)* — "Dağınık orkları tek bir yumruk altında toplayan
+  biri var: Ork Reisi. Fısıltının ilk büyük kılıcı o. Onu devir, evlat; Akçakule'ye
+  yürüyüşü başsız kalsın."
+  - *Dönüşte:* "Reis düştü… Bu kasaba sana borçlu. Al şu Büyük Kılıç'ı; kuzeyden
+    esen rüzgâr hâlâ hayra alamet değil."
+
+### Yan Görevler: Temizlik, Trol ve İkinci Bölge
+
+- **Temizlik** *(Q_Cleanup)* — "Bölgede çıban gibi çoğaldılar, evlat. Kim olduğu
+  fark etmez, önüne çıkan ilk on canavarı temizle; muhafızlar da biraz soluklansın."
+  - *Dönüşte:* "Bir süre rahat uyuruz. Ama fısıltı dinmedikçe yenileri çıkar."
+- **Trol Avı** *(Q_Trolls)* — "Ormanın kıyısında trol dolaşıyor. Bir tanesi bile
+  bir müfrezeyi dağıtır, evlat. Üçünü seç, ama tek başına dalma."
+  - *Dönüşte:* "Sağ döndün, bu da bir hüner. Trole karşı cesaret değil, hesap
+    kazanır."
+- **Ork Savaşçıları** *(Q_OrcWarriors)* — "Karakaya Geçidi'ni baltalı savaşçılar
+  tutuyor; ordunun bel kemiği onlar. Dördünü devir, geçit biraz gevşesin."
+  - *Dönüşte:* "Baltalar sustu. Şu Çelik Miğfer'i tak; ikinci bir vuruşa fırsat
+    vermesin."
+- **Korku Kurtları** *(Q_DireWolves)* — "Karakaya'nın kayalıklarında sıradan
+  kurttan iri olanlar yuvalanmış; gözleri karanlıkta kor gibi yanar. Dördünü
+  devir, kokunu almadan önce davran."
+  - *Dönüşte:* "Gözler söndü. Al şu Çelik Bot'u; kayalıkta yolun şaşmasın."
+- **Büyük Servet** *(Q_Gold1000)* — "Kesende bin altın dursun, evlat. Parayı
+  sevdiğimden değil; savaşın kaprisi çok, hazırlıksız maceracının hesabı bellidir.
+  Biriktir, ama kasayı boş bırakma."
+  - *Dönüşte:* "Cebin dolu, aklın da dolu olsun. Altın kılıç tutmaz ama kılıcı
+    taşıyanı besler."
+
+### Obsidyen Sırtları Zinciri (Lv25-30)
+
+*Magma Tiranı düştüğünde ateş dağı soğur, lav kara cama kesilir. Zincir, Magma
+Tiranı'nı devirenlere açılır.*
+
+- **Obsidyen Avcıları** *(Q_ObsidianStalkers)* — "Ateş dağı soğudu, evlat; ama
+  kara camın üstünde yeni bir bayrak dikildi. Gölgelerde dolaşan avcılar zehirle
+  vurur. Beşini durdur."
+  - *Dönüşte:* "Sırtlar biraz daha güvenli. Al şu Obsidyen Bot'u; kara cam sivri,
+    ayağın temiz basmalı."
+- **Obsidyen Muhafızları** *(Q_ObsidianSentinels)* — "Geçidi ağır bekçiler tutuyor;
+  yavaşlar ama geri çekilmezler, darbeleri adımını ağırlaştırır. Beşini devir ki
+  yol açılsın."
+  - *Dönüşte:* "Geçit açık. Bu Obsidyen Kask senin; aklın keskin, başın sağlam
+    kalsın."
+- **Obsidyen Akıncıları** *(Q_ObsidianRaiders)* — "Kara camdan kalkanlarla yola
+  dökülen ork akıncıları… Canları azaldıkça gözleri döner, öfkeleri katlanır. Beşini
+  dağıt, ardından reisi gör."
+  - *Dönüşte:* "Akıncılar dağıldı. Al şu Obsidyen Zırh'ı; ateşin artığından bile
+    kalkan çıkar, işte öyle."
+- **Obsidyen Reisi** *(Q_ObsidianWarlord)* — "Karakaya'da düşen reisin kan bağı
+  sırtlarda orduyu yeniden topluyor. Aynı kandan, aynı öfke. Devir onu, evlat;
+  ordusu bir daha toplanmasın."
+  - *Dönüşte:* "Kan bağı koptu, ordu başsız. Al şu Obsidyen Kılıç'ı. Ama fısıltı
+    buna rağmen susmadı — gölgeler daha batıda uzuyor."
+
+### Alacakaranlık Korusu Zinciri (Lv31-40)
+
+*Obsidyen Reisi'nin ardından fısıltı ormanın kalbinde güçlenir. Zincir, Obsidyen
+Reisi'ni devirenlere açılır.*
+
+- **Alacakaranlık Avcıları** *(Q_DuskProwlers)* — "Gün ile gecenin arasındaki
+  boşlukta avlanan yaratıklar var, evlat; ısırıkları zehirler. Korunun kıyısından
+  başla, beşini durdur."
+  - *Dönüşte:* "Kıyı temiz. Al şu Büyük Can İksirleri'ni; zehrin götürdüğünü
+    bunlar geri getirir."
+- **Alacakaranlık Muhafızları** *(Q_DuskGuardians)* — "Korunun yollarını ağır
+  bekçiler tutuyor; yavaştırlar ama bir darbede adımın ağırlaşır. Beşini devir,
+  gölgede kaybolma."
+  - *Dönüşte:* "Yollar açıldı. Alacakaranlık Botu'nu giy; ışığın hiç tam olmadığı
+    yerde ayağın şaşmasın."
+- **Alacakaranlık Yağmacıları** *(Q_DuskReavers)* — "Koruya sığınan iri ork
+  yağmacılar kervanları soyuyor; yaralandıkça çıldırırlar. Beşini dağıt."
+  - *Dönüşte:* "Yağma bitti. Alacakaranlık Kaskı senin; bu gölgede baş dik durur."
+- **Alacakaranlık Hayaletleri** *(Q_DuskWraiths)* — "Korunun sisinde süzülen
+  gölgeler var; dokunuşları bedeni ağırlaştırır. Fısıltı burada ninni gibidir,
+  evlat. Beşini kov, ninniyi dinleme."
+  - *Dönüşte:* "Sis inceldi, gözün açık kaldı. Al şu Alacakaranlık Zırhı'nı; gölge
+    seni sahiplenmesin."
+- **Alacakaranlık Hükümdarı** *(Q_DuskOverlord)* — "Korunun kalbinde hüküm süren
+  bir efendi var. Yıllarca fısıltının sahibi sandık onu. Devir onu, evlat;
+  korunun alacakaranlığı dağılsın."
+  - *Dönüşte:* "Koru aydınlandı… ama fısıltı susmadı. Köklerden geliyordu, kuzeye
+    çekildi. Al şu Alacakaranlık Kılıcı'nı; Kuzey Yolu seni bekliyor."
+
+### Kış Diyarı Zinciri (Lv42-50)
+
+*Fısıltının peşinden Akçakule ilk kez Kuzey Yolu'nu açar. Zincir, Alacakaranlık
+Hükümdarı'nı devirenlere açılır.*
+
+- **Kış İzcileri** *(Q_WinterStalkers)* — "Kuzey Yolu'nun sonunda Ayazdiş'ten de
+  beyaz bir toprak var, evlat: Kış Diyarı. Karda iz bırakmadan koşan izciler yolu
+  tutuyor. Beşini durdur; dokunuşları adımını ağırlaştırır."
+  - *Dönüşte:* "İzciler sustu. Al şu Büyük Can İksirleri'ni; bu soğukta yara
+    geç kapanır."
+- **Kış Muhafızları** *(Q_WinterGuardians)* — "Diyarın geçitlerini sabırlı
+  bekçiler tutuyor; darbeleri avı yavaşlatır. Beşini devir ki ilerleyebilelim."
+  - *Dönüşte:* "Geçit açıldı. Kış Botu'nu giy; buz sağlam basana yol verir."
+- **Kış Yağmacıları** *(Q_WinterReavers)* — "Fırtınanın içinden iri ork
+  yağmacılar çıkıyor; canları azaldıkça öfkeleri alevlenir. Beşini dağıt, geride
+  kimse kalmasın."
+  - *Dönüşte:* "Yağma durdu. Bu Kış Kaskı senin; fırtına gözünü yaksa da aklın
+    berrak kalsın."
+- **Kış Hayaletleri** *(Q_WinterWraiths)* — "Uzun Kış'ın en eski ölüleri bunlar,
+  evlat; dokunuşları kanı ağırlaştırır. Beşini kov, ama sayılarını sayma."
+  - *Dönüşte:* "Ölüler yatışıyor. Kış Zırhı'nı giy; soğuk onlardan geliyor, senden
+    değil."
+- **Kış Hükümdarı** *(Q_WinterSovereign)* — "Diyarın tahtında oturan, Uzun Kış'ın
+  asıl sahibi. Buz Lordu bile bir vali sayılırmış yanında. Devir onu; dokunuşu
+  bedenini ağırlaştırır, öfkesi fırtına gibi kabarır."
+  - *Dönüşte:* "Fırtına dindi, evlat… ufuk göründü, görüyor musun? Al şu Kış
+    Kılıcı'nı; ötesi artık senin yolun."
+
 ## Depocu Rana: Ortak Defter
 
 Yaz'ın da Kış'ın da hub'ında, Satıcı Merek'in tezgâhının tam karşısında bir ambar

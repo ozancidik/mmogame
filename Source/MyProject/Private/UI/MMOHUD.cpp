@@ -16,6 +16,7 @@
 #include "Skills/MMOSkillDatabase.h"
 #include "Items/MMOItemDatabase.h"
 #include "Quests/MMOQuestTypes.h"
+#include "Quests/MMOQuestDialogue.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOQuestGiverNPC.h"
 #include "World/MMOTalkerNPC.h"
@@ -2489,6 +2490,12 @@ bool AMMOHUD::HandleQuestClick(const FVector2D& Pos)
 		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
 		{
 			Q->AcceptQuest(R.SkillId);
+			// Gorev alis repligi (docs/Lore.md -> MMOQuestDialogue.cpp); yoksa sessizce gec.
+			const FString AcceptLine = FMMOQuestDialogue::GetAcceptLine(R.SkillId);
+			if (!AcceptLine.IsEmpty())
+			{
+				ShowNpcDialogue(TEXT("Yasli Doran"), AcceptLine);
+			}
 			return true;
 		}
 	}
@@ -2497,6 +2504,11 @@ bool AMMOHUD::HandleQuestClick(const FVector2D& Pos)
 		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
 		{
 			Q->ClaimReward(R.SkillId);
+			const FString TurnInLine = FMMOQuestDialogue::GetTurnInLine(R.SkillId);
+			if (!TurnInLine.IsEmpty())
+			{
+				ShowNpcDialogue(TEXT("Yasli Doran"), TurnInLine);
+			}
 			return true;
 		}
 	}
