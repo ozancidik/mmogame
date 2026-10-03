@@ -76,6 +76,21 @@ for qid, q in quests.items():
     if q["reward"] and q["reward"] not in items:
         errors.append(f"{qid}: odul ekipman yok -> {q['reward']}")
 
+# Zincir tutarliligi: gorev kapisi, on kosul gorevin kapisindan dusuk olmamali
+for qid, q in quests.items():
+    pre = quests.get(q["prereq"]) if q["prereq"] else None
+    if pre and q["req"] < pre["req"]:
+        warnings.append(f"{qid}: kapi Lv{q['req']} ama on kosul {q['prereq']} kapisi Lv{pre['req']} (zincir geri gidiyor)")
+
+# Odul ekipmaninin kusanma seviyesi, gorev tamamlandiginda ulasilabilir mi (kapi + 2)
+item_levels = {}
+for m in re.finditer(r'MakeItem\(TEXT\("([^"]+)"\),\s*TEXT\("[^"]*"\),\s*S::\w+,\s*[\d.]+f,\s*[\d.]+f,\s*(\d+)', item_src):
+    item_levels[m.group(1)] = int(m.group(2))
+for qid, q in quests.items():
+    lv = item_levels.get(q["reward"]) if q["reward"] else None
+    if lv is not None and lv > q["req"] + 2:
+        warnings.append(f"{qid}: odul {q['reward']} Lv{lv} gerektiriyor, gorev kapisi Lv{q['req']} (hemen kusanilamaz)")
+
 # On kosul dongusu
 for qid in quests:
     seen, cur = set(), qid
@@ -86,7 +101,7 @@ for qid in quests:
         seen.add(cur)
         cur = quests[cur]["prereq"]
 
-print(f"Mob: {len(mobs)}  Item: {len(items)}  Gorev: {len(quests)}")
+print(f"Mob: {len(mobs)}  Item: {len(items)} (seviyesi okunan: {len(item_levels)})  Gorev: {len(quests)}")
 for w in warnings:
     print("UYARI:", w)
 for e in errors:
