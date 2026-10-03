@@ -14,6 +14,7 @@
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
 #include "Components/MMOClanComponent.h"
+#include "Components/MMOFriendsComponent.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 #include "Engine/SkeletalMesh.h"
@@ -41,6 +42,7 @@ AMMOMob::AMMOMob()
 	// Mob oyuncu ticaret/klan bilesenlerini tasimaz (QA): gereksiz replike alt nesneleri kapat.
 	if (GetTradeComponent()) { GetTradeComponent()->SetIsReplicated(false); }
 	if (GetClanComponent()) { GetClanComponent()->SetIsReplicated(false); }
+	if (GetFriendsComponent()) { GetFriendsComponent()->SetIsReplicated(false); }
 
 	// Hareket yonune donsun.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())

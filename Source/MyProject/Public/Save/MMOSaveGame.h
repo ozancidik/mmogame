@@ -103,6 +103,10 @@ struct FMMOCharacterSaveData
 	UPROPERTY(SaveGame)
 	bool bClanLeader = false;
 
+	// Arkadas listesi (karakter basina, en fazla 30 ad). Eski kayitlarda bos gelir.
+	UPROPERTY(SaveGame)
+	TArray<FString> Friends;
+
 	// Konum
 	// Eski kayitlarda bos gelir; yeni kayitlarda konumu hangi haritada aldigimizi tutar.
 	UPROPERTY(SaveGame)

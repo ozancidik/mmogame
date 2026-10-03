@@ -27,6 +27,7 @@
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
 #include "Components/MMOClanComponent.h"
+#include "Components/MMOFriendsComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
@@ -146,7 +147,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
 		LastChatServerTime = Now;
-		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /yardim"), 2);
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, sil isim, liste), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
@@ -246,6 +247,42 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		else
 		{
 			ClientReceiveChat(FString(), TEXT("Kullanim: /klan kur ad, /klan davet, /klan kabul, /klan ayril, /klan at isim, /klan liste"), 2);
+		}
+		return;
+	}
+	// Arkadas listesi: "/arkadas ekle <isim>", "/arkadas sil <isim>", "/arkadas" veya "/arkadas liste".
+	if (Msg.Equals(TEXT("/arkadas"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/arkadas "), ESearchCase::IgnoreCase))
+	{
+		LastChatServerTime = Now;
+		UMMOFriendsComponent* Friends = nullptr;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			Friends = Me->GetFriendsComponent();
+		}
+		const FString Rest = Msg.RightChop(8).TrimStartAndEnd();
+		FString Sub = Rest;
+		FString Arg;
+		Rest.Split(TEXT(" "), &Sub, &Arg);
+		Arg = Arg.TrimStartAndEnd();
+		if (!Friends)
+		{
+			ClientReceiveChat(FString(), TEXT("Arkadas listesi su an kullanilamaz."), 2);
+		}
+		else if (Sub.IsEmpty() || Sub.Equals(TEXT("liste"), ESearchCase::IgnoreCase))
+		{
+			Friends->CmdList();
+		}
+		else if (Sub.Equals(TEXT("ekle"), ESearchCase::IgnoreCase))
+		{
+			Friends->CmdAdd(Arg);
+		}
+		else if (Sub.Equals(TEXT("sil"), ESearchCase::IgnoreCase))
+		{
+			Friends->CmdRemove(Arg);
+		}
+		else
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /arkadas ekle isim, /arkadas sil isim, /arkadas liste"), 2);
 		}
 		return;
 	}

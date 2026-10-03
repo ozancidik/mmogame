@@ -2938,3 +2938,17 @@ Kapsam: `MMOClanComponent.cpp/.h`, `ServerSendChat` klan/`/g` dalları, `ClientR
 - [ ] **Çevrimdışı ad kapma (ORTA-2 doğrulama):** A klan kurup `MMOSave`+çıkış; B (başka karakter) aynı adla `/klan kur` yapıp C'yi davet etsin. A yeniden girince: A'nın liderliği X'ten alıp almadığına, C'nin A'nın klanında kalıp kalmadığına, B'ye bildirim gidip gitmediğine bak ve not et. Beklenen (düzeltme sonrası): çakışma engellenir ya da kimse sessizce devralınmaz.
 - [ ] **`/yardim` ve gerileme:** `/yardim`, `/who`, `/p mesaj`, `/w isim mesaj`, `/trade`, `/trade iptal` hâlâ eskisi gibi çalışmalı; `/klanlar` ya da `/gelmek` gibi komut olmayan metinler genel sohbete düz metin olarak gitmeli.
 - [ ] **Hız sınırı:** Sohbet kutusundan hızlıca art arda `/klan liste` (0,7 sn'den kısa) → fazla olanlar sessizce düşmeli, çökme/yığılma olmamalı.
+
+# Arkadaş listesi — 2026-10-03
+
+Aşağıdakiler derleme sonrası PIE/listen-server (en az 2 oyuncu) ile denenecek:
+
+- [ ] **Ekleme:** A, B çevrimiçiyken `/arkadas ekle B` (büyük/küçük harf farkı olsa da, örn. `/arkadas ekle b`) → "B arkadas listene eklendi." Aynı komut tekrar → "zaten arkadas listende"; `/arkadas ekle A` (kendi adı) → reddedilmeli; `/arkadas ekle YokBoyleBiri` → "cevrimici oyuncu bulunamadi"; boş isim / 24+ karakter → kullanım / "cok uzun" uyarısı.
+- [ ] **Liste:** `/arkadas` ve `/arkadas liste` aynı çıktıyı vermeli: B çevrimiçiyken "B - cevrimici (LvN)", B çıkınca "B - cevrimdisi". Boş listede "Arkadas listen bos".
+- [ ] **Silme:** `/arkadas sil b` (küçük harf) → silinmeli; listede olmayan ad → "arkadas listende yok".
+- [ ] **Tek yönlülük:** A, B'yi eklediğinde B'ye hiçbir bildirim gitmemeli ve B'nin listesi değişmemeli.
+- [ ] **Durum bildirimi:** A listesinde B varken B oyuna girince A'ya "B cevrimici oldu." (kanal 2 sistem satırı), B oyundan çıkınca (pencereyi kapat / bağlantıyı kes) "B cevrimdisi oldu." gelmeli. Listesinde B olmayan üçüncü oyuncuya bildirim gitmemeli. Not: bölge geçişinde (travel) çevrimdışı satırı atlanıyor, geçiş sonrası "cevrimici oldu" satırı gelebilir; bunu not et.
+- [ ] **Kalıcılık:** Arkadaş ekle, `MMOSave`, oyundan çık, tekrar gir → `/arkadas` aynı isimleri göstermeli. Eski kaydı olan (Friends alanı olmayan) karakterle giriş → liste boş, çökme yok.
+- [ ] **Sınırlar:** 30 arkadaştan sonra ekleme → "Arkadas listesi dolu (en fazla 30)". (Çok oyuncu gerektirdiğinden istenirse sadece kod okuyarak doğrula.)
+- [ ] **Sahibine replikasyon:** İstemci oyuncuda `/arkadas ekle` çalışmalı (sunucuya gider), başka oyuncunun listesi görünmemeli.
+- [ ] **Gerileme:** `/yardim` metninde `/arkadas` görünmeli; `/klan`, `/g`, `/p`, `/w`, `/who`, `/trade` aynen çalışmalı; `/arkadaslar` gibi komut olmayan metin genel sohbete düz metin gitmeli; hızlı art arda komut (0,7 sn) sessizce düşmeli.

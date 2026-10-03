@@ -9,6 +9,7 @@
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
 #include "Components/MMOClanComponent.h"
+#include "Components/MMOFriendsComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
@@ -53,6 +54,7 @@ AMMOCharacter::AMMOCharacter()
 	PartyComponent = CreateDefaultSubobject<UMMOPartyComponent>(TEXT("PartyComponent"));
 	TradeComponent = CreateDefaultSubobject<UMMOTradeComponent>(TEXT("TradeComponent"));
 	ClanComponent = CreateDefaultSubobject<UMMOClanComponent>(TEXT("ClanComponent"));
+	FriendsComponent = CreateDefaultSubobject<UMMOFriendsComponent>(TEXT("FriendsComponent"));
 
 	// Saldiri animasyonlari. Sira onemli: 0..2 = yakin dovus varyasyonlari, 3 = buyu okuma.
 	// Kilic savurma Mixamo'dan alinip Manny iskeletine retarget edildi (RT_ onekli).
@@ -252,6 +254,12 @@ void AMMOCharacter::AutoLoadDeferred()
 {
 	// bInitialLoadComplete artik LoadCharacter() icinde (her cagiran yoldan) set edilir.
 	LoadCharacter();
+
+	// Giris tamam: listesinde bu oyuncu olan cevrimici arkadaslara haber ver.
+	if (HasAuthority() && IsPlayerControlled() && FriendsComponent)
+	{
+		FriendsComponent->AnnouncePresence(true);
+	}
 }
 
 void AMMOCharacter::MoveToPlayerStart()
@@ -376,6 +384,12 @@ void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		{
 			PartyComponent->RequestLeave();
 		}
+
+		// Gercek cikis (Destroyed; bolge gecisi/kapanis degil): arkadaslara cevrimdisi haberi.
+		if (FriendsComponent && EndPlayReason == EEndPlayReason::Destroyed && !bTravelSaveCommitted)
+		{
+			FriendsComponent->AnnouncePresence(false);
+		}
 	}
 	Super::EndPlay(EndPlayReason);
 }
@@ -461,6 +475,10 @@ bool AMMOCharacter::SaveCharacterForTravel()
 	{
 		ClanComponent->FillSaveData(D);
 	}
+	if (FriendsComponent)
+	{
+		FriendsComponent->FillSaveData(D);
+	}
 	D.MapName = UGameplayStatics::GetCurrentLevelName(this, true);
 	D.Location = GetActorLocation();
 	D.Rotation = GetActorRotation();
@@ -532,6 +550,10 @@ bool AMMOCharacter::LoadCharacter()
 	if (ClanComponent)
 	{
 		ClanComponent->ApplySaveData(D);
+	}
+	if (FriendsComponent)
+	{
+		FriendsComponent->ApplySaveData(D);
 	}
 
 	// Eski/bozuk kayit koordinati harita disinda, boslukta veya navmesh disinda olabilir.
