@@ -123,6 +123,7 @@ protected:
 	float LastConfirmTime = -100.f;
 	static constexpr float ConfirmLockSeconds = 1.0f;
 	static constexpr float ConfirmCooldown = 0.5f;
+	static constexpr float IdleTimeoutSeconds = 180.f;
 	FTimerHandle ValidateTimerHandle;
 
 	static constexpr float InviteCooldown = 3.f;

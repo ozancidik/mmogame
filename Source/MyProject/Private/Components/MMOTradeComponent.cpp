@@ -563,6 +563,13 @@ void UMMOTradeComponent::ValidateTick()
 	if (FVector::Dist(Self->GetActorLocation(), Other->GetActorLocation()) > CancelDistance)
 	{
 		EndTradeServer(TEXT("Ticaret iptal edildi: oyuncular birbirinden uzaklasti."));
+		return;
+	}
+	// Bosta kalan ticaret (AFK partner) pencereyi/kilitleri sonsuza dek acik tutmasin.
+	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	if (Now - LastTradeChangeTime > IdleTimeoutSeconds)
+	{
+		EndTradeServer(TEXT("Ticaret iptal edildi: uzun suredir islem yapilmadi."));
 	}
 }
 
