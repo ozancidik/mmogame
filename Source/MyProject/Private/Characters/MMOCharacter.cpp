@@ -1029,19 +1029,12 @@ bool AMMOCharacter::CanHarmPlayer(const AMMOCharacter* Victim, const TCHAR*& Out
 	}
 
 	// Hub guvenli bolgesi: saldiran ya da hedef PlayerStart'a 700u icindeyse PvP yok.
-	if (const UWorld* World = GetWorld())
+	constexpr float SafeRadius = 700.f;
+	if (MMOTargeting::IsInsideHubSafeZone(this, GetActorLocation(), SafeRadius)
+		|| MMOTargeting::IsInsideHubSafeZone(this, Victim->GetActorLocation(), SafeRadius))
 	{
-		constexpr float SafeRadius = 700.f;
-		for (TActorIterator<APlayerStart> It(World); It; ++It)
-		{
-			const FVector Hub = It->GetActorLocation();
-			if (FVector::Dist2D(GetActorLocation(), Hub) < SafeRadius
-				|| FVector::Dist2D(Victim->GetActorLocation(), Hub) < SafeRadius)
-			{
-				OutReason = TEXT("Guvenli bolgede PvP yok");
-				return false;
-			}
-		}
+		OutReason = TEXT("Guvenli bolgede PvP yok");
+		return false;
 	}
 	return true;
 }
