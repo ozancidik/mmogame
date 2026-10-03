@@ -14,6 +14,15 @@ The MMORPG systems are written in C++ so they can be edited and compiled without
 - `UMMOStatsComponent` (`Public/Components/`, `Private/Components/`) — the stat system core: primary stats (STR/DEX/INT/VIT), level/experience with an exponential curve, derived vitals (MaxHealth/MaxMana/AttackPower/Defense), and a server-authoritative combat/progression API (`ApplyDamage`, `Heal`, `ConsumeMana`, `GainExperience`, `SpendStatPoint`, `Revive`). Fully replicated with `OnRep_*` handlers that fire `BlueprintAssignable` delegates for UI.
 - `AMMOCharacter` (`Public/Characters/`, `Private/Characters/`) — `ACharacter` subclass that owns a `UMMOStatsComponent`, routes engine damage (`TakeDamage`) into it, and exposes an `OnCharacterDied` BlueprintImplementableEvent. `BP_ThirdPersonCharacter` is reparented to this class so the existing character gains stats.
 
+Rest of the module (all server-authoritative; see `docs/` for design/progress):
+- **Components** (`Components/`): `UMMOInventoryComponent` (gold, consumables, equipment bag of 12, 4 equipped slots, +N upgrade/burn, vendor buy/sell, 24-slot warehouse), `UMMOSkillComponent` (4 classes, mastery trees, hotbar, cooldowns), `UMMOQuestComponent` (kill/level/gold quests, prerequisite chains, claim rewards), `UMMOPartyComponent` (party XP share, invites).
+- **Characters**: `AMMOMob` + `FMMOMobArchetype` table (`MMOMobArchetype.cpp`, Lv1-80 normals/elites; XP scaled by level gap in `ScaleXPForLevelGap`), `AMMOMobSpawner` (level-band or forced-archetype spawner with navmesh/ground validation).
+- **World NPCs** (`World/`, share `AMMONpcBase`): vendor, quest giver, talker (LLM dialogue via `UMMODialogueSubsystem`), healer, warehouse; `AMMOLootPickup`.
+- **Data tables in code**: items `MMOItemDatabase.cpp`, quests `MMOQuestTypes.cpp`, skills `MMOSkillDatabase.cpp`, effects `MMOEffectDatabase.cpp`. Add new rows following the existing `Make*` factory pattern; IDs must be unique.
+- **Core/UI/Player**: `AMMOGameMode` (spawns hub NPCs and all spawners; Summer_scene and Winter_scene layouts live here), `AMMOPlayerController` (click-to-move, hotbar, chat via Enter: `/p` party, `/w` whisper, `/who`, `/yardim`), `AMMOHUD` (Canvas-only HUD and windows), `UMMOSaveGame` (per-player-name slot).
+- **Maps**: `Summer_scene` (Lv1-40 hub area + Lv58-65 outer pockets) and `Winter_scene` (Lv41-57 + Lv66-80). Navmesh bounds were enlarged by `Scripts/ExtendSummerNavigation.py` / `ExtendWinterNavigation.py`; new spawn spots must be probed headless (see `docs/PROGRESSION_PLAN.md`).
+- **Docs**: `docs/PROGRESSION_PLAN.md` (Lv1-80 plan), `docs/PLAYTEST_CHECKLIST.md` (untested-in-PIE checklist, QA findings), `docs/Lore.md`, `docs/NpcDialogue.md`, `docs/CLOUD_TASKS.md` (what a cloud session may do: no compile, no binary assets).
+
 Design intent: authority (server/host) mutates stats; values replicate to clients; `OnRep` handlers drive UI. Keep new gameplay systems server-authoritative and replication-ready from the start.
 
 ## Building the C++ module
