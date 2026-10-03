@@ -141,6 +141,32 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	{
 		return; // bos parti mesaji: genel sohbete "/p" olarak sizmasin
 	}
+	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
+	{
+		LastChatServerTime = Now;
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /yardim"), 2);
+		return;
+	}
+	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
+	{
+		LastChatServerTime = Now;
+		FString List;
+		int32 Count = 0;
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			const AMMOPlayerController* PC = Cast<AMMOPlayerController>(It->Get());
+			if (!PC || !PC->PlayerState)
+			{
+				continue;
+			}
+			const AMMOCharacter* Ch = Cast<AMMOCharacter>(PC->GetPawn());
+			const int32 Lv = (Ch && Ch->GetStats()) ? Ch->GetStats()->Level : 0;
+			List += FString::Printf(TEXT("%s%s (Lv%d)"), Count > 0 ? TEXT(", ") : TEXT(""), *PC->PlayerState->GetPlayerName(), Lv);
+			++Count;
+		}
+		ClientReceiveChat(FString(), FString::Printf(TEXT("Cevrimici (%d): %s"), Count, *List), 2);
+		return;
+	}
 	if (Msg.StartsWith(TEXT("/p "), ESearchCase::IgnoreCase))
 	{
 		Channel = 1;
