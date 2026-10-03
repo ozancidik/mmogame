@@ -60,6 +60,10 @@ void AMMOHUD::DrawHUD()
 	DrawFloatingTexts();
 	DrawTargetBar();
 	DrawChat();
+	if (AMMOCharacter* ThreatPlayer = Cast<AMMOCharacter>(GetOwningPawn()))
+	{
+		DrawNearbyThreat(ThreatPlayer);
+	}
 
 	AMMOCharacter* MMOChar = Cast<AMMOCharacter>(GetOwningPawn());
 	if (!MMOChar)
@@ -648,6 +652,52 @@ void AMMOHUD::DrawEnemyHealthBars()
 		DrawRect(FLinearColor(0.15f, 0.15f, 0.16f, 0.9f), BX, BY, BarW, BarH);
 		DrawRect(FLinearColor(0.85f, 0.12f, 0.12f, 1.f), BX, BY, BarW * S->GetHealthPercent(), BarH);
 	}
+}
+
+void AMMOHUD::DrawNearbyThreat(AMMOCharacter* PlayerChar)
+{
+	UWorld* World = GetWorld();
+	UMMOStatsComponent* MyStats = PlayerChar ? PlayerChar->GetStats() : nullptr;
+	if (!Canvas || !World || !MyStats || MyStats->bIsDead)
+	{
+		return;
+	}
+
+	// Istemcide spawner'lar yok (replike degil); yakindaki en yakin canli mob bolgeyi anlatir.
+	const AMMOMob* Nearest = nullptr;
+	float BestSq = 3000.f * 3000.f;
+	for (TActorIterator<AMMOMob> It(World); It; ++It)
+	{
+		const AMMOMob* M = *It;
+		if (!M || !M->GetStats() || M->GetStats()->bIsDead)
+		{
+			continue;
+		}
+		const float D = FVector::DistSquared(M->GetActorLocation(), PlayerChar->GetActorLocation());
+		if (D < BestSq)
+		{
+			BestSq = D;
+			Nearest = M;
+		}
+	}
+	if (!Nearest)
+	{
+		return;
+	}
+
+	// Zorluk: oyuncu seviyesine gore. >10 ust: olumcul, >5: tehlikeli, <-5: gri (XP duser).
+	const int32 Diff = Nearest->GetMobLevel() - MyStats->Level;
+	FLinearColor Col = FLinearColor(0.85f, 0.85f, 0.85f);
+	const TCHAR* Tag = TEXT("");
+	if (Diff > 10)      { Col = FLinearColor(1.f, 0.2f, 0.2f);  Tag = TEXT("  [COK TEHLIKELI]"); }
+	else if (Diff > 5)  { Col = FLinearColor(1.f, 0.55f, 0.15f); Tag = TEXT("  [tehlikeli]"); }
+	else if (Diff < -5) { Col = FLinearColor(0.55f, 0.55f, 0.55f); Tag = TEXT("  [dusuk XP]"); }
+	else                { Col = FLinearColor(0.7f, 0.95f, 0.7f); }
+
+	const FMMOMobArchetype* NearestArch = FMMOMobDatabase::Find(Nearest->ArchetypeId);
+	const FString Txt = FString::Printf(TEXT("Yakinda: %s Lv%d%s%s"), *Nearest->GetMobName(), Nearest->GetMobLevel(),
+		(NearestArch && NearestArch->bIsElite) ? TEXT(" (elit)") : TEXT(""), Tag);
+	DrawText(Txt, Col, (float)Canvas->SizeX * 0.5f - 130.f, 14.f, nullptr, 1.0f);
 }
 
 void AMMOHUD::DrawTargetBar()

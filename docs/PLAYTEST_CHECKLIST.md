@@ -2759,6 +2759,7 @@ HUD düğmeleri aynı `RequestSetupForClass` sunucu yolunu kullanıyor. UE 5.7 C
 - [ ] **Konum:** Kutu ve kayıt sol altta hotbar'ın soluna/üstüne binmemeli (dar pencerede kontrol et; gerekirse konum ayarı yapılacak).
 - [ ] **Bölge geçişi:** Summer↔Winter geçişinden sonra Enter ile sohbet yine çalışmalı; açık kutu geçişte ekranda asılı kalmamalı.
 - [ ] **Fısıltı (`aa6a6aa`):** İki oyuncuyla "/w DigerOyuncuAdi merhaba": hedefte pembe "[Ad fısıldıyor] merhaba", gönderende pembe "[Hedef adlı oyuncuya] merhaba" çıkmalı; üçüncü oyuncu görmemeli. Olmayan isim → turuncu "bulunamadı". "/w" ya da "/w Ad" (mesajsız) → "Kullanım: /w Isim mesaj". Büyük/küçük harf fark etmemeli. Kendine fısıldamak "bulunamadı" demeli.
+- [ ] **Yakındaki tehdit göstergesi:** Ekranın üst ortasında "Yakinda: <mob> LvN" yazısı çıkmalı (3000u içindeki en yakın canlı mob). Renk: oyuncudan >10 seviye yüksek kırmızı "[COK TEHLIKELI]", >5 turuncu "[tehlikeli]", <-5 gri "[dusuk XP]", aralarda yeşil. Elitlerde "(elit)". Ölüyken ve yakında mob yokken görünmemeli. İstemcide de (host olmayan oyuncuda) çalışmalı. Yazı sohbet/uyarı satırlarıyla üst üste binerse konumu değiştirilecek.
 - [ ] **/yardim ve /who:** "/yardim" (ya da "/help") komut listesini turuncu sistem satırı olarak yalnız yazana göstermeli. "/who" çevrimiçi oyuncuları "Ad (LvN)" biçiminde sıralamalı; ölü/pawn'sız oyuncu Lv0 görünür (bilinen, zararsız).
 
 # Depocu NPC + depo penceresi — 2026-10-03

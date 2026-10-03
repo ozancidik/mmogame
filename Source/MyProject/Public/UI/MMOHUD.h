@@ -130,6 +130,7 @@ protected:
 
 	// KO'nun TargetBar'i: Z ile secilen hedefin adi + HP'si ust-ortada; hedefin tepesine isaret cizer.
 	void DrawTargetBar();
+	void DrawNearbyThreat(class AMMOCharacter* PlayerChar);
 
 	// Aktif ucan hasar sayilarini cizer/gunceller.
 	void DrawFloatingTexts();
