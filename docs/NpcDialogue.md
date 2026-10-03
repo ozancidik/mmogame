@@ -192,3 +192,32 @@ baloncuğuna sığacak kısalıktadır.*
 - **Son Siper** *(Q_AbyssBastion)* — Yaşlı Doran:
   - *Alırken:* "Yaylanın doğusunda Naibin son siperi duruyor. On iki koruyucu devir, yol açılsın."
   - *Teslimde:* "Siper yıkıldı, doğu açık. Soluklan, evlat; Naibin karşısına yorgun çıkma."
+
+---
+
+## Depocu Rana (depo görevlisi)
+
+*Yaz ve Kış hub'larındaki ambar kâtibi. Sakin, düzenli, az ve net konuşur; sözünün arkasında durur, güveni abartmadan verir.*
+
+**Karşılama**
+
+- Hoş geldin. Çanta ağır mı geldi? Bırak burada, kimse dokunmaz.
+- Her eşyanın defterde yeri var. Ne getirdiysen, aldığında aynı bulursun.
+- Kış'ta da Yaz'da da aynı defter: buraya bıraktığın her yerde seni bekler.
+
+**Depo dolu**
+
+- Defterde boş satır kalmadı, yiğit. Önce eskilerden birini al ya da bırakma.
+
+**Çanta dolu**
+
+- Çantanda yer yok. Bir şey bırak da sonra alalım; ikisini birden taşıyamazsın.
+
+**Teslim / alma sonrası**
+
+- Yazdım. Gerisini düşünme, senin yerin burada hazır bekler.
+- Al bakalım, tam teslim. Sayısı da yeri de defterde duruyor.
+
+**Veda**
+
+- Yol uzun, sırt kısa. Fazlasını bana bırak, hafif yürü.

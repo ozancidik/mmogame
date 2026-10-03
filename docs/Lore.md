@@ -670,3 +670,18 @@ görevleri Uçurum Gezginleri'ni ve Uçurum Hattı'nı bitirenlere açılır.*
   gölge kalacak."
   - *Dönüşte:* "Siper yıkıldı, doğunun yolu açık. Al şu Büyük Can İksirleri'ni
     ve soluklan; Naibin karşısına yorgun çıkma."
+
+## Depocu Rana: Ortak Defter
+
+Yaz'ın da Kış'ın da hub'ında, Satıcı Merek'in tezgâhının tam karşısında bir ambar
+kapısı durur; kapının önünde de **Depocu Rana**. Büyükannesi, Uzun Kış'ta
+Akçakule'nin kervan ambarını elinde bir defterle ayakta tutan kâtipti; Rana o
+defteri, ocağın başında ekmekle birlikte miras aldı. Serbest Keseciler ona
+"ambarın sözü" der: bir kese altın kaybolabilir, ama Rana'nın deftere yazdığı satır
+kaybolmaz. Kuzey Yolu açıldığında maceracılar yükün yolculuğa ağır geldiğini
+öğrendi; Rana da aynı defteri iki yakaya birden açtı. **Ortak defter** denen şey
+budur: Yaz'da bıraktığını Kış'ta, Kış'ta bıraktığını Yaz'da aynen geri alırsın.
+Defterin iki yakayı nasıl bağladığını soran çıkmadı değil; Rana yalnızca kalemini
+kaldırıp "Satır yerinde, gerisi benim derdim" der. Merek her şeyin bir fiyatı
+olduğuna inanır, Doran her şeyin bir terazisi olduğuna; Rana ise her şeyin bir yeri
+olduğuna.
