@@ -670,7 +670,13 @@ void AMMOMob::HandleDeath()
 			{
 				continue;
 			}
-			const int32 ScaledXP = ScaleXPForLevelGap(XPReward, R->GetStats()->Level, MobLevel);
+			int32 ScaledXP = ScaleXPForLevelGap(XPReward, R->GetStats()->Level, MobLevel);
+			// Parti power-leveling tavani (QA): mob alicidan >10 seviye yuksekse tek oldurmeden
+			// alinan XP, alicinin sonraki seviye esiginin %25'ini gecemez (Lv1 -> tek kill'de Lv18 olmasin).
+			if (MobLevel - R->GetStats()->Level > 10)
+			{
+				ScaledXP = FMath::Min(ScaledXP, FMath::Max(1, R->GetStats()->ExperienceToNextLevel / 4));
+			}
 			if (R->GetStats()->Level < R->GetStats()->MaxLevel)
 			{
 				R->ClientNotifyXPGain(ScaledXP, XPReward > 0 ? FMath::RoundToInt(100.f * ScaledXP / XPReward) : 100);
