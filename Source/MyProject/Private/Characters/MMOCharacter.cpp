@@ -944,6 +944,15 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 		}
 		return;
 	}
+	// Dostu-ates ve guvenli bolge kurallari (parti / klan / hub).
+	if (const TCHAR* BlockReason = nullptr; Victim->IsPlayerControlled() && !CanHarmPlayer(Victim, BlockReason))
+	{
+		if (GEngine && bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, BlockReason);
+		}
+		return;
+	}
 
 	// Saldiran oyuncu canlanma korumasini kaybeder (dokunulmazken vurmasin).
 	EndSpawnProtection();
@@ -988,6 +997,53 @@ void AMMOCharacter::ServerAttackTarget_Implementation(AMMOCharacter* Target)
 	// tam gecmesi icin LastMeleeTime'i bir cooldown geriye al, o da LastMeleeTime=Now yapar.
 	LastMeleeTime = Now - MeleeCooldown;
 	AttackTarget(Target);
+}
+
+bool AMMOCharacter::CanHarmPlayer(const AMMOCharacter* Victim, const TCHAR*& OutReason) const
+{
+	if (!Victim || !Victim->IsPlayerControlled())
+	{
+		return true; // mob / oyuncu olmayan hedef: kurallar uygulanmaz
+	}
+
+	// Parti uyesine vurulmaz.
+	if (PartyComponent)
+	{
+		for (const TObjectPtr<AMMOCharacter>& M : PartyComponent->Members)
+		{
+			if (M.Get() == Victim)
+			{
+				OutReason = TEXT("Parti uyesine vuramazsin");
+				return false;
+			}
+		}
+	}
+
+	// Ayni klan uyesine vurulmaz.
+	if (ClanComponent && Victim->GetClanComponent()
+		&& ClanComponent->IsInClan()
+		&& ClanComponent->ClanName.Equals(Victim->GetClanComponent()->ClanName, ESearchCase::IgnoreCase))
+	{
+		OutReason = TEXT("Klan uyesine vuramazsin");
+		return false;
+	}
+
+	// Hub guvenli bolgesi: saldiran ya da hedef PlayerStart'a 700u icindeyse PvP yok.
+	if (const UWorld* World = GetWorld())
+	{
+		constexpr float SafeRadius = 700.f;
+		for (TActorIterator<APlayerStart> It(World); It; ++It)
+		{
+			const FVector Hub = It->GetActorLocation();
+			if (FVector::Dist2D(GetActorLocation(), Hub) < SafeRadius
+				|| FVector::Dist2D(Victim->GetActorLocation(), Hub) < SafeRadius)
+			{
+				OutReason = TEXT("Guvenli bolgede PvP yok");
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 bool AMMOCharacter::IsPvPAllowed() const

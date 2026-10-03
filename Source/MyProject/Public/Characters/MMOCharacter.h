@@ -221,6 +221,10 @@ public:
 
 	bool IsPvPAllowed() const;
 
+	// PvP dostu-ates / guvenli bolge kurallari (sunucu): parti uyesi, ayni klan ve hub guvenli bolgesi
+	// (PlayerStart 700u) icindeki oyunculara vurulamaz. false ise OutReason sebebi verir.
+	bool CanHarmPlayer(const AMMOCharacter* Victim, const TCHAR*& OutReason) const;
+
 	// Test: kendine bir buff/debuff uygular (konsol: "MMOBuff Rage", "MMOBuff Poison", "MMOBuff Haste").
 	UFUNCTION(Exec)
 	void MMOBuff(const FString& EffectId);
