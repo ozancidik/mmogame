@@ -931,10 +931,11 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	if (MMOTargeting::IsInsideHubSafeZone(this, GetActorLocation()))
 	{
 		// Bu kontrol istemcide de calisir; uzak oyuncu sunucu yanitini beklemeden
-		// neden saldiramadigini gorur.
+		// neden saldiramadigini gorur. Tikla-saldir dongusu her karede cagirdigi icin
+		// sabit pozitif anahtar kullanilir (ayni satir yenilenir, yigilmaz).
 		if (GEngine && IsLocallyControlled())
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Guvenli bolgede PvP yok"));
+			GEngine->AddOnScreenDebugMessage(4101, 1.f, FColor::Silver, TEXT("Guvenli bolgede saldiri yok"));
 		}
 		return;
 	}
@@ -961,24 +962,25 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 		{
 			if (GEngine)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, Text);
+				// Sabit anahtar: tikla-saldir dongusunde satir yigilmaz, yenilenir.
+				GEngine->AddOnScreenDebugMessage(4102, 1.f, FColor::Silver, Text);
 			}
 			return;
 		}
 
 		// Listen-server'daki uzak pawn sunucuda locally controlled degildir.
-		// Var olan owner-only Client RPC'yi kullanarak ret sebebini saldirana ilet.
-		// Ayni sebep 1 sn icinde tekrar gonderilmez (RPC/sohbet spami olmasin).
+		// Ret sebebi gecici ipucu olarak (karakter ustunde kisa balon) saldirana iletilir;
+		// kalici sohbet satiri birakmaz. Ayni metin 3 sn icinde tekrar gonderilmez.
 		const float FeedbackNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-		if (Text == LastAttackFeedbackText && FeedbackNow - LastAttackFeedbackTime < 1.f)
+		if (Text == LastAttackFeedbackText && FeedbackNow - LastAttackFeedbackTime < 3.f)
 		{
 			return;
 		}
-		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController()))
+		if (Cast<AMMOPlayerController>(GetController()))
 		{
 			LastAttackFeedbackText = Text;
 			LastAttackFeedbackTime = FeedbackNow;
-			PC->ClientReceiveChat(FString(), Text, 2);
+			ClientShowHint(Text);
 		}
 	};
 
@@ -1350,6 +1352,17 @@ void AMMOCharacter::ClientNotifyXPGain_Implementation(int32 Amount, int32 Percen
 		? FString::Printf(TEXT("+%d EXP (%%%d)"), Amount, Percent)
 		: FString::Printf(TEXT("+%d EXP"), Amount);
 	HUD->AddFloatingLabel(GetActorLocation() + FVector(0.f, 0.f, 130.f), Label);
+}
+
+void AMMOCharacter::ClientShowHint_Implementation(const FString& Text)
+{
+	const APlayerController* PC = Cast<APlayerController>(GetController());
+	AMMOHUD* HUD = PC ? Cast<AMMOHUD>(PC->GetHUD()) : nullptr;
+	if (!HUD || Text.IsEmpty())
+	{
+		return;
+	}
+	HUD->AddFloatingLabel(GetActorLocation() + FVector(0.f, 0.f, 170.f), Text);
 }
 
 void AMMOCharacter::MMONpcTalk()

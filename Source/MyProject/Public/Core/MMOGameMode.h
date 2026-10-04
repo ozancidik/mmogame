@@ -35,9 +35,11 @@ public:
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
 
-	// PvP acik mi? Acikken oyuncular birbirine vurabilir (sunucuda dogrulanir). Test icin varsayilan acik.
+	// PvP acik mi? Acikken oyuncular birbirine vurabilir (sunucuda dogrulanir). Varsayilan KAPALI:
+	// tikla-saldir oyuncu hedefini AttackTarget'a gecirmiyor, PvP bilincli acilana kadar kapali kalir.
+	// Host konsolundan "MMOPvP 1" ile acilir.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "MMO|GameMode")
-	bool bAllowPvP = true;
+	bool bAllowPvP = false;
 
 protected:
 	bool bZoneTravelInProgress = false;

@@ -25,8 +25,8 @@ ama **hiçbiri gerçek oyunda oynanmadı**. Önce 1–3 çalışmıyorsa diğerl
 
 ## 4) Parti + PvP kuralları (5 dk)
 - `MMOInvite` / istemcide `MMOPartyAccept`. Parti XP paylaşımı.
-- `MMOPvP 1`: partideyken birbirine vuramamalı ("Parti üyesine vuramazsın"); partiden çık, hub dışında vurabilmeli;
-  hub'da (başlangıç noktası 700u) vuramamalı.
+- PvP varsayılan KAPALI: önce host konsolunda `MMOPvP 1` yaz. Sonra partideyken birbirine vuramamalı ("Parti üyesine vuramazsın"); partiden çık, hub dışında vurabilmeli;
+  hub'da (başlangıç noktası 700u) vuramamalı. (Not: tıkla-saldır oyuncu hedefini geçirmiyor; PvP yalnız RPC/BP ile `AttackTarget(oyuncu)` çağrılarak denenebilir.)
 
 ## 5) Ticaret (10 dk) — en çok exploit riski olan sistem
 - `MMOGiveItem ShortSword 2` (iki tarafa farklı eşya ver) → `/trade` (ya da `MMOTrade`), istemci `/trade kabul`.
@@ -50,5 +50,5 @@ ama **hiçbiri gerçek oyunda oynanmadı**. Önce 1–3 çalışmıyorsa diğerl
 
 ## Bilinen sınırlar (bilerek)
 - Kimlik oyuncu adına bağlı, şifre/hesap yok (klan, arkadaş, kayıt hepsi ad anahtarlı).
-- `bAllowPvP` varsayılan açık (test için); beceriler yalnız mob'lara vurur, PvP yalnız yakın dövüş.
+- `bAllowPvP` varsayılan kapalı (`MMOPvP 1` ile açılır); beceriler yalnız mob'lara vurur, PvP yalnız yakın dövüş.
 - Klan lideri devri komutu yok; arkadaş eklemede karşı taraf bilgilendirilmez.

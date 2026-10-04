@@ -283,6 +283,10 @@ public:
 	UFUNCTION(Client, Unreliable)
 	void ClientNotifyXPGain(int32 Amount, int32 Percent);
 
+	// Saldiri ret sebebi gibi gecici ipuclari: karakter ustunde kisa balon (kalici sohbet satiri birakmaz).
+	UFUNCTION(Client, Unreliable)
+	void ClientShowHint(const FString& Text);
+
 protected:
 	// "MMONpcTalk" debug komutunun spam korumasi (client-side, RPC olmadigi icin
 	// sunucu-tarafi mesafe/cooldown guard'lari devreye girmiyor — bkz. MMONpcTalk).
