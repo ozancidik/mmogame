@@ -3069,3 +3069,38 @@ Kapsam: ORTA-2 (1 sn sınırı; ret sebebi aktarımı `0f03437`'de gelmişti), O
 - [ ] **DÜŞÜK-1 (kontrolcüsüz pawn):** (Elle tetiklemesi zor.) Mantık kodu: `IsPlayerPawn` = mob olmayan `AMMOCharacter`. Normal PvP/parti/klan/hub senaryoları (yukarıdaki maddeler) değişmeden çalışmalı; moblar hâlâ hasar vermeli/almalı (mob->oyuncu, oyuncu->mob).
 - [ ] **DÜŞÜK-5 (Exec):** Development derlemede `MMOProbeSurface -5500 4500 225` hâlâ `[MMOPROBE]` satırı yazmalı (Shipping'de komut boş gövde, log yok).
 - [ ] **Script:** `Scripts/GenQuestDialogue.py` çalıştır: Lore.md'de "Dönüşte" satırı olmayan görev varsa çıktı sonunda `UYARI: Q_... icin teslim repligi yok` satırları görünmeli; çıkış kodu 0 kalmalı (2026-10-04 itibarıyla Lore'da 73/73 görevin teslim repliği var, uyarı beklenmez).
+
+# Ağ denetimi düzeltmeleri — 2026-10-04
+
+Kapsam: `docs/NETWORK_AUDIT.md` Y2/Y4/Y5 ve O1/O2/O3/O9/O10. Her grup ayrı commit; derleme ve `Scripts/RunAllChecks.ps1 -SkipBuild` (veri + Summer/Winter duman + NetSmokeTest) geçti. Aşağıdakilerin hiçbiri PIE'de oynanarak denenmedi; ağ değerleri (Hz, cull) ölçülmedi.
+
+## Y2 / O9 — özel alanlar yalnız sahibe (listen-server + en az 1 uzak istemci)
+- [ ] **Kendi envanterin istemcide çalışıyor mu:** Uzak istemcide `I` ile envanteri aç: altın, eşya listesi, kuşanılan 4 slot, çanta, iksir sayısı eskisi gibi görünmeli; mob öldürüp loot al, altın/eşya anında güncellenmeli (OnRep sahip tarafında tetiklenmeli). Depo ve satıcı pencereleri de aynı şekilde.
+- [ ] **Başkasının envanteri sızmıyor:** Host + istemci; istemcide başka oyuncunun pawn'ının `Inventory.Gold` değerini `showdebug`/BP ile oku: 0 (varsayılan) kalmalı, host altın kazansa bile değişmemeli.
+- [ ] **Görev/skill/stat HUD'u:** Uzak istemcide görev takibi (aktif görev satırları), görev penceresi ve teslim balonu, skill kitabı (K), hotbar, stat penceresi (nokta dağıtma), MP ve EXP barı normal çalışmalı. Seviye atlayınca istemcide "dağıtılacak puan" artmalı.
+- [ ] **Herkese açık alanlar korunuyor:** Parti listesinde diğer üyenin adı, seviyesi, sınıfı, canı ve ölü durumu görünmeli; isim plakası seviyesi doğru olmalı. Başkasının MP/EXP'si görünmemeli (zaten HUD'da yok).
+- [ ] **Not:** `Party.Members/Leader` herkese replike kalmaya devam ediyor (düşük risk, dokunulmadı).
+
+## Y5 — mob bileşenleri ve ağ sıklığı
+- [ ] **Mob davranışı değişmedi:** Mobları çek, dövüş, öldür: hasar, XP, loot düşüşü, görev ilerlemesi ve parti XP paylaşımı eskisi gibi olmalı (Inventory/Skill/Quest/Party yalnız replikasyondan çıkarıldı, sunucu mantığı aynı).
+- [ ] **Mob hareketi akıcılığı (DOĞRULANMADI):** Uzak istemcide koşan/saldıran moba bak: titreme/sıçrama varsa mob `NetUpdateFrequency` (30) / `MinNetUpdateFrequency` (10) değerlerini `AMMOMob` kurucusunda artır.
+- [ ] **Cull mesafesi (DOĞRULANMADI):** Mob `NetCullDistanceSquared` = 12000². Uzak istemciyle bir moba 12000uu'dan uzaklaşıp geri dön: mob kaybolup geri gelirken eksik/hayalet görünüm olmamalı. Uzak oyuncunun hareket akıcılığı için de bak (oyuncu 60/20 Hz, cull motor varsayılanı).
+- [ ] **Ölçüm:** 2 istemci + ~50 mob ile `stat net` / Network Profiler: istemci başına giriş B/sn hedefi < 15 KB/sn; değerler buna göre ayarlanmalı.
+
+## Y4 / O10 — InstanceId tabanlı kuşan/yükselt/sat
+- [ ] **Kuşan:** Çantada ekipmana tıkla: kuşanılmalı, slottaki eski eşya çantaya dönmeli. İstemcide ve host'ta dene.
+- [ ] **Yükselt (sağ tık):** Çanta eşyasına sağ tıkla: altın düşmeli, sonuç mesajı (BASARILI/Basarisiz/YANDI) gelmeli. Hızlı çift sağ tık (+7 ve üzeri bir eşya): ikinci istek ya reddedilmeli (arti seviyesi uyuşmazlığı veya 0.3 sn soguma) ya da yalnız bir kez altın harcamalı; **başka bir eşyaya yükseltme/yanma uygulanmamalı**.
+- [ ] **Bayat indeks (kritik):** `p.NetPktLag=200` benzeri gecikmeyle (örn. konsolda `Net PktLag=200`) çantanın ortasındaki eşyayı hızlıca iki kez sat/yükselt: ikinci istek bir sonraki eşyayı etkilememeli (eşya sayısı yalnız bir azalmalı).
+- [ ] **Sat:** Satıcının yanında çanta eşyasına tıkla: altın artmalı, eşya gitmeli; satıcıdan 800u+ uzaktayken satış reddedilmeli. Sat penceresinde sayfalama (ShopSellPage) ikinci sayfada da doğru eşyayı satmalı.
+- [ ] **Çanta dolu iken çıkarma:** Çantayı 12'ye doldur (`CANTA 12/12`), kuşanılan bir eşyaya tıkla (çıkar): reddedilmeli, sohbette "Canta dolu! Once bir esya sat veya depoya koy." çıkmalı (uzak istemcide de), çanta 12'yi aşmamalı. Çantada boş yer varken çıkarma normal çalışmalı.
+- [ ] **Takas/depo gerilemesi:** Depoya koy/al ve ticaret (2 oyuncu) eski gibi çalışmalı (bu yollar zaten InstanceId kullanıyordu).
+
+## O1 / O2 / O3 — sohbet ve klan
+- [ ] **Uzunluk sınırı:** 300+ karakterlik bir mesajı sohbetten gönder: mesaj ~120 karaktere kırpılmış gelmeli (200'de ön kırpma + dallardaki 120 sınırı); `/klan kur` ya da `/w isim` ile çok uzun argüman: hata/kullanım mesajı kısa kalmalı, bağlantı kopmamalı.
+- [ ] **Ortak throttle:** 0.7 sn'den hızlı art arda `/yardim`, `/who`, `/trade`, `/klan liste`, `/arkadas liste`, `/w` (hatalı kullanım dahil) gönder: aralarında 0.7 sn geçmeyenler sessizce düşmeli (hata yankısı yağmamalı). 0.7 sn bekleyince komut çalışmalı.
+- [ ] **Boş komut regresyonu:** Boş mesaj ve tek başına `/p`, `/g` genel sohbete sızmamalı.
+- [ ] **`/arkadas liste`:** 3+ arkadaşla: başlık + her arkadaş ayrı satırda ("X - cevrimici (Lv..)" / "X - cevrimdisi") görünmeli; yalnız tek sistem mesajı olarak gelir. Arkadaş yokken "Arkadas listen bos" çıkmalı. Diğer sistem mesajları (klan, ticaret, yardım) tek satır olarak eskisi gibi görünmeli.
+- [ ] **`/klan kur` önbelleği:** Yeni bir ad kur → başarılı. Başka oyuncu aynı adı hemen dener → "kullanimda" (online ya da önbellekten). Klandan ayrıl, 30 sn içinde başka biri aynı adı kurmayı denerse "kullanimda (cevrimdisi uyeleri var)" görebilir (bilinen taviz); 30 sn sonra kurulabilmeli. Çevrimdışı bir üyenin kayıtlı klan adı kurulmaya çalışılınca reddedilmeli.
+
+## Yapılmadı (bu turda kapsam dışı)
+- Y3 (Can/Mana adımlama, `ActiveEffects.RemainingTime`), Y1 (kimlik = ad), O4-O8/O11/O12 ve D maddeleri. `Party.Members/Leader` kısıtlanmadı; `Stats` Strength/Dexterity/Intelligence/Vitality da herkese kaldı (OnRep_PrimaryStats ve istemci hesapları riski).
