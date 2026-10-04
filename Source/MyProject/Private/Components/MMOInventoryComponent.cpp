@@ -392,6 +392,14 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 	{
 		return; // bayat istek: esya yandi/satildi/tasindi
 	}
+	// Olu karakter yukseltme yapamaz (canlanma beklerken altin/esya harcamasin; NETWORK_AUDIT D3).
+	if (const AMMOCharacter* DeadCheckChar = Cast<AMMOCharacter>(GetOwner()))
+	{
+		if (const UMMOStatsComponent* St = DeadCheckChar->GetStats(); St && St->bIsDead)
+		{
+			return;
+		}
+	}
 
 	FMMOEquipmentInstance& Inst = EquipmentBag[BagIndex];
 	const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
@@ -460,6 +468,14 @@ bool UMMOInventoryComponent::IsOwnerNearVendor(float MaxDist) const
 	if (!OwnerActor || !World)
 	{
 		return false;
+	}
+	// Olu karakter satici ile islem yapamaz (depodaki kuralla ayni; NETWORK_AUDIT D3).
+	if (const AMMOCharacter* Char = Cast<AMMOCharacter>(OwnerActor))
+	{
+		if (const UMMOStatsComponent* St = Char->GetStats(); St && St->bIsDead)
+		{
+			return false;
+		}
 	}
 	const FVector Loc = OwnerActor->GetActorLocation();
 	const float MaxDistSq = MaxDist * MaxDist;

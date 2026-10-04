@@ -3153,3 +3153,8 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 
 - [ ] **Development/Editor regresyonu:** `MMOGiveItem HealthPotion 3`, `MMOGainXP 5000`, `MMOSpawnMob Goblin`, `MMOBuff Haste`, `MMODamage 20`, `MMOHeal 20`, `MMOUseMana 10` hepsi eskisi gibi calismali (SmokeTest/NetSmokeTest bu komutlara dayaniyorsa gecmeli).
 - [ ] **Shipping paketi (opsiyonel, ilk dagitimdan once):** Paketlenmis Shipping build'de bu komutlar etkisiz olmali; ayrica `~` konsolunun Shipping'de gercekten kapali oldugunu dogrula (`DefaultInput.ini`'de `ConsoleKeys=Tilde` var).
+
+## Olu karakter satici/yukseltme kapisi (NETWORK_AUDIT D3) — 2026-10-04 (DERLENMEDI)
+
+- [ ] **Olu karakter:** Oyuncu oldugunda (olum ekrani) saticiya alis/satis ve cantadaki esyaya yukseltme istegi reddedilmeli; altin ve esya degismemeli. Canlanip tekrar denenince normal calismali.
+- [ ] **Regresyon:** Canli karakterle satin alma, satis ve yukseltme eskisi gibi calismali. (Yukseltme icin yakinlik kosulu bilerek eklenmedi: tasarim karari bekliyor.)
