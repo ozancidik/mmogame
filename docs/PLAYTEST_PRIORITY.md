@@ -57,4 +57,4 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 
 - Kalan beceri boşluğu: her sınıfta Lv28→33 (5 seviye), `ValidateData.py` UYARI basıyor. Eklenen 12 beceri (Lv13, Lv20, Lv28) tahmini değerlerle yazıldı; ölçüm sonrası ayarlanmalı.
 - Denge ayarı (XP hızı, altın sink, ölüm cezası): `[MMOMETRIC]` verisi gelmeden körlemesine olur.
-- K-1 (kimlik/kayıt yuvası), Y-5, `MaxTokens`: tasarım kararı ya da ölçüm gerektiriyor.
+- K-1 (kalıcı çözüm: hesap sistemi) ve `MaxTokens`: tasarım kararı ya da ölçüm gerektiriyor.

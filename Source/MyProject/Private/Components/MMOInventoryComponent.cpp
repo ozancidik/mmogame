@@ -10,6 +10,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "Core/MMONotify.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -191,10 +192,7 @@ void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMO
 	// getirir). Loot/odul/satin-alma sessizce kaybolur; oyuncu once bosaltmali.
 	if (EquipmentBag.Num() >= MaxBagSize)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Canta dolu!"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -507,20 +505,14 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	// (hileli istemci satici olmadan her yerden alisveris RPC'si atmasin).
 	if (!IsOwnerNearVendor())
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
 		return;
 	}
 
 	const int32 Price = FMMOItemDatabase::GetBuyPrice(*Def);
 	if (Gold < Price)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Altin yetersiz"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -530,20 +522,13 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	// oyuncu gercekten para harciyor; parayi dusmeden ONCE kontrol et.
 	if (EquipmentBag.Num() >= MaxBagSize)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Canta dolu!"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f);
 		return;
 	}
 
 	AddGoldFrom(-Price, TEXT("satin_alma"));
 	AddEquipmentInstance(ItemId, 0);
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120),
-			FString::Printf(TEXT("Satin alindi: %s (-%d altin)"), *Def->Name, Price));
-	}
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %s (-%d altin)"), *Def->Name, Price), FColor(120, 220, 120), 2.f);
 }
 
 void UMMOInventoryComponent::ServerBuyEquipment_Implementation(FName ItemId)
@@ -568,30 +553,20 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 
 	if (!IsOwnerNearVendor())
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
 		return;
 	}
 
 	const int32 Price = FMMOItemDatabase::PotionPrice * Count;
 	if (Gold < Price)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Altin yetersiz"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
 		return;
 	}
 
 	AddGoldFrom(-Price, TEXT("satin_alma"));
 	AddItem(FName(TEXT("HealthPotion")), Count);
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120),
-			FString::Printf(TEXT("Satin alindi: %d iksir (-%d altin)"), Count, Price));
-	}
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d iksir (-%d altin)"), Count, Price), FColor(120, 220, 120), 2.f);
 }
 
 void UMMOInventoryComponent::ServerBuyPotion_Implementation(int32 Count)
@@ -613,10 +588,7 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 
 	if (!IsOwnerNearVendor())
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -629,20 +601,13 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 	const int32 Price = Def->Price * Count;
 	if (Gold < Price)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Altin yetersiz"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
 		return;
 	}
 
 	AddGoldFrom(-Price, TEXT("satin_alma"));
 	AddItem(ItemId, Count);
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120),
-			FString::Printf(TEXT("Satin alindi: %d %s (-%d altin)"), Count, *Def->Name, Price));
-	}
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d %s (-%d altin)"), Count, *Def->Name, Price), FColor(120, 220, 120), 2.f);
 }
 
 void UMMOInventoryComponent::ServerBuyConsumable_Implementation(FName ItemId, int32 Count)
@@ -674,10 +639,7 @@ void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
 
 	if (!IsOwnerNearVendor())
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -700,11 +662,7 @@ void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
 	AddGoldFrom(Price, TEXT("satis"));
 	OnInventoryChanged.Broadcast();
 
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 210, 0),
-			FString::Printf(TEXT("Satildi: %s +%d (+%d altin)"), *Def->Name, Inst.Plus, Price));
-	}
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satildi: %s +%d (+%d altin)"), *Def->Name, Inst.Plus, Price), FColor(255, 210, 0), 2.f);
 }
 
 void UMMOInventoryComponent::ServerSellByInstanceId_Implementation(int32 InstanceId)
@@ -750,10 +708,7 @@ void UMMOInventoryComponent::DepositEquipment(int32 InstanceId)
 
 	auto Notify = [this](const TCHAR* Msg)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, Msg);
-		}
+		MMONotify::ToOwner(GetOwner(), Msg, FColor::Silver, 2.f);
 	};
 
 	if (!IsOwnerNearWarehouse())
@@ -795,10 +750,7 @@ void UMMOInventoryComponent::WithdrawEquipment(int32 InstanceId)
 
 	auto Notify = [this](const TCHAR* Msg)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, Msg);
-		}
+		MMONotify::ToOwner(GetOwner(), Msg, FColor::Silver, 2.f);
 	};
 
 	if (!IsOwnerNearWarehouse())

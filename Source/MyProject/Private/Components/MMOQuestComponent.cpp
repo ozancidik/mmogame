@@ -8,6 +8,7 @@
 #include "Save/MMOSaveGame.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
+#include "Core/MMONotify.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -177,10 +178,7 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	// yoktu — hileli istemci gorevliye hic yaklasmadan gorev kabul edebiliyordu (bug-hunt).
 	if (!IsOwnerNearQuestGiver())
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Gorevli yakininda degilsin"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Gorevli yakininda degilsin"), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -199,10 +197,7 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	if (Owner && Owner->GetStats() && Owner->GetStats()->Level < Def->RequiredLevel)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel));
-		}
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -211,10 +206,7 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	P.KillProgress = 0;
 	ActiveQuests.Add(P);
 
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor(120, 200, 255), FString::Printf(TEXT("Gorev alindi: %s"), *Def->Name));
-	}
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev alindi: %s"), *Def->Name), FColor(120, 200, 255), 2.5f);
 }
 
 bool UMMOQuestComponent::PassesRpcRateLimit(double& LastTime)
@@ -267,6 +259,8 @@ void UMMOQuestComponent::NotifyMobKilled(FName MobArchetypeId)
 		if (bCount && P.KillProgress < Def->TargetCount)
 		{
 			P.KillProgress++;
+			// Her oldurmede gelen ilerleme satiri uzak istemcinin sohbetini doldurmasin: yalniz yerel ekran
+			// (HUD gorev takibi zaten uzak istemcide ilerlemeyi gosterir).
 			if (GEngine && IsLocallyControlledOwner())
 			{
 				GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor(200, 200, 120),
@@ -299,10 +293,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	// Sunucu-otoriter dogrulama: odul alma da gorevliye yakinlik istemeli (bug-hunt).
 	if (!IsOwnerNearQuestGiver())
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Gorevli yakininda degilsin"));
-		}
+		MMONotify::ToOwner(GetOwner(), TEXT("Gorevli yakininda degilsin"), FColor::Silver, 2.f);
 		return;
 	}
 
@@ -352,11 +343,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	CompletedQuests.Add(QuestId);
 	ActiveQuests.RemoveAll([QuestId](const FMMOQuestProgress& X) { return X.QuestId == QuestId; });
 
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor(120, 255, 120),
-			FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin)"), *Def->Name, Def->RewardXP, Def->RewardGold));
-	}
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin)"), *Def->Name, Def->RewardXP, Def->RewardGold), FColor(120, 255, 120), 3.f);
 }
 
 void UMMOQuestComponent::ServerClaimReward_Implementation(FName QuestId)
@@ -370,10 +357,7 @@ void UMMOQuestComponent::ServerClaimReward_Implementation(FName QuestId)
 
 void UMMOQuestComponent::ClientClaimRewardFailed_Implementation(const FString& Reason)
 {
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(255, 120, 80), Reason);
-	}
+	MMONotify::ToOwner(GetOwner(), Reason, FColor(255, 120, 80), 4.f);
 }
 
 void UMMOQuestComponent::FillSaveData(FMMOCharacterSaveData& Out) const

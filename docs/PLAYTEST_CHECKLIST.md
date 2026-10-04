@@ -3250,3 +3250,12 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Uzak istemci saat farki:** Istemcide sayac sunucudakiyle ~1 sn icinde uyumlu olmali; negatif veya sicrayan deger olmamali (`Max(0, ...)`).
 - [ ] **Efekt mantigi degismedi:** Zehir (DoT) hasari, yavaslatma, saldiri/savunma/hiz buff'lari ve suresi dolunca kalkmasi eskisi gibi (yalniz sunucu mantigi RemainingTime kullanir).
 - [ ] **Olcum (opsiyonel):** Buff'li oyuncu varken `stat net` trafigi, onceki turlara gore dusmeli.
+
+## Sunucu mesajlari uzak istemciye ulasir: MMONotify::ToOwner (NETWORK_AUDIT O11 madde 3) — 2026-10-04 (DERLENMEDI)
+
+Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenlerindeki `GEngine && IsLocallyControlledOwner()` bloklari `MMONotify::ToOwner(GetOwner(), ...)` oldu: yerel pawn'da ekrana, sunucuda uzak oyuncunun pawn'inda sahibine owner-only sistem satiri (kanal 2) olarak gider. Gorev ilerleme satiri ("X: 3/5") bilerek yerel kaldi (her oldurmede sohbeti doldurmasin). **Beceri bileseni (`bLocalFeedback`), karakter ve ganimet mesajlari ve parti bileseni (Codex'te) degismedi.**
+
+- [ ] **Uzak istemci geri bildirimi:** Host + uzak istemci. Istemcide: cantayi doldurup satin al / ganimet al ("Canta dolu!"), altini yetmeden satin al ("Altin yetersiz"), saticidan uzakken satin al/sat ("Satici yakininda degilsin"), gorev al ("Gorev alindi: ..."), gorev teslim et ("Gorev tamam: ..."), seviyesi yetmeyen gorev ("Level N gerekli"): her biri **istemcinin sohbet kutusunda** sistem satiri olarak gorunmeli (daha once hic gorunmuyordu).
+- [ ] **Host regresyonu:** Ayni islemlerde host'ta mesaj eskisi gibi ekran ustunde gorunmeli (sohbet satiri DEGIL), cift mesaj olmamali.
+- [ ] **Sohbet spami:** Cantayi doldurup ust uste ganimet toplamayi dene (loot yolu degismedi); kisa surede ayni satirin tekrar tekrar sohbeti doldurup doldurmadigini not al (gerekirse hiz siniri eklenmeli).
+- [ ] **Derleme:** Yeni dosyalar (`MMONotify.cpp/.h`) icin proje dosyalari yeniden uretilmesi gerekebilir (`Generate Visual Studio project files`); `AMMOPlayerController::ClientReceiveChat` erisilebilir olmali.
