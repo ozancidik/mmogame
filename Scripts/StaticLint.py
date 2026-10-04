@@ -59,6 +59,30 @@ def files(changed_rev=None):
     return sorted(p for p in SRC.rglob("*") if p.suffix in (".cpp", ".h"))
 
 
+def check_definitions():
+    """cpp'deki 'Sinif::Fonksiyon(' tanimlarinin sinifin basliginda bildirimi var mi (yazim hatasi/silinmis bildirim)."""
+    pub = SRC / "MyProject" / "Public"
+    priv = SRC / "MyProject" / "Private"
+    class_header = {}
+    header_text = {}
+    for h in pub.rglob("*.h"):
+        t = strip(h.read_text(encoding="utf-8", errors="replace"))
+        header_text[h] = t
+        for m in re.finditer(r"\b(?:class|struct)\s+(?:\w+_API\s+)?(\w+)\s*(?:final\s*)?(?::|\{)", t):
+            class_header.setdefault(m.group(1), h)
+    errs = []
+    for c in priv.rglob("*.cpp"):
+        t = strip(c.read_text(encoding="utf-8", errors="replace"))
+        for m in re.finditer(r"^[A-Za-z_][\w:<>\*&\s,]*?\b(\w+)::(~?\w+)\s*\(", t, re.M):
+            cls, fn = m.group(1), m.group(2)
+            if fn.startswith("~") or fn == cls or cls not in class_header:
+                continue
+            base = re.sub(r"_(Implementation|Validate)$", "", fn)
+            if not re.search(r"\b" + re.escape(base) + r"\b", header_text[class_header[cls]]):
+                errs.append(f"{c.relative_to(ROOT)}: {cls}::{fn} tanimli ama {class_header[cls].name} icinde bildirimi yok")
+    return errs
+
+
 def main():
     rev = None
     if "--changed" in sys.argv:
@@ -94,6 +118,7 @@ def main():
                 if Path(first.group(1)).stem != stem and (SRC / "MyProject" / "Public").exists():
                     # Beklenti: cpp kendi basligini ilk include etsin (UE kurali). Yalniz uyari.
                     pass
+    errors += check_definitions()
     print(f"Taranan dosya: {n}")
     for e in errors:
         print("HATA:", e)
