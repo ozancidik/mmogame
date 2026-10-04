@@ -132,13 +132,19 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	{
 		return;
 	}
+	// NETWORK_AUDIT O1: girdi boyutu ve hiz siniri TEK yerde, hicbir komut dali parse edilmeden
+	// once uygulanir. Uzunluk siniri en basta (sinirsiz bir Message ile Replace/Split/yankilanan
+	// hata mesajlari bant ve CPU yakmasin); throttle, mesaj gecerli ya da hatali olsun her
+	// denemeyi sayar (eskiden yalniz bazi dallar LastChatServerTime'i guncelliyordu).
+	static constexpr int32 MaxChatInputLength = 200;
 	const float Now = World->GetTimeSeconds();
 	if (Now - LastChatServerTime < 0.7f)
 	{
 		return;
 	}
+	LastChatServerTime = Now;
 
-	FString Msg = Message.Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" ")).TrimStartAndEnd();
+	FString Msg = Message.Left(MaxChatInputLength).Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" ")).TrimStartAndEnd();
 	uint8 Channel = 0;
 	if (Msg.Equals(TEXT("/p"), ESearchCase::IgnoreCase))
 	{
@@ -146,13 +152,11 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	}
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
-		LastChatServerTime = Now;
 		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, sil isim, liste), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
 	{
-		LastChatServerTime = Now;
 		FString List;
 		int32 Count = 0;
 		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
@@ -173,7 +177,6 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	// Ticaret: "/trade" (en yakin oyuncuya davet), "/trade kabul", "/trade iptal".
 	if (Msg.Equals(TEXT("/trade"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/trade "), ESearchCase::IgnoreCase))
 	{
-		LastChatServerTime = Now;
 		UMMOTradeComponent* Trade = nullptr;
 		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
 		{
@@ -205,7 +208,6 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	// Klan: "/klan kur <ad>", "/klan davet", "/klan kabul", "/klan ayril", "/klan at <isim>", "/klan liste".
 	if (Msg.Equals(TEXT("/klan"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/klan "), ESearchCase::IgnoreCase))
 	{
-		LastChatServerTime = Now;
 		UMMOClanComponent* Clan = nullptr;
 		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
 		{
@@ -253,7 +255,6 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	// Arkadas listesi: "/arkadas ekle <isim>", "/arkadas sil <isim>", "/arkadas" veya "/arkadas liste".
 	if (Msg.Equals(TEXT("/arkadas"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/arkadas "), ESearchCase::IgnoreCase))
 	{
-		LastChatServerTime = Now;
 		UMMOFriendsComponent* Friends = nullptr;
 		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
 		{
@@ -298,7 +299,6 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		{
 			return;
 		}
-		LastChatServerTime = Now;
 		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
 		{
 			if (UMMOClanComponent* Clan = Me->GetClanComponent())
@@ -332,7 +332,6 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 			ClientReceiveChat(FString(), TEXT("Kullanim: /w Isim mesaj"), 2);
 			return;
 		}
-		LastChatServerTime = Now;
 
 		const FString From = PlayerState ? PlayerState->GetPlayerName() : FString(TEXT("?"));
 		AMMOPlayerController* Target = nullptr;
@@ -359,7 +358,6 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	{
 		return;
 	}
-	LastChatServerTime = Now;
 
 	const FString Sender = PlayerState ? PlayerState->GetPlayerName() : FString(TEXT("?"));
 
@@ -432,7 +430,14 @@ void AMMOPlayerController::ClientReceiveChat_Implementation(const FString& Sende
 	{
 		Line = FString::Printf(TEXT("%s: %s"), *Sender, *Message);
 	}
-	HUD->AddChatLine(Line, Col);
+	// Sistem mesaji birden fazla satir tasiyabilir ('\n'; ornegin /arkadas liste tek RPC'de gelir):
+	// HUD tek satir cizdigi icin satirlara bol. Kullanici girdisindeki '\n' sunucuda zaten ayiklanir.
+	TArray<FString> Parts;
+	Line.ParseIntoArray(Parts, TEXT("\n"), true);
+	for (const FString& Part : Parts)
+	{
+		HUD->AddChatLine(Part, Col);
+	}
 }
 
 void AMMOPlayerController::OnChatKey()

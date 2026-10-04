@@ -41,21 +41,39 @@ namespace
 		return C ? C->GetClanComponent() : nullptr;
 	}
 
+	// NETWORK_AUDIT O3: kayit yuvasi -> klan adi ozeti kisa sure onbellege alinir. Eskiden her
+	// /klan kur denemesi tum MMOSave_*.sav dosyalarini oyun is parcacliginda tam deserialize
+	// ediyordu (Kur/Ayril dongusuyle takilma uretilebilirdi). Onbellek yalniz TTL dolunca diskten
+	// yeniden kurulur; bu surecte yeni kurulan klan CmdCreate'te onbellege de eklenir, yani
+	// ayni sunucuda kurulan klanlar her zaman gorunur. Tek taviz: bir klandan ayrilan uyenin
+	// eski adi en fazla TTL kadar "kullanimda" gorunebilir.
+	TMap<FString, FString> GSavedClanBySlot;
+	double GSavedClanCacheTime = -1.0e9;
+	constexpr double SavedClanCacheTtlSeconds = 30.0;
+
 	// Disk kayitlarinda (baska bir karakter yuvasinda) bu klan adi kullaniliyor mu?
-	// Yalniz klan kurarken (nadir) calisir; her kayit yuvasi senkron okunur.
 	bool SavedClanNameInUse(const FString& Name, const FString& ExcludeSlot)
 	{
-		TArray<FString> Files;
-		IFileManager::Get().FindFiles(Files, *(FPaths::ProjectSavedDir() / TEXT("SaveGames") / TEXT("MMOSave_*.sav")), true, false);
-		for (const FString& File : Files)
+		const double Now = FPlatformTime::Seconds();
+		if (Now - GSavedClanCacheTime > SavedClanCacheTtlSeconds)
 		{
-			const FString Slot = FPaths::GetBaseFilename(File);
-			if (Slot.Equals(ExcludeSlot, ESearchCase::IgnoreCase))
+			GSavedClanBySlot.Reset();
+			TArray<FString> Files;
+			IFileManager::Get().FindFiles(Files, *(FPaths::ProjectSavedDir() / TEXT("SaveGames") / TEXT("MMOSave_*.sav")), true, false);
+			for (const FString& File : Files)
 			{
-				continue;
+				const FString Slot = FPaths::GetBaseFilename(File);
+				const UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
+				if (SG && !SG->Data.ClanName.IsEmpty())
+				{
+					GSavedClanBySlot.Add(Slot, SG->Data.ClanName);
+				}
 			}
-			const UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-			if (SG && SG->Data.ClanName.Equals(Name, ESearchCase::IgnoreCase))
+			GSavedClanCacheTime = Now;
+		}
+		for (const TPair<FString, FString>& Pair : GSavedClanBySlot)
+		{
+			if (!Pair.Key.Equals(ExcludeSlot, ESearchCase::IgnoreCase) && Pair.Value.Equals(Name, ESearchCase::IgnoreCase))
 			{
 				return true;
 			}
@@ -257,6 +275,7 @@ void UMMOClanComponent::CmdCreate(const FString& Name)
 	bIsLeader = true;
 	bActingLeader = false;
 	JoinSeq = ++GClanJoinCounter;
+	GSavedClanBySlot.Add(Self->GetSaveSlotName(), N); // onbellek: yeni klan hemen gorunsun
 	MarkChanged();
 	NotifyOwner(FString::Printf(TEXT("Klan kuruldu: [%s]. Davet: /klan davet"), *ClanName));
 	Self->SaveCharacter();

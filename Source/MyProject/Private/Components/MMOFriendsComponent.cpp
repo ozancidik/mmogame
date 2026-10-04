@@ -214,20 +214,23 @@ void UMMOFriendsComponent::CmdList()
 		NotifyOwner(TEXT("Arkadas listen bos. /arkadas ekle isim"));
 		return;
 	}
-	NotifyOwner(FString::Printf(TEXT("Arkadaslar (%d/%d):"), Friends.Num(), MaxFriends));
+	// NETWORK_AUDIT O2: tum liste TEK mesajda (tek reliable RPC); satirlar '\n' ile ayrilir,
+	// istemci ClientReceiveChat'te sistem kanalini satir satir boler.
+	FString ListText = FString::Printf(TEXT("Arkadaslar (%d/%d):"), Friends.Num(), MaxFriends);
 	for (const FString& F : Friends)
 	{
 		const AMMOCharacter* C = FindOnlineByName(GetWorld(), F);
 		if (C)
 		{
 			const int32 Lv = C->GetStats() ? C->GetStats()->Level : 0;
-			NotifyOwner(FString::Printf(TEXT("%s - cevrimici (Lv%d)"), *F, Lv));
+			ListText += FString::Printf(TEXT("\n%s - cevrimici (Lv%d)"), *F, Lv);
 		}
 		else
 		{
-			NotifyOwner(FString::Printf(TEXT("%s - cevrimdisi"), *F));
+			ListText += FString::Printf(TEXT("\n%s - cevrimdisi"), *F);
 		}
 	}
+	NotifyOwner(ListText);
 }
 
 void UMMOFriendsComponent::AnnouncePresence(bool bOnline, const FString& NameOverride) const
