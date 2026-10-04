@@ -23,6 +23,7 @@ public:
 	// Gelistirici araci: spawner dogrulamasini (zemin izi + navmesh) verilen konumda 64 kez calistirir ve
 	// sonucu "[MMOPROBE]" satiri olarak loglar. Smoke test (Scripts/SmokeTest.ps1 -Probe) kullanir.
 	// Konsol: MMOProbeSpawn X Y Z [Radius]. Yalniz sunucuda anlamlidir; oyunu etkilemez.
+	// Shipping derlemesinde govdeleri bos (UHT, UFUNCTION'i #if icinde kabul etmez).
 	UFUNCTION(Exec)
 	void MMOProbeSpawn(float X, float Y, float Z, float Radius = 225.f);
 

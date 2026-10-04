@@ -28,6 +28,7 @@ AMMOGameMode::AMMOGameMode()
 
 void AMMOGameMode::MMOProbeSpawn(float X, float Y, float Z, float Radius)
 {
+#if !UE_BUILD_SHIPPING
 	UWorld* World = GetWorld();
 	const AMMOMob* MobDefaults = AMMOMob::StaticClass()->GetDefaultObject<AMMOMob>();
 	const UCapsuleComponent* Capsule = MobDefaults ? MobDefaults->GetCapsuleComponent() : nullptr;
@@ -49,10 +50,12 @@ void AMMOGameMode::MMOProbeSpawn(float X, float Y, float Z, float Radius)
 	}
 	UE_LOG(LogTemp, Display, TEXT("[MMOPROBE] (%.0f,%.0f,%.0f) r=%.0f ok=%d/%d trace_miss=%d egim_yukseklik=%d [son zemin Z=%.1f nz=%.2f] nav=%d"),
 		X, Y, Z, Radius, Ok, Samples, Stats.TraceMiss, Stats.SlopeOrHeight, Stats.LastGroundZ, Stats.LastNormalZ, Stats.Nav);
+#endif
 }
 
 void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
 {
+#if !UE_BUILD_SHIPPING
 	UWorld* World = GetWorld();
 	if (!World || !HasAuthority())
 	{
@@ -67,6 +70,7 @@ void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
 		return;
 	}
 	MMOProbeSpawn(X, Y, Top.ImpactPoint.Z + 50.f, Radius);
+#endif
 }
 
 void AMMOGameMode::StartPlay()
@@ -230,7 +234,8 @@ void AMMOGameMode::SpawnMobArea()
 		// yaklasip istenmeyen cekisler yaratabiliyordu, Nobetci ayrica eski navmesh
 		// kenarindaydi. Navmesh genisletmesinden sonra ikisi de >=2400u uzaga tasindi.
 		//  - Gozcu (Lv51) dogu (3000,0): zemin 141..178u.
-		//  - Nobetci (Lv55) kuzey (-2800,4400): zemin ~-170u, halka 16/16.
+		//  - Nobetci (Lv55) kuzey (-3500,3000): ilk (-2800,4400) konumu calisma zamaninda
+		//    2/64 verdi, asagidaki 2026-10-03 notuna bak (yeni konum 64/64).
 		//  - Muhafiz elit (Lv57) (2000,2800): zemin ~186u, halka 16/16.
 		auto SpawnFrostbound = [&](const FVector& Loc, int32 MinLv, int32 MaxLv, float Radius,
 			int32 MaxMobs, FName Forced, float TopUp)
@@ -257,7 +262,7 @@ void AMMOGameMode::SpawnMobArea()
 		// 2026-10-03 calisma zamani duman testi (Scripts/SmokeTest.ps1 + MMOProbeSpawn): editor probu
 		// "gecti" dese de Nobetci (-2800,4400,-120) cebi oyunda 2/64, Ucurum Gezgini (-5200,3600,-115)
 		// 23/64 verdi (iz surme baslangicinda cokus: dag cikintisinin basit carpismasi). Yeni konumlar
-		// MMOProbeSurface gridiyle olculdu: Nobetci (-3500,3000) 64/64, Gezgin (-5500,4500) 64/64;
+		// MMOProbeSurface gridiyle olculdu: Nobetci (-3500,3000) 64/64, Gezgin (-5500,4500) 59/64;
 		// hub'dan tam navmesh yolu var; Kis Hukumdari'ndan 3041u, birbirinden 2500u.
 		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-3500.f, 3000.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
@@ -268,7 +273,7 @@ void AMMOGameMode::SpawnMobArea()
 		// Yeni grid probunda (spawner-esdeger kontrol, hub'a tam yol) halkalar 16/16;
 		// tum cepler birbirinden ve onceki Winter ceplerinden >=1800u, hub'dan >=3800u.
 		//  Kul Oncusu Lv66 (1200,-5200) | Kul Baglayici Lv68 (-2000,-6800) | Kul Tirani elit Lv70 (4400,-5200)
-		//  Ucurum Gezgini Lv72 (-5200,3600) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
+		//  Ucurum Gezgini Lv72 (-5500,4500) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
 		//  (Naib ilk (-7600,-1200)'deydi; gezinmeyle navmesh sinirini -8000 asiyordu, QA ile tasindi.)
 		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
