@@ -1296,6 +1296,8 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 
 		FMMOClickRegion R;
 		R.Slot = i;
+		R.InstanceId = Inst.InstanceId; // RPC'ler indeks degil kimlik gonderir (NETWORK_AUDIT Y4)
+		R.Plus = Inst.Plus;
 		R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + SharedCellH));
 		InvBagRegions.Add(R);
 
@@ -1394,7 +1396,7 @@ bool AMMOHUD::HandleInventoryClick(const FVector2D& Pos)
 	{
 		if (R.Slot >= 0 && R.Rect.IsInside(Pos))
 		{
-			Inv->EquipFromBag(R.Slot);
+			Inv->EquipByInstanceId(R.InstanceId);
 			return true;
 		}
 	}
@@ -1440,7 +1442,7 @@ bool AMMOHUD::HandleInventoryRightClick(const FVector2D& Pos)
 	{
 		if (R.Slot >= 0 && R.Rect.IsInside(Pos))
 		{
-			Inv->TryUpgrade(R.Slot);
+			Inv->UpgradeByInstanceId(R.InstanceId, R.Plus);
 			return true;
 		}
 	}
@@ -1594,6 +1596,8 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		DrawRect(FLinearColor(0.18f, 0.15f, 0.1f, 0.9f), RightX, RY, ColW, RowH - 4.f);
 		FMMOClickRegion R;
 		R.Slot = i;
+		R.InstanceId = Inst.InstanceId; // RPC'ler indeks degil kimlik gonderir (NETWORK_AUDIT Y4)
+		R.Plus = Inst.Plus;
 		R.Rect = FBox2D(FVector2D(RightX, RY), FVector2D(RightX + ColW, RY + RowH - 4.f));
 		ShopSellRegions.Add(R);
 		const int32 SellPrice = FMath::RoundToInt(FMMOItemDatabase::GetSellPrice(*Def, Inst.Plus)
@@ -2003,7 +2007,7 @@ bool AMMOHUD::HandleShopClick(const FVector2D& Pos)
 	{
 		if (R.Slot >= 0 && R.Rect.IsInside(Pos))
 		{
-			Inv->SellEquipment(R.Slot);
+			Inv->SellByInstanceId(R.InstanceId);
 			return true;
 		}
 	}

@@ -92,9 +92,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
 	void AddEquipmentInstance(FName ItemId, int32 Plus = 0, EMMOItemRarity Rarity = EMMOItemRarity::Common);
 
+	// NETWORK_AUDIT Y4: Equip/Upgrade/Sell sunucuya canta INDEKSI degil InstanceId ile gider
+	// (indeks, bayat gorunum/hizli cift tikta yanlis esyaya isabet edebiliyordu). Indeks alan
+	// eski API'ler (EquipFromBag/TryUpgrade/SellEquipment) korundu: istemci tarafinda indeksi
+	// KENDI gorunumundeki InstanceId'ye cevirip *ByInstanceId yoluna yonlendirirler.
+
 	/** Cantadaki ekipmani kusanir (slot doluysa takas eder). Istemciden cagrilirsa sunucuya yonlenir. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
 	void EquipFromBag(int32 BagIndex);
+
+	/** EquipFromBag'in InstanceId surumu (sunucuya giden asil yol). */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
+	void EquipByInstanceId(int32 InstanceId);
 
 	/** Slottaki ekipmani cikarip cantaya koyar. Istemciden cagrilirsa sunucuya yonlenir. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
@@ -103,6 +112,13 @@ public:
 	/** Cantadaki ekipmani +1 yukseltmeyi dener: altin harcar, sans zar atar; yuksek artida basarisizlik YAKAR. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
 	void TryUpgrade(int32 BagIndex);
+
+	/**
+	 * TryUpgrade'in InstanceId surumu. ExpectedPlus >= 0 ise sunucu, esyanin arti seviyesi
+	 * istemcinin gordugu degerle ayni degilse reddeder (cift tikta ikinci istek bayat olur).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
+	void UpgradeByInstanceId(int32 InstanceId, int32 ExpectedPlus = -1);
 
 	UFUNCTION(BlueprintPure, Category = "MMO|Equipment")
 	FMMOEquipmentInstance GetEquipped(EMMOEquipSlot Slot) const;
@@ -124,6 +140,10 @@ public:
 	/** Cantadaki ekipmani saticiya satar (altin kazanir). Istemciden -> Server RPC. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Shop")
 	void SellEquipment(int32 BagIndex);
+
+	/** SellEquipment'in InstanceId surumu (sunucuya giden asil yol). */
+	UFUNCTION(BlueprintCallable, Category = "MMO|Shop")
+	void SellByInstanceId(int32 InstanceId);
 
 	// --- Depo (KO "Inn" deposu): canta disinda kalici ekipman saklama ---
 	// Yalniz sahibine replike edilir. Kayitla birlikte saklanir; haritalar arasi ortaktir.
@@ -180,15 +200,25 @@ protected:
 	// Sunucuda artan ornek kimligi.
 	int32 NextInstanceId = 1;
 
+	// Cantada InstanceId'li ekipmanin indeksi (yoksa/0 ise INDEX_NONE).
+	int32 FindBagIndexByInstanceId(int32 InstanceId) const;
+
+	// Sahibine kisa sistem satiri yollar (uzak istemciye de ulasir; yalniz sunucuda).
+	void NotifyOwnerText(const TCHAR* Text) const;
+
+	// Yukseltme istekleri arasi asgari sure (sunucu saati, saniye) ve son deneme zamani.
+	static constexpr double UpgradeCooldownSeconds = 0.3;
+	double LastUpgradeServerTime = -1000.0;
+
 	// --- Server RPC'ler ---
 	UFUNCTION(Server, Reliable)
-	void ServerEquipFromBag(int32 BagIndex);
+	void ServerEquipByInstanceId(int32 InstanceId);
 
 	UFUNCTION(Server, Reliable)
 	void ServerUnequipSlot(EMMOEquipSlot Slot);
 
 	UFUNCTION(Server, Reliable)
-	void ServerTryUpgrade(int32 BagIndex);
+	void ServerUpgradeByInstanceId(int32 InstanceId, int32 ExpectedPlus);
 
 	UFUNCTION(Server, Reliable)
 	void ServerBuyEquipment(FName ItemId);
@@ -200,7 +230,7 @@ protected:
 	void ServerBuyConsumable(FName ItemId, int32 Count);
 
 	UFUNCTION(Server, Reliable)
-	void ServerSellEquipment(int32 BagIndex);
+	void ServerSellByInstanceId(int32 InstanceId);
 
 	// Upgrade sonucunu sahibine bildir (basari / basarisiz / YANDI).
 	UFUNCTION(Client, Reliable)

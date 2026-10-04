@@ -32,6 +32,8 @@ struct FMMOClickRegion
 	FBox2D Rect = FBox2D(ForceInit);
 	FName SkillId;      // skill satiri icin
 	int32 Slot = -1;    // hotbar slotu icin (-1 = skill satiri)
+	int32 InstanceId = 0; // canta/satis satirlari icin ekipman kimligi (0 = yok)
+	int32 Plus = -1;      // canta satirinda cizim anindaki arti seviyesi (yukseltme istegi dogrulamasi)
 };
 
 /**

@@ -12,6 +12,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Player/MMOPlayerController.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOWarehouseNPC.h"
 
@@ -221,17 +222,57 @@ void UMMOInventoryComponent::RecomputeEquipmentBonuses()
 	}
 }
 
+int32 UMMOInventoryComponent::FindBagIndexByInstanceId(int32 InstanceId) const
+{
+	if (InstanceId == 0)
+	{
+		return INDEX_NONE;
+	}
+	return EquipmentBag.IndexOfByPredicate([InstanceId](const FMMOEquipmentInstance& I)
+	{
+		return I.InstanceId == InstanceId;
+	});
+}
+
+void UMMOInventoryComponent::NotifyOwnerText(const TCHAR* Text) const
+{
+	// Uzak istemcinin pawn'i sunucuda IsLocallyControlled degildir: sahibin controller'ina
+	// owner-only sistem sohbeti satiri olarak gonder (ClanComponent::NotifyOwner ile ayni yol).
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+	{
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(OwnerPawn->GetController()))
+		{
+			PC->ClientReceiveChat(FString(), FString(Text), 2);
+		}
+	}
+}
+
 void UMMOInventoryComponent::EquipFromBag(int32 BagIndex)
 {
-	if (!EquipmentBag.IsValidIndex(BagIndex))
+	// Indeks yalniz bu (sahip) istemcinin kendi gorunumunde cozulur; sunucuya InstanceId gider.
+	if (EquipmentBag.IsValidIndex(BagIndex))
+	{
+		EquipByInstanceId(EquipmentBag[BagIndex].InstanceId);
+	}
+}
+
+void UMMOInventoryComponent::EquipByInstanceId(int32 InstanceId)
+{
+	if (InstanceId == 0)
 	{
 		return;
 	}
 
 	if (!HasAuthorityInternal())
 	{
-		ServerEquipFromBag(BagIndex);
+		ServerEquipByInstanceId(InstanceId);
 		return;
+	}
+
+	const int32 BagIndex = FindBagIndexByInstanceId(InstanceId);
+	if (BagIndex == INDEX_NONE)
+	{
+		return; // bayat istek: esya artik cantada degil
 	}
 
 	const FMMOEquipmentInstance Inst = EquipmentBag[BagIndex];
@@ -267,9 +308,9 @@ void UMMOInventoryComponent::EquipFromBag(int32 BagIndex)
 	OnInventoryChanged.Broadcast();
 }
 
-void UMMOInventoryComponent::ServerEquipFromBag_Implementation(int32 BagIndex)
+void UMMOInventoryComponent::ServerEquipByInstanceId_Implementation(int32 InstanceId)
 {
-	EquipFromBag(BagIndex);
+	EquipByInstanceId(InstanceId);
 }
 
 void UMMOInventoryComponent::UnequipSlot(EMMOEquipSlot Slot)
@@ -283,6 +324,14 @@ void UMMOInventoryComponent::UnequipSlot(EMMOEquipSlot Slot)
 	if (!HasAuthorityInternal())
 	{
 		ServerUnequipSlot(Slot);
+		return;
+	}
+
+	// NETWORK_AUDIT O10: canta doluysa cikarma reddedilir (aksi halde canta MaxBagSize'i asar,
+	// takas/geri alma/odul reddedilir ve HUD fazla esyalari gosteremez).
+	if (EquipmentBag.Num() >= MaxBagSize)
+	{
+		NotifyOwnerText(TEXT("Canta dolu! Once bir esya sat veya depoya koy."));
 		return;
 	}
 
@@ -300,20 +349,51 @@ void UMMOInventoryComponent::ServerUnequipSlot_Implementation(EMMOEquipSlot Slot
 
 void UMMOInventoryComponent::TryUpgrade(int32 BagIndex)
 {
-	if (!EquipmentBag.IsValidIndex(BagIndex))
+	// Indeks yalniz bu (sahip) istemcinin kendi gorunumunde cozulur; sunucuya InstanceId +
+	// gorulen arti seviyesi gider.
+	if (EquipmentBag.IsValidIndex(BagIndex))
+	{
+		UpgradeByInstanceId(EquipmentBag[BagIndex].InstanceId, EquipmentBag[BagIndex].Plus);
+	}
+}
+
+void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 ExpectedPlus)
+{
+	if (InstanceId == 0)
 	{
 		return;
 	}
 
 	if (!HasAuthorityInternal())
 	{
-		ServerTryUpgrade(BagIndex);
+		ServerUpgradeByInstanceId(InstanceId, ExpectedPlus);
 		return;
+	}
+
+	const int32 BagIndex = FindBagIndexByInstanceId(InstanceId);
+	if (BagIndex == INDEX_NONE)
+	{
+		return; // bayat istek: esya yandi/satildi/tasindi
 	}
 
 	FMMOEquipmentInstance& Inst = EquipmentBag[BagIndex];
 	const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
 	if (!Def || Inst.Plus < 0 || Inst.Plus >= FMMOItemDatabase::MaxPlus)
+	{
+		return;
+	}
+
+	// Istemcinin gordugu arti seviyesi artik gecerli degilse (ornegin ilk tik basarili oldu,
+	// hizli ikinci tik eski seviye ile geldi) sessizce reddet: kullanici yeni seviyeyi gorup
+	// bilincli olarak tekrar basmali.
+	if (ExpectedPlus >= 0 && ExpectedPlus != Inst.Plus)
+	{
+		return;
+	}
+
+	// Ust uste RPC'lere karsi kisa soguma (gecikmeli baglantida tik yigilmasi).
+	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (Now - LastUpgradeServerTime < UpgradeCooldownSeconds)
 	{
 		return;
 	}
@@ -325,6 +405,7 @@ void UMMOInventoryComponent::TryUpgrade(int32 BagIndex)
 		return;
 	}
 
+	LastUpgradeServerTime = Now;
 	AddGold(-Cost);
 
 	const int32 ChancePct = FMMOItemDatabase::GetUpgradeChancePct(Inst.Plus);
@@ -350,9 +431,9 @@ void UMMOInventoryComponent::TryUpgrade(int32 BagIndex)
 	OnInventoryChanged.Broadcast();
 }
 
-void UMMOInventoryComponent::ServerTryUpgrade_Implementation(int32 BagIndex)
+void UMMOInventoryComponent::ServerUpgradeByInstanceId_Implementation(int32 InstanceId, int32 ExpectedPlus)
 {
-	TryUpgrade(BagIndex);
+	UpgradeByInstanceId(InstanceId, ExpectedPlus);
 }
 
 bool UMMOInventoryComponent::IsOwnerNearVendor(float MaxDist) const
@@ -538,14 +619,23 @@ void UMMOInventoryComponent::ServerBuyConsumable_Implementation(FName ItemId, in
 
 void UMMOInventoryComponent::SellEquipment(int32 BagIndex)
 {
-	if (!EquipmentBag.IsValidIndex(BagIndex))
+	// Indeks yalniz bu (sahip) istemcinin kendi gorunumunde cozulur; sunucuya InstanceId gider.
+	if (EquipmentBag.IsValidIndex(BagIndex))
+	{
+		SellByInstanceId(EquipmentBag[BagIndex].InstanceId);
+	}
+}
+
+void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
+{
+	if (InstanceId == 0)
 	{
 		return;
 	}
 
 	if (!HasAuthorityInternal())
 	{
-		ServerSellEquipment(BagIndex);
+		ServerSellByInstanceId(InstanceId);
 		return;
 	}
 
@@ -556,6 +646,12 @@ void UMMOInventoryComponent::SellEquipment(int32 BagIndex)
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Satici yakininda degilsin"));
 		}
 		return;
+	}
+
+	const int32 BagIndex = FindBagIndexByInstanceId(InstanceId);
+	if (BagIndex == INDEX_NONE)
+	{
+		return; // bayat istek: esya zaten satildi/yandi/tasindi
 	}
 
 	const FMMOEquipmentInstance Inst = EquipmentBag[BagIndex];
@@ -578,9 +674,9 @@ void UMMOInventoryComponent::SellEquipment(int32 BagIndex)
 	}
 }
 
-void UMMOInventoryComponent::ServerSellEquipment_Implementation(int32 BagIndex)
+void UMMOInventoryComponent::ServerSellByInstanceId_Implementation(int32 InstanceId)
 {
-	SellEquipment(BagIndex);
+	SellByInstanceId(InstanceId);
 }
 
 bool UMMOInventoryComponent::IsOwnerNearWarehouse(float MaxDist) const
