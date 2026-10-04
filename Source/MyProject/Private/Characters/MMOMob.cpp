@@ -693,54 +693,128 @@ void AMMOMob::HandleDeath()
 	{
 		const float PartyXPShareRange = 3000.f;
 
-		TArray<AMMOCharacter*> Recipients;
-		if (UMMOPartyComponent* Party = Killer->GetPartyComponent())
+		// XP payi: oyuncu basina verilen hasarin toplam hasara orani (%1 hasar = %1 XP). Parti tek birim
+		// sayilir: partinin toplam hasar payi parti UYE SAYISINA bolunur (8 kisilik partide herkes payin
+		// 1/8'ini alir); payi alan uyeler menzildeki (3000u) uyelerdir. Gorev ilerlemesi (kredi) paya bagli
+		// degildir: son vurusu yapan ve payi olan herkes tam kredi alir.
+		TArray<TPair<AMMOCharacter*, float>> Shares;
+		auto AddShare = [&Shares](AMMOCharacter* C, float Share)
 		{
-			if (Party->IsInParty())
+			for (TPair<AMMOCharacter*, float>& E : Shares)
 			{
-				Party->GetPartyInRange(GetActorLocation(), PartyXPShareRange, Recipients);
+				if (E.Key == C)
+				{
+					E.Value = FMath::Max(E.Value, Share);
+					return;
+				}
 			}
-		}
-		Recipients.AddUnique(Killer); // olduren her zaman kredi alir
+			Shares.Add(TPair<AMMOCharacter*, float>(C, Share));
+		};
 
-		// Hasar katkisi: mobun MaxHealth'inin en az %20'sine hasar veren, hayatta ve menzildeki oyuncular da
-		// kredi alir (son vurusu baskasi yapsa bile; "kill stealing" azalir). Parti kredisi aynen korunur.
+		float TotalDamage = 0.f;
+		for (const TPair<TWeakObjectPtr<AMMOCharacter>, float>& C : DamageContributions)
 		{
-			const float MinContribution = Stats ? FMath::Max(1.f, Stats->MaxHealth * 0.2f) : 1.f;
+			TotalDamage += C.Value; // baglantisi kopan/gecersiz katki sahiplerinin payi da toplama girer (pay kaybolur)
+		}
+
+		if (TotalDamage <= 0.f)
+		{
+			// Katki kaydi yok (olum oyuncu hasari disindan geldi): olduren (veya partisi) tum payi alir;
+			// parti ise pay uye sayisina bolunur.
+			float KillerShare = 1.f;
+			if (UMMOPartyComponent* Party = Killer->GetPartyComponent())
+			{
+				if (Party->IsInParty())
+				{
+					TArray<AMMOCharacter*> AllMembers;
+					Party->GetPartyInRange(GetActorLocation(), 1.0e9f, AllMembers);
+					KillerShare = 1.f / FMath::Max(1, AllMembers.Num());
+					TArray<AMMOCharacter*> InRange;
+					Party->GetPartyInRange(GetActorLocation(), PartyXPShareRange, InRange);
+					for (AMMOCharacter* M : InRange)
+					{
+						AddShare(M, KillerShare);
+					}
+				}
+			}
+			AddShare(Killer, KillerShare);
+		}
+		else
+		{
+			TArray<AMMOCharacter*> Assigned;
 			for (const TPair<TWeakObjectPtr<AMMOCharacter>, float>& C : DamageContributions)
 			{
 				AMMOCharacter* Who = C.Key.Get();
-				if (Who && C.Value >= MinContribution
-					&& FVector::Dist(Who->GetActorLocation(), GetActorLocation()) <= PartyXPShareRange)
+				if (!Who || Assigned.Contains(Who))
 				{
-					Recipients.AddUnique(Who);
+					continue;
+				}
+				// Grup = katki sahibi + (varsa) tum parti uyeleri; grup payi = grubun toplam hasari / toplam hasar.
+				TArray<AMMOCharacter*> Group;
+				if (UMMOPartyComponent* Party = Who->GetPartyComponent())
+				{
+					if (Party->IsInParty())
+					{
+						Party->GetPartyInRange(GetActorLocation(), 1.0e9f, Group);
+					}
+				}
+				Group.AddUnique(Who);
+				float GroupDamage = 0.f;
+				for (AMMOCharacter* G : Group)
+				{
+					Assigned.AddUnique(G);
+					if (const float* D = DamageContributions.Find(G))
+					{
+						GroupDamage += *D;
+					}
+				}
+				// Grubun payi uye sayisina bolunur (tek basina oynayan icin grup = 1 kisi, bolunme yok).
+				const float GroupShare = FMath::Clamp(GroupDamage / TotalDamage, 0.f, 1.f);
+				const float PerMemberShare = GroupShare / FMath::Max(1, Group.Num());
+				for (AMMOCharacter* G : Group)
+				{
+					if (FVector::Dist(G->GetActorLocation(), GetActorLocation()) <= PartyXPShareRange)
+					{
+						AddShare(G, PerMemberShare);
+					}
 				}
 			}
+			AddShare(Killer, 0.f); // olduren her zaman gorev kredisi alir (payi yoksa XP almaz)
 		}
 
-		for (AMMOCharacter* R : Recipients)
+		for (const TPair<AMMOCharacter*, float>& Entry : Shares)
 		{
+			AMMOCharacter* R = Entry.Key;
+			const float Share = Entry.Value;
 			// Oluyken XP verilmiyor; ayni oldurmeden gorev kredisi de verilmesin.
 			if (!R || !R->GetStats() || R->GetStats()->bIsDead)
 			{
 				continue;
 			}
-			int32 ScaledXP = ScaleXPForLevelGap(XPReward, R->GetStats()->Level, MobLevel);
-			// Parti power-leveling tavani (QA): mob alicidan >10 seviye yuksekse tek oldurmeden
-			// alinan XP, alicinin sonraki seviye esiginin %25'ini gecemez (Lv1 -> tek kill'de Lv18 olmasin).
-			if (MobLevel - R->GetStats()->Level > 10)
+			int32 ScaledXP = 0;
+			if (Share > 0.f)
 			{
-				ScaledXP = FMath::Min(ScaledXP, FMath::Max(1, R->GetStats()->ExperienceToNextLevel / 4));
-			}
-			if (R->GetStats()->Level < R->GetStats()->MaxLevel)
-			{
-				R->ClientNotifyXPGain(ScaledXP, XPReward > 0 ? FMath::RoundToInt(100.f * ScaledXP / XPReward) : 100);
+				const int32 ShareXP = FMath::Max(1, FMath::RoundToInt(XPReward * Share));
+				ScaledXP = ScaleXPForLevelGap(ShareXP, R->GetStats()->Level, MobLevel);
+				// Parti power-leveling tavani (QA): mob alicidan >10 seviye yuksekse tek oldurmeden
+				// alinan XP, alicinin sonraki seviye esiginin %25'ini gecemez (Lv1 -> tek kill'de Lv18 olmasin).
+				if (MobLevel - R->GetStats()->Level > 10)
+				{
+					ScaledXP = FMath::Min(ScaledXP, FMath::Max(1, R->GetStats()->ExperienceToNextLevel / 4));
+				}
+				if (R->GetStats()->Level < R->GetStats()->MaxLevel)
+				{
+					R->ClientNotifyXPGain(ScaledXP, XPReward > 0 ? FMath::RoundToInt(100.f * ScaledXP / XPReward) : 100);
+				}
 			}
 			// Olcum gunlugu: oldurme (seviye = XP verilmeden onceki seviye; party=1 -> son vurusu yapan degil).
 			UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=kill who=%s lv=%d mob=%s mlv=%d xp=%d party=%d elite=%d"),
 				MMOMetrics::Seconds(), *MMOMetrics::WhoName(R), R->GetStats()->Level, *ArchetypeId.ToString(),
 				MobLevel, ScaledXP, R != Killer ? 1 : 0, bIsElite ? 1 : 0);
-			R->GetStats()->GainExperience(ScaledXP);
+			if (ScaledXP > 0)
+			{
+				R->GetStats()->GainExperience(ScaledXP);
+			}
 			if (R->GetQuestComponent())
 			{
 				R->GetQuestComponent()->NotifyMobKilled(ArchetypeId);

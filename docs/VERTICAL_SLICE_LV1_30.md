@@ -336,4 +336,4 @@ KO/Rise tarzı beklenen döngü (yalnız genel referans, doğrulanmadı): hub �
 
 ## Güncelleme (2026-10-04, bulut)
 
-Madde 10'un **hasar katkısı kredisi** kısmı `AMMOMob`'a eklendi (mobun canının ≥%20'sine hasar veren oyuncular XP + görev kredisi alır; derlenmedi). Parti bonusu, ganimet sahipliği (ilk 10 sn) ve parti ölçekli elit can açık. Kalan işler ve model bulguları: `BALANCE_MODEL.md`.
+Madde 10'un **hasar payı XP'si** `AMMOMob`'a eklendi (derlenmedi): XP, mobda bırakılan hasarın toplam hasara oranıyla dağıtılır (%1 hasar = %1 XP, eşik yok); parti tek birim sayılır ve partinin payı **üye sayısına bölünür** (8 kişilik partide 1/8). Görev kredisi paydan bağımsız tam verilir. Eski "parti üyesi tam XP alır" davranışı kalktı. Parti bonusu, ganimet sahipliği (ilk 10 sn) ve parti ölçekli elit can açık. Kalan işler ve model bulguları: `BALANCE_MODEL.md`.
