@@ -24,6 +24,11 @@ Step "Veri denetimi (ValidateData.py)" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Statik C++ kontrolu (StaticLint.py; derleme degildir)" {
+    & $py (Join-Path $PSScriptRoot "StaticLint.py") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 if (-not $SkipBuild) {
     Step "Derleme (MyProjectEditor)" {
         $out = & $ue MyProjectEditor Win64 Development "-Project=$root\MyProject.uproject" -WaitMutex 2>&1
