@@ -55,3 +55,23 @@ python3 Scripts/ProgressionModel.py --max 30   # yalnız Lv1-30
 - [Muhtemel] `Q_Gold5000` (Lv16, ~2,1 seviye), `Q_Gold500/1000` (~3 seviye) ve `Q_Level5` (~1,6 seviye) erken oyunda bir seviyenin çok üstünde XP veriyor. Model, oyuncunun Lv30'a kadar 80.000+ altın biriktirdiğini söylüyor (`VERTICAL_SLICE_LV1_30.md`), yani `Q_Gold*` görevleri kapı açıldığı anda bedava XP.
 - Lv28 sonrası oranlar küçük (≤0,7 seviye); asıl hız etkisi Lv1–20'de.
 - **Seçenekler (karar bekliyor):** (a) `HaveGold` görevlerinde teslimde altını düş ("harca"), (b) `RewardXP`'yi kapı seviyesi eşiğinin ≤%50'sine indir, (c) olduğu gibi bırak ve yalnız dokümante et. Ölçüm (`[MMOMETRIC]`) olmadan (b) körlemesine olur.
+
+## Kümülatif görev XP'si / kümülatif gereken XP (model)
+
+`kum.gorev%` ≥ %100: o seviyeye kadar kapısı açılmış görevlerin ödülü tek başına oyuncuyu o seviyeye taşır (öldürme/grind gerekmez). `ReachLevel` ödülleri hedef seviyede teslim sayıldı; `Q_Gold*` hariç. **[KOD+MODEL]**
+
+| Seviye | Kümülatif görev XP | Kümülatif gerekenin % |
+|---:|---:|---:|
+| 5 | 5.350 | %652 |
+| 10 | 16.450 | %495 |
+| 15 | 24.350 | %222 |
+| 20 | 53.050 | %155 |
+| 25 | 83.450 | %79 |
+| 30 | 140.450 | %45 |
+| 40 | 297.450 | %17 |
+| 50 | 593.450 | %11 |
+| 65 | 2.503.450 | %14 |
+| 79 | 8.658.450 | %22 |
+
+- [Muhtemel] Lv1–10 görev ödülleri eşiklerin 5–8 katı: bilinçli bir "hızlı giriş" olabilir. Lv15'te %222, Lv20'de ~%150: görevler hâlâ grind'ın çoğunu karşılıyor. Lv25'te %79, Lv30'da %45'e düşüyor: görev ödülleri eşiklerin gerisine ancak Lv25 civarında düşüyor, yani yavaşlama o noktadan sonra başlıyor.
+- Ayar denemek için: `python3 Scripts/ProgressionModel.py --mob-mult "1:1.0,10:0.6,30:0.4" --quest-mult "1:1.0,16:0.5,30:0.4"` (kodu değiştirmez; yalnız modele uygular). Not: görev öldürme sayıları sabit olduğundan Lv1–5 bandı ne olursa olsun ~6 öldürmenin altına inmez; bu modelin sınırıdır.
