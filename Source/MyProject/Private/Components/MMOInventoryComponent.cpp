@@ -917,6 +917,8 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 			}
 			else
 			{
+				UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: yanlis slottaki esya (%s) canta dolu oldugu icin depoya tasindi (depo %d/%d)"),
+					*EquippedItems[i].ItemId.ToString(), Warehouse.Num() + 1, MaxWarehouseSize);
 				Warehouse.Add(EquippedItems[i]);
 			}
 			EquippedItems[i] = FMMOEquipmentInstance();
