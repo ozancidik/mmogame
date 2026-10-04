@@ -58,3 +58,10 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 - Kalan beceri boşluğu: her sınıfta Lv28→33 (5 seviye), `ValidateData.py` UYARI basıyor. Eklenen 12 beceri (Lv13, Lv20, Lv28) tahmini değerlerle yazıldı; ölçüm sonrası ayarlanmalı.
 - Denge ayarı (XP hızı, altın sink, ölüm cezası): `[MMOMETRIC]` verisi gelmeden körlemesine olur.
 - K-1 (kalıcı çözüm: hesap sistemi) ve `MaxTokens`: tasarım kararı ya da ölçüm gerektiriyor.
+
+## 6. Parti ve çok oyunculu adalet (2026-10-04)
+
+- **Parti üye sınırı kodda yok [KOD].** `MMOPartyComponent.cpp` içinde azami üye sayısı kontrolü bulunmuyor; XP bölme mantığı (`AMMOMob::HandleDeath`) parti büyüklüğünü sınırsız kabul ediyor. 8 kişilik üst sınır isteniyorsa davet/kabul yolunda eklenmeli. `MMOPartyComponent.cpp` yerelde Codex'te olduğu için bulutta dokunulmadı; yerelde `ApplyPartySet`/davet kabulüne `Members.Num() >= 8` kontrolü eklenebilir.
+- **Kill XP'si hasar payına orantılı ve parti payı üye sayısına bölünür** (PR #1, derlenmedi): %1 hasar = %1 XP, 8 kişilik partide herkes payın 1/8'ini alır. Parti artık toplam XP'yi artırmıyor, yalnızca paylaştırıyor; parti teşviki (bonus) ayrı bir tasarım kararı.
+- **Ganimet** ilk 10 sn yalnızca XP payı olanlara rezerve (PR #1, derlenmedi).
+- `Scripts/ProgressionModel.py` ve `EconomyModel.py` **solo** oyuncuyu modeller; parti/paylaşım yok.
