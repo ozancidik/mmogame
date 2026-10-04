@@ -753,6 +753,26 @@ float AMMOCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEv
 		return 0.f;
 	}
 
+	// Tum hasar yollari buradan gecer. Yeni bir PvP skill'i AttackTarget'in on
+	// kontrolunu atlayip ApplyDamage cagirsa bile parti/klan/hub kurallari korunur.
+	if (HasAuthority() && IsPlayerControlled())
+	{
+		AMMOCharacter* Attacker = EventInstigator
+			? Cast<AMMOCharacter>(EventInstigator->GetPawn()) : nullptr;
+		if (!Attacker)
+		{
+			Attacker = Cast<AMMOCharacter>(DamageCauser);
+		}
+		if (Attacker && Attacker != this && Attacker->IsPlayerControlled())
+		{
+			const TCHAR* BlockReason = nullptr;
+			if (!Attacker->IsPvPAllowed() || !Attacker->CanHarmPlayer(this, BlockReason))
+			{
+				return 0.f;
+			}
+		}
+	}
+
 	const float BaseHandled = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	if (!HasAuthority() || !Stats)
