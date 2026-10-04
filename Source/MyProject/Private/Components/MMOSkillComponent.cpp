@@ -40,9 +40,11 @@ void UMMOSkillComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UMMOSkillComponent, CharacterClass);
-	DOREPLIFETIME(UMMOSkillComponent, LearnedSkills);
-	DOREPLIFETIME(UMMOSkillComponent, Hotbar);
-	DOREPLIFETIME(UMMOSkillComponent, MasteryRankArray);
+	// NETWORK_AUDIT O9: CharacterClass herkese (parti listesi sinif adi), build detaylari
+	// (ogrenilen skiller, hotbar, rutbe) yalniz sahibine.
+	DOREPLIFETIME_CONDITION(UMMOSkillComponent, LearnedSkills, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOSkillComponent, Hotbar, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOSkillComponent, MasteryRankArray, COND_OwnerOnly);
 }
 
 void UMMOSkillComponent::BeginPlay()

@@ -23,8 +23,10 @@ UMMOQuestComponent::UMMOQuestComponent()
 void UMMOQuestComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(UMMOQuestComponent, ActiveQuests);
-	DOREPLIFETIME(UMMOQuestComponent, CompletedQuests);
+	// NETWORK_AUDIT O9: gorev durumu yalniz sahibine (HUD gorev takibi/NPC isaretleri kendi
+	// pawn'ini okur; baska oyuncunun gorev listesi gizlilik + bant yukudur).
+	DOREPLIFETIME_CONDITION(UMMOQuestComponent, ActiveQuests, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOQuestComponent, CompletedQuests, COND_OwnerOnly);
 }
 
 bool UMMOQuestComponent::HasAuthorityInternal() const

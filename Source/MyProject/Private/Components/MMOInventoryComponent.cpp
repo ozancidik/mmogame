@@ -28,10 +28,14 @@ void UMMOInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(UMMOInventoryComponent, Gold);
-	DOREPLIFETIME(UMMOInventoryComponent, Items);
-	DOREPLIFETIME(UMMOInventoryComponent, EquipmentBag);
-	DOREPLIFETIME(UMMOInventoryComponent, EquippedItems);
+	// NETWORK_AUDIT Y2: envanter yalniz sahibine replike edilir (gizlilik + bant).
+	// Baska oyuncunun envanterini okuyan istemci kodu yok (HUD yalniz kendi pawn'ini cizer;
+	// ticaret karsi teklifi UMMOTradeComponent'te ayri OwnerOnly alanlarda). EquippedItems
+	// icin gorsel/isim plakasi kullanimi yok; ileride gerekirse ayri hafif alan eklenmeli.
+	DOREPLIFETIME_CONDITION(UMMOInventoryComponent, Gold, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOInventoryComponent, Items, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOInventoryComponent, EquipmentBag, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOInventoryComponent, EquippedItems, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOInventoryComponent, Warehouse, COND_OwnerOnly);
 }
 

@@ -78,14 +78,17 @@ void UMMOStatsComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(UMMOStatsComponent, Dexterity);
 	DOREPLIFETIME(UMMOStatsComponent, Intelligence);
 	DOREPLIFETIME(UMMOStatsComponent, Vitality);
-	DOREPLIFETIME(UMMOStatsComponent, UnspentStatPoints);
-	DOREPLIFETIME(UMMOStatsComponent, UnspentSkillPoints);
+	// NETWORK_AUDIT O9: puanlar, EXP ve mana yalniz sahibine (HUD bunlari kendi pawn'i icin
+	// cizer; parti listesi yalniz Level/sinif/can/olu bilgisini kullanir). Level, Health,
+	// MaxHealth, AttackPower, Defense, bIsDead ve efektler herkese kalir.
+	DOREPLIFETIME_CONDITION(UMMOStatsComponent, UnspentStatPoints, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOStatsComponent, UnspentSkillPoints, COND_OwnerOnly);
 	DOREPLIFETIME(UMMOStatsComponent, Level);
-	DOREPLIFETIME(UMMOStatsComponent, Experience);
+	DOREPLIFETIME_CONDITION(UMMOStatsComponent, Experience, COND_OwnerOnly);
 	DOREPLIFETIME(UMMOStatsComponent, Health);
 	DOREPLIFETIME(UMMOStatsComponent, MaxHealth);
-	DOREPLIFETIME(UMMOStatsComponent, Mana);
-	DOREPLIFETIME(UMMOStatsComponent, MaxMana);
+	DOREPLIFETIME_CONDITION(UMMOStatsComponent, Mana, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOStatsComponent, MaxMana, COND_OwnerOnly);
 	DOREPLIFETIME(UMMOStatsComponent, AttackPower);
 	DOREPLIFETIME(UMMOStatsComponent, Defense);
 	DOREPLIFETIME(UMMOStatsComponent, bIsDead);
