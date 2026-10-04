@@ -333,7 +333,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		}
 		if (Owner->GetInventory() && Def->RewardGold > 0)
 		{
-			Owner->GetInventory()->AddGold(Def->RewardGold);
+			Owner->GetInventory()->AddGoldFrom(Def->RewardGold, TEXT("gorev"));
 		}
 		// Odul-esyalari (sadece otorite; ClaimReward zaten tek sefer calisir).
 		if (UMMOInventoryComponent* Inv = Owner->GetInventory())

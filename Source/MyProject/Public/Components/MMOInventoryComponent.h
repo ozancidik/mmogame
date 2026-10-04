@@ -53,6 +53,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Inventory")
 	void AddGold(int32 Amount);
 
+	/** AddGold + olcum gunlugu kaynak etiketi (loot/gorev/satis/satin_alma/yukseltme/iyilestirme/ticaret). Sadece otorite. */
+	void AddGoldFrom(int32 Amount, const TCHAR* Source);
+
 	/** Item ekler (varsa yigina ekler, yoksa yeni yigin). Sadece otorite. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Inventory")
 	void AddItem(FName ItemId, int32 Count = 1);
@@ -177,6 +180,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Items();
+
+	// Olcum gunlugu: AddGoldFrom'un gecici kaynak etiketi (AddGold icinde okunur, sonra temizlenir).
+	const TCHAR* GoldSourceTag = nullptr;
 
 	bool HasAuthorityInternal() const;
 	bool IsLocallyControlledOwner() const;

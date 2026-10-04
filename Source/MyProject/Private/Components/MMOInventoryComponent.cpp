@@ -4,6 +4,7 @@
 #include "Items/MMOItemDatabase.h"
 #include "Items/MMOConsumableTypes.h"
 #include "Characters/MMOCharacter.h"
+#include "Core/MMOMetrics.h"
 #include "Components/MMOStatsComponent.h"
 #include "Save/MMOSaveGame.h"
 #include "Net/UnrealNetwork.h"
@@ -64,8 +65,24 @@ void UMMOInventoryComponent::AddGold(int32 Amount)
 	// dahilinde) sonuc negatife doner ve FMath::Max(0,...) oyuncunun TUM altinini
 	// sifirlardi. int64'te topla, sonra guvenle [0, INT32_MAX] araligina sikistir.
 	const int64 Sum = (int64)Gold + (int64)Amount;
+	const int32 OldGold = Gold;
 	Gold = (int32)FMath::Clamp<int64>(Sum, 0, MAX_int32);
 	OnGoldChanged.Broadcast(Gold);
+
+	// Olcum gunlugu (yalniz oyuncular): gercekte degisen miktar (+kazanc / -harcama).
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); OwnerPawn && OwnerPawn->IsPlayerControlled() && Gold != OldGold)
+	{
+		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=gold who=%s src=%s amount=%d balance=%d"),
+			MMOMetrics::Seconds(), *MMOMetrics::WhoName(OwnerPawn), GoldSourceTag ? GoldSourceTag : TEXT("diger"),
+			Gold - OldGold, Gold);
+	}
+}
+
+void UMMOInventoryComponent::AddGoldFrom(int32 Amount, const TCHAR* Source)
+{
+	GoldSourceTag = Source;
+	AddGold(Amount);
+	GoldSourceTag = nullptr;
 }
 
 void UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
@@ -406,7 +423,7 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 	}
 
 	LastUpgradeServerTime = Now;
-	AddGold(-Cost);
+	AddGoldFrom(-Cost, TEXT("yukseltme"));
 
 	const int32 ChancePct = FMMOItemDatabase::GetUpgradeChancePct(Inst.Plus);
 	const bool bSuccess = FMath::RandRange(1, 100) <= ChancePct;
@@ -504,7 +521,7 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 		return;
 	}
 
-	AddGold(-Price);
+	AddGoldFrom(-Price, TEXT("satin_alma"));
 	AddEquipmentInstance(ItemId, 0);
 	if (GEngine && IsLocallyControlledOwner())
 	{
@@ -552,7 +569,7 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 		return;
 	}
 
-	AddGold(-Price);
+	AddGoldFrom(-Price, TEXT("satin_alma"));
 	AddItem(FName(TEXT("HealthPotion")), Count);
 	if (GEngine && IsLocallyControlledOwner())
 	{
@@ -603,7 +620,7 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 		return;
 	}
 
-	AddGold(-Price);
+	AddGoldFrom(-Price, TEXT("satin_alma"));
 	AddItem(ItemId, Count);
 	if (GEngine && IsLocallyControlledOwner())
 	{
@@ -664,7 +681,7 @@ void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
 	const int32 Price = FMath::RoundToInt(FMMOItemDatabase::GetSellPrice(*Def, Inst.Plus)
 		* FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity));
 	EquipmentBag.RemoveAt(BagIndex);
-	AddGold(Price);
+	AddGoldFrom(Price, TEXT("satis"));
 	OnInventoryChanged.Broadcast();
 
 	if (GEngine && IsLocallyControlledOwner())

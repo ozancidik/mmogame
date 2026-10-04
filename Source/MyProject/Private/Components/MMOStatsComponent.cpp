@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Components/MMOStatsComponent.h"
+#include "Core/MMOMetrics.h"
 #include "Effects/MMOEffectDatabase.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
@@ -374,6 +375,7 @@ int32 UMMOStatsComponent::ApplyDeathPenalty()
 
 void UMMOStatsComponent::HandleLevelUp()
 {
+	const int32 OldLevel = Level;
 	Level++;
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
 	UnspentStatPoints += StatPointsPerLevel;
@@ -383,6 +385,13 @@ void UMMOStatsComponent::HandleLevelUp()
 	RecalculateDerivedStats(/*bRefill=*/true);
 
 	OnLevelUp.Broadcast(Level);
+
+	// Olcum gunlugu (yalniz oyuncular): seviye atlama.
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); OwnerPawn && OwnerPawn->IsPlayerControlled())
+	{
+		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=levelup who=%s from=%d to=%d"),
+			MMOMetrics::Seconds(), *MMOMetrics::WhoName(OwnerPawn), OldLevel, Level);
+	}
 }
 
 bool UMMOStatsComponent::SpendStatPoint(FName StatName, int32 Amount)

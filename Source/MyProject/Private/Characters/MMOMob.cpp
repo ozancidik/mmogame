@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/MMOMob.h"
+#include "Core/MMOMetrics.h"
 #include "Characters/MMOMobArchetype.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -710,6 +711,10 @@ void AMMOMob::HandleDeath()
 			{
 				R->ClientNotifyXPGain(ScaledXP, XPReward > 0 ? FMath::RoundToInt(100.f * ScaledXP / XPReward) : 100);
 			}
+			// Olcum gunlugu: oldurme (seviye = XP verilmeden onceki seviye; party=1 -> son vurusu yapan degil).
+			UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=kill who=%s lv=%d mob=%s mlv=%d xp=%d party=%d elite=%d"),
+				MMOMetrics::Seconds(), *MMOMetrics::WhoName(R), R->GetStats()->Level, *ArchetypeId.ToString(),
+				MobLevel, ScaledXP, R != Killer ? 1 : 0, bIsElite ? 1 : 0);
 			R->GetStats()->GainExperience(ScaledXP);
 			if (R->GetQuestComponent())
 			{

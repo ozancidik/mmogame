@@ -1295,7 +1295,7 @@ void AMMOPlayerController::ServerRequestHeal_Implementation(AMMOHealerNPC* Npc)
 	}
 
 	// Altini dus ve tam iyilestir (Heal/RestoreMana clamp'li; olu ise dirilt).
-	Inv->AddGold(-Cost);
+	Inv->AddGoldFrom(-Cost, TEXT("iyilestirme"));
 	if (St->bIsDead)
 	{
 		St->Revive();

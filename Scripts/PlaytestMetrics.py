@@ -1,0 +1,227 @@
+"""PIE olcum gunlugu ozeti (docs/VERTICAL_SLICE_LV1_30.md madde 1).
+
+Sunucu logundaki "[MMOMETRIC] t=.. ev=.. anahtar=deger" satirlarini okuyup oyuncu basina
+seviye basina sure / oldurme / olum / altin tablosu basar.
+
+Kullanim:
+  python Scripts/PlaytestMetrics.py [log_yolu] [--who OyuncuAdi]
+log_yolu verilmezse <proje>/Saved/Logs/MyProject.log kullanilir. Log yoksa ya da icinde
+[MMOMETRIC] satiri yoksa aciklayici mesaj basar ve 0 ile cikar (hata vermez).
+
+Olaylar (Source/MyProject, UE_LOG LogTemp Display):
+  levelup  who from to
+  kill     who lv mob mlv xp party elite     (lv = XP verilmeden onceki oyuncu seviyesi)
+  death    who lv x y z by xploss
+  gold     who src amount balance            (amount: +kazanc / -harcama)
+  src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
+t = surec baslangicindan beri saniye.
+"""
+import os
+import re
+import sys
+from collections import defaultdict
+
+LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
+
+
+def project_root():
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def to_num(text, default=0.0):
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return default
+
+
+def parse_log(path):
+    events = []
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for raw in fh:
+            m = LINE_RE.search(raw)
+            if not m:
+                continue
+            fields = {}
+            for tok in m.group(1).split():
+                if "=" in tok:
+                    k, _, v = tok.partition("=")
+                    fields[k] = v
+            if "ev" in fields and "who" in fields:
+                events.append(fields)
+    return events
+
+
+def add_gold(p, lv, amount):
+    if amount >= 0:
+        p["lv"][lv]["gold_in"] += amount
+    else:
+        p["lv"][lv]["gold_out"] += -amount
+
+
+def flush_pending(p):
+    """Seviye ilk kez bilinince, oncesinde gelen altin olaylarini o seviyeye yaz."""
+    if p["level"] is not None and p["pending"]:
+        base = p.get("start_level", p["level"])
+        for amount in p["pending"]:
+            add_gold(p, base, amount)
+        p["pending"] = []
+
+
+def build_stats(events):
+    """Oyuncu -> seviye -> toplamlar. Seviye girisi levelup ile belirlenir; ilk seviye ilk olaydan baslar."""
+    players = {}
+    for e in events:
+        who = e["who"]
+        t = to_num(e.get("t"))
+        p = players.setdefault(who, {
+            "level": None, "enter": {}, "dur": {}, "lv": defaultdict(lambda: defaultdict(float)),
+            "first_t": t, "last_t": t, "src": defaultdict(lambda: [0, 0]), "mobs": defaultdict(int),
+            "pending": [],  # seviye henuz bilinmezken gelen altin olaylari (ilk bilinen seviyeye yazilir)
+        })
+        p["last_t"] = max(p["last_t"], t)
+        ev = e["ev"]
+        if ev == "levelup":
+            frm = int(to_num(e.get("from")))
+            to = int(to_num(e.get("to")))
+            enter = p["enter"].get(frm, p["first_t"] if p["level"] is None else t)
+            p["enter"].setdefault(frm, enter)
+            p["dur"][frm] = p["dur"].get(frm, 0.0) + max(0.0, t - enter)
+            p["enter"][to] = t
+            if p["level"] is None:
+                p["start_level"] = frm
+                p["level"] = frm
+                flush_pending(p)
+            p["level"] = to
+            p["lv"][to]  # seviye satiri olussun
+            p["lv"][frm]
+        elif ev in ("kill", "death"):
+            lv = int(to_num(e.get("lv")))
+            if p["level"] is None:
+                p["level"] = lv
+                p["enter"][lv] = p["first_t"]
+                flush_pending(p)
+            if ev == "kill":
+                p["lv"][lv]["kills"] += 1
+                p["lv"][lv]["xp"] += to_num(e.get("xp"))
+                p["mobs"][e.get("mob", "?")] += 1
+            else:
+                p["lv"][lv]["deaths"] += 1
+                p["lv"][lv]["xploss"] += to_num(e.get("xploss"))
+        elif ev == "gold":
+            amount = int(to_num(e.get("amount")))
+            src = e.get("src", "diger")
+            if amount >= 0:
+                p["src"][src][0] += amount
+            else:
+                p["src"][src][1] += -amount
+            if p["level"] is None:
+                p["pending"].append(amount)
+            else:
+                add_gold(p, p["level"], amount)
+    # Devam eden (son) seviyenin suresi
+    for p in players.values():
+        for amount in p["pending"]:  # seviye hic ogrenilemediyse "?" satirina
+            add_gold(p, 0, amount)
+        if p["level"] is not None and p["level"] in p["enter"] and p["level"] not in p["dur"]:
+            p["dur"][p["level"]] = max(0.0, p["last_t"] - p["enter"][p["level"]])
+            p["open_level"] = p["level"]
+    return players
+
+
+def fmt_time(sec):
+    sec = int(round(sec))
+    return "%d:%02d" % (sec // 60, sec % 60)
+
+
+def print_player(who, p):
+    print("")
+    print("=== Oyuncu: %s ===" % who)
+    levels = sorted(set(p["lv"].keys()) | set(p["dur"].keys()))
+    header = "%-7s %-9s %-9s %-9s %-7s %-10s %-10s %-10s" % (
+        "Seviye", "Sure", "Oldurme", "XP(kill)", "Olum", "Altin+", "Altin-", "Net")
+    print(header)
+    print("-" * len(header))
+    tot_kills = tot_deaths = tot_in = tot_out = 0
+    for lv in levels:
+        d = p["lv"][lv]
+        dur = p["dur"].get(lv)
+        dur_txt = fmt_time(dur) if dur is not None else "-"
+        if lv == p.get("open_level"):
+            dur_txt += "*"
+        gi, go = int(d["gold_in"]), int(d["gold_out"])
+        print("%-7s %-9s %-9d %-9d %-7d %-10d %-10d %-10d" % (
+            lv if lv else "?", dur_txt, d["kills"], d["xp"], d["deaths"], gi, go, gi - go))
+        tot_kills += d["kills"]
+        tot_deaths += d["deaths"]
+        tot_in += gi
+        tot_out += go
+    print("-" * len(header))
+    print("%-7s %-9s %-9d %-9s %-7d %-10d %-10d %-10d" % (
+        "Toplam", fmt_time(p["last_t"] - p["first_t"]), tot_kills, "", tot_deaths, tot_in, tot_out, tot_in - tot_out))
+    if any(str(l) for l in levels) and p.get("open_level") is not None:
+        print("(*) devam eden seviye: sure son olay zamanina kadar")
+    if tot_kills:
+        rate = (100.0 * tot_deaths / tot_kills)
+        print("Olum orani: %.1f olum / 100 oldurme (hedef: 1 olum / 30-80 oldurme = 1.3-3.3)" % rate)
+        print("Giris/cikis orani (altin): %s" % ("%.2f" % (tot_in / tot_out) if tot_out else "cikis yok"))
+    if p["src"]:
+        print("Altin akisi (kaynaga gore):")
+        for src, (gin, gout) in sorted(p["src"].items()):
+            print("  %-12s giris=%-8d cikis=%-8d" % (src, gin, gout))
+    if p["mobs"]:
+        top = sorted(p["mobs"].items(), key=lambda kv: -kv[1])[:8]
+        print("En cok oldurulen: " + ", ".join("%s x%d" % kv for kv in top))
+
+
+def main(argv):
+    path = None
+    only = None
+    args = list(argv[1:])
+    while args:
+        a = args.pop(0)
+        if a == "--who" and args:
+            only = args.pop(0).replace(" ", "_")
+        elif not a.startswith("--") and path is None:
+            path = a
+    if path is None:
+        path = os.path.join(project_root(), "Saved", "Logs", "MyProject.log")
+
+    if not os.path.isfile(path):
+        print("Log dosyasi bulunamadi: %s" % path)
+        print("Once oyunu (PIE) oynayin; sunucu logu Saved/Logs/MyProject.log icine yazilir. "
+              "Baska bir log icin: python Scripts/PlaytestMetrics.py <log_yolu>")
+        return 0
+
+    events = parse_log(path)
+    if not events:
+        print("Log icinde [MMOMETRIC] satiri yok: %s" % path)
+        print("Olcum satirlari yalniz sunucuda (listen server host / dedicated) basilir ve "
+              "seviye atlama, oldurme, olum ve altin degisiminde olusur.")
+        return 0
+
+    players = build_stats(events)
+    print("Log: %s" % path)
+    print("Olay sayisi: %d (levelup=%d kill=%d death=%d gold=%d)" % (
+        len(events),
+        sum(1 for e in events if e["ev"] == "levelup"),
+        sum(1 for e in events if e["ev"] == "kill"),
+        sum(1 for e in events if e["ev"] == "death"),
+        sum(1 for e in events if e["ev"] == "gold")))
+    shown = 0
+    for who in sorted(players):
+        if only and who != only:
+            continue
+        print_player(who, players[who])
+        shown += 1
+    if only and shown == 0:
+        print("'%s' adli oyuncu icin olay yok. Mevcut: %s" % (only, ", ".join(sorted(players))))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # betik hicbir kosulda hata ile dusmesin
+        print("PlaytestMetrics beklenmeyen hata: %s" % exc)
+        sys.exit(0)

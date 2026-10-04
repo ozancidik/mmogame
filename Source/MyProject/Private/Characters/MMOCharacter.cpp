@@ -11,6 +11,7 @@
 #include "Components/MMOClanComponent.h"
 #include "Components/MMOFriendsComponent.h"
 #include "Core/MMOTargeting.h"
+#include "Core/MMOMetrics.h"
 #include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
 #include "Items/MMOConsumableTypes.h"
@@ -839,6 +840,14 @@ void AMMOCharacter::HandleDeath()
 			if (Stats)
 			{
 				const int32 Lost = Stats->ApplyDeathPenalty();
+
+				// Olcum gunlugu: oyuncu olumu (by = son hasar veren mob arketipi, yoksa none).
+				const AMMOMob* KillerMob = Cast<AMMOMob>(LastDamageInstigator.Get());
+				const FVector DeathLoc = GetActorLocation();
+				UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=death who=%s lv=%d x=%.0f y=%.0f z=%.0f by=%s xploss=%d"),
+					MMOMetrics::Seconds(), *MMOMetrics::WhoName(this), Stats->Level, DeathLoc.X, DeathLoc.Y, DeathLoc.Z,
+					KillerMob ? *KillerMob->ArchetypeId.ToString() : TEXT("none"), Lost);
+
 				if (Lost > 0 && IsLocallyControlled() && GEngine)
 				{
 					GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor(255, 120, 120),

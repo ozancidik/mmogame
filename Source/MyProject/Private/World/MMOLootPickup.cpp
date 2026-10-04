@@ -179,7 +179,7 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 
 	if (bIsGold)
 	{
-		Inv->AddGold(GoldAmount);
+		Inv->AddGoldFrom(GoldAmount, TEXT("loot"));
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 210, 0),
