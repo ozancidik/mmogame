@@ -95,6 +95,9 @@ namespace
 			E::AoESelf, 250.f, 20.f, 660.f, 0.f, 560.f));
 		Table.Add(MakeDef(TEXT("War_LifeReap"), TEXT("Yasam Cali"), C::Warrior, T::Special1, 2, 16, 2, TEXT("War_BloodDrain"),
 			E::HealSelf, 70.f, 16.f, 310.f, 0.f, 0.f));
+		// Lv24-33 bosluk dolgusu (2026-10-04): Special0 rutbe 6 (1 puan harcatir); PLACEHOLDER degerler.
+		Table.Add(MakeDef(TEXT("War_Rampage"), TEXT("Kudurma"), C::Warrior, T::Special0, 6, 28, 2, TEXT("War_TempestSlash"),
+			E::MeleeDamage, 110.f, 13.f, 340.f, 240.f, 0.f));
 		Table.Add(MakeDef(TEXT("War_BloodLord"), TEXT("Kan Efendisi"), C::Warrior, T::Special1, 3, 33, 2, TEXT("War_LifeReap"),
 			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("RageII")));
 		Table.Add(MakeDef(TEXT("War_SteelArmor"), TEXT("Celik Zirh"), C::Warrior, T::Special2, 2, 45, 2, TEXT("War_IronSkin"),
@@ -143,6 +146,9 @@ namespace
 			E::RangedDamage, 105.f, 13.f, 360.f, 1900.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Arc_ShadowStep"), TEXT("Golge Adimi"), C::Archer, T::Special1, 2, 16, 2, TEXT("Arc_Sprint"),
 			E::BuffSelf, 70.f, 18.f, 0.f, 0.f, 0.f, TEXT("HasteII")));
+		// Lv24-33 bosluk dolgusu (2026-10-04): Special0 rutbe 6; PLACEHOLDER degerler.
+		Table.Add(MakeDef(TEXT("Arc_DeathMark"), TEXT("Olum Isareti"), C::Archer, T::Special0, 6, 28, 2, TEXT("Arc_DragonArrow"),
+			E::RangedDamage, 125.f, 15.f, 430.f, 2000.f, 0.f, TEXT("Poison")));
 		Table.Add(MakeDef(TEXT("Arc_WindsBreath"), TEXT("Ruzgarin Nefesi"), C::Archer, T::Special1, 3, 33, 2, TEXT("Arc_ShadowStep"),
 			E::BuffSelf, 145.f, 24.f, 0.f, 0.f, 0.f, TEXT("HasteIII")));
 		// Civili Tuzak: alandaki hedeflere zehir birakan yeni okcu hatti.
@@ -191,6 +197,9 @@ namespace
 			E::RangedDamage, 105.f, 13.f, 380.f, 1900.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Mag_IceChain"), TEXT("Buz Zinciri"), C::Mage, T::Special1, 2, 16, 2, TEXT("Mag_FrostNova"),
 			E::RangedDamage, 70.f, 12.f, 245.f, 1800.f, 0.f, TEXT("Slow")));
+		// Lv24-33 bosluk dolgusu (2026-10-04): Special0 rutbe 6; PLACEHOLDER degerler.
+		Table.Add(MakeDef(TEXT("Mag_Disintegrate"), TEXT("Parcalama"), C::Mage, T::Special0, 6, 28, 2, TEXT("Mag_Thunderclap"),
+			E::RangedDamage, 120.f, 12.f, 420.f, 1900.f, 0.f));
 		Table.Add(MakeDef(TEXT("Mag_FreezingTempest"), TEXT("Donduran Firtinasi"), C::Mage, T::Special1, 3, 33, 2, TEXT("Mag_IceChain"),
 			E::AoESelf, 145.f, 16.f, 380.f, 0.f, 480.f, TEXT("Slow")));
 		// Arcane Patlama: buyucunun yeni arkane hatti, elementsiz saf mana hasari.
@@ -257,6 +266,9 @@ namespace
 		// Kutsal Yagmur: Buyuk Sifa'nin devami, secili muttefigi iyilestirir (yoksa kendini).
 		Table.Add(MakeDef(TEXT("Pri_HolyRain"), TEXT("Kutsal Yagmur"), C::Priest, T::Special1, 3, 16, 2, TEXT("Pri_DivineRestoration"),
 			E::HealTarget, 110.f, 16.f, 380.f, 0.f, 0.f));
+		// Lv24-33 bosluk dolgusu (2026-10-04): Special0 rutbe 4; PLACEHOLDER degerler.
+		Table.Add(MakeDef(TEXT("Pri_Retribution"), TEXT("Karsilik"), C::Priest, T::Special0, 4, 28, 2, TEXT("Pri_WrathOfAngels"),
+			E::RangedDamage, 105.f, 11.f, 330.f, 1500.f, 0.f));
 		Table.Add(MakeDef(TEXT("Pri_LifeBond"), TEXT("Yasam Bagi"), C::Priest, T::Special1, 4, 33, 3, TEXT("Pri_HolyRain"),
 			E::HealTarget, 210.f, 20.f, 750.f, 0.f, 0.f, TEXT("Regen")));
 		// Kutsal Kalkan: Priestin yeni koruma hatti (Special2, ilk defa kullaniliyor).

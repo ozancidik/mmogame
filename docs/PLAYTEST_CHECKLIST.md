@@ -3175,3 +3175,19 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **His:** Yeni beceri, bir onceki zincir becerisinden belirgin guclu hissettirmeli; mana tavanina (Lv13/Lv20) takilmadan atilabilmeli.
 - [ ] **Kutsal Onarim:** Partide muttefik secili iken onu iyilestirmeli, hedef yoksa kendini.
 - [ ] **Regresyon:** Mevcut 61 becerinin davranisi degismemeli; hotbar atamasi/kayit-yukle eskisi gibi.
+
+## Lv24–33 beceri boslugu dolgusu: 4 sinifa Lv28 becerisi — 2026-10-04 (DERLENMEDI, PIE yok)
+
+> `ValidateData.py` temiz: 73 beceri. Warrior/Archer/Mage Special0 **rutbe 6**, Priest Special0 **rutbe 4** (her biri 1 beceri puani harcatir; yeni rutbe). Degerler PLACEHOLDER.
+
+| Sinif | Lv28 beceri | Guc / mana |
+|---|---|---|
+| Savasci | Kudurma (yakin) | 340 / 110 |
+| Okcu | Olum Isareti (Zehir) | 430 / 125 |
+| Buyucu | Parcalama | 420 / 120 |
+| Rahip | Karsilik | 330 / 105 |
+
+- [ ] **Rutbe yatirimi:** Lv28'de Special0 agacina 1 puan yatirinca beceri acilmali; puan yoksa/rutbe seviyeyi asmiyorsa (rutbe <= seviye) reddedilmemeli.
+- [ ] **Mana (Lv28):** INT'ye hic puan basmayan Savasci/Okcu bile bu becerileri bir kez atabilmeli (MaxMana ~ 25 + INT*5 + 28*5,5).
+- [ ] **Hasar gozlemi:** Her sinifta bir onceki Lv24 becerisinden (Savas Firtinasi 270, Ejder Oku 360, Gok Gurlemesi 380, Meleklerin Ofkesi 290) tek hedefte belirgin yuksek vurmali.
+- [ ] **Beceri kitabi (K):** Savasci 21 becerilik duzende tasma yok.
