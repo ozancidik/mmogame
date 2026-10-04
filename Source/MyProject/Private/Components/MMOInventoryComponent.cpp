@@ -909,21 +909,17 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		const FMMOItemDef* Def = FMMOItemDatabase::Find(EquippedItems[i].ItemId);
 		if (Def && (int32)Def->Slot != i)
 		{
-			// Yer varsa cantaya, yoksa depoya; ikisi de doluysa esya YERINDE kalir (silinmez, bag 12'yi asmaz).
+			// Yer varsa cantaya (12'yi asmaz); yoksa depoya. Depo kapasitesi yuklemede asilabilir (mevcut kural:
+			// bozuk/eski kayitta hicbir esya silinmez, yalniz yeni depolama reddedilir). Esya yanlis slotta KALMAZ.
 			if (EquipmentBag.Num() < MaxBagSize)
 			{
 				EquipmentBag.Add(EquippedItems[i]);
-				EquippedItems[i] = FMMOEquipmentInstance();
-			}
-			else if (Warehouse.Num() < MaxWarehouseSize)
-			{
-				Warehouse.Add(EquippedItems[i]);
-				EquippedItems[i] = FMMOEquipmentInstance();
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: yanlis slottaki esya tasinamadi (canta ve depo dolu): %s"), *EquippedItems[i].ItemId.ToString());
+				Warehouse.Add(EquippedItems[i]);
 			}
+			EquippedItems[i] = FMMOEquipmentInstance();
 		}
 	}
 
@@ -936,6 +932,10 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	for (const FMMOEquipmentInstance& Inst : EquippedItems)
 	{
 		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
+	}
+	for (const FMMOEquipmentInstance& Inst : Warehouse)
+	{
+		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1); // yanlis slottan depoya tasinanlar dahil
 	}
 
 	// Yinelenen InstanceId (canta/kusanilan/depo arasinda): ilki kalir, digerlerine yeni

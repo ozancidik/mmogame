@@ -271,6 +271,7 @@ float UMMOStatsComponent::ApplyDamage(float RawDamage, AActor* /*DamageInstigato
 	// Defense hasarı azaltır ama en az 1 hasar geçer.
 	const float Mitigated = FMath::Max(1.f, RawDamage - Defense);
 	const float ActualDamage = FMath::Min(Mitigated, Health);
+	LastAppliedDamage = ActualDamage; // OnDeath'ten once: olumcul vurusun hasari HandleDeath'te okunur
 
 	Health = FMath::Clamp(Health - ActualDamage, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(Health, MaxHealth);

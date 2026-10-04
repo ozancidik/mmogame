@@ -139,6 +139,11 @@ public:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_IsDead, Category = "MMO|Vitals")
 	bool bIsDead = false;
 
+	// Son ApplyDamage'in gercek (uygulanan) hasari; yalniz sunucuda anlamli, replike degil. OnDeath yayininda
+	// OLUMCUL vurusun hasarini okumak icin: ApplyDamage bunu Health dusurulmeden ve OnDeath'ten ONCE yazar
+	// (AMMOMob::HandleDeath hasar payi icin kullanir).
+	float LastAppliedDamage = 0.f;
+
 	// ------------------------------------------------------------------
 	// Ayar eğrileri (dengeleme için Blueprint/DataAsset'ten değiştirilebilir)
 	// ------------------------------------------------------------------

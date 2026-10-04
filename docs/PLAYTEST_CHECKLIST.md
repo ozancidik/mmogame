@@ -3304,3 +3304,9 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - **Kayit yukleme/canta:** Yanlis slottaki esya cantaya sigmazsa depoya, ikisi de doluysa yerinde kalir (canta 12'yi asmaz). [ ] **Test:** Dolu canta (12) + yanlis slotlu kayitli esya yukle: canta 12'de kalmali, esya depoda gorunmeli.
 - **NPC diyalogu sayaci:** `ProcessRequest()` baslatilamazsa eszamanli sayac sizmaz (NPC konusmalari kilitlenmez). [ ] **Test:** LLM anahtarini bozup birkac kez konus, sonra duzelt: konusma yeniden calismali.
 - **Baslangic adi:** `?Name=` secenegi `ServerSetName` ile ayni karakter kuralina sokulur (satir sonu/kontrol karakteri atilir, en cok 24 karakter); PreLogin cakisma denetimi de temizlenmis adla yapilir; rastgele `Gezgin######` ayni zamanda diskte var olan bir kayit yuvasiyla cakismaz. [ ] **Test:** `open <host>:7777?Name=Test%0AFake` ile baglan: ad `TestFake` olmali, sohbette ek satir olusmamali.
+
+### Ikinci kod incelemesi duzeltmeleri (2026-10-04, DERLENMEDI)
+- **Olumcul vurus hasari `UMMOStatsComponent::LastAppliedDamage` uzerinden** (mob'da yan kanal/sifirlama kalmadi; dogrudan `ApplyDamage` yollari da kapsanir). [ ] Test: onceki "olumcul vurus payi" maddesiyle ayni.
+- **Yanlis slottaki esya** cantaya, doluysa depoya (kapasite yuklemede asilabilir; esya silinmez, yanlis slotta kalmaz); `NextInstanceId` depodakileri de sayar.
+- **`?Name=` 20 karakter:** motor ham ad degerini 20 karakterle keser; PreLogin ayni kesimle karsilastirir. 16 rastgele ad cakisirsa GUID tabanli benzersiz yedek ad verilir.
+- **NPC hiz siniri:** baslatilamayan istek dakika sinirini tuketmez.

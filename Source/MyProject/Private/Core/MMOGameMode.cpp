@@ -131,6 +131,7 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 			// Cevrimici baska bir oyuncuyla VE diskteki bir kayit yuvasiyla cakismayan rastgele ad
 			// (kayit yuvasi = ad; var olan bir yuva baska birinin karakterini yukler/ezer).
 			const UWorld* World = GetWorld();
+			bool bAssigned = false;
 			for (int32 Attempt = 0; Attempt < 16; ++Attempt)
 			{
 				const FString Candidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999));
@@ -150,8 +151,14 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 				if (!bTaken)
 				{
 					UseName = Candidate;
+					bAssigned = true;
 					break;
 				}
+			}
+			if (!bAssigned)
+			{
+				// 16 deneme de cakistiysa (cok olasi degil): GUID tabanli benzersiz yedek ad.
+				UseName = FString(TEXT("Gezgin")) + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(10);
 			}
 		}
 	}
@@ -185,7 +192,8 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 		return;
 	}
 	// Kayit yuvasi adiyla ayni normallestirme: bosluk -> '_', buyuk/kucuk harf duyarsiz.
-	const FString RequestedKey = SanitizeInitialName(Requested).Replace(TEXT(" "), TEXT("_"));
+	// Motor (AGameModeBase::InitNewPlayer) ?Name= degerini 20 karakterle keser; ayni kesimle karsilastir.
+	const FString RequestedKey = SanitizeInitialName(Requested.Left(20)).Replace(TEXT(" "), TEXT("_"));
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
 		const APlayerController* PC = It->Get();

@@ -216,6 +216,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		{
 			*bSlotReleased = true;
 			InFlightRequests = FMath::Max(0, InFlightRequests - 1);
+			RecentRequestTimes.RemoveSingle(NowSec); // atilmayan istek dakika sinirini tuketmesin
 			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		}
 	}
