@@ -715,6 +715,15 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			return;
 		}
 	}
+	// Soguma yalniz uzak istemcilere uygulanir: host/yerel konsol (test akisi) kisitlanmaz.
+	const UWorld* CooldownWorld = GetWorld();
+	if (CooldownWorld && !IsLocallyControlled())
+	{
+		if (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime < SetNameCooldown)
+		{
+			return;
+		}
+	}
 	// Ayni oturumdaki iki karakter ayni save dosyasina yazmasin. Windows dosya
 	// adlari buyuk/kucuk harf ayirt etmez; bosluk ve '_' da ayni slotu uretir.
 	const FString CandidateSlot = FString(TEXT("MMOSave_")) + Trimmed.Replace(TEXT(" "), TEXT("_"));
@@ -729,6 +738,10 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 				return;
 			}
 		}
+	}
+	if (CooldownWorld)
+	{
+		LastSetNameServerTime = CooldownWorld->GetTimeSeconds();
 	}
 	if (APlayerState* PS = GetPlayerState())
 	{

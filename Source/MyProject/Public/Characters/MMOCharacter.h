@@ -346,6 +346,10 @@ protected:
 	bool bStarterPackGranted = false;
 	float LastRemoteManualSaveTime = -100.f;
 	static constexpr float RemoteManualSaveCooldown = 10.f;
+	// Ad degistirme soguma suresi (SECURITY_AUDIT Y-7): her basarili degisim arkadaslara
+	// iki bildirim yolluyor; cooldown'suz iki ad arasinda gidip gelmek spam uretirdi.
+	float LastSetNameServerTime = -100.f;
+	static constexpr float SetNameCooldown = 30.f;
 
 	// --- Server RPC'ler (istemci istegi -> sunucu uygular) ---
 	UFUNCTION(Server, Reliable)

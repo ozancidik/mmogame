@@ -3141,3 +3141,8 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Yanlis slot:** Silah "Zirh" slotunda kayitliysa yuklemede cantaya donmeli, kusanilan slot bos kalmali.
 - [ ] **Yinelenen InstanceId:** Canta/kusanilan/depoda ayni kimlikli iki esya varsa ilki kalmali, digerine yeni kimlik verilmeli; kuşan/sat/yükselt tek esyayi etkilemeli.
 - [ ] **Gorev sayaci:** `KillProgress=999999` olan aktif gorev hedef adedine (TargetCount) inmeli; yinelenen gorev kimligi tek kayda inmeli; bos kimlik atilmali; tamamlanan gorev listesindeki yinelenenler tekillenmeli. Ilerlemesi dogru olan gorevler degismemeli.
+
+## Ad degistirme soguma suresi (SECURITY_AUDIT Y-7) — 2026-10-04 (DERLENMEDI)
+
+- [ ] **Uzak istemci:** `MMOSetName A` sonra hemen `MMOSetName B`: ikinci degisim 30 sn dolana kadar sessizce reddedilmeli; arkadas bildirimi yagmamali. 30 sn sonra tekrar calismali.
+- [ ] **Host/yerel:** Host konsolunda `MMOSetName` art arda cagrilari kisitlanmamali (test akisi bozulmamali).
