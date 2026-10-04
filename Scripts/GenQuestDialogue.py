@@ -84,5 +84,10 @@ lines += [
 OUT.write_text("\n".join(lines), encoding="utf-8")
 with_turn = sum(1 for a, t in entries.values() if t)
 print(f"{len(entries)} gorev girdisi ({with_turn} tanesinde teslim repligi) -> {OUT.relative_to(ROOT)}")
+no_turn = sorted(qid for qid, (a, t) in entries.items() if a and not t)
+for qid in no_turn:
+    print(f"UYARI: {qid} icin teslim repligi yok (Lore.md'de 'Dönüşte' satiri eksik).")
+if no_turn:
+    print(f"UYARI: toplam {len(no_turn)} gorevde teslim repligi bos.")
 if len(entries) == 0:
     sys.exit(1)

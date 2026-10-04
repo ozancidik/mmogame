@@ -3057,3 +3057,15 @@ Uzak istemcinin sunucuda reddedilen yakın dövüş isteği artık sessiz kalmı
 - [ ] Saldıran hub içindeyken saldırı tuşu: yerel ekranda aynı güvenli bölge mesajı hemen görünmeli.
 - [ ] `MMOPvP 0` durumunda uzak istemci oyuncuya saldırsın: istemcide `PvP kapali`, hasar 0.
 - [ ] Mob saldırısı ve hub dışındaki izinli PvP vuruşu eskisi gibi hasar vermeli; reddedilme mesajı çıkmamalı.
+
+# QA düzeltmeleri turu 2 — 2026-10-04
+
+Kapsam: ORTA-2 (1 sn sınırı; ret sebebi aktarımı `0f03437`'de gelmişti), ORTA-3 (görev balonu), DÜŞÜK-1/4/5/6 ve `GenQuestDialogue.py` uyarısı. Derleme: `Build.bat MyProjectEditor` -> Result: Succeeded. Aşağıdakilerin hiçbiri oyunda denenmedi.
+
+- [ ] **ORTA-2 (spam):** Host + uzak istemci aynı partide; istemci hostun üstüne saldırı tuşunu basılı tutsun/sık tıklasın. `Parti uyesine vuramazsin` sohbette/ekranda saniyede en fazla 1 kez görünmeli (sohbet satırı yağmamalı). 1 sn bekleyip tekrar saldırınca yine bir kez görünmeli.
+- [ ] **ORTA-3 (kabul):** NPC'den görev kabul et: "Yasli Doran" balonu görev listede aktif olduktan hemen sonra (≤1 sn) çıkmalı. Host'ta (listen-server) da çıkmalı. Uzak istemcide de çıkmalı (sunucu yanıtı gelince).
+- [ ] **ORTA-3 (teslim):** Tamamlanmış görevi teslim et: balon ödül gerçekten verilince çıkmalı. Ekipman ödüllü görevi (ör. `Q_FrostboundScouts`) ekipman çantası DOLUYKEN teslim et: "Ekipman cantasi dolu" uyarısı çıkar, balon **çıkmamalı**; çantayı boşalt, tekrar teslim et: balon + ödül.
+- [ ] **ORTA-3 (uzak/limit):** Görev penceresi açıkken NPC'den 800u+ uzaklaş, "Kabul"a tıkla: "Gorevli yakininda degilsin", balon **çıkmamalı**. Aynı butona çok hızlı çift tık: en fazla tek balon, görev bir kez alınmalı.
+- [ ] **DÜŞÜK-1 (kontrolcüsüz pawn):** (Elle tetiklemesi zor.) Mantık kodu: `IsPlayerPawn` = mob olmayan `AMMOCharacter`. Normal PvP/parti/klan/hub senaryoları (yukarıdaki maddeler) değişmeden çalışmalı; moblar hâlâ hasar vermeli/almalı (mob->oyuncu, oyuncu->mob).
+- [ ] **DÜŞÜK-5 (Exec):** Development derlemede `MMOProbeSurface -5500 4500 225` hâlâ `[MMOPROBE]` satırı yazmalı (Shipping'de komut boş gövde, log yok).
+- [ ] **Script:** `Scripts/GenQuestDialogue.py` çalıştır: Lore.md'de "Dönüşte" satırı olmayan görev varsa çıktı sonunda `UYARI: Q_... icin teslim repligi yok` satırları görünmeli; çıkış kodu 0 kalmalı (2026-10-04 itibarıyla Lore'da 73/73 görevin teslim repliği var, uyarı beklenmez).
