@@ -3158,3 +3158,20 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 
 - [ ] **Olu karakter:** Oyuncu oldugunda (olum ekrani) saticiya alis/satis ve cantadaki esyaya yukseltme istegi reddedilmeli; altin ve esya degismemeli. Canlanip tekrar denenince normal calismali.
 - [ ] **Regresyon:** Canli karakterle satin alma, satis ve yukseltme eskisi gibi calismali. (Yukseltme icin yakinlik kosulu bilerek eklenmedi: tasarim karari bekliyor.)
+
+# Lv11–30 beceri boslugu dolgusu: 4 sinifa 2'ser yeni beceri — 2026-10-04 (DERLENMEDI, PIE yok)
+
+> Veri satirlari (`MMOSkillDatabase.cpp`), mevcut `MakeDef` kalibi. `Scripts/ValidateData.py` temiz: 69 beceri, rutbe/on kosul/efekt tutarli, devami on kosuldan zayif beceri yok. Guc/mana degerleri Lv10 ve Lv24 satirlari arasinda dogrusal ara deger; **PLACEHOLDER**, olcumle ayarlanmali. Yeni beceriler mevcut rutbeyi paylasir (ek puan harcatmaz).
+
+| Sinif | Lv13 | Lv20 |
+|---|---|---|
+| Savasci | Ezici Darbe (190 guc, 58 mana) | Infaz (250, 85) |
+| Okcu | Ok Sagnagi (AoE 140, Zehir) | Keskin Nisan (290, menzil 2000) |
+| Buyucu | Buz Mizragi (195, Yavaslatma) | Gizemli Patlama (AoE 270) |
+| Rahip | Ilahi Hukum (195) | Kutsal Onarim (muttefik sifa 520) |
+
+- [ ] **Acilis:** Her sinifla `MMOGainXP` ile Lv13 ve Lv20'ye cik; ilgili agacin mevcut rutbesi yatirilmissa beceri Lv13/Lv20'de ogrenilebilir olmali (rutbe <= seviye).
+- [ ] **Beceri kitabi (K):** Savasci artik 20 beceri: iki sutunda tasma/ust uste binme yok, son satirlar panel icinde.
+- [ ] **His:** Yeni beceri, bir onceki zincir becerisinden belirgin guclu hissettirmeli; mana tavanina (Lv13/Lv20) takilmadan atilabilmeli.
+- [ ] **Kutsal Onarim:** Partide muttefik secili iken onu iyilestirmeli, hedef yoksa kendini.
+- [ ] **Regresyon:** Mevcut 61 becerinin davranisi degismemeli; hotbar atamasi/kayit-yukle eskisi gibi.

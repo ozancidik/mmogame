@@ -104,12 +104,20 @@ skill_order = []
 for m in skill_pat.finditer(skill_src):
     sid, cls, tree, rank, lvl, prereq, eff, rest = m.groups()
     eff_id = re.search(r'TEXT\("([^"]*)"\)\s*$', rest.strip())
-    skills[sid] = dict(cls=cls, tree=tree, rank=int(rank), lvl=int(lvl), prereq=prereq, effect=eff_id.group(1) if eff_id else "")
+    nums = re.findall(r'([\d.]+)f', rest)  # mana, bekleme, guc, menzil, yaricap
+    skills[sid] = dict(cls=cls, tree=tree, rank=int(rank), lvl=int(lvl), prereq=prereq, effect=eff_id.group(1) if eff_id else "",
+                       etype=eff, mana=float(nums[0]) if len(nums) > 0 else 0.0, power=float(nums[2]) if len(nums) > 2 else 0.0)
     skill_order.append(sid)
 dupes(skill_order, "Beceri")
 skill_calls = len(re.findall(r'Table\.Add\(MakeDef\(', skill_src))
 if skill_calls != len(skills):
     errors.append(f"Beceri ayristirma uyumsuz: {skill_calls} MakeDef cagrisi, {len(skills)} ayristirildi")
+
+# Zincir mantigi: ayni etki turundeki on kosulun devami, on kosuldan ZAYIF olmamali (QA Bulgu #4 deseni)
+for sid, k in skills.items():
+    pre = skills.get(k["prereq"]) if k["prereq"] else None
+    if pre and pre["etype"] == k["etype"] and k["power"] > 0 and k["power"] < pre["power"]:
+        warnings.append(f"{sid}: gucu {k['power']:g}, on kosul {k['prereq']} gucu {pre['power']:g} (devami daha zayif)")
 
 tree_ranks = {}
 for sid, k in skills.items():

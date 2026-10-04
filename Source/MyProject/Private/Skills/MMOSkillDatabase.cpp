@@ -72,6 +72,12 @@ namespace
 		// "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80).
 		Table.Add(MakeDef(TEXT("War_ShatterBlow"), TEXT("Parcalayici Darbe"), C::Warrior, T::Special0, 4, 10, 2, TEXT("War_BloodStorm"),
 			E::MeleeDamage, 45.f, 10.f, 150.f, 240.f, 0.f, TEXT("Slow")));
+		// Lv11-30 bosluk dolgusu (2026-10-04): Lv10 (150) ile Lv24 arasinda yeni tek hedef hasar yoktu.
+		// Guc/mana Lv10 ve Lv24 satirlari arasinda dogrusal ara deger; PLACEHOLDER, olcumle ayarlanir.
+		Table.Add(MakeDef(TEXT("War_CrushingBlow"), TEXT("Ezici Darbe"), C::Warrior, T::Special0, 4, 13, 2, TEXT("War_BloodStorm"),
+			E::MeleeDamage, 58.f, 9.f, 190.f, 240.f, 0.f));
+		Table.Add(MakeDef(TEXT("War_Execute"), TEXT("Infaz"), C::Warrior, T::Special0, 5, 20, 2, TEXT("War_ShatterBlow"),
+			E::MeleeDamage, 85.f, 12.f, 250.f, 240.f, 0.f));
 		Table.Add(MakeDef(TEXT("War_TempestSlash"), TEXT("Savas Firtinasi"), C::Warrior, T::Special0, 5, 24, 2, TEXT("War_ShatterBlow"),
 			E::AoESelf, 95.f, 12.f, 270.f, 0.f, 440.f));
 		// QA BULGU #6 duzeltmesi (2026-09-15): Special0 fiziksel hasar zinciri Lv24'te
@@ -128,6 +134,11 @@ namespace
 		// Special3 = gec oyun "ustalik sonu" agaci (iki capstone, Lv70 ve Lv80).
 		Table.Add(MakeDef(TEXT("Arc_EagleEye"), TEXT("Kartal Gozu"), C::Archer, T::Special0, 4, 10, 2, TEXT("Arc_PiercingShot"),
 			E::RangedDamage, 45.f, 10.f, 150.f, 1800.f, 0.f));
+		// Lv11-30 bosluk dolgusu (2026-10-04); PLACEHOLDER degerler.
+		Table.Add(MakeDef(TEXT("Arc_Volley"), TEXT("Ok Sagnagi"), C::Archer, T::Special0, 4, 13, 2, TEXT("Arc_PiercingShot"),
+			E::AoETarget, 62.f, 11.f, 140.f, 1700.f, 380.f, TEXT("Poison")));
+		Table.Add(MakeDef(TEXT("Arc_Snipe"), TEXT("Keskin Nisan"), C::Archer, T::Special0, 5, 20, 2, TEXT("Arc_EagleEye"),
+			E::RangedDamage, 90.f, 14.f, 290.f, 2000.f, 0.f));
 		Table.Add(MakeDef(TEXT("Arc_DragonArrow"), TEXT("Ejder Oku"), C::Archer, T::Special0, 5, 24, 2, TEXT("Arc_EagleEye"),
 			E::RangedDamage, 105.f, 13.f, 360.f, 1900.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Arc_ShadowStep"), TEXT("Golge Adimi"), C::Archer, T::Special1, 2, 16, 2, TEXT("Arc_Sprint"),
@@ -171,6 +182,11 @@ namespace
 		// uzerine cikaracak sekilde duzeltildi.
 		Table.Add(MakeDef(TEXT("Mag_FlameStorm"), TEXT("Alev Firtinasi"), C::Mage, T::Special0, 4, 10, 2, TEXT("Mag_ChainLightning"),
 			E::AoETarget, 45.f, 11.f, 155.f, 1800.f, 430.f));
+		// Lv11-30 bosluk dolgusu (2026-10-04); PLACEHOLDER degerler.
+		Table.Add(MakeDef(TEXT("Mag_IceLance"), TEXT("Buz Mizragi"), C::Mage, T::Special1, 2, 13, 2, TEXT("Mag_FrostNova"),
+			E::RangedDamage, 58.f, 8.f, 195.f, 1800.f, 0.f, TEXT("Slow")));
+		Table.Add(MakeDef(TEXT("Mag_ArcaneBlast"), TEXT("Gizemli Patlama"), C::Mage, T::Special0, 5, 20, 2, TEXT("Mag_FlameStorm"),
+			E::AoETarget, 95.f, 13.f, 270.f, 1800.f, 450.f));
 		Table.Add(MakeDef(TEXT("Mag_Thunderclap"), TEXT("Gok Gurlemesi"), C::Mage, T::Special0, 5, 24, 2, TEXT("Mag_FlameStorm"),
 			E::RangedDamage, 105.f, 13.f, 380.f, 1900.f, 0.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Mag_IceChain"), TEXT("Buz Zinciri"), C::Mage, T::Special1, 2, 16, 2, TEXT("Mag_FrostNova"),
@@ -220,6 +236,11 @@ namespace
 		// hem savasci hem sifaci kimligini yansitir).
 		Table.Add(MakeDef(TEXT("Pri_HolyFlame"), TEXT("Kutsal Alev"), C::Priest, T::Special0, 2, 10, 2, TEXT("Pri_HolyBurst"),
 			E::RangedDamage, 45.f, 10.f, 150.f, 1500.f, 0.f));
+		// Lv11-30 bosluk dolgusu (2026-10-04); PLACEHOLDER degerler. Mending: HolyRain (380) ile LifeBond (750) arasi sifa.
+		Table.Add(MakeDef(TEXT("Pri_Judgement"), TEXT("Ilahi Hukum"), C::Priest, T::Special0, 2, 13, 2, TEXT("Pri_HolyFlame"),
+			E::RangedDamage, 58.f, 9.f, 195.f, 1500.f, 0.f));
+		Table.Add(MakeDef(TEXT("Pri_Mending"), TEXT("Kutsal Onarim"), C::Priest, T::Special1, 3, 20, 2, TEXT("Pri_HolyRain"),
+			E::HealTarget, 120.f, 14.f, 520.f, 0.f, 0.f));
 		Table.Add(MakeDef(TEXT("Pri_WrathOfAngels"), TEXT("Meleklerin Ofkesi"), C::Priest, T::Special0, 3, 24, 2, TEXT("Pri_HolyFlame"),
 			E::AoETarget, 105.f, 13.f, 290.f, 1500.f, 420.f));
 		// QA BULGU #6 duzeltmesi (2026-09-15): Warrior ile ayni sorun Priest'te de vardi -

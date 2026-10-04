@@ -4,7 +4,7 @@
 
 ## 1. Durum
 
-- 48 mob arketipi, 73 görev, 53 ekipman, 61 beceri, 6 efekt; Lv1'den Lv80'e kesintisiz görev zinciri **[KOD]**.
+- 48 mob arketipi, 73 görev, 53 ekipman, 69 beceri (8'i 2026-10-04'te boşluk dolgusu, PLACEHOLDER değerli), 12 efekt; Lv1'den Lv80'e kesintisiz görev zinciri **[KOD]**.
 - Sistemler: stat, envanter, beceri, görev, parti, ticaret, klan, arkadaş, depo, sohbet, PvP kuralları, bölge geçişi (host `MMOTravel`), kayıt **[KOD]**.
 - Otomatik kontroller (veri denetimi, derleme, Summer/Winter duman testi, ağ bağlantı testi) geçiyor **[BELGE]**. Bunlar oyunun oynanabildiğini göstermez.
 - `PLAYTEST_CHECKLIST.md` içinde ~880 madde var, yalnızca 4'ü işaretli **[BELGE]**. Doğrulama borcu özellik üretiminden hızlı büyüyor.
@@ -39,7 +39,7 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 **Ağ ve sunucu (`NETWORK_AUDIT.md`)**: Can/mana adımlama (Y3), O4 (parti/ticaret davet kapma), O5 (arkadaş rızası), O6, O7, O8, O11, O12 (denetim logu) yapılmadı **[BELGE]**. Ölü karakterin satıcıdan işlem yapması ve yükseltmesi engellendi (D3, PR #1, derlenmedi). `MMOPartyComponent.cpp` ve `MMOTradeComponent.cpp` yerelde Codex'in elinde olduğu için bulutta dokunulmadı **[BELGE]**. Uzak istemcilere bazı geri bildirim mesajları hâlâ gitmiyor olabilir; dedicated server'a geçişin önünde engeller listelenmiş.
 
 **Oynanış ve denge (hepsi `[PLACEHOLDER]`, ölçülmedi)** **[BELGE]**
-- Lv1–30 yolu çok kısa (~80–85 öldürme); Lv30'da 49–51 harcanmamış beceri puanı birikiyor.
+- Lv1–30 yolu çok kısa (~80–85 öldürme); Lv30'da 49–51 harcanmamış beceri puanı birikiyor (yeni 8 beceri aynı rütbeyi paylaştığı için puan fazlasını azaltmaz).
 - Altın kaynağı bol, harcama yolu zayıf; `Q_Gold*` görevleri harcama değil birikim.
 - Ölüm neredeyse bedava; savunma formülü tehdidi büyük ölçüde siliyor.
 - Warrior ve Priest'te Lv24–70 arası hasar becerisi platosu; Warrior Lv80 capstone'u Lv70'inkinden zayıf (QA Bulgu #5, #6).
@@ -55,6 +55,6 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 
 ## 5. Bulutta bilerek yapılmayanlar
 
-- Lv11–30 beceri boşluklarına yeni beceri eklemek: `Scripts/ValidateData.py` artık bu boşlukları UYARI olarak basıyor (her sınıfta Lv10→16, 16→24, 24→33). Güç/mana/bekleme değerleri ölçüm olmadan tahmin olur; önceki QA turları benzer eklemelerde birebir aynı buff ve öncekinden zayıf beceri bulmuştu **[BELGE]**.
+- Lv24→33 arası beceri boşluğu (her sınıfta 9 seviye): `ValidateData.py` UYARI basıyor; kalan boşluk tasarım kararı bekliyor.
 - Denge ayarı (XP hızı, altın sink, ölüm cezası): `[MMOMETRIC]` verisi gelmeden körlemesine olur.
 - K-1 (kimlik/kayıt yuvası), Y-5, `MaxTokens`: tasarım kararı ya da ölçüm gerektiriyor.
