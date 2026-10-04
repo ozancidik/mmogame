@@ -105,15 +105,23 @@ yaratıklar dolaşır. Her biri tek başına bir müfrezeye bedeldir.
 - **Örümcek Ana'nın Ağı** *(Q_SpiderQueen)* — "Ormanın gölgesi ağırlaştı, evlat;
   ağaçların arası ipek ördü. O ağın ortasında bir ana bekler — onu yakmadan, orman
   bir daha nefes almayacak."
+  - *Dönüşte:* "Ağ çözüldü, orman nefes alıyor. Al şu Plaka Zırh'ı; bir daha ipek
+    görürsen önce kalkanını düşün, evlat."
 - **Uyanmış Taş** *(Q_StoneGolem)* — "Karakaya bir zamanlar kendi bekçisini taştan
   yontmuştu. Şimdi o bekçi yanlış bir sözle uyandı ve geçide vuruyor. Onu tekrar
   uykuya yatır; ama unutma, öfkesi büyüdükçe darbesi ağırlaşır."
+  - *Dönüşte:* "Bekçi yeniden uykuda, geçit rahat soluyor. Al şu Ejder Kılıcı'nı;
+    taşı yıkan elin hakkı budur."
 - **Geceyi Kesen** *(Q_ShadowAssassin)* — "Bir gölge dolaşıyor patikalarda; kervanlar
   sabaha sessiz varıyor, kimse bağırmaya fırsat bulamıyor. O gölgeyi bul ve dağıt —
   yoksa bir sonraki sessizlik senin olur."
+  - *Dönüşte:* "Kervanlar sabaha sağ varıyor artık. Al şu Ejder Miğferi'ni; gölgeler
+    seni bir daha arkandan bulmasın."
 - **Fısıltıya Kulak Verenler** *(Q_Warlocks)* — "Karakaya'da orkları toplayan el,
   bir baltanın değil bir büyücünün eli. Solgun Fısıltı'ya kanıp insanlığını
   değişenleri sustur; sözlerini keser kesmez, ordu da başsız kalır."
+  - *Dönüşte:* "Fısıltının sesi kısıldı, ordu yönünü yitirdi. Al şu Savaş Baltası'nı;
+    bir sonraki söze keskin bir cevap olsun."
 
 ## Üçüncü Bölge: Ayazdiş Buzulu (Lv8-12)
 
@@ -811,6 +819,67 @@ Hükümdarı'nı devirenlere açılır.*
   bedenini ağırlaştırır, öfkesi fırtına gibi kabarır."
   - *Dönüşte:* "Fırtına dindi, evlat… ufuk göründü, görüyor musun? Al şu Kış
     Kılıcı'nı; ötesi artık senin yolun."
+
+## Görevler (Anlatı): Eksik Teslim Repliği ve Kilometre Taşları
+
+*Seviye ve servet kilometre taşları belirli bir canavar ya da bölge istemez; hedefe
+ulaşıldığında Yaşlı Doran'a dönülür. Alış repliği tek cümlelik bir yönlendirmedir,
+asıl söz teslimdedir. Tonu `docs/NpcDialogue.md` "Kilometre Taşı Görevleri"
+bölümüyle uyumludur.*
+
+### Seviye Zinciri
+
+- **Güçlen** *(Q_Level5)* — "Kendini geliştir, evlat; beşinci seviyeye ulaş, gerisini
+  yol öğretir."
+  - *Dönüşte:* "Beşinci seviye… İlk adımlar hep zordur, evlat. Al şu Büyük Mana
+    İksirleri'ni; yolun daha yeni başlıyor."
+- **Kıdemli Savaşçı** *(Q_Level20)* — "Deneyimini kanıtla, evlat; yirminci seviyeye
+  ulaş, adın kapıdan önce gelsin."
+  - *Dönüşte:* "Yirminci seviye; artık adın yollarda duyuluyor, evlat. Al şu Büyük
+    Can İksirleri'ni, işine yarayacak."
+- **Usta Savaşçı** *(Q_Level30)* — "Ustalık acelesiz gelir, evlat. Otuzuncu seviyeye
+  ulaş ve kılıcın sana boyun eğsin."
+  - *Dönüşte:* "Usta Savaşçı… Kılıcı artık elin değil, aklın tutuyor, evlat. Al şu
+    Büyük Mana İksirleri; en zor ders de budur."
+- **Efsanevi Şövalye** *(Q_Level40)* — "Adını efsanelere yaz, evlat; kırkıncı
+  seviyeye ulaş, ocak başları seni anlatsın."
+  - *Dönüşte:* "Efsanevi Şövalye. Akçakule'nin ocak başlarında adın anılıyor, evlat.
+    Al şu Büyük Can İksirleri; o hikâyeleri boşa çıkarma."
+- **Savaş Ustası** *(Q_Level50)* — "Gücünü pekiştir, evlat; ellinci seviyeye ulaş,
+  Kış Diyarı'nın rüzgârı da seni tanısın."
+  - *Dönüşte:* "Ellinci seviye… Artık acemi değil, örnek gösterilen birisin, evlat.
+    Bu yükü gururla taşı; Fısıltı hâlâ susmadı."
+- **Kahraman** *(Q_Level65)* — "Kahramanlık çağına gir, evlat; altmış beşinci
+  seviyeye ulaş ve omzundaki yükü tart."
+  - *Dönüşte:* "Kahraman diyorlar sana, evlat. Ama unvanı yüceltmez seni; ayakta
+    tutan, omzundaki yüktür. Onu taşımaya devam et."
+- **Zirve** *(Q_Level80)* — "Yolculuğunun zirvesine yürü, evlat; sekseninci seviyeye
+  ulaş, ötesini göreceksin."
+  - *Dönüşte:* "Zirvedesin, evlat. Buradan her yol görünür; ama unutma, dağın
+    tepesinde de rüzgâr eser."
+
+### Servet Zinciri
+
+- **Tüccar Ruhu** *(Q_Gold500)* — "Beş yüz altın biriktir, evlat; kesesi boş
+  maceracıya pazar bile selam vermez."
+  - *Dönüşte:* "Beş yüz altın… Küçük bir kese, ama büyük bir alışkanlığın başı.
+    Aklını da kesen kadar dolu tut."
+- **Vadinin Tüccarı** *(Q_Gold5000)* — "Beş bin altın biriktir, evlat; vadide adın
+  tüccarlar arasında geçsin."
+  - *Dönüşte:* "Beş bin altın taşıyorsun artık. Kesen ağırlaştıkça gözün de açılsın;
+    parası çok olanın düşmanı da çok olur."
+- **Efsanevi Servet** *(Q_Gold15000)* — "On beş bin altın biriktir, evlat; bu servet
+  kılıçtan fazla kapı açar."
+  - *Dönüşte:* "On beş bin altın… Servet kılıçtan çok kapı açar, evlat. Kapıyı kim
+    için açtığına dikkat et."
+- **Bölge Tüccarı** *(Q_Gold30000)* — "Otuz bin altın biriktir, evlat; Akçakule'nin
+  bile kolay görmediği bir kese olsun."
+  - *Dönüşte:* "Otuz bin altın. Altın seni taşısın, sen altını taşıma, evlat; yük
+    olan servet, servet sayılmaz."
+- **Altın Çağın Efendisi** *(Q_Gold50000)* — "Elli bin altın biriktir, evlat; bu
+  yolun sonunda kasaya değil, ardında bıraktığına bakılır."
+  - *Dönüşte:* "Elli bin altın. Bütün bölge adını anıyor, evlat. En zengin yolcu, geride
+    bir iyilik bırakandır; unutma."
 
 ## Depocu Rana: Ortak Defter
 
