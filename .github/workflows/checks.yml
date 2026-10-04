@@ -1,0 +1,26 @@
+name: Static checks
+
+# Derleyici/Unreal gerektirmez: yalniz Python ile veri tablolari ve C++ kaynaginin hafif statik kontrolu.
+# Bu bir DERLEME DEGILDIR; yerelde Build.bat + Scripts/RunAllChecks.ps1 hala gereklidir.
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Veri denetimi (mob/item/gorev/beceri/efekt)
+        run: python Scripts/ValidateData.py
+      - name: Statik C++ kontrolu (suslu/parantez dengesi, generated.h)
+        run: python Scripts/StaticLint.py
+      - name: Ilerleme ve ekonomi modelleri calisiyor mu
+        run: |
+          python Scripts/ProgressionModel.py --max 30 > /dev/null
+          python Scripts/EconomyModel.py > /dev/null
+          python Scripts/ContentMap.py > /dev/null
