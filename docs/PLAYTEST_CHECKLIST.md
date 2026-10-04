@@ -3197,3 +3197,12 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Kontrol/bidi karakterleri:** Sohbete sekme veya U+202E iceren bir mesaj gonder: karakterler bosluga donmeli, satir gorunumu (gonderen/yon) bozulmamali; normal Turkce karakterler (ç, ğ, ı, ö, ş, ü) aynen kalmali.
 - [ ] **Regresyon:** `/p`, `/w`, `/g`, `/klan`, `/arkadas` komutlari eskisi gibi calismali.
 - [ ] **Arkadas duyurusu:** 5 dk icinde ayni durumun tekrar duyurulmamasi eskisi gibi; tablo 512 kaydi asmamali (test icin gerek yok, kod incelemesi).
+
+## Cevrimici ad cakismasi baglantiyi reddeder (SECURITY_AUDIT K-1, kismi) — 2026-10-04 (DERLENMEDI)
+
+`AMMOGameMode::PreLogin`: baglanti URL'indeki `?Name=` su an cevrimici bir oyuncunun adiyla (kayit yuvasi esdegeri: harf boyutu ve bosluk/`_` ayni) cakisiyorsa reddedilir. **Cevrimdisi birinin adini kapmayi engellemez** (hesap sistemi gerekir).
+
+- [ ] **Cakisma reddi:** Host `MMOSetName Host`; ikinci bir istemci `open <host>:7777?Name=host` (kucuk harf) ile baglanmayi dene: "Bu ad su an baska bir oyuncu tarafindan kullaniliyor" ile reddedilmeli.
+- [ ] **Normal baglanti:** Adsiz (`?Name` yok) ve benzersiz adli istemciler eskisi gibi baglanmali; `Scripts/NetSmokeTest.ps1` gecmeli.
+- [ ] **Harita gecisi (MMOTravel):** Summer<->Winter gecisinden sonra oyuncular kendi adlariyla (ayni adla yeniden baglanma hatasi olmadan) dunyada kalmali.
+- [ ] **Yeniden baglanma:** Istemciyi kapatip hemen ayni adla tekrar baglan: eski baglanti kopma zaman asimina kadar "ad kullaniliyor" gorulebilir (bilinen taviz).

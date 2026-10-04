@@ -20,6 +20,11 @@ public:
 
 	virtual void StartPlay() override;
 
+	// Kimlik korumasi (SECURITY_AUDIT K-1, kismi): baglanti URL'indeki ?Name= degeri su an
+	// cevrimici bir oyuncunun adiyla (kayit yuvasi esdegeri: buyuk/kucuk harf ve bosluk/_ ayni)
+	// cakisiyorsa baglanti reddedilir. Cevrimdisi birinin adini kapmayi ENGELLEMEZ (hesap sistemi gerekir).
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
+
 	// Gelistirici araci: spawner dogrulamasini (zemin izi + navmesh) verilen konumda 64 kez calistirir ve
 	// sonucu "[MMOPROBE]" satiri olarak loglar. Smoke test (Scripts/SmokeTest.ps1 -Probe) kullanir.
 	// Konsol: MMOProbeSpawn X Y Z [Radius]. Yalniz sunucuda anlamlidir; oyunu etkilemez.

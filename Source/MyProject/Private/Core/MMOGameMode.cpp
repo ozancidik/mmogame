@@ -17,6 +17,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "Components/MMOStatsComponent.h"
 
 AMMOGameMode::AMMOGameMode()
@@ -71,6 +72,37 @@ void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
 	}
 	MMOProbeSpawn(X, Y, Top.ImpactPoint.Z + 50.f, Radius);
 #endif
+}
+
+void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+	const UWorld* World = GetWorld();
+	const FString Requested = UGameplayStatics::ParseOption(Options, TEXT("Name"));
+	if (!World || Requested.IsEmpty())
+	{
+		return;
+	}
+	// Kayit yuvasi adiyla ayni normallestirme: bosluk -> '_', buyuk/kucuk harf duyarsiz.
+	const FString RequestedKey = Requested.TrimStartAndEnd().Replace(TEXT(" "), TEXT("_"));
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		if (!PC || !PC->PlayerState)
+		{
+			continue;
+		}
+		const FString OnlineKey = PC->PlayerState->GetPlayerName().TrimStartAndEnd().Replace(TEXT(" "), TEXT("_"));
+		if (OnlineKey.Equals(RequestedKey, ESearchCase::IgnoreCase))
+		{
+			ErrorMessage = TEXT("Bu ad su an baska bir oyuncu tarafindan kullaniliyor.");
+			return;
+		}
+	}
 }
 
 void AMMOGameMode::StartPlay()
