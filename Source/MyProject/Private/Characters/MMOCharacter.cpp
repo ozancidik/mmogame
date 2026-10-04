@@ -46,6 +46,20 @@
 
 namespace
 {
+	// Hile/debug komutlari (MMOGiveItem, MMOGainXP, MMOSpawnMob vb.) Shipping derlemede
+	// calismaz (SECURITY_AUDIT Y-6). Gelistirme ve editor derlemelerinde davranis ayni.
+	bool MMODebugCommandsEnabled()
+	{
+#if UE_BUILD_SHIPPING
+		return false;
+#else
+		return true;
+#endif
+	}
+}
+
+namespace
+{
 	// PvP kurallarinda "oyuncu" = mob olmayan AMMOCharacter. IsPlayerControlled() kontrolcusu
 	// o an olmayan (travel/yeniden sahiplenme) oyuncu pawn'ini mob sanip korumayi atlardi.
 	bool IsPlayerPawn(const AMMOCharacter* C)
@@ -1208,6 +1222,10 @@ void AMMOCharacter::ServerSetPvP_Implementation(bool bOn)
 
 void AMMOCharacter::MMOBuff(const FString& EffectId)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	const FName Id(*EffectId);
 	if (HasAuthority())
 	{
@@ -1224,6 +1242,10 @@ void AMMOCharacter::MMOBuff(const FString& EffectId)
 
 void AMMOCharacter::ServerApplyBuff_Implementation(FName EffectId)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	// Hata ayiklama komutu: uzak istemci kendi RPC'sini dogrudan cagirip buff alamaz.
 	const AController* C = GetController();
 	if (!C || !C->IsLocalController())
@@ -1239,6 +1261,10 @@ void AMMOCharacter::ServerApplyBuff_Implementation(FName EffectId)
 
 void AMMOCharacter::MMOSpawnMob(const FString& ArchetypeId)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	const FName Id(*ArchetypeId);
 	if (HasAuthority())
 	{
@@ -1465,6 +1491,10 @@ void AMMOCharacter::MMONpcTalk()
 
 void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	// Sunucunun yerel oyuncusu disindakiler mob olusturup XP/ganimet uretemez.
 	const AController* C = GetController();
 	if (!C || !C->IsLocalController())
@@ -1504,12 +1534,20 @@ void AMMOCharacter::MulticastMeleeFX_Implementation(FVector ImpactLocation, int3
 
 void AMMOCharacter::MMODamage(float Amount)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	// Standart hasar akisindan gecir: TakeDamage -> Stats->ApplyDamage.
 	UGameplayStatics::ApplyDamage(this, Amount, GetController(), this, nullptr);
 }
 
 void AMMOCharacter::MMOHeal(float Amount)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	if (Stats)
 	{
 		Stats->Heal(Amount);
@@ -1518,6 +1556,10 @@ void AMMOCharacter::MMOHeal(float Amount)
 
 void AMMOCharacter::MMOGainXP(int32 Amount)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	if (Stats)
 	{
 		Stats->GainExperience(Amount);
@@ -1526,6 +1568,10 @@ void AMMOCharacter::MMOGainXP(int32 Amount)
 
 void AMMOCharacter::MMOUseMana(float Amount)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	if (Stats)
 	{
 		Stats->ConsumeMana(Amount);
@@ -1668,6 +1714,10 @@ void AMMOCharacter::ServerUseConsumable_Implementation(FName ItemId)
 
 void AMMOCharacter::MMOGiveItem(const FString& ItemId, int32 Count)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	const FName Id(*ItemId);
 	const int32 C = FMath::Max(1, Count);
 	if (HasAuthority())
@@ -1685,6 +1735,10 @@ void AMMOCharacter::MMOGiveItem(const FString& ItemId, int32 Count)
 
 void AMMOCharacter::ServerGiveItem_Implementation(FName ItemId, int32 Count)
 {
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	// Debug item komutunu yalnizca host kullanabilir; sayi siniri tek basina yeterli degil.
 	const AController* C = GetController();
 	if (!C || !C->IsLocalController())

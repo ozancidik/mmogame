@@ -3146,3 +3146,10 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 
 - [ ] **Uzak istemci:** `MMOSetName A` sonra hemen `MMOSetName B`: ikinci degisim 30 sn dolana kadar sessizce reddedilmeli; arkadas bildirimi yagmamali. 30 sn sonra tekrar calismali.
 - [ ] **Host/yerel:** Host konsolunda `MMOSetName` art arda cagrilari kisitlanmamali (test akisi bozulmamali).
+
+## Debug komutlari Shipping'de kapali (SECURITY_AUDIT Y-6) — 2026-10-04 (DERLENMEDI)
+
+`MMODamage/MMOHeal/MMOGainXP/MMOUseMana/MMOGiveItem/MMOBuff/MMOSpawnMob` ve `ServerGiveItem/ServerApplyBuff/ServerSpawnMob` gövdeleri `UE_BUILD_SHIPPING`'de erken doner. `MMOPvP/MMOClass/MMOSave/MMOLoad/MMOSetName/MMOUse` oyun komutu sayildigi icin acik kaldi.
+
+- [ ] **Development/Editor regresyonu:** `MMOGiveItem HealthPotion 3`, `MMOGainXP 5000`, `MMOSpawnMob Goblin`, `MMOBuff Haste`, `MMODamage 20`, `MMOHeal 20`, `MMOUseMana 10` hepsi eskisi gibi calismali (SmokeTest/NetSmokeTest bu komutlara dayaniyorsa gecmeli).
+- [ ] **Shipping paketi (opsiyonel, ilk dagitimdan once):** Paketlenmis Shipping build'de bu komutlar etkisiz olmali; ayrica `~` konsolunun Shipping'de gercekten kapali oldugunu dogrula (`DefaultInput.ini`'de `ConsoleKeys=Tilde` var).
