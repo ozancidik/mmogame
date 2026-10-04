@@ -1,3 +1,5 @@
+| Y-5 | **Kod kapandı** | `<ad>-<hex>` varsayılan adı `Gezgin######` olur (`AGameModeBase::ChangeName`, derlenmedi; imza UE 5.7'de doğrulanmalı). Eski `MMOSave_<KULLANICI>-<hex>.sav` dosyaları yetim kalır. |
+| Y-4 | **Büyük kısmı** | LLM çıktısı 240 karakter + kontrol karakteri temizliği; sunucu geneli hız sınırı (dakikada 30, eşzamanlı 4; sınır aşılınca NPC yedek replik söyler). **Açık:** `MaxTokens` (düşünme tokenları aynı tavana sayıldığı için ölçümsüz düşürülmedi), günlük bütçe tavanı. |
 # Güvenlik Denetimi (Salt Okunur) - MyProject MMORPG
 
 Tarih: 2026-10-04. Yöntem: yalnızca statik inceleme (kod okuma, grep, git geçmişi taraması, motor kaynağı doğrulaması). Hiçbir dosya düzenlenmedi, derleme/commit/push yapılmadı, oyun çalıştırılmadı. Bu dosya tek yazma çıktısıdır.
