@@ -83,6 +83,48 @@ def check_definitions():
     return errs
 
 
+def check_declarations():
+    """Basliktaki sinif uyesi bildirimlerinin (govdesiz) hicbir cpp'de tanimi yoksa UYARI (olasi link hatasi)."""
+    pub = SRC / "MyProject" / "Public"
+    priv = SRC / "MyProject" / "Private"
+    defs = set()
+    for c in priv.rglob("*.cpp"):
+        t = strip(c.read_text(encoding="utf-8", errors="replace"))
+        for m in re.finditer(r"\b(\w+)::(~?\w+)\s*\(", t):
+            defs.add((m.group(1), m.group(2)))
+    warns = []
+    skip = {"UPROPERTY", "UFUNCTION", "GENERATED_BODY", "check"}
+    for h in sorted(pub.rglob("*.h")):
+        t = strip(h.read_text(encoding="utf-8", errors="replace"))
+        for cm in re.finditer(r"\bclass\s+(?:\w+_API\s+)?(\w+)\s*(?::[^{;]*)?\{", t):
+            cls = cm.group(1)
+            i, depth = cm.end(), 1
+            while depth and i < len(t):
+                depth += (t[i] == "{") - (t[i] == "}")
+                i += 1
+            body = t[cm.end():i - 1]
+            flat, d = "", 0
+            for ch in body:
+                if ch == "{":
+                    if d == 0:
+                        flat += "{}"
+                    d += 1
+                elif ch == "}":
+                    d -= 1
+                elif d == 0:
+                    flat += ch
+            for m in re.finditer(r"\b(\w+)\s*\(([^;{}]*?)\)\s*(?:const)?\s*(?:override|final)?\s*;", flat):
+                name = m.group(1)
+                if name in skip or (cls, name) in defs or (cls, name + "_Implementation") in defs:
+                    continue
+                if re.match(r"[FTUAE][A-Z]", name):  # tur adi / kurucu cagrisi ("FBox2D Rect = FBox2D(...)")
+                    continue
+                msg = f"{h.name}: {cls}::{name} bildirilmis ama hicbir cpp'de tanimi yok (olasi link hatasi)"
+                if msg not in warns:
+                    warns.append(msg)
+    return warns
+
+
 def main():
     rev = None
     if "--changed" in sys.argv:
@@ -119,6 +161,8 @@ def main():
                     # Beklenti: cpp kendi basligini ilk include etsin (UE kurali). Yalniz uyari.
                     pass
     errors += check_definitions()
+    for w in check_declarations():
+        print("UYARI:", w)
     print(f"Taranan dosya: {n}")
     for e in errors:
         print("HATA:", e)
