@@ -31,3 +31,27 @@
 python3 Scripts/ProgressionModel.py            # Lv1-79 tablo + bant özeti
 python3 Scripts/ProgressionModel.py --max 30   # yalnız Lv1-30
 ```
+
+## Kilometre taşı ve `Q_Gold*` görevlerinin XP ağırlığı
+
+`ReachLevel` görevleri hedef seviyeye ulaşıldığında, `HaveGold` görevleri ise kapı seviyesinde oyuncu gerekli altını **taşıyorsa** (altın harcanmaz) anında teslim edilir. Aşağıdaki tablo, ödül XP'sinin teslim seviyesindeki bir seviye eşiğine oranını gösterir. **[KOD+MODEL]**
+
+| Görev | Tür | Kapı Lv | Teslim Lv | Ödül XP | Teslim seviyesi eşiği | Oran (seviye) |
+|---|---|---:|---:|---:|---:|---:|
+| `Q_Level5` | ReachLevel | 1 | 5 | 400 | 244 | 1,64 |
+| `Q_Gold500` | HaveGold | 1 | 1 | 300 | 100 | 3,00 |
+| `Q_Gold1000` | HaveGold | 3 | 3 | 500 | 156 | 3,21 |
+| `Q_Level20` | ReachLevel | 16 | 20 | 9.000 | 6.939 | 1,30 |
+| `Q_Gold5000` | HaveGold | 16 | 16 | 6.000 | 2.842 | 2,11 |
+| `Q_Level30` | ReachLevel | 24 | 30 | 16.000 | 59.576 | 0,27 |
+| `Q_Gold15000` | HaveGold | 28 | 28 | 14.000 | 40.670 | 0,34 |
+| `Q_Gold30000` | HaveGold | 28 | 28 | 28.000 | 40.670 | 0,69 |
+| `Q_Level40` | ReachLevel | 30 | 40 | 24.000 | 225.026 | 0,11 |
+| `Q_Level50` | ReachLevel | 40 | 50 | 35.000 | 508.676 | 0,07 |
+| `Q_Gold50000` | HaveGold | 40 | 40 | 45.000 | 225.026 | 0,20 |
+| `Q_Level65` | ReachLevel | 50 | 65 | 55.000 | 1.155.776 | 0,05 |
+| `Q_Level80` | ReachLevel | 65 | 80 | 90.000 | 2.068.826 | 0,04 |
+
+- [Muhtemel] `Q_Gold5000` (Lv16, ~2,1 seviye), `Q_Gold500/1000` (~3 seviye) ve `Q_Level5` (~1,6 seviye) erken oyunda bir seviyenin çok üstünde XP veriyor. Model, oyuncunun Lv30'a kadar 80.000+ altın biriktirdiğini söylüyor (`VERTICAL_SLICE_LV1_30.md`), yani `Q_Gold*` görevleri kapı açıldığı anda bedava XP.
+- Lv28 sonrası oranlar küçük (≤0,7 seviye); asıl hız etkisi Lv1–20'de.
+- **Seçenekler (karar bekliyor):** (a) `HaveGold` görevlerinde teslimde altını düş ("harca"), (b) `RewardXP`'yi kapı seviyesi eşiğinin ≤%50'sine indir, (c) olduğu gibi bırak ve yalnız dokümante et. Ölçüm (`[MMOMETRIC]`) olmadan (b) körlemesine olur.
