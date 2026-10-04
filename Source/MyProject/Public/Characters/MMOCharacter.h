@@ -339,6 +339,8 @@ protected:
 	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
 	bool bTravelSaveCommitted = false;
+	// Son yuklenen/olusturulan/yazilan kayit yuvasi (K-1: ad degisince baska yuvanin ezilmesini engellemek icin).
+	FString ActiveSaveSlot;
 
 	// Yeni karakter (kayit dosyasi yok) baslangic paketi: Kisa Kilic + Deri Zirh (kusanili) + 3 Can Iksiri.
 	// Yalniz LoadCharacter'in "kayit yok" dalindan, sunucuda; pawn basina bir kez.

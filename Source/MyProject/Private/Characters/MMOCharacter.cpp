@@ -479,6 +479,22 @@ bool AMMOCharacter::SaveCharacterForTravel()
 		return false;
 	}
 
+	// SECURITY_AUDIT K-1 (kayit ezme): yuklenen/olusturulan yuva ile simdiki yuva (ad degisti) farkliysa
+	// ve hedef yuvada baska birine ait bir kayit zaten varsa YAZMA. Yeni (bos) bir yuvaya yazmak serbest;
+	// mevcut bir kaydi sahiplenmek icin once o adla MMOLoad yapilmalidir (ActiveSaveSlot guncellenir).
+	const FString TargetSlot = GetSaveSlotName();
+	if (!ActiveSaveSlot.IsEmpty() && !ActiveSaveSlot.Equals(TargetSlot, ESearchCase::IgnoreCase)
+		&& UGameplayStatics::DoesSaveGameExist(TargetSlot, 0))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Save refused: %s -> %s already exists (name changed since load)"), *ActiveSaveSlot, *TargetSlot);
+		if (GEngine && IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange,
+				TEXT("Bu ad baska bir kayda ait: kaydedilmedi. Once MMOLoad ile o kaydi yukle ya da farkli bir ad sec."));
+		}
+		return false;
+	}
+
 	UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::CreateSaveGameObject(UMMOSaveGame::StaticClass()));
 	if (!SG)
 	{
@@ -515,7 +531,11 @@ bool AMMOCharacter::SaveCharacterForTravel()
 	D.Location = GetActorLocation();
 	D.Rotation = GetActorRotation();
 
-	const bool bOk = UGameplayStatics::SaveGameToSlot(SG, GetSaveSlotName(), 0);
+	const bool bOk = UGameplayStatics::SaveGameToSlot(SG, TargetSlot, 0);
+	if (bOk)
+	{
+		ActiveSaveSlot = TargetSlot;
+	}
 
 	if (bOk && GEngine && IsLocallyControlled())
 	{
@@ -578,6 +598,7 @@ bool AMMOCharacter::LoadCharacter()
 		// artik replike bayrakla HUD'da sinif secilene kadar kalici bir ipucu paneli cizilir.
 		bClassChoicePending = true;
 		bInitialLoadComplete = true;
+		ActiveSaveSlot = Slot;
 		// Baslangic paketi YALNIZ bu dalda (kayit dosyasi yok); kayit yuklenen karakterlere hic verilmez.
 		GrantStarterPack();
 		return false; // yeni karakter
@@ -645,6 +666,7 @@ bool AMMOCharacter::LoadCharacter()
 			*UGameplayStatics::GetCurrentLevelName(this, true));
 	}
 	bInitialLoadComplete = true;
+	ActiveSaveSlot = Slot;
 
 	if (GEngine && IsLocallyControlled())
 	{

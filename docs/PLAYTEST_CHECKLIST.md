@@ -3206,3 +3206,12 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Normal baglanti:** Adsiz (`?Name` yok) ve benzersiz adli istemciler eskisi gibi baglanmali; `Scripts/NetSmokeTest.ps1` gecmeli.
 - [ ] **Harita gecisi (MMOTravel):** Summer<->Winter gecisinden sonra oyuncular kendi adlariyla (ayni adla yeniden baglanma hatasi olmadan) dunyada kalmali.
 - [ ] **Yeniden baglanma:** Istemciyi kapatip hemen ayni adla tekrar baglan: eski baglanti kopma zaman asimina kadar "ad kullaniliyor" gorulebilir (bilinen taviz).
+
+## Kayit ezme korumasi: ad degisince baska yuvanin uzerine yazilmaz (SECURITY_AUDIT K-1, kismi) — 2026-10-04 (DERLENMEDI)
+
+`AMMOCharacter::ActiveSaveSlot`: son yuklenen/olusturulan/yazilan yuva. Ad degisip hedef yuva farkli **ve zaten kayitliysa** kayit (otomatik, manuel, cikis, harita gecisi) reddedilir. Bos bir yuvaya (yeni ad) yazmak serbest; mevcut kaydi sahiplenmek icin o adla `MMOLoad` gerekir.
+
+- [ ] **Ezme engeli:** Karakter A ile oyna ve kaydet. Yeni bir karakter B icin `MMOSetName A` (kucuk/buyuk harf fark etmez) dene: ad cakismasi cevrimici A varsa zaten reddedilir; A cevrimdisiyken B `MMOSetName A` yapip `MMOSave` yazsin: "Bu ad baska bir kayda ait" uyarisi cikmali, A'nin kayit dosyasi (`MMOSave_A.sav`) DEGISMEMELI (degistirilme zamanini kontrol et). Oyundan cikinca da A'nin dosyasi ezilmemeli.
+- [ ] **Sahiplenme yolu:** Ayni durumda `MMOLoad` yaz: A'nin kaydi yuklenir (bilinen sinir: kimlik dogrulama yok, bu yol hala acik); ardindan `MMOSave` calismali.
+- [ ] **Yeni ada tasima:** Kayitli A karakteri `MMOSetName YeniAd` (dosyasi olmayan ad) + `MMOSave`: yeni dosya yazilmali, hata olmamali; eski dosya yetim kalir (onceki davranis).
+- [ ] **Regresyon:** Normal oynanista otomatik kayit (60 sn), cikista kayit ve `MMOTravel` ile harita gecisi eskisi gibi calismali (`SaveCharacterForTravel` hata dondurmemeli).
