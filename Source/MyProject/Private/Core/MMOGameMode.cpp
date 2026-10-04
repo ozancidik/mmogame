@@ -18,6 +18,8 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Components/MMOStatsComponent.h"
 
 AMMOGameMode::AMMOGameMode()
@@ -80,6 +82,19 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 	if (!ErrorMessage.IsEmpty())
 	{
 		return;
+	}
+	// Istege bagli katilim parolasi (SECURITY_AUDIT K-1/B-13): sunucu komut satirina -MMOPassword=xxx
+	// verilirse baglanti URL'inde ?Password=xxx zorunlu olur. Parola kodda/repoda tutulmaz; verilmezse
+	// davranis degismez. Kimlik dogrulamanin yerini TUTMAZ; yalniz tanimadigin kisilerin girmesini zorlastirir.
+	FString RequiredPassword;
+	if (FParse::Value(FCommandLine::Get(), TEXT("MMOPassword="), RequiredPassword) && !RequiredPassword.IsEmpty())
+	{
+		const FString Given = UGameplayStatics::ParseOption(Options, TEXT("Password"));
+		if (!Given.Equals(RequiredPassword, ESearchCase::CaseSensitive))
+		{
+			ErrorMessage = TEXT("Sunucu parolasi gerekli veya yanlis.");
+			return;
+		}
 	}
 	const UWorld* World = GetWorld();
 	const FString Requested = UGameplayStatics::ParseOption(Options, TEXT("Name"));

@@ -3215,3 +3215,11 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Sahiplenme yolu:** Ayni durumda `MMOLoad` yaz: A'nin kaydi yuklenir (bilinen sinir: kimlik dogrulama yok, bu yol hala acik); ardindan `MMOSave` calismali.
 - [ ] **Yeni ada tasima:** Kayitli A karakteri `MMOSetName YeniAd` (dosyasi olmayan ad) + `MMOSave`: yeni dosya yazilmali, hata olmamali; eski dosya yetim kalir (onceki davranis).
 - [ ] **Regresyon:** Normal oynanista otomatik kayit (60 sn), cikista kayit ve `MMOTravel` ile harita gecisi eskisi gibi calismali (`SaveCharacterForTravel` hata dondurmemeli).
+
+## Istege bagli sunucu katilim parolasi (SECURITY_AUDIT K-1/B-13) — 2026-10-04 (DERLENMEDI)
+
+`AMMOGameMode::PreLogin`: sunucu komut satirinda `-MMOPassword=xxx` varsa baglanti URL'inde `?Password=xxx` zorunlu. Verilmezse davranis ayni. **Kimlik dogrulamanin yerini tutmaz.**
+
+- [ ] **Parolasiz sunucu (varsayilan):** `-MMOPassword` olmadan host + istemci eskisi gibi baglanmali (`NetSmokeTest.ps1` gecmeli).
+- [ ] **Parolali sunucu:** Host `UnrealEditor ... -game ?listen -MMOPassword=test123`; istemci `open <host>:7777` (parolasiz) reddedilmeli ("Sunucu parolasi gerekli veya yanlis"), `?Password=test123` ile baglanmali, yanlis parola reddedilmeli.
+- [ ] **Not:** Parola komut satirinda gorunur (surec listesi); halka acik sunucu icin yeterli degil, yalniz tanidik kisilerle test icin.
