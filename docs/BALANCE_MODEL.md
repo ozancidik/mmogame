@@ -75,3 +75,24 @@ python3 Scripts/ProgressionModel.py --max 30   # yalnız Lv1-30
 
 - [Muhtemel] Lv1–10 görev ödülleri eşiklerin 5–8 katı: bilinçli bir "hızlı giriş" olabilir. Lv15'te %222, Lv20'de ~%150: görevler hâlâ grind'ın çoğunu karşılıyor. Lv25'te %79, Lv30'da %45'e düşüyor: görev ödülleri eşiklerin gerisine ancak Lv25 civarında düşüyor, yani yavaşlama o noktadan sonra başlıyor.
 - Ayar denemek için: `python3 Scripts/ProgressionModel.py --mob-mult "1:1.0,10:0.6,30:0.4" --quest-mult "1:1.0,16:0.5,30:0.4"` (kodu değiştirmez; yalnız modele uygular). Not: görev öldürme sayıları sabit olduğundan Lv1–5 bandı ne olursa olsun ~6 öldürmenin altına inmez; bu modelin sınırıdır.
+
+## Altın ekonomisi (statik model)
+
+Betik: `python3 Scripts/EconomyModel.py [--upgrade-to N]`. Gelir = öldürme (ilerleme modelinden) × pencere ortalama mob altını + görev altın ödülleri; gider = kademenin 4 parçasının alış fiyatı + parça başına +N yükseltme. İksir, şifacı, loot satışı, ölüm, yanma ve parti **yok**; sonuç yön gösterir, ölçüm değildir. **[KOD+MODEL]**
+
+| Kademe Lv | Aralık | Gelir | Gider (+3) | Gelir/gider |
+|---:|---|---:|---:|---:|
+| 1 | 1–2 | 829 | 1.716 | 0,5 |
+| 3 | 3–4 | 960 | 2.120 | 0,5 |
+| 5 | 5 | 2.462 | 2.524 | 1,0 |
+| 7 | 7–9 | 4.130 | 3.060 | 1,3 |
+| 10 | 10–15 | 8.008 | 3.648 | 2,2 |
+| 16 | 16–24 | 42.148 | 4.656 | 9,1 |
+| 25 | 25–32 | 143.441 | 5.904 | 24,3 |
+| 33 | 33–41 | 457.479 | 7.112 | 64,3 |
+| 42 | 42–50 | 931.425 | 8.432 | 110,5 |
+| 72 | 72–79 | 3.038.495 | 13.568 | 223,9 |
+
+- [Muhtemel] Lv1–9 altın **kıt** (gelir/gider 0,5–1,3): ilk set ancak görev altınıyla alınır, bu "kıtlık yalnız Lv1–8" hedefiyle uyumlu. Lv16'dan itibaren gelir giderin 9–224 katı: ekipman ve +3 yükseltme altını hiç zorlamıyor, altın birikir. `VERTICAL_SLICE_LV1_30.md`'nin "faucet bol, sink zayıf" bulgusunu doğruluyor.
+- Yükseltme maliyeti `50×(artı+1)`, seviyeden bağımsız; ekipman fiyatı yalnız `12×(atk+def) + 25×seviye + 50` ile büyüyor. Gelir ise mob altınıyla ~×1,2/seviye büyüyor, bu yüzden oran açılıyor.
+- **Karar bekleyen:** yeni altın sink'i (ör. yükseltme/iksir/şifacı maliyetini seviyeyle ölçekle) ya da gelir düşürme. Ölçüm (`[MMOMETRIC]` `gold` olayları) olmadan körlemesine olur. Q_Gold* görevleri birikimi ödüllendirdiği için bu dengesizliği büyütüyor.
