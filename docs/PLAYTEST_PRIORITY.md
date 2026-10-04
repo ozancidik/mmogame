@@ -4,7 +4,7 @@
 
 ## 1. Durum
 
-- 48 mob arketipi, 73 görev, 53 ekipman, 69 beceri (8'i 2026-10-04'te boşluk dolgusu, PLACEHOLDER değerli), 12 efekt; Lv1'den Lv80'e kesintisiz görev zinciri **[KOD]**.
+- 48 mob arketipi, 73 görev, 53 ekipman, 73 beceri (12'si 2026-10-04'te boşluk dolgusu, PLACEHOLDER değerli), 12 efekt; Lv1'den Lv80'e kesintisiz görev zinciri **[KOD]**.
 - Sistemler: stat, envanter, beceri, görev, parti, ticaret, klan, arkadaş, depo, sohbet, PvP kuralları, bölge geçişi (host `MMOTravel`), kayıt **[KOD]**.
 - Otomatik kontroller (veri denetimi, derleme, Summer/Winter duman testi, ağ bağlantı testi) geçiyor **[BELGE]**. Bunlar oyunun oynanabildiğini göstermez.
 - `PLAYTEST_CHECKLIST.md` içinde ~880 madde var, yalnızca 4'ü işaretli **[BELGE]**. Doğrulama borcu özellik üretiminden hızlı büyüyor.
@@ -55,6 +55,6 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 
 ## 5. Bulutta bilerek yapılmayanlar
 
-- Lv24→33 arası beceri boşluğu (her sınıfta 9 seviye): `ValidateData.py` UYARI basıyor; kalan boşluk tasarım kararı bekliyor.
+- Kalan beceri boşluğu: her sınıfta Lv28→33 (5 seviye), `ValidateData.py` UYARI basıyor. Eklenen 12 beceri (Lv13, Lv20, Lv28) tahmini değerlerle yazıldı; ölçüm sonrası ayarlanmalı.
 - Denge ayarı (XP hızı, altın sink, ölüm cezası): `[MMOMETRIC]` verisi gelmeden körlemesine olur.
 - K-1 (kimlik/kayıt yuvası), Y-5, `MaxTokens`: tasarım kararı ya da ölçüm gerektiriyor.
