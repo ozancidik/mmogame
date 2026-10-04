@@ -66,6 +66,13 @@ AMMOCharacter::AMMOCharacter()
 	ClanComponent = CreateDefaultSubobject<UMMOClanComponent>(TEXT("ClanComponent"));
 	FriendsComponent = CreateDefaultSubobject<UMMOFriendsComponent>(TEXT("FriendsComponent"));
 
+	// NETWORK_AUDIT Y5: oyuncu aktoru icin makul replikasyon sikligi (motor varsayilani ~100 Hz
+	// gereksiz; 60 Hz akici hareket icin yeterli, hareketsizken 20 Hz tabanina duser). Cull
+	// mesafesi motor varsayilaninda birakildi (oyuncular/parti uyeleri uzaktan da gorunmeli).
+	// DOGRULANMADI: degerler PIE/Network Profiler ile olculmedi. AMMOMob kurucusu bunu ezer.
+	SetNetUpdateFrequency(60.f);
+	SetMinNetUpdateFrequency(20.f);
+
 	// Saldiri animasyonlari. Sira onemli: 0..2 = yakin dovus varyasyonlari, 3 = buyu okuma.
 	// Kilic savurma Mixamo'dan alinip Manny iskeletine retarget edildi (RT_ onekli).
 	{

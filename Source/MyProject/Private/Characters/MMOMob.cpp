@@ -10,6 +10,8 @@
 #include "Engine/DamageEvents.h"
 #include "World/MMOLootPickup.h"
 #include "Items/MMOItemDatabase.h"
+#include "Components/MMOInventoryComponent.h"
+#include "Components/MMOSkillComponent.h"
 #include "Components/MMOQuestComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
@@ -43,6 +45,25 @@ AMMOMob::AMMOMob()
 	if (GetTradeComponent()) { GetTradeComponent()->SetIsReplicated(false); }
 	if (GetClanComponent()) { GetClanComponent()->SetIsReplicated(false); }
 	if (GetFriendsComponent()) { GetFriendsComponent()->SetIsReplicated(false); }
+
+	// NETWORK_AUDIT Y5: moblarda Inventory/Skill/Quest/Party bilesenleri de replike edilmez.
+	// Bunlar yalniz sunucuda kullanilir (mob becerisi/loot sunucuda calisir; istemci mobun
+	// envanterini/gorevini/partisini okumaz). Sadece replikasyon kapanir, sunucu mantigi aynidir.
+	// Stats replike kalir (can cubugu, olum, seviye, efektler).
+	if (GetInventory()) { GetInventory()->SetIsReplicated(false); }
+	if (GetSkillComponent()) { GetSkillComponent()->SetIsReplicated(false); }
+	if (GetQuestComponent()) { GetQuestComponent()->SetIsReplicated(false); }
+	if (GetPartyComponent()) { GetPartyComponent()->SetIsReplicated(false); }
+
+	// Mob aktoru dusuk frekansla replike edilir: oyuncu basina 45-55 mob her karede ~100 Hz
+	// guncellenirse bant bosa gider (motor varsayilani NetUpdateFrequency ~100). Hareket
+	// yumusatmasi istemcide yapildigi icin 30 Hz yeterli; hareketsiz moblar MinNetUpdateFrequency
+	// (10 Hz) tabanina duser. Cull mesafesi AggroRange'in (~1200uu) cok ustunde ama harita
+	// genisliginden (~17000uu) kucuk: uzaktaki moblar ilgili listesinden duser.
+	// DOGRULANMADI: degerler PIE/Network Profiler ile olculmedi; "stat net" ile ayarlanmali.
+	SetNetUpdateFrequency(30.f);
+	SetMinNetUpdateFrequency(10.f);
+	SetNetCullDistanceSquared(12000.f * 12000.f);
 
 	// Hareket yonune donsun.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
