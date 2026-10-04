@@ -3232,3 +3232,12 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Kasitli ad:** `open <host>:7777?Name=Ozan` ile baglan: ad `Ozan` kalmali. `MMOSetName Ozan2` da calismali.
 - [ ] **Kayit:** `Saved/SaveGames` altinda yeni `MMOSave_Gezgin######.sav` olusur (onceki `MMOSave_<KULLANICI>-<hex>.sav` dosyalari yetim kalir).
 - [ ] **Derleme:** `AGameModeBase::ChangeName` imzasi (`AController*, const FString&, bool`) UE 5.7'de dogrulanmali; fark varsa derleme hatasi verir.
+
+## Can/mana yenilenmesi adimli (NETWORK_AUDIT Y3, madde 1) — 2026-10-04 (DERLENMEDI)
+
+`UMMOStatsComponent::TickComponent`: yenilenme `HealthRegenAccum`/`ManaRegenAccum` ile biriktirilir, >=1 puan olunca yazilir. Toplam miktar ayni; `Health`/`Mana` her karede degismez, replikasyon ve HUD yayini azalir. Efekt dizisi (`ActiveEffects.RemainingTime`, madde 2) hala her karede degisiyor (yapilmadi).
+
+- [ ] **Yenilenme hizi ayni:** Hasar al, savas disinda bekle: can ~6/sn (`HealthRegenPerSec`) hizinda dolmali; savasta `CombatRegenMult` ile yavas. Mana seviye ile artan hizda dolmali. Eski davranisla gozle fark etmemeli (can 1'er puan atlar).
+- [ ] **Sinirlar:** Can/mana maksimumu asmamali; tam dolunca yenilenme durmali; olu oyuncuda yenilenme olmamali.
+- [ ] **HUD:** Can ve mana cubugu 1 puanlik adimlarla akici dolmali (titreme/geri sarma yok), uzak istemcide de (can).
+- [ ] **Olcum (opsiyonel):** `stat net` ile can yenilenirken oyuncu basina giris trafigi, onceki turlara gore azalmis olmali.

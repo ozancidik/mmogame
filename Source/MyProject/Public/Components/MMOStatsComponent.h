@@ -332,6 +332,11 @@ protected:
 	// Son alinan hasar veya saldiri zamani (savas ici/disi yenilenme icin; replike degil).
 	float LastCombatActivityTime = -100.f;
 
+	// Yenilenme birikimi (replike degil): Health/Mana yalniz >=1 puanlik adimlarla yazilir; her karede
+	// kirlenip replike edilmesin (NETWORK_AUDIT Y3). Toplam yenilenme miktari degismez.
+	float HealthRegenAccum = 0.f;
+	float ManaRegenAccum = 0.f;
+
 	// --- OnRep fonksiyonları: istemcide değer değişince UI delegate'lerini tetikler ---
 	UFUNCTION()
 	void OnRep_Health();

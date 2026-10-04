@@ -58,16 +58,37 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 
 	if (Health < MaxHealth)
 	{
-		Health = FMath::Clamp(Health + FMath::Max(0.f, HealthRegenPerSec) * Mult * DeltaTime, 0.f, MaxHealth);
-		OnHealthChanged.Broadcast(Health, MaxHealth);
+		// Biriktir, >=1 puan olunca uygula (Y3: her karede replikasyon kirliligi yok).
+		HealthRegenAccum += FMath::Max(0.f, HealthRegenPerSec) * Mult * DeltaTime;
+		if (HealthRegenAccum >= 1.f)
+		{
+			const float Step = FMath::FloorToFloat(HealthRegenAccum);
+			HealthRegenAccum -= Step;
+			Health = FMath::Clamp(Health + Step, 0.f, MaxHealth);
+			OnHealthChanged.Broadcast(Health, MaxHealth);
+		}
+	}
+	else
+	{
+		HealthRegenAccum = 0.f;
 	}
 	if (Mana < MaxMana)
 	{
 		// Seviye ile buyuyen yenilenme (QA MEDIUM #5): sabit 7/sn ile Lv80 capstone (400 mana,
 		// 26sn CD) savasta ~174sn'de bir atilabiliyordu.
 		const float RegenPerSec = ManaRegenPerSec + Level * ManaRegenPerLevel;
-		Mana = FMath::Clamp(Mana + FMath::Max(0.f, RegenPerSec) * Mult * DeltaTime, 0.f, MaxMana);
-		OnManaChanged.Broadcast(Mana, MaxMana);
+		ManaRegenAccum += FMath::Max(0.f, RegenPerSec) * Mult * DeltaTime;
+		if (ManaRegenAccum >= 1.f)
+		{
+			const float Step = FMath::FloorToFloat(ManaRegenAccum);
+			ManaRegenAccum -= Step;
+			Mana = FMath::Clamp(Mana + Step, 0.f, MaxMana);
+			OnManaChanged.Broadcast(Mana, MaxMana);
+		}
+	}
+	else
+	{
+		ManaRegenAccum = 0.f;
 	}
 }
 
