@@ -30,12 +30,13 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 | ID | Sorun | Durum |
 |---|---|---|
 | K-1 | Kayıt yuvası oyuncunun seçtiği ada bağlı; ad değiştirerek başkasının kaydı ezilebilir ya da yüklenebilir **[BELGE]**. | Açık. Kritik, ama yalnızca tanıdıklarla oynarsan pratik risk düşük. Hesap sistemi planı `ACCOUNT_BACKEND_COMPARISON.md`. |
-| Y-2 | Kayıt yüklemede ana stat doğrulaması PR #1'de eklendi (derlenmedi). Eşya, görev ve klan alanları hâlâ doğrulanmıyor **[BELGE]**. | Kısmi. |
+| Y-2 | Kayıt yüklemede ana stat, altın/yığın/nadirlik tavanı, yanlış slot, yinelenen `InstanceId`, görev sayacı doğrulaması PR #1'de eklendi (derlenmedi). Klan alanı ve görev ön koşul zinciri hâlâ doğrulanmıyor **[BELGE]**. | Büyük kısmı kapandı; derleme bekliyor. |
 | Y-3 | `NVIDIA_API_KEY` ve `ANTHROPIC_API_KEY` kalıcı kullanıcı ortam değişkeni; ajanlar geniş izinle çalışıyor **[BELGE]**. | Yerelde senin kararın; anahtar rotasyonu önerilir. |
 | Y-5 | Varsayılan oyuncu adı Windows kullanıcı adını içeriyor **[BELGE]**. | Açık. |
-| Y-6 | Debug komutları (`MMOGiveItem`, `MMOGainXP` vb.) Shipping'den çıkarılmamış **[BELGE]**. | Açık. Test aşamasında zararsız, yayında kapatılmalı. |
+| Y-6 | Debug/hile komutları (`MMOGiveItem`, `MMOGainXP`, `MMOSpawnMob` vb.) Shipping derlemede erken döner (PR #1, derlenmedi). `~` konsolunun Shipping'de kapalı olduğu doğrulanmadı **[BELGE]**. | Kod tarafı kapandı; Shipping paketinde doğrulama bekliyor. |
+| Y-7 | `ServerSetName` için uzak istemcilere 30 sn soğuma eklendi (PR #1, derlenmedi). `/klan kur` disk taraması 30 sn önbellekli (önceki tur). | Kapandı; derleme bekliyor. |
 
-**Ağ ve sunucu (`NETWORK_AUDIT.md`)**: Can/mana adımlama (Y3), O4–O8, O11, O12 yapılmadı **[BELGE]**. Uzak istemcilere bazı geri bildirim mesajları hâlâ gitmiyor olabilir; dedicated server'a geçişin önünde engeller listelenmiş.
+**Ağ ve sunucu (`NETWORK_AUDIT.md`)**: Can/mana adımlama (Y3), O4 (parti/ticaret davet kapma), O5 (arkadaş rızası), O6, O7, O8, O11, O12 (denetim logu) yapılmadı **[BELGE]**. Ölü karakterin satıcıdan işlem yapması ve yükseltmesi engellendi (D3, PR #1, derlenmedi). `MMOPartyComponent.cpp` ve `MMOTradeComponent.cpp` yerelde Codex'in elinde olduğu için bulutta dokunulmadı **[BELGE]**. Uzak istemcilere bazı geri bildirim mesajları hâlâ gitmiyor olabilir; dedicated server'a geçişin önünde engeller listelenmiş.
 
 **Oynanış ve denge (hepsi `[PLACEHOLDER]`, ölçülmedi)** **[BELGE]**
 - Lv1–30 yolu çok kısa (~80–85 öldürme); Lv30'da 49–51 harcanmamış beceri puanı birikiyor.
@@ -44,10 +45,16 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 - Warrior ve Priest'te Lv24–70 arası hasar becerisi platosu; Warrior Lv80 capstone'u Lv70'inkinden zayıf (QA Bulgu #5, #6).
 - Lv61→65 ve Lv75→80 aralıkları görevsiz uzun öğütme.
 
-**Bu PR (#1) derlenmedi.** Yerelde `Scripts/RunAllChecks.ps1` çalıştırılmadan birleştirilmemeli.
+**PR #1'deki kod değişikliklerinin hiçbiri derlenmedi** (5 kod commit'i: `5292ca4`, `1b07574`, `275f45b`, `06f2769`, `282cef2`). Yerelde `Scripts/RunAllChecks.ps1` çalıştırılmadan birleştirilmemeli.
 
 ## 4. Önerilen sıra (geliştirme)
 
 1. Yukarıdaki test sırasını bir kez oyna; bulguları bu belgenin 3. bölümüne işle (checklist'i değil).
 2. Test sonucuna göre: temel döngü bozuksa onu düzelt. Bozuk değilse K-1 (kayıt yuvasını görünen addan ayırma) önce, hesap sistemi sonra.
 3. İçerik üretimine (yeni bölge, yeni sistem) ancak 1. adım tamamlandıktan sonra dön.
+
+## 5. Bulutta bilerek yapılmayanlar
+
+- Lv11–30 beceri boşluklarına yeni beceri eklemek: `Scripts/ValidateData.py` artık bu boşlukları UYARI olarak basıyor (her sınıfta Lv10→16, 16→24, 24→33). Güç/mana/bekleme değerleri ölçüm olmadan tahmin olur; önceki QA turları benzer eklemelerde birebir aynı buff ve öncekinden zayıf beceri bulmuştu **[BELGE]**.
+- Denge ayarı (XP hızı, altın sink, ölüm cezası): `[MMOMETRIC]` verisi gelmeden körlemesine olur.
+- K-1 (kimlik/kayıt yuvası), Y-5, `MaxTokens`: tasarım kararı ya da ölçüm gerektiriyor.
