@@ -74,6 +74,16 @@ def main():
         for o, c in (("{", "}"), ("(", ")"), ("[", "]")):
             if code.count(o) != code.count(c):
                 errors.append(f"{p.relative_to(ROOT)}: {o}{c} dengesiz ({code.count(o)} vs {code.count(c)})")
+        # Proje include'lari gercekten var mi? (ilk yol parcasi Public/ altindaki bir klasorse)
+        pub = SRC / "MyProject" / "Public"
+        top_dirs = {d.name for d in pub.iterdir() if d.is_dir()} if pub.exists() else set()
+        for inc in re.findall(r'#include\s+"([^"]+)"', raw):
+            if inc.endswith(".generated.h"):
+                continue
+            first = inc.split("/")[0]
+            # Motor klasorleriyle ad cakismasi olmasin diye yalniz MMO* dosyalari denetlenir.
+            if first in top_dirs and inc.split("/")[-1].startswith("MMO") and not (pub / inc).exists():
+                errors.append(f"{p.relative_to(ROOT)}: include bulunamadi -> {inc}")
         if p.suffix == ".h" and re.search(r"\b(UCLASS|USTRUCT|UENUM)\s*\(", code):
             if ".generated.h" not in raw:
                 errors.append(f"{p.relative_to(ROOT)}: UCLASS/USTRUCT/UENUM var ama .generated.h include'u yok")
