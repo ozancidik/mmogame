@@ -19,6 +19,8 @@ SRC = ROOT / "Source" / "MyProject" / "Private"
 mob_src = (SRC / "Characters" / "MMOMobArchetype.cpp").read_text(encoding="utf-8", errors="replace")
 item_src = (SRC / "Items" / "MMOItemDatabase.cpp").read_text(encoding="utf-8", errors="replace")
 quest_src = (SRC / "Quests" / "MMOQuestTypes.cpp").read_text(encoding="utf-8", errors="replace")
+skill_src = (SRC / "Skills" / "MMOSkillDatabase.cpp").read_text(encoding="utf-8", errors="replace")
+effect_src = (SRC / "Effects" / "MMOEffectDatabase.cpp").read_text(encoding="utf-8", errors="replace")
 
 errors = []
 warnings = []
@@ -91,6 +93,49 @@ for qid, q in quests.items():
     if lv is not None and lv > q["req"] + 2:
         warnings.append(f"{qid}: odul {q['reward']} Lv{lv} gerektiriyor, gorev kapisi Lv{q['req']} (hemen kusanilamaz)")
 
+
+# --- Beceriler: MakeDef(TEXT("Id"), TEXT("Ad"), C::Sinif, T::Agac, Rutbe, ReqLevel, SP, TEXT("Onkosul"), E::Etki, ...[, TEXT("EfektId")])
+effects = dupes([m.group(1) for m in re.finditer(r'MakeEffect\(TEXT\("([^"]+)"\)', effect_src)], "Efekt")
+skill_pat = re.compile(
+    r'Table\.Add\(MakeDef\(TEXT\("([^"]+)"\),\s*TEXT\("[^"]*"\),\s*C::(\w+),\s*T::(\w+),\s*(\d+),\s*(\d+),\s*\d+,\s*'
+    r'TEXT\("([^"]*)"\),\s*E::(\w+),([^;]*?)\)\);', re.S)
+skills = {}
+skill_order = []
+for m in skill_pat.finditer(skill_src):
+    sid, cls, tree, rank, lvl, prereq, eff, rest = m.groups()
+    eff_id = re.search(r'TEXT\("([^"]*)"\)\s*$', rest.strip())
+    skills[sid] = dict(cls=cls, tree=tree, rank=int(rank), lvl=int(lvl), prereq=prereq, effect=eff_id.group(1) if eff_id else "")
+    skill_order.append(sid)
+dupes(skill_order, "Beceri")
+skill_calls = len(re.findall(r'Table\.Add\(MakeDef\(', skill_src))
+if skill_calls != len(skills):
+    errors.append(f"Beceri ayristirma uyumsuz: {skill_calls} MakeDef cagrisi, {len(skills)} ayristirildi")
+
+tree_ranks = {}
+for sid, k in skills.items():
+    if k["prereq"] and k["prereq"] not in skills:
+        errors.append(f"{sid}: on kosul beceri yok -> {k['prereq']}")
+    if k["effect"] and k["effect"] not in effects:
+        errors.append(f"{sid}: efekt yok -> {k['effect']}")
+    if k["rank"] > k["lvl"]:
+        errors.append(f"{sid}: rutbe {k['rank']} > gereken seviye {k['lvl']} (acilamaz)")
+    tree_ranks.setdefault((k["cls"], k["tree"]), set()).add(k["rank"])
+for (cls, tree), ranks in sorted(tree_ranks.items()):
+    if ranks != set(range(1, max(ranks) + 1)):
+        errors.append(f"{cls}/{tree}: rutbeler bosluklu -> {sorted(ranks)}")
+
+# Bilgi: sinif basina Lv1-30 arasinda yeni beceri gelmeyen 5+ seviyelik pencereler
+by_class = {}
+for k in skills.values():
+    by_class.setdefault(k["cls"], set()).add(k["lvl"])
+for cls, lvls in sorted(by_class.items()):
+    pts = sorted(l for l in lvls if l <= 30)
+    after = sorted(l for l in lvls if l > 30)
+    nxt = after[0] if after else 31  # Lv30 sonrasi ilk beceri (yoksa 31)
+    for a, b in zip(pts, pts[1:] + [nxt]):
+        if b - a >= 5:
+            warnings.append(f"{cls}: Lv{a} sonrasi Lv{b} oncesine kadar yeni beceri yok ({b - a} seviye)")
+
 # On kosul dongusu
 for qid in quests:
     seen, cur = set(), qid
@@ -101,7 +146,7 @@ for qid in quests:
         seen.add(cur)
         cur = quests[cur]["prereq"]
 
-print(f"Mob: {len(mobs)}  Item: {len(items)} (seviyesi okunan: {len(item_levels)})  Gorev: {len(quests)}")
+print(f"Mob: {len(mobs)}  Item: {len(items)} (seviyesi okunan: {len(item_levels)})  Gorev: {len(quests)}  Beceri: {len(skills)}  Efekt: {len(effects)}")
 for w in warnings:
     print("UYARI:", w)
 for e in errors:
