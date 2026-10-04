@@ -510,6 +510,35 @@ bool AMMOCharacter::SaveCharacterForTravel()
 	return bOk;
 }
 
+void AMMOCharacter::GrantStarterPack()
+{
+	// Yalniz sunucu + oyuncu. Ayni pawn icin bir kez (MMOLoad vb. ile yeni-karakter dali tekrar
+	// calisirsa cift vermesin). Kayit formatina alan eklenmez: "kayit dosyasi yoktu" bilgisi yeterli.
+	if (!HasAuthority() || bStarterPackGranted || !Inventory || !IsPlayerControlled())
+	{
+		return;
+	}
+	bStarterPackGranted = true;
+
+	// Ilk silah + ilk zirh (VERTICAL_SLICE_LV1_30 madde 2) cantaya girip kusanilir; 3 Can Iksiri.
+	static const FName StarterEquipment[] = { FName(TEXT("ShortSword")), FName(TEXT("LeatherArmor")) };
+	for (const FName& ItemId : StarterEquipment)
+	{
+		const int32 BagBefore = Inventory->EquipmentBag.Num();
+		Inventory->AddEquipmentInstance(ItemId);
+		if (Inventory->EquipmentBag.Num() > BagBefore)
+		{
+			Inventory->EquipByInstanceId(Inventory->EquipmentBag.Last().InstanceId);
+		}
+	}
+	Inventory->AddItem(FName(TEXT("HealthPotion")), 3);
+
+	UE_LOG(LogTemp, Display, TEXT("[MMODBG] Starter pack granted to %s weapon=%d armor=%d bag=%d potions=%d"),
+		*MMOMetrics::WhoName(this), Inventory->GetEquipped(EMMOEquipSlot::Weapon).IsValidInstance() ? 1 : 0,
+		Inventory->GetEquipped(EMMOEquipSlot::Armor).IsValidInstance() ? 1 : 0, Inventory->EquipmentBag.Num(),
+		Inventory->GetItemCount(FName(TEXT("HealthPotion"))));
+}
+
 bool AMMOCharacter::LoadCharacter()
 {
 	if (!HasAuthority())
@@ -535,6 +564,8 @@ bool AMMOCharacter::LoadCharacter()
 		// artik replike bayrakla HUD'da sinif secilene kadar kalici bir ipucu paneli cizilir.
 		bClassChoicePending = true;
 		bInitialLoadComplete = true;
+		// Baslangic paketi YALNIZ bu dalda (kayit dosyasi yok); kayit yuklenen karakterlere hic verilmez.
+		GrantStarterPack();
 		return false; // yeni karakter
 	}
 	bClassChoicePending = false;

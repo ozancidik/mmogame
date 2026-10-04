@@ -339,6 +339,11 @@ protected:
 	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
 	bool bTravelSaveCommitted = false;
+
+	// Yeni karakter (kayit dosyasi yok) baslangic paketi: Kisa Kilic + Deri Zirh (kusanili) + 3 Can Iksiri.
+	// Yalniz LoadCharacter'in "kayit yok" dalindan, sunucuda; pawn basina bir kez.
+	void GrantStarterPack();
+	bool bStarterPackGranted = false;
 	float LastRemoteManualSaveTime = -100.f;
 	static constexpr float RemoteManualSaveCooldown = 10.f;
 
