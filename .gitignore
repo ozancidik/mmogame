@@ -37,3 +37,9 @@ Art/
 
 # Mac/OS
 .DS_Store
+
+# Guvenlik (docs/SECURITY_AUDIT.md): IDE ayarlari, kayit dosyalari ve sirlar yanlislikla commit'lenmesin
+.idea/
+*.sav
+.env
+.env.*
