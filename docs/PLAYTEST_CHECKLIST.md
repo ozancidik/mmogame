@@ -3129,3 +3129,15 @@ Kapsam: `1cf9577` (QA turu-2 ORTA-1/2/3), `dc4ad90` (`[MMOMETRIC]` günlüğü +
 - [ ] **Çok oyunculu:** Host + yeni adlı istemci: istemci kendi envanterinde paketi görmeli; host'un envanteri etkilenmemeli. Sunucu logunda iki ayrı oyuncu için birer `Starter pack granted ... weapon=1 armor=1 bag=0 potions=3` satırı.
 - [ ] **Manuel `MMOLoad` (kayıt yokken):** Yeni karakterde ilk kayıttan önce `MMOLoad` yaz: ikinci kez paket verilmemeli (pawn bayrağı). Bilinen sınır: kayıt dosyası silinmiş eski bir karakter de "yeni" sayılır ve paket alır.
 - [ ] **Doğuş güvenliği (madde 2 kabul ölçütünün PIE kısmı):** Yeni karakterle doğuş noktasında 3 dk bekle: hiçbir mob saldırmamalı (bu tur doğrulanmadı; `VERTICAL_SLICE_LV1_30.md` §2.3).
+
+# Kayit yukleme dogrulamasi (SECURITY_AUDIT Y-2) — 2026-10-04 (DERLENMEDI, PIE yok)
+
+Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySaveData`. Kayit bicimi degismedi; yalnizca yuklenirken degerler duzeltilir. Bilinmeyen esya ve gorev kimlikleri bilerek silinmez.
+
+- [ ] **Normal kayit ayni kalir (regresyon):** Oynanmis bir karakteri kaydet, cik, gir: seviye, statlar, altin, iksirler, canta, kusanilan 4 slot, depo, aktif/tamamlanan gorevler ve ilerleme birebir ayni olmali.
+- [ ] **Stat tavani:** `.sav` dosyasini elle/arac ile duzenle (ya da test kodu): `Vitality=2000000000` yukle; ana statlarin toplami `50 + (Seviye-1)*3` degerini asmamali.
+- [ ] **Altin/yigin tavani:** Altin 999.999.999'a, iksir yigini 999'a, yigin turu sayisi 64'e kirpilmali.
+- [ ] **Gecersiz nadirlik:** Nadirlik enum disinda bir esya yuklenince Siradan olarak gorunmeli, cokme olmamali.
+- [ ] **Yanlis slot:** Silah "Zirh" slotunda kayitliysa yuklemede cantaya donmeli, kusanilan slot bos kalmali.
+- [ ] **Yinelenen InstanceId:** Canta/kusanilan/depoda ayni kimlikli iki esya varsa ilki kalmali, digerine yeni kimlik verilmeli; kuşan/sat/yükselt tek esyayi etkilemeli.
+- [ ] **Gorev sayaci:** `KillProgress=999999` olan aktif gorev hedef adedine (TargetCount) inmeli; yinelenen gorev kimligi tek kayda inmeli; bos kimlik atilmali; tamamlanan gorev listesindeki yinelenenler tekillenmeli. Ilerlemesi dogru olan gorevler degismemeli.

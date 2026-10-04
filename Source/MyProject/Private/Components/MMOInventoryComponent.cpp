@@ -866,16 +866,39 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		return;
 	}
 
-	Gold = FMath::Max(0, In.Gold);
+	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2): elle duzenlenmis kayitta sinirsiz altin/yigin/
+	// gecersiz nadirlik olmasin. Bilinmeyen esya kimlikleri bilerek SILINMEZ (surumler arasi
+	// kaldirilan esya oyuncunun kaybi olurdu); yalniz degerler makul araliga cekilir.
+	constexpr int32 SaveGoldCap = 999999999;
+	constexpr int32 SaveStackCap = 999;
+	constexpr int32 SaveMaxStacks = 64;
+	Gold = FMath::Clamp(In.Gold, 0, SaveGoldCap);
 	Items = In.Items;
 	Items.RemoveAll([](const FMMOItemStack& Stack)
 	{
 		return Stack.ItemId.IsNone() || Stack.Count <= 0;
 	});
+	for (FMMOItemStack& Stack : Items)
+	{
+		Stack.Count = FMath::Min(Stack.Count, SaveStackCap);
+	}
+	if (Items.Num() > SaveMaxStacks)
+	{
+		Items.SetNum(SaveMaxStacks);
+	}
+	// Nadirlik enum araligi disindaysa Siradan'a cek (stat carpani tablosu disina cikmasin).
+	auto SanitizeInstance = [](FMMOEquipmentInstance& Inst)
+	{
+		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+		if ((uint8)Inst.Rarity >= (uint8)EMMOItemRarity::MAX)
+		{
+			Inst.Rarity = EMMOItemRarity::Common;
+		}
+	};
 	EquipmentBag = In.EquipmentBag;
 	for (FMMOEquipmentInstance& Inst : EquipmentBag)
 	{
-		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+		SanitizeInstance(Inst);
 	}
 	NextInstanceId = FMath::Max(1, In.NextInstanceId);
 
@@ -885,7 +908,7 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	Warehouse.RemoveAll([](const FMMOEquipmentInstance& Inst) { return !Inst.IsValidInstance(); });
 	for (FMMOEquipmentInstance& Inst : Warehouse)
 	{
-		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+		SanitizeInstance(Inst);
 		// Ornek kimligi cakismasin: NextInstanceId depodaki en buyuk kimligin ustunde kalsin.
 		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
 	}
@@ -896,7 +919,7 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	EquippedItems = In.EquippedItems;
 	for (FMMOEquipmentInstance& Inst : EquippedItems)
 	{
-		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
+		SanitizeInstance(Inst);
 	}
 	const int32 MaxSlots = (int32)EMMOEquipSlot::MAX;
 	for (int32 i = MaxSlots; i < EquippedItems.Num(); ++i)
@@ -907,6 +930,21 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		}
 	}
 	EquippedItems.SetNum(MaxSlots);
+	// Yanlis slota kusanilmis esya (ornegin silah "Zirh" slotunda) cantaya geri konur;
+	// normal EquipFromBag bunu zaten engeller, elle duzenlenmis kayit atlayabilirdi.
+	for (int32 i = 0; i < MaxSlots; ++i)
+	{
+		if (!EquippedItems[i].IsValidInstance())
+		{
+			continue;
+		}
+		const FMMOItemDef* Def = FMMOItemDatabase::Find(EquippedItems[i].ItemId);
+		if (Def && (int32)Def->Slot != i)
+		{
+			EquipmentBag.Add(EquippedItems[i]);
+			EquippedItems[i] = FMMOEquipmentInstance();
+		}
+	}
 
 	// Bozuk/eski kayitta kayitli sayac en buyuk kimligin gerisinde kalmis olabilir: yeni
 	// (ticaret/loot) kimlikleri mevcut bir esyayla cakismasin diye Max(Id)+1'e cek.
@@ -918,6 +956,26 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	{
 		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
 	}
+
+	// Yinelenen InstanceId (canta/kusanilan/depo arasinda): ilki kalir, digerlerine yeni
+	// kimlik verilir; boylece kimlik tabanli kusan/sat/yukselt tek bir esyayi hedefler ve
+	// duplike edilmis bir kopya ayni kimlikle ikinci kez islenemez.
+	TSet<int32> SeenIds;
+	auto Dedupe = [this, &SeenIds](FMMOEquipmentInstance& Inst)
+	{
+		if (!Inst.IsValidInstance())
+		{
+			return;
+		}
+		if (SeenIds.Contains(Inst.InstanceId))
+		{
+			Inst.InstanceId = NextInstanceId++;
+		}
+		SeenIds.Add(Inst.InstanceId);
+	};
+	for (FMMOEquipmentInstance& Inst : EquippedItems) { Dedupe(Inst); }
+	for (FMMOEquipmentInstance& Inst : EquipmentBag) { Dedupe(Inst); }
+	for (FMMOEquipmentInstance& Inst : Warehouse) { Dedupe(Inst); }
 
 	RecomputeEquipmentBonuses();
 	OnGoldChanged.Broadcast(Gold);

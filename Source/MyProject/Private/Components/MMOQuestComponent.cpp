@@ -388,6 +388,35 @@ void UMMOQuestComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	{
 		return;
 	}
+	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2): bos/yinelenen kimlikleri at, sayaci hedef
+	// adedine sikistir (elle yazilmis "KillProgress=999999" ile anlik tamamlama olmasin).
+	// Bilinmeyen gorev kimlikleri SILINMEZ (surumler arasi yeniden adlandirma ilerlemeyi kaybettirmesin).
 	ActiveQuests = In.ActiveQuests;
-	CompletedQuests = In.CompletedQuests;
+	TSet<FName> SeenActive;
+	for (int32 i = ActiveQuests.Num() - 1; i >= 0; --i)
+	{
+		FMMOQuestProgress& P = ActiveQuests[i];
+		if (P.QuestId.IsNone() || SeenActive.Contains(P.QuestId))
+		{
+			ActiveQuests.RemoveAt(i);
+			continue;
+		}
+		SeenActive.Add(P.QuestId);
+		P.KillProgress = FMath::Max(0, P.KillProgress);
+		if (const FMMOQuestDef* Def = FMMOQuestDatabase::Find(P.QuestId))
+		{
+			P.KillProgress = FMath::Min(P.KillProgress, FMath::Max(1, Def->TargetCount));
+		}
+	}
+
+	CompletedQuests.Reset();
+	TSet<FName> SeenDone;
+	for (const FName& Id : In.CompletedQuests)
+	{
+		if (!Id.IsNone() && !SeenDone.Contains(Id))
+		{
+			SeenDone.Add(Id);
+			CompletedQuests.Add(Id);
+		}
+	}
 }
