@@ -9,6 +9,8 @@
 #include "Engine/StaticMesh.h"
 #include "Core/MMONotify.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -51,6 +53,19 @@ void AMMOLootPickup::OnRep_LootVisual()
 	ApplyVisual();
 }
 
+void AMMOLootPickup::SetReserved(const TArray<AMMOCharacter*>& Owners, float Seconds)
+{
+	ReservedFor.Reset();
+	for (AMMOCharacter* O : Owners)
+	{
+		if (O)
+		{
+			ReservedFor.Add(O);
+		}
+	}
+	ReservedSeconds = ReservedFor.Num() > 0 ? FMath::Max(0.f, Seconds) : 0.f;
+}
+
 void AMMOLootPickup::SetupAsGold(int32 Amount)
 {
 	bIsGold = true;
@@ -85,6 +100,13 @@ void AMMOLootPickup::BeginPlay()
 	{
 		Collision->OnComponentBeginOverlap.AddDynamic(this, &AMMOLootPickup::OnOverlap);
 		SetLifeSpan(LifeSpanSeconds);
+		// Rezervasyon: sure dolunca ortadaki baska oyuncular icin yeniden dene (BeginOverlap tekrar tetiklenmez).
+		if (ReservedSeconds > 0.f && GetWorld())
+		{
+			ReservedUntilTime = GetWorld()->GetTimeSeconds() + ReservedSeconds;
+			GetWorldTimerManager().SetTimer(ReservationTimer, this, &AMMOLootPickup::OnReservationExpired,
+				ReservedSeconds + 0.1f, false);
+		}
 	}
 }
 
@@ -138,16 +160,57 @@ void AMMOLootPickup::Tick(float DeltaSeconds)
 void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* OtherActor, UPrimitiveComponent* /*OtherComp*/,
 	int32 /*OtherBodyIndex*/, bool /*bFromSweep*/, const FHitResult& /*SweepResult*/)
 {
+	TryCollect(Cast<AMMOCharacter>(OtherActor));
+}
+
+void AMMOLootPickup::OnReservationExpired()
+{
+	if (!HasAuthority() || bCollected || !Collision)
+	{
+		return;
+	}
+	// Rezervasyon bitti: pickup'in uzerinde duran oyuncular (BeginOverlap daha once reddedilmisti) simdi toplayabilir.
+	TArray<AActor*> Overlapping;
+	Collision->GetOverlappingActors(Overlapping, AMMOCharacter::StaticClass());
+	for (AActor* A : Overlapping)
+	{
+		TryCollect(Cast<AMMOCharacter>(A));
+		if (bCollected)
+		{
+			break;
+		}
+	}
+}
+
+void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
+{
 	if (!HasAuthority())
 	{
 		return;
 	}
 
 	// Sadece oyuncu toplayabilir (moblar degil).
-	AMMOCharacter* Char = Cast<AMMOCharacter>(OtherActor);
 	if (!Char || !Char->IsPlayerControlled())
 	{
 		return;
+	}
+
+	// Ganimet rezervasyonu: sure dolana kadar yalniz hak sahipleri (XP payi olan oyuncular) toplayabilir.
+	if (ReservedFor.Num() > 0 && GetWorld() && GetWorld()->GetTimeSeconds() < ReservedUntilTime)
+	{
+		bool bAllowed = false;
+		for (const TWeakObjectPtr<AMMOCharacter>& W : ReservedFor)
+		{
+			if (W.Get() == Char)
+			{
+				bAllowed = true;
+				break;
+			}
+		}
+		if (!bAllowed)
+		{
+			return;
+		}
 	}
 
 	UMMOInventoryComponent* Inv = Char->GetInventory();

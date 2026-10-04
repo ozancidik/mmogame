@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/TimerHandle.h"
 #include "GameFramework/Actor.h"
 #include "Items/MMOItemTypes.h"
 #include "MMOLootPickup.generated.h"
 
+class AMMOCharacter;
 class USphereComponent;
 class UStaticMeshComponent;
 
@@ -59,6 +61,10 @@ public:
 	void SetupAsItem(FName InItemId, int32 Count);
 	void SetupAsEquipment(FName InItemId, int32 InPlus, EMMOItemRarity InRarity = EMMOItemRarity::Common);
 
+	// Ganimet rezervasyonu (yalniz sunucu): Seconds boyunca yalniz Owners toplayabilir; sure dolunca herkes.
+	// Owners bos ise rezervasyon yok. Spawner'dan FinishSpawning'den ONCE cagrilmali (BeginPlay zamanlayiciyi kurar).
+	void SetReserved(const TArray<AMMOCharacter*>& Owners, float Seconds);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -83,4 +89,14 @@ protected:
 	// frame'de gelen ikinci bir overlap (iki oyuncu veya cok-govde) lootu DUPE edebilir.
 	// grant'tan ONCE set edilir; ikinci overlap erken doner. (Sunucu-tarafi.)
 	bool bCollected = false;
+
+	// Rezervasyon durumu (yalniz sunucu, replike degil).
+	TArray<TWeakObjectPtr<AMMOCharacter>> ReservedFor;
+	float ReservedSeconds = 0.f;
+	double ReservedUntilTime = 0.0;
+	FTimerHandle ReservationTimer;
+
+	// OnOverlap ve rezervasyon bitiminde ortadaki oyuncular icin ortak toplama mantigi.
+	void TryCollect(AMMOCharacter* Char);
+	void OnReservationExpired();
 };

@@ -3287,3 +3287,13 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - [ ] **Menzil/olu:** 3000u'dan uzaktaki ya da olu katki sahibi XP/kredi almamali.
 - [ ] **Leash sifirlamasi:** Mobu cek, katki yaptir, mobu eve kacir ve tam canlansin; sonra baskasi oldursun: onceki katki sahibi pay almamali.
 - [ ] **Regresyon:** Tek oyuncu oldurmeleri eskisi gibi tam XP; `[MMOMETRIC]` satirlari ve `GainExperience` cift cagrilmamali.
+
+## Ganimet rezervasyonu: ilk 10 sn yalniz XP payi olanlar (VERTICAL_SLICE_LV1_30 madde 10, kismi) — 2026-10-04 (DERLENMEDI)
+
+`AMMOMob` olurken XP payi olan herkesi (`LootOwners`; parti uyeleri dahil) o mobun TUM ganimetine (altin, item, ekipman) **10 sn** rezerve eder (`AMMOLootPickup::SetReserved`). Sure icinde baska oyuncu uzerinden gecse bile toplayamaz; sure dolunca (`OnReservationExpired`) pickup'in uzerinde duran oyuncular otomatik toplar (BeginOverlap tekrar tetiklenmedigi icin zamanlayiciyla yeniden denenir). Hak sahibi yoksa (oyuncu hasari yok) rezervasyon yok. Ganimet omru 30 sn (`LifeSpanSeconds`) degismedi.
+
+- [ ] **Rezervasyon:** Host bir mob oldursun; istemci hemen cesedin uzerinden gecsin (hasar vermemis): ilk 10 sn **hicbir ganimet toplayamamali**. Host toplayabilmeli.
+- [ ] **Sure dolunca:** Istemci cesedin uzerinde (pickup yaricapi 90u icinde) dursun, hareket etmesin: ~10 sn sonra ganimet **kendiliginden** istemciye gecmeli (zamanlayici).
+- [ ] **Parti:** Partideki iki oyuncu birlikte oldursun: ikisi de 10 sn icinde toplayabilmeli. Partiden olmayan ucuncu oyuncu toplayamamali.
+- [ ] **Kill stealing ile uyumlu:** Ikisi de partisiz ve ikisi de hasar vermis: ikisi de ilk 10 sn toplayabilmeli; hic hasar vermeyen ucuncu oyuncu toplayamamali.
+- [ ] **Regresyon:** Tek oyuncu: ganimet eskisi gibi hemen toplanmali; cift toplama (dupe) olmamali; canta doluyken ekipman yerde kalip sonra toplanabilmeli; 30 sn sonra kaybolmali.

@@ -782,6 +782,15 @@ void AMMOMob::HandleDeath()
 			AddShare(Killer, 0.f); // olduren her zaman gorev kredisi alir (payi yoksa XP almaz)
 		}
 
+		// Ganimet hak sahipleri: XP payi olan herkes (parti uyeleri dahil).
+		for (const TPair<AMMOCharacter*, float>& Entry : Shares)
+		{
+			if (Entry.Key && Entry.Value > 0.f)
+			{
+				LootOwners.AddUnique(Entry.Key);
+			}
+		}
+
 		for (const TPair<AMMOCharacter*, float>& Entry : Shares)
 		{
 			AMMOCharacter* R = Entry.Key;
@@ -846,6 +855,21 @@ void AMMOMob::HandleDeath()
 		}
 		const FVector Base = GetActorLocation();
 
+		// Ganimet rezervasyonu: ilk 10 sn yalniz XP payi olanlar toplayabilir (kill stealing/ganimet kapma azalir).
+		const float LootReserveSeconds = 10.f;
+		auto ReserveLoot = [this, LootReserveSeconds](AMMOLootPickup* Pickup)
+		{
+			TArray<AMMOCharacter*> Owners;
+			for (const TWeakObjectPtr<AMMOCharacter>& W : LootOwners)
+			{
+				if (AMMOCharacter* C = W.Get())
+				{
+					Owners.Add(C);
+				}
+			}
+			Pickup->SetReserved(Owners, LootReserveSeconds);
+		};
+
 		// Altin
 		{
 			const FVector Loc = Base + FVector(FMath::FRandRange(-60.f, 60.f), FMath::FRandRange(-60.f, 60.f), -40.f);
@@ -853,6 +877,7 @@ void AMMOMob::HandleDeath()
 			if (AMMOLootPickup* P = World->SpawnActorDeferred<AMMOLootPickup>(LootClass, SpawnTM))
 			{
 				P->SetupAsGold(FMath::RandRange(MinGold, MaxGold));
+				ReserveLoot(P);
 				UGameplayStatics::FinishSpawningActor(P, SpawnTM);
 			}
 		}
@@ -865,6 +890,7 @@ void AMMOMob::HandleDeath()
 			if (AMMOLootPickup* P = World->SpawnActorDeferred<AMMOLootPickup>(LootClass, SpawnTM))
 			{
 				P->SetupAsItem(DropItemId, 1);
+				ReserveLoot(P);
 				UGameplayStatics::FinishSpawningActor(P, SpawnTM);
 			}
 		}
@@ -961,6 +987,7 @@ void AMMOMob::HandleDeath()
 			if (AMMOLootPickup* P = World->SpawnActorDeferred<AMMOLootPickup>(LootClass, SpawnTM))
 			{
 				P->SetupAsEquipment(Picked->ItemId, Plus, Rarity);
+				ReserveLoot(P);
 				UGameplayStatics::FinishSpawningActor(P, SpawnTM);
 			}
 		}

@@ -183,6 +183,9 @@ protected:
 	// MaxHealth'inin en az %20'sine hasar veren oyunculara da verilir (VERTICAL_SLICE_LV1_30 madde 10).
 	TMap<TWeakObjectPtr<AMMOCharacter>, float> DamageContributions;
 
+	// Bu mobun ganimetini ilk LootReserveSeconds saniye toplayabilecek oyuncular (XP payi olanlar; sunucu).
+	TArray<TWeakObjectPtr<AMMOCharacter>> LootOwners;
+
 	// Hasar alan mobun saldirgani ne kadar sure zorla hedeflemeye devam edecegi.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float ForcedAggroDuration = 8.f;
