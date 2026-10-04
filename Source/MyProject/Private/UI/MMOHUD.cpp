@@ -25,6 +25,7 @@
 #include "Player/MMOPlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerState.h"
 
@@ -73,6 +74,9 @@ void AMMOHUD::DrawHUD()
 		DrawPlayerCursor();
 		return;
 	}
+
+	// Gorev kabul/teslim balonlari: sunucu sonucu (replike liste degisimi) gelince goster.
+	UpdatePendingQuestLines(MMOChar->GetQuestComponent());
 
 	UMMOStatsComponent* S = MMOChar->GetStats();
 	if (!S)
@@ -2489,13 +2493,15 @@ bool AMMOHUD::HandleQuestClick(const FVector2D& Pos)
 	{
 		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
 		{
-			Q->AcceptQuest(R.SkillId);
-			// Gorev alis repligi (docs/Lore.md -> MMOQuestDialogue.cpp); yoksa sessizce gec.
-			const FString AcceptLine = FMMOQuestDialogue::GetAcceptLine(R.SkillId);
-			if (!AcceptLine.IsEmpty())
+			// Gorev alis repligi (docs/Lore.md -> MMOQuestDialogue.cpp): sunucu gorevi gercekten
+			// kabul edince gosterilir (UpdatePendingQuestLines); yoksa sessizce gec.
+			// Host'ta AcceptQuest senkron calisir; bu yuzden bekleme kaydi cagridan ONCE eklenir.
+			const bool bWasActive = Q->IsQuestActive(R.SkillId);
+			if (!bWasActive)
 			{
-				ShowNpcDialogue(TEXT("Yasli Doran"), AcceptLine);
+				PendingQuestLines.Add({ R.SkillId, false, GetWorld()->GetTimeSeconds() + 2.0 });
 			}
+			Q->AcceptQuest(R.SkillId);
 			return true;
 		}
 	}
@@ -2503,16 +2509,44 @@ bool AMMOHUD::HandleQuestClick(const FVector2D& Pos)
 	{
 		if (!R.SkillId.IsNone() && R.Rect.IsInside(Pos))
 		{
-			Q->ClaimReward(R.SkillId);
-			const FString TurnInLine = FMMOQuestDialogue::GetTurnInLine(R.SkillId);
-			if (!TurnInLine.IsEmpty())
+			// Teslim repligi: gorev CompletedQuests'e girince gosterilir (kayit cagridan once).
+			if (!Q->IsCompleted(R.SkillId))
 			{
-				ShowNpcDialogue(TEXT("Yasli Doran"), TurnInLine);
+				PendingQuestLines.Add({ R.SkillId, true, GetWorld()->GetTimeSeconds() + 2.0 });
 			}
+			Q->ClaimReward(R.SkillId);
 			return true;
 		}
 	}
 	return true;
+}
+
+void AMMOHUD::UpdatePendingQuestLines(const UMMOQuestComponent* Q)
+{
+	if (PendingQuestLines.Num() == 0 || !GetWorld())
+	{
+		return;
+	}
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (int32 i = PendingQuestLines.Num() - 1; i >= 0; --i)
+	{
+		const FPendingQuestLine P = PendingQuestLines[i];
+		const bool bDone = Q && (P.bClaim ? Q->IsCompleted(P.QuestId) : Q->IsQuestActive(P.QuestId));
+		if (bDone)
+		{
+			const FString Line = P.bClaim ? FMMOQuestDialogue::GetTurnInLine(P.QuestId)
+				: FMMOQuestDialogue::GetAcceptLine(P.QuestId);
+			if (!Line.IsEmpty())
+			{
+				ShowNpcDialogue(TEXT("Yasli Doran"), Line);
+			}
+			PendingQuestLines.RemoveAt(i);
+		}
+		else if (!Q || Now > P.ExpireTime)
+		{
+			PendingQuestLines.RemoveAt(i);
+		}
+	}
 }
 
 void AMMOHUD::DrawStatWindow(AMMOCharacter* PlayerChar)

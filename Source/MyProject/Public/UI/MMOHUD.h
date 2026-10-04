@@ -268,6 +268,18 @@ protected:
 	TArray<FMMOClickRegion> QuestAcceptRegions;
 	TArray<FMMOClickRegion> QuestClaimRegions;
 
+	// Tiklanmis ama sunucu sonucu henuz gorulmemis kabul/teslim istekleri. Balon, durum gercekten
+	// degisince (ActiveQuests'e girdi / CompletedQuests'e girdi) gosterilir; 2 sn icinde degismezse
+	// (canta dolu, uzak, hiz siniri) istek atilir ve balon cikmaz.
+	struct FPendingQuestLine
+	{
+		FName QuestId;
+		bool bClaim = false;
+		double ExpireTime = 0.0;
+	};
+	TArray<FPendingQuestLine> PendingQuestLines;
+	void UpdatePendingQuestLines(const class UMMOQuestComponent* Q);
+
 	// Atama icin "eline alinan" skill (kitapta ogrenilmise tiklaninca).
 	FName PendingAssignSkill;
 
