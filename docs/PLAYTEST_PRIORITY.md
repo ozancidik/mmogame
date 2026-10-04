@@ -61,7 +61,7 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 
 ## 6. Parti ve çok oyunculu adalet (2026-10-04)
 
-- **Parti üye sınırı kodda yok [KOD].** `MMOPartyComponent.cpp` içinde azami üye sayısı kontrolü bulunmuyor; XP bölme mantığı (`AMMOMob::HandleDeath`) parti büyüklüğünü sınırsız kabul ediyor. 8 kişilik üst sınır isteniyorsa davet/kabul yolunda eklenmeli. `MMOPartyComponent.cpp` yerelde Codex'te olduğu için bulutta dokunulmadı; yerelde `ApplyPartySet`/davet kabulüne `Members.Num() >= 8` kontrolü eklenebilir.
+- **Parti üye sınırı 8'dir [KOD]:** `UMMOPartyComponent::FormOrJoin` içinde `MaxParty = 8`; birleşme 8'i aşarsa tümden reddedilir ("Parti dolu (maksimum 8)"). XP bölme (`AMMOMob::HandleDeath`) parti büyüklüğünü `Party->GetPartyInRange` ile okuyor, yani en çok 8'e bölünür. (Önceki bir sürümde burada "sınır yok" yazıyordu; yanlıştı, düzeltildi.)
 - **Kill XP'si hasar payına orantılı ve parti payı üye sayısına bölünür** (PR #1, derlenmedi): %1 hasar = %1 XP, 8 kişilik partide herkes payın 1/8'ini alır. Parti artık toplam XP'yi artırmıyor, yalnızca paylaştırıyor; parti teşviki (bonus) ayrı bir tasarım kararı.
 - **Ganimet** ilk 10 sn yalnızca XP payı olanlara rezerve (PR #1, derlenmedi).
 - `Scripts/ProgressionModel.py` ve `EconomyModel.py` **solo** oyuncuyu modeller; parti/paylaşım yok.
