@@ -179,9 +179,14 @@ protected:
 	TWeakObjectPtr<APawn> ForcedTarget;
 	float ForcedAggroUntil = -1.f;
 
-	// Hasar katkisi (yalniz sunucu, replike degil): oldurme kredisi son vurusu yapana ek olarak mobun
-	// MaxHealth'inin en az %20'sine hasar veren oyunculara da verilir (VERTICAL_SLICE_LV1_30 madde 10).
+	// Hasar katkisi (yalniz sunucu, replike degil): oyuncu basina mobda biraktigi toplam gercek hasar.
+	// Oldurme XP'si bu paya orantili dagitilir (esik yok; VERTICAL_SLICE_LV1_30 madde 10).
 	TMap<TWeakObjectPtr<AMMOCharacter>, float> DamageContributions;
+
+	// Son vurustan ONCEKI can (yalniz sunucu): olumcul vurusun gercek hasari = bu deger. Olum isleyicisi
+	// TakeDamage'in ICINDE (Super::TakeDamage -> OnDeath) senkron calistigindan, olumcul vurus
+	// DamageContributions'a TakeDamage donmeden eklenemez; HandleDeath bunu kullanir.
+	float HealthBeforeLastHit = 0.f;
 
 	// Bu mobun ganimetini ilk LootReserveSeconds saniye toplayabilecek oyuncular (XP payi olanlar; sunucu).
 	TArray<TWeakObjectPtr<AMMOCharacter>> LootOwners;

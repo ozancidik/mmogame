@@ -159,14 +159,22 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 
 	// Yanit callback'i. TWeakObjectPtr ile subsystem yok olduysa guvenli kal.
 	TWeakObjectPtr<UMMODialogueSubsystem> WeakThis(this);
+	// Eszamanli sayac yuvasi tam BIR kez birakilir: ya tamamlanma callback'inde ya da ProcessRequest
+	// baslatilamazsa asagida (callback hic gelmeyebilir; sayac sizip tum NPC konusmalarini kilitlemesin).
+	const TSharedRef<bool> bSlotReleased = MakeShared<bool>(false);
 	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, OnReady, bNvidia](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
+		[WeakThis, OnReady, bNvidia, bSlotReleased](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
 		{
 			// Subsystem yok olduysa (dunya kapandi vs.) hicbir sey yapma — niyet edilen omur korumasi.
 			if (!WeakThis.IsValid())
 			{
 				return;
 			}
+			if (*bSlotReleased)
+			{
+				return; // baslatma basarisizligi zaten islendi (cift cevap yok)
+			}
+			*bSlotReleased = true;
 			WeakThis->InFlightRequests = FMath::Max(0, WeakThis->InFlightRequests - 1);
 
 			if (!bConnectedOk || !Resp.IsValid())
@@ -201,7 +209,16 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			}
 		});
 
-	Request->ProcessRequest();
+	if (!Request->ProcessRequest())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Istek baslatilamadi."));
+		if (!*bSlotReleased)
+		{
+			*bSlotReleased = true;
+			InFlightRequests = FMath::Max(0, InFlightRequests - 1);
+			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
+		}
+	}
 }
 
 bool UMMODialogueSubsystem::ParseOpenAIResponse(const FString& Body, FString& OutText, FString& OutError)

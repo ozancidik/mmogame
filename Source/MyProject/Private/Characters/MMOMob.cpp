@@ -184,10 +184,17 @@ float AMMOMob::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
 		return 0.f;
 	}
 
+	HealthBeforeLastHit = Stats ? Stats->Health : 0.f;
 	const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
-	// Hasar katkisi: oyuncu saldirganlarin mobda biraktigi toplam hasar (oldurme kredisi icin).
-	if (HasAuthority() && Applied > 0.f)
+	// Hasar katkisi: oyuncu saldirganlarin mobda biraktigi toplam hasar (oldurme XP payi icin).
+	// Olumcul vurus burada EKLENMEZ: HandleDeath Super::TakeDamage icinde zaten calisti ve olumcul
+	// vurusun hasarini HealthBeforeLastHit ile kendisi ekledi.
+	if (!(Stats && Stats->bIsDead))
+	{
+		HealthBeforeLastHit = 0.f; // vurus oldurmedi: bayat deger sonraki olume sizmasin
+	}
+	if (HasAuthority() && Applied > 0.f && !(Stats && Stats->bIsDead))
 	{
 		if (AMMOCharacter* AttackerChar = Cast<AMMOCharacter>(Attacker); AttackerChar && Attacker->IsPlayerControlled())
 		{
@@ -710,6 +717,13 @@ void AMMOMob::HandleDeath()
 			}
 			Shares.Add(TPair<AMMOCharacter*, float>(C, Share));
 		};
+
+		// Olumcul vurusun hasari (can bitti): TakeDamage donmeden once hesaba katilmali (bkz. HealthBeforeLastHit).
+		if (HealthBeforeLastHit > 0.f && Killer->IsPlayerControlled())
+		{
+			DamageContributions.FindOrAdd(Killer) += HealthBeforeLastHit;
+			HealthBeforeLastHit = 0.f;
+		}
 
 		float TotalDamage = 0.f;
 		for (const TPair<TWeakObjectPtr<AMMOCharacter>, float>& C : DamageContributions)

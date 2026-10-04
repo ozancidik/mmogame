@@ -909,8 +909,21 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		const FMMOItemDef* Def = FMMOItemDatabase::Find(EquippedItems[i].ItemId);
 		if (Def && (int32)Def->Slot != i)
 		{
-			EquipmentBag.Add(EquippedItems[i]);
-			EquippedItems[i] = FMMOEquipmentInstance();
+			// Yer varsa cantaya, yoksa depoya; ikisi de doluysa esya YERINDE kalir (silinmez, bag 12'yi asmaz).
+			if (EquipmentBag.Num() < MaxBagSize)
+			{
+				EquipmentBag.Add(EquippedItems[i]);
+				EquippedItems[i] = FMMOEquipmentInstance();
+			}
+			else if (Warehouse.Num() < MaxWarehouseSize)
+			{
+				Warehouse.Add(EquippedItems[i]);
+				EquippedItems[i] = FMMOEquipmentInstance();
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: yanlis slottaki esya tasinamadi (canta ve depo dolu): %s"), *EquippedItems[i].ItemId.ToString());
+			}
 		}
 	}
 

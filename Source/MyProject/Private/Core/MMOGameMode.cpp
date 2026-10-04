@@ -78,6 +78,22 @@ void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
 
 namespace
 {
+	// Baglanti secenegindeki (?Name=) baslangic adini ServerSetName ile AYNI karakter kuralina sokar
+	// (harf/rakam, '_', '-', bosluk; en cok 24 karakter). Kontrol karakterleri (satir sonu vb.) sohbet
+	// satirlarini taklit etmek icin kullanilabildiginden atilir.
+	FString SanitizeInitialName(const FString& In)
+	{
+		FString Out;
+		for (const TCHAR Ch : In.TrimStartAndEnd())
+		{
+			if (FChar::IsAlnum(Ch) || Ch == TEXT('_') || Ch == TEXT('-') || Ch == TEXT(' '))
+			{
+				Out.AppendChar(Ch);
+			}
+		}
+		return Out.Left(24).TrimStartAndEnd();
+	}
+
 	// "<ad>-<8+ onaltilik hane>" kalibi: Null OSS'in uretilen varsayilan oyuncu adi.
 	bool LooksLikeOsDefaultName(const FString& Name)
 	{
@@ -105,30 +121,37 @@ namespace
 void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, bool bNameChange)
 {
 	FString UseName = NewName;
-	if (!bNameChange && LooksLikeOsDefaultName(NewName.TrimStartAndEnd()))
+	if (!bNameChange)
 	{
-		// Cevrimici baska bir oyuncuyla cakismayan rastgele ad (ayni ad = ayni kayit yuvasi).
-		const UWorld* World = GetWorld();
-		for (int32 Attempt = 0; Attempt < 8; ++Attempt)
+		// Baslangic adi: guvensiz karakterleri at; bos kalirsa ya da OS kullanici adi kalibindaysa rastgele ad ver.
+		const FString Clean = SanitizeInitialName(NewName);
+		UseName = Clean;
+		if (Clean.IsEmpty() || LooksLikeOsDefaultName(Clean))
 		{
-			const FString Candidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999));
-			bool bTaken = false;
-			if (World)
+			// Cevrimici baska bir oyuncuyla VE diskteki bir kayit yuvasiyla cakismayan rastgele ad
+			// (kayit yuvasi = ad; var olan bir yuva baska birinin karakterini yukler/ezer).
+			const UWorld* World = GetWorld();
+			for (int32 Attempt = 0; Attempt < 16; ++Attempt)
 			{
-				for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+				const FString Candidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999));
+				bool bTaken = UGameplayStatics::DoesSaveGameExist(FString(TEXT("MMOSave_")) + Candidate, 0);
+				if (!bTaken && World)
 				{
-					const APlayerController* PC = It->Get();
-					if (PC && PC->PlayerState && PC->PlayerState->GetPlayerName().Equals(Candidate, ESearchCase::IgnoreCase))
+					for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 					{
-						bTaken = true;
-						break;
+						const APlayerController* PC = It->Get();
+						if (PC && PC->PlayerState && PC->PlayerState->GetPlayerName().Equals(Candidate, ESearchCase::IgnoreCase))
+						{
+							bTaken = true;
+							break;
+						}
 					}
 				}
-			}
-			if (!bTaken)
-			{
-				UseName = Candidate;
-				break;
+				if (!bTaken)
+				{
+					UseName = Candidate;
+					break;
+				}
 			}
 		}
 	}
@@ -162,7 +185,7 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 		return;
 	}
 	// Kayit yuvasi adiyla ayni normallestirme: bosluk -> '_', buyuk/kucuk harf duyarsiz.
-	const FString RequestedKey = Requested.TrimStartAndEnd().Replace(TEXT(" "), TEXT("_"));
+	const FString RequestedKey = SanitizeInitialName(Requested).Replace(TEXT(" "), TEXT("_"));
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
 		const APlayerController* PC = It->Get();

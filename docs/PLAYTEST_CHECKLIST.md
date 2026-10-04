@@ -3297,3 +3297,10 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - [ ] **Parti:** Partideki iki oyuncu birlikte oldursun: ikisi de 10 sn icinde toplayabilmeli. Partiden olmayan ucuncu oyuncu toplayamamali.
 - [ ] **Kill stealing ile uyumlu:** Ikisi de partisiz ve ikisi de hasar vermis: ikisi de ilk 10 sn toplayabilmeli; hic hasar vermeyen ucuncu oyuncu toplayamamali.
 - [ ] **Regresyon:** Tek oyuncu: ganimet eskisi gibi hemen toplanmali; cift toplama (dupe) olmamali; canta doluyken ekipman yerde kalip sonra toplanabilmeli; 30 sn sonra kaybolmali.
+
+## Bagimsiz kod incelemesi (code-review, yuksek) duzeltmeleri — 2026-10-04 (DERLENMEDI)
+
+- **Olumcul vurus payi:** `AMMOMob::HandleDeath` `TakeDamage` icinde senkron calistigindan olumcul vurusun hasari katki tablosuna eklenmiyordu (son vurusu yapan XP ve ganimet payi alamiyordu). Artik `HealthBeforeLastHit` ile hesaba katiliyor. [ ] **Test:** Host canin %70'ini, istemci kalan %30'u vurup oldursun: XP ~%70 / %30 bolunmeli; istemci (olduren) ganimet rezervasyonunda olmali.
+- **Kayit yukleme/canta:** Yanlis slottaki esya cantaya sigmazsa depoya, ikisi de doluysa yerinde kalir (canta 12'yi asmaz). [ ] **Test:** Dolu canta (12) + yanlis slotlu kayitli esya yukle: canta 12'de kalmali, esya depoda gorunmeli.
+- **NPC diyalogu sayaci:** `ProcessRequest()` baslatilamazsa eszamanli sayac sizmaz (NPC konusmalari kilitlenmez). [ ] **Test:** LLM anahtarini bozup birkac kez konus, sonra duzelt: konusma yeniden calismali.
+- **Baslangic adi:** `?Name=` secenegi `ServerSetName` ile ayni karakter kuralina sokulur (satir sonu/kontrol karakteri atilir, en cok 24 karakter); PreLogin cakisma denetimi de temizlenmis adla yapilir; rastgele `Gezgin######` ayni zamanda diskte var olan bir kayit yuvasiyla cakismaz. [ ] **Test:** `open <host>:7777?Name=Test%0AFake` ile baglan: ad `TestFake` olmali, sohbette ek satir olusmamali.
