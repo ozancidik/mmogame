@@ -76,6 +76,65 @@ void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
 #endif
 }
 
+namespace
+{
+	// "<ad>-<8+ onaltilik hane>" kalibi: Null OSS'in uretilen varsayilan oyuncu adi.
+	bool LooksLikeOsDefaultName(const FString& Name)
+	{
+		int32 Dash = INDEX_NONE;
+		if (!Name.FindLastChar(TEXT('-'), Dash) || Dash <= 0)
+		{
+			return false;
+		}
+		const FString Suffix = Name.Mid(Dash + 1);
+		if (Suffix.Len() < 8)
+		{
+			return false;
+		}
+		for (const TCHAR Ch : Suffix)
+		{
+			if (!FChar::IsHexDigit(Ch))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, bool bNameChange)
+{
+	FString UseName = NewName;
+	if (!bNameChange && LooksLikeOsDefaultName(NewName.TrimStartAndEnd()))
+	{
+		// Cevrimici baska bir oyuncuyla cakismayan rastgele ad (ayni ad = ayni kayit yuvasi).
+		const UWorld* World = GetWorld();
+		for (int32 Attempt = 0; Attempt < 8; ++Attempt)
+		{
+			const FString Candidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999));
+			bool bTaken = false;
+			if (World)
+			{
+				for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+				{
+					const APlayerController* PC = It->Get();
+					if (PC && PC->PlayerState && PC->PlayerState->GetPlayerName().Equals(Candidate, ESearchCase::IgnoreCase))
+					{
+						bTaken = true;
+						break;
+					}
+				}
+			}
+			if (!bTaken)
+			{
+				UseName = Candidate;
+				break;
+			}
+		}
+	}
+	Super::ChangeName(Controller, UseName, bNameChange);
+}
+
 void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
 {
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);

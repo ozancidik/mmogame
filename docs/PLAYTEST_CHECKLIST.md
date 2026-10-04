@@ -3223,3 +3223,12 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Parolasiz sunucu (varsayilan):** `-MMOPassword` olmadan host + istemci eskisi gibi baglanmali (`NetSmokeTest.ps1` gecmeli).
 - [ ] **Parolali sunucu:** Host `UnrealEditor ... -game ?listen -MMOPassword=test123`; istemci `open <host>:7777` (parolasiz) reddedilmeli ("Sunucu parolasi gerekli veya yanlis"), `?Password=test123` ile baglanmali, yanlis parola reddedilmeli.
 - [ ] **Not:** Parola komut satirinda gorunur (surec listesi); halka acik sunucu icin yeterli degil, yalniz tanidik kisilerle test icin.
+
+## Varsayilan oyuncu adi OS kullanici adini sizdirmaz (SECURITY_AUDIT Y-5) — 2026-10-04 (DERLENMEDI)
+
+`AMMOGameMode::ChangeName` (ilk atama, `bNameChange=false`): ad `<ad>-<8+ hex hane>` kalibindaysa (Null OSS varsayilani, ornek `CIDIK-3F2A...`) rastgele `Gezgin######` ile degistirilir. Kasitli adlar ve sonraki ad degisiklikleri etkilenmez.
+
+- [ ] **Host ve istemci adi:** Adsiz oyuna gir (host ve istemci); `/who` ve sohbet gonderen etiketinde Windows kullanici adin **gorunmemeli**, `Gezgin######` gorunmeli.
+- [ ] **Kasitli ad:** `open <host>:7777?Name=Ozan` ile baglan: ad `Ozan` kalmali. `MMOSetName Ozan2` da calismali.
+- [ ] **Kayit:** `Saved/SaveGames` altinda yeni `MMOSave_Gezgin######.sav` olusur (onceki `MMOSave_<KULLANICI>-<hex>.sav` dosyalari yetim kalir).
+- [ ] **Derleme:** `AGameModeBase::ChangeName` imzasi (`AController*, const FString&, bool`) UE 5.7'de dogrulanmali; fark varsa derleme hatasi verir.

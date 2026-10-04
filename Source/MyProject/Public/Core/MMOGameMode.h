@@ -23,6 +23,11 @@ public:
 	// Kimlik korumasi (SECURITY_AUDIT K-1, kismi): baglanti URL'indeki ?Name= degeri su an
 	// cevrimici bir oyuncunun adiyla (kayit yuvasi esdegeri: buyuk/kucuk harf ve bosluk/_ ayni)
 	// cakisiyorsa baglanti reddedilir. Cevrimdisi birinin adini kapmayi ENGELLEMEZ (hesap sistemi gerekir).
+	// Y-5 (SECURITY_AUDIT): baslangic adi "<isletim sistemi kullanici adi>-<hex>" kalibindaysa (Null OSS
+	// varsayilani) herkese gorunmesin diye rastgele "Gezgin######" ile degistirilir. Kasitli secilen adlar
+	// (?Name=Ozan, MMOSetName) ve sonraki ad degisiklikleri (bNameChange) etkilenmez.
+	virtual void ChangeName(AController* Controller, const FString& NewName, bool bNameChange) override;
+
 	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 
 	// Gelistirici araci: spawner dogrulamasini (zemin izi + navmesh) verilen konumda 64 kez calistirir ve
