@@ -811,10 +811,39 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	const int32 LevelsGained = Level - 1;
 	UnspentStatPoints = FMath::Clamp(In.UnspentStatPoints, 0, LevelsGained * FMath::Max(0, StatPointsPerLevel));
 	UnspentSkillPoints = FMath::Clamp(In.UnspentSkillPoints, 0, LevelsGained * FMath::Max(0, SkillPointsPerLevel));
-	Strength = In.Strength;
-	Dexterity = In.Dexterity;
-	Intelligence = In.Intelligence;
-	Vitality = In.Vitality;
+	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2): ana statlar dogrulamasiz kopyalaniyordu; elle
+	// duzenlenmis bir kayit sinirsiz can/saldiri verebilirdi. Sinif baslangic toplami en cok
+	// 50 (Savasci/Okcu), her seviye StatPointsPerLevel ekler; bu toplami asan fazlayi en
+	// buyuk statlardan keser. Harcanmamis puanlar ayri tutuldugu icin gecerli kayitlar etkilenmez.
+	const int32 MaxStatTotal = 50 + LevelsGained * FMath::Max(0, StatPointsPerLevel);
+	int32 Loaded[4] = { In.Strength, In.Dexterity, In.Intelligence, In.Vitality };
+	int32 Total = 0;
+	for (int32& V : Loaded)
+	{
+		V = FMath::Clamp(V, 1, MaxStatTotal);
+		Total += V;
+	}
+	while (Total > MaxStatTotal)
+	{
+		int32 Largest = 0;
+		for (int32 i = 1; i < 4; ++i)
+		{
+			if (Loaded[i] > Loaded[Largest])
+			{
+				Largest = i;
+			}
+		}
+		if (Loaded[Largest] <= 1)
+		{
+			break;
+		}
+		--Loaded[Largest];
+		--Total;
+	}
+	Strength = Loaded[0];
+	Dexterity = Loaded[1];
+	Intelligence = Loaded[2];
+	Vitality = Loaded[3];
 
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
 	// Egri degistigi icin eski bir kayittaki Experience yeni esigi asabilir ("40000/26492"

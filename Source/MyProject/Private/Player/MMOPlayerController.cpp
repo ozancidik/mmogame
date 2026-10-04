@@ -1221,7 +1221,16 @@ void AMMOPlayerController::ServerRequestNpcDialogue_Implementation(AMMOTalkerNPC
 		{
 			return;
 		}
-		WeakThis->ClientReceiveNpcDialogue(SpeakerName, bSuccess ? Text : FallbackLine);
+		// LLM ciktisi guvenilmez: uzunluk 240'a kirpilir, kontrol karakterleri bosluga cevrilir (SECURITY_AUDIT Y-4/D-9).
+		FString Safe = Text.Left(240);
+		for (TCHAR& C : Safe)
+		{
+			if (C < 32)
+			{
+				C = TEXT(' ');
+			}
+		}
+		WeakThis->ClientReceiveNpcDialogue(SpeakerName, bSuccess ? Safe : FallbackLine);
 	});
 
 	Dialogue->RequestNpcLine(Npc->NpcName, Npc->NpcRole, PlayerInfo, OnReady);

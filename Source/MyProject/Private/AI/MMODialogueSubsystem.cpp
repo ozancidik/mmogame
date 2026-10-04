@@ -167,7 +167,8 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 
 			if (Code != 200)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] HTTP %d: %s"), Code, *RespBody);
+				// Hata govdesi kisaltilir: bazi saglayicilar iletide anahtar parcasi yankilar (SECURITY_AUDIT D-10).
+				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] HTTP %d: %s"), Code, *RespBody.Left(200));
 				OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 				return;
 			}
