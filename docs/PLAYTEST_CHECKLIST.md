@@ -3104,3 +3104,28 @@ Kapsam: `docs/NETWORK_AUDIT.md` Y2/Y4/Y5 ve O1/O2/O3/O9/O10. Her grup ayrı comm
 
 ## Yapılmadı (bu turda kapsam dışı)
 - Y3 (Can/Mana adımlama, `ActiveEffects.RemainingTime`), Y1 (kimlik = ad), O4-O8/O11/O12 ve D maddeleri. `Party.Members/Leader` kısıtlanmadı; `Stats` Strength/Dexterity/Intelligence/Vitality da herkese kaldı (OnRep_PrimaryStats ve istemci hesapları riski).
+
+# QA turu-2 düzeltmeleri + ölçüm + başlangıç paketi — 2026-10-04
+
+Kapsam: `1cf9577` (QA turu-2 ORTA-1/2/3), `dc4ad90` (`[MMOMETRIC]` günlüğü + `Scripts/PlaytestMetrics.py`) ve başlangıç paketi commit'i. Her grup derlendi (Development; Shipping tek-dosya `-NoPCH -NoLink` temiz) ve `RunAllChecks.ps1 -SkipBuild` (veri + Summer/Winter duman + NetSmokeTest) geçti. **PIE'de oynanarak hiçbir şey denenmedi.** Tek doğrulanan: ağ duman testinin sunucu logunda yeni karakter için `[MMODBG] Starter pack granted ... weapon=1 armor=1 bag=0 potions=3` satırı bir kez çıktı (headless, oynanış değil). `PlaytestMetrics.py` yalnız sahte satırlarla denendi.
+
+## PvP varsayılanı + saldırı ipuçları (ORTA-1/2/3 karşılığı)
+- [ ] **PvP varsayılan kapalı:** Yeni oturumda iki oyuncu (host + istemci), hub dışı, `MMOPvP` yazmadan: tıkla-saldır zaten oyuncuyu hedeflemiyor; `AttackTarget(oyuncu)` RPC/BP ile çağrılırsa "PvP kapali" gelmeli. Host konsolunda `MMOPvP 1` yazınca "PvP ACIK" görünmeli. (Not: yukarıdaki eski maddelerdeki "bAllowPvP varsayılan açık" ifadeleri artık geçersiz.)
+- [ ] **Hub mesajı yığılmıyor:** Summer hub'ında (PlayerStart 700u içi) bir mob/hedefe sol tıkla, yaklaş, 3 sn bekle: ekranın üstünde tek satır "Guvenli bolgede saldiri yok" (sabit anahtar 4101) görünüp sürekli yenilenmeli; satır sayısı artmamalı. Metinde artık "PvP" geçmemeli.
+- [ ] **Menzil ipucu geçici:** Uzak istemci, yanında mob yokken bir hedefe tıklayıp 10 sn yanında dursun. Sohbet kutusuna **hiç** "Menzilde dusman yok - yaklas" satırı düşmemeli; karakterin üstünde yukarı süzülen kısa mavi balon görünmeli ve en çok ~3 sn'de bir yenilenmeli (aynı metin 3 sn sınırı). Listen-server hostunda (yerel) ekranın üstünde tek yenilenen satır (anahtar 4102) beklenir.
+
+## `[MMOMETRIC]` ölçüm günlüğü
+- [ ] **Satırlar çıkıyor mu:** Listen-server host ile 5 dk oyna (mob öldür, loot al, satıcıdan sat/al, görev teslim et, en az bir kez öl, mümkünse seviye atla). `Saved/Logs/MyProject.log` içinde `[MMOMETRIC]` ara; olay türleri: `levelup` (from/to), `kill` (lv/mob/mlv/xp/party/elite), `death` (lv/x/y/z/by/xploss), `gold` (src/amount/balance). Her olay tek satır, `anahtar=deger` biçiminde, oyuncu adındaki boşluk `_` olmalı.
+- [ ] **Altın kaynak etiketleri:** mob altını/loot -> `src=loot`; görev ödülü -> `src=gorev`; ekipman satışı -> `src=satis`; satıcıdan eşya/iksir alma -> `src=satin_alma`; yükseltme -> `src=yukseltme` (negatif); şifacı -> `src=iyilestirme` (negatif). **Bilinen kısıt:** oyuncular arası ticaret `src=diger` görünür (`MMOTradeComponent.cpp` başkasının değişiklikleri sürerken dokunulmadı); her iki taraf için +/- yazılır, net sıfır.
+- [ ] **Parti kredisi:** 2 oyunculu partide mob öldür: öldüren için `party=0`, partidaşı için `party=1` satırı (aynı mob) çıkmalı; istemci tarafında hiç `[MMOMETRIC]` basılmamalı (yalnız sunucu).
+- [ ] **Ölüm nedeni:** Mob öldürürse `by=<arketip>` (ör. `Goblin`); ortam/başka kaynakta `by=none`. `xploss` ekrandaki "Oldun! -N EXP" ile aynı olmalı.
+- [ ] **Betik:** `python Scripts/PlaytestMetrics.py` (UE Python: `C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\Python3\Win64\python.exe`) gerçek logda oyuncu/seviye başına süre, öldürme, XP, ölüm, altın+/-/net tablosu, ölüm oranı ve altın kaynak dökümünü basmalı; hata vermemeli. `--who Oyuncu_Adi` ile filtre. İlk gerçek koşudan sonra sütunlar anlamlı mı, eksik metrik var mı not et.
+- [ ] **Davranış değişmedi (regresyon):** Mob dövüşü, XP, loot, satış/yükseltme, görev teslimi eskisi gibi; sunucu logu dışında hiçbir fark olmamalı.
+
+## Yeni karakter başlangıç paketi (VERTICAL_SLICE madde 2)
+- [ ] **Yeni karakter:** Hiç kaydı olmayan bir adla (`MMOSetName YeniDeneme` ya da `Saved/SaveGames/MMOSave_<ad>.sav` olmadan) gir; ilk ~2 sn içinde envanterde (I) **Kısa Kılıç (Weapon) ve Deri Zırh (Armor) kuşanılı**, çantada başka eşya yok, **Can İksiri sayısı 3** (HUD "Iksir: 3"), altın 0 olmalı. Saldırı gücü çıplak değerden büyük olmalı. Sınıf seçim paneli (varsayılan Savaşçı ipucu) yine görünmeli; sınıf değiştirince kuşanılı eşyalar ve iksirler kaybolmamalı.
+- [ ] **Çift verme yok:** Aynı karakterle 60 sn+ bekle (otomatik kayıt) ya da `MMOSave`, çık, tekrar gir: iksir hâlâ 3 (6 değil), kuşanılı eşya aynı, çanta boş. Kayıt-yükle-kayıt sonrası envanter sayısı sabit.
+- [ ] **Eski kayıtlara verilmez:** Daha önce oynanmış kayıtlı bir karakterle gir: envanter/altın/iksir kaydedildiği gibi kalmalı, paket gelmemeli (sunucu logunda `Starter pack granted` satırı çıkmamalı).
+- [ ] **Çok oyunculu:** Host + yeni adlı istemci: istemci kendi envanterinde paketi görmeli; host'un envanteri etkilenmemeli. Sunucu logunda iki ayrı oyuncu için birer `Starter pack granted ... weapon=1 armor=1 bag=0 potions=3` satırı.
+- [ ] **Manuel `MMOLoad` (kayıt yokken):** Yeni karakterde ilk kayıttan önce `MMOLoad` yaz: ikinci kez paket verilmemeli (pawn bayrağı). Bilinen sınır: kayıt dosyası silinmiş eski bir karakter de "yeni" sayılır ve paket alır.
+- [ ] **Doğuş güvenliği (madde 2 kabul ölçütünün PIE kısmı):** Yeni karakterle doğuş noktasında 3 dk bekle: hiçbir mob saldırmamalı (bu tur doğrulanmadı; `VERTICAL_SLICE_LV1_30.md` §2.3).
