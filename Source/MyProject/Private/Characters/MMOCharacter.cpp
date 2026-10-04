@@ -43,6 +43,16 @@
 #include "Save/MMOSaveGame.h"
 #include "Net/UnrealNetwork.h"
 
+namespace
+{
+	// PvP kurallarinda "oyuncu" = mob olmayan AMMOCharacter. IsPlayerControlled() kontrolcusu
+	// o an olmayan (travel/yeniden sahiplenme) oyuncu pawn'ini mob sanip korumayi atlardi.
+	bool IsPlayerPawn(const AMMOCharacter* C)
+	{
+		return C && !Cast<AMMOMob>(C);
+	}
+}
+
 AMMOCharacter::AMMOCharacter()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -755,7 +765,7 @@ float AMMOCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEv
 
 	// Tum hasar yollari buradan gecer. Yeni bir PvP skill'i AttackTarget'in on
 	// kontrolunu atlayip ApplyDamage cagirsa bile parti/klan/hub kurallari korunur.
-	if (HasAuthority() && IsPlayerControlled())
+	if (HasAuthority() && IsPlayerPawn(this))
 	{
 		AMMOCharacter* Attacker = EventInstigator
 			? Cast<AMMOCharacter>(EventInstigator->GetPawn()) : nullptr;
@@ -763,7 +773,7 @@ float AMMOCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEv
 		{
 			Attacker = Cast<AMMOCharacter>(DamageCauser);
 		}
-		if (Attacker && Attacker != this && Attacker->IsPlayerControlled())
+		if (Attacker && Attacker != this && IsPlayerPawn(Attacker))
 		{
 			const TCHAR* BlockReason = nullptr;
 			if (!Attacker->IsPvPAllowed() || !Attacker->CanHarmPlayer(this, BlockReason))
@@ -951,8 +961,16 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 
 		// Listen-server'daki uzak pawn sunucuda locally controlled degildir.
 		// Var olan owner-only Client RPC'yi kullanarak ret sebebini saldirana ilet.
+		// Ayni sebep 1 sn icinde tekrar gonderilmez (RPC/sohbet spami olmasin).
+		const float FeedbackNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		if (Text == LastAttackFeedbackText && FeedbackNow - LastAttackFeedbackTime < 1.f)
+		{
+			return;
+		}
 		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController()))
 		{
+			LastAttackFeedbackText = Text;
+			LastAttackFeedbackTime = FeedbackNow;
 			PC->ClientReceiveChat(FString(), Text, 2);
 		}
 	};
@@ -977,13 +995,13 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	}
 
 	// PvP kontrolu: hedef oyuncuysa PvP acik olmali.
-	if (Victim->IsPlayerControlled() && !IsPvPAllowed())
+	if (IsPlayerPawn(Victim) && !IsPvPAllowed())
 	{
 		SendAttackFeedback(TEXT("PvP kapali"));
 		return;
 	}
 	// Dostu-ates ve guvenli bolge kurallari (parti / klan / hub).
-	if (const TCHAR* BlockReason = nullptr; Victim->IsPlayerControlled() && !CanHarmPlayer(Victim, BlockReason))
+	if (const TCHAR* BlockReason = nullptr; IsPlayerPawn(Victim) && !CanHarmPlayer(Victim, BlockReason))
 	{
 		SendAttackFeedback(BlockReason ? FString(BlockReason) : TEXT("Bu hedefe saldiramazsin"));
 		return;
@@ -1036,7 +1054,7 @@ void AMMOCharacter::ServerAttackTarget_Implementation(AMMOCharacter* Target)
 
 bool AMMOCharacter::CanHarmPlayer(const AMMOCharacter* Victim, const TCHAR*& OutReason) const
 {
-	if (!Victim || !Victim->IsPlayerControlled())
+	if (!IsPlayerPawn(Victim))
 	{
 		return true; // mob / oyuncu olmayan hedef: kurallar uygulanmaz
 	}

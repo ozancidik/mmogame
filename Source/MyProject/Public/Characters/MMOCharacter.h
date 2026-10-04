@@ -395,6 +395,10 @@ protected:
 
 	float LastMeleeTime = -100.f;
 
+	// Sunucu: saldirana gonderilen son ret sebebi ve zamani (ayni sebebi 1 sn icinde tekrar yollama).
+	FString LastAttackFeedbackText;
+	float LastAttackFeedbackTime = -100.f;
+
 	// Stat bileşeninin OnDeath delegate'ine bağlanır.
 	UFUNCTION()
 	virtual void HandleDeath();
