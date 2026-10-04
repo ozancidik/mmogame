@@ -3191,3 +3191,9 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Mana (Lv28):** INT'ye hic puan basmayan Savasci/Okcu bile bu becerileri bir kez atabilmeli (MaxMana ~ 25 + INT*5 + 28*5,5).
 - [ ] **Hasar gozlemi:** Her sinifta bir onceki Lv24 becerisinden (Savas Firtinasi 270, Ejder Oku 360, Gok Gurlemesi 380, Meleklerin Ofkesi 290) tek hedefte belirgin yuksek vurmali.
 - [ ] **Beceri kitabi (K):** Savasci 21 becerilik duzende tasma yok.
+
+## Sohbet temizligi + arkadas duyuru tablosu siniri (NETWORK_AUDIT D5/D6/D9) — 2026-10-04 (DERLENMEDI)
+
+- [ ] **Kontrol/bidi karakterleri:** Sohbete sekme veya U+202E iceren bir mesaj gonder: karakterler bosluga donmeli, satir gorunumu (gonderen/yon) bozulmamali; normal Turkce karakterler (ç, ğ, ı, ö, ş, ü) aynen kalmali.
+- [ ] **Regresyon:** `/p`, `/w`, `/g`, `/klan`, `/arkadas` komutlari eskisi gibi calismali.
+- [ ] **Arkadas duyurusu:** 5 dk icinde ayni durumun tekrar duyurulmamasi eskisi gibi; tablo 512 kaydi asmamali (test icin gerek yok, kod incelemesi).

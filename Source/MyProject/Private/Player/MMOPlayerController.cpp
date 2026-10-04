@@ -145,6 +145,16 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	LastChatServerTime = Now;
 
 	FString Msg = Message.Left(MaxChatInputLength).Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" ")).TrimStartAndEnd();
+	// NETWORK_AUDIT D5/D9: kontrol karakterleri ve cift yonlu/sifir genislikli bicim karakterleri
+	// (U+200B-200F, U+202A-202E, U+2066-2069) satir gorunumunu taklit/bozmak icin kullanilabilir: bosluga cevrilir.
+	for (TCHAR& C : Msg)
+	{
+		if (C < 32 || (C >= 0x200B && C <= 0x200F) || (C >= 0x202A && C <= 0x202E) || (C >= 0x2066 && C <= 0x2069))
+		{
+			C = TEXT(' ');
+		}
+	}
+	Msg.TrimStartAndEndInline();
 	uint8 Channel = 0;
 	if (Msg.Equals(TEXT("/p"), ESearchCase::IgnoreCase))
 	{

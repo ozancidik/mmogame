@@ -264,6 +264,17 @@ void UMMOFriendsComponent::AnnouncePresence(bool bOnline, const FString& NameOve
 	{
 		return; // hic cevrimici duyurulmamis ad icin cevrimdisi duyuru gitmez
 	}
+	// NETWORK_AUDIT D6: tablo sinirsiz buyumesin; 512'yi asinca 5 dk'dan eski kayitlar silinir.
+	if (GAnnounced.Num() > 512)
+	{
+		for (auto It = GAnnounced.CreateIterator(); It; ++It)
+		{
+			if ((NowSec - It.Value().Value) >= 300.0)
+			{
+				It.RemoveCurrent();
+			}
+		}
+	}
 	GAnnounced.Add(Key, TPair<bool, double>(bOnline, NowSec));
 	const FString Text = FString::Printf(TEXT("%s %s"), *MyName, bOnline ? TEXT("cevrimici oldu.") : TEXT("cevrimdisi oldu."));
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
