@@ -239,3 +239,12 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - `open ip?Name=<mevcut kayıt adı>` ile bağlan (Y1-B).
 - Elit boss'u uzak bir oyuncu varken öldür: duyuru uzak oyuncuya ulaşıyor mu (O7).
 - İki oyuncuyla `MMOTravel` sırasında pawn `EndPlay` logları ve parti durumu (bölüm 5).
+
+---
+
+## 9. Uygulama durumu (2026-10-04 güncellemesi)
+
+PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişiklikleri **derlenmedi**. Önceki yerel turda kapananlar: Y2/O9, Y4/O10, Y5, O1, O2, O3.
+
+- **Bu turda (derlenmedi):** D1 (debug RPC'leri Shipping'de erken döner), D3 (ölü karakter satıcıdan işlem ve yükseltme yapamaz; yükseltmede NPC yakınlık koşulu tasarım kararı olarak eklenmedi), D5/D9 (sohbet kontrol ve bidi karakter temizliği), D6 (`GAnnounced` tablosu 512 kayıtla sınırlı), D9/Y1 ad değiştirme soğuması (30 sn, yalnız uzak istemci).
+- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), Y3 (can/mana adımlama), O4 (parti ve ticaret davet kapma — `MMOPartyComponent.cpp`/`MMOTradeComponent.cpp` yerelde Codex'te olduğu için bulutta dokunulmadı), O5 (arkadaş rızası), O6, O7, O8, O11, O12 (denetim logu; Trade dosyası), D2, D4, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10.

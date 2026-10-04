@@ -246,3 +246,24 @@ Düzeltme: `.gitignore`'a `.idea/`, `*.sav`, `*.log`, `.env*`, `*.pem`, `*.key`,
 - Ajan oturumlarında ağ çıkışının kısıtlı olup olmadığı (Y-3).
 - `JsonUtilities` modülünün kullanılıp kullanılmadığı.
 - Kayıt dosyası düzenlemesinin fiilen kabul edildiği (Y-2 sömürüsü kod okumasından çıkarıldı; düzenlenmiş .sav ile test edilmedi).
+
+---
+
+## 3. Uygulama durumu (2026-10-04 güncellemesi)
+
+PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) üzerindeki değişiklikler **derlenmedi** (bulutta derleyici yok); yerelde `RunAllChecks.ps1` gerekir.
+
+| No | Durum | Ne yapıldı / ne kaldı |
+|----|-------|------------------------|
+| K-1 | **Kısmen** | Çevrimiçi bir oyuncunun adıyla bağlanma reddedilir (`AMMOGameMode::PreLogin`); ad değişince başka kayıt yuvasının üzerine yazma engellenir (`ActiveSaveSlot`); isteğe bağlı sunucu parolası `-MMOPassword=`. **Açık:** çevrimdışı birinin adını `?Name=` ile kapıp kaydını yüklemek, `MMOLoad` ile sahiplenme. Kalıcı çözüm hesap sistemi (`ACCOUNT_BACKEND_COMPARISON.md`). |
+| Y-2 | **Büyük kısmı** | Ana stat toplam tavanı, altın/yığın/nadirlik tavanı, yanlış slot, yinelenen `InstanceId`, görev sayacı ve yinelenen kimlikler. **Açık:** klan alanı (sunucu kaydı gerekir), görev ön koşul zinciri tutarlılığı, dosya imzası/HMAC. |
+| Y-3 | Açık | Yerelde kullanıcı kararı (anahtar rotasyonu, ajan izinleri). |
+| Y-4 | **Kısmen** | LLM çıktısı 240 karakter + kontrol karakteri temizliği. **Açık:** genel token bütçesi, `MaxTokens` (düşünme tokenları aynı tavana sayıldığı için ölçümsüz düşürülmedi). |
+| Y-5 | Açık | Varsayılan oyuncu adı OS kullanıcı adını içeriyor; `GameInstance` giriş seçeneği geçersiz kılma gerekir. |
+| Y-6 | **Kod kapandı** | Yedi debug Exec komutu ve üç Server RPC gövdesi `UE_BUILD_SHIPPING`'de erken döner. Shipping paketinde konsolun kapalı olduğu doğrulanmadı. |
+| Y-7 | **Kapandı** | `ServerSetName` uzak istemciler için 30 sn soğuma; sohbet girişi ve `/klan kur` önbelleği önceki turda. |
+| Y-8 | Önceki turda kapandı | Envanter/görev/beceri/stat özel alanları yalnız sahibe. |
+| D-9 | **Kısmen** | Sohbette kontrol ve bidi karakterleri temizlenir. **Açık:** klan adı homoglif denetimi. |
+| D-10 | Kapandı | HTTP hata gövdesi 200 karakterle loglanır. |
+| D-11 | Açık | `DefaultEngine.ini` AndroidFileServer token'ı (`Config/` bulutta düzenlenmez). |
+| D-12 | Önceki turda kapandı | `.gitignore` (`.idea/`, `*.sav`, `.env`). |
