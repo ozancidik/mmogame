@@ -52,6 +52,6 @@ Yeni dosyalar (`Core/MMONotify.h/.cpp`) eklendi: derleme "dosya bulunamadı"/ba�
 
 ## 3. Sonuç
 
-- Derleme + `RunAllChecks.ps1` geçti, 1–13 geçti → PR'ı draft'tan çıkarıp birleştir.
+- Derleme + `RunAllChecks.ps1` geçti, 1–17 geçti → PR'ı draft'tan çıkarıp birleştir.
 - Başarısız adım varsa: hangi satır, ne gördün, log (`Saved/Logs/MyProject.log`, `[MMODBG]`/`Error:`) → bana yaz.
 - Bu PR'ın kapsamı dışında: parti/ticaret bileşenleri (yerelde Codex'te), `Config/`, `Content/`, kayıt biçimi.
