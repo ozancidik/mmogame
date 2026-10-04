@@ -3259,3 +3259,11 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - [ ] **Host regresyonu:** Ayni islemlerde host'ta mesaj eskisi gibi ekran ustunde gorunmeli (sohbet satiri DEGIL), cift mesaj olmamali.
 - [ ] **Sohbet spami:** Cantayi doldurup ust uste ganimet toplamayi dene (loot yolu degismedi); kisa surede ayni satirin tekrar tekrar sohbeti doldurup doldurmadigini not al (gerekirse hiz siniri eklenmeli).
 - [ ] **Derleme:** Yeni dosyalar (`MMONotify.cpp/.h`) icin proje dosyalari yeniden uretilmesi gerekebilir (`Generate Visual Studio project files`); `AMMOPlayerController::ClientReceiveChat` erisilebilir olmali.
+
+## Ganimet mesajlari toplayana gider (NETWORK_AUDIT O11 madde 3 / D7 komsusu) — 2026-10-04 (DERLENMEDI)
+
+`AMMOLootPickup`: "Canta dolu!" ve ekipman dustu mesaji `MMONotify::ToOwner(Char, ...)` ile toplayana (uzak istemci dahil) gider. Altin ve yigin ("+N altin", "+N Esya") mesajlari artik yalniz toplayan **yerel** oyuncunun ekraninda; eskiden sunucuda herkesin ganimeti host ekranina basiliyordu ve uzak istemci hicbir sey gormuyordu.
+
+- [ ] **Host ekrani temiz:** Uzak istemci ganimet toplarken host ekraninda "+N altin" ve "+N Esya" satirlari belirmemeli; host kendi ganimetinde eskisi gibi gormeli.
+- [ ] **Uzak istemci ekipman:** Uzak istemci bir ekipman toplayinca sohbetinde "[Nadirlik] Esya +N dustu" satiri gorunmeli. Canta doluyken ayni ganimete yaklasinca "Canta dolu!" gorunmeli ve ganimet yerde kalmali.
+- [ ] **Bilinen sinir:** Uzak istemci altin/yigin satirini artik hic gormuyor (envanter penceresinden/HUD'dan gorur); gerekirse ayri bir "ucan etiket" ile eklenmeli.

@@ -7,6 +7,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Core/MMONotify.h"
 #include "Engine/Engine.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -165,10 +166,7 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 	// oyuncu yer actiktan sonra tekrar toplayabilsin.
 	if (bIsEquipment && Inv->EquipmentBag.Num() >= UMMOInventoryComponent::MaxBagSize)
 	{
-		if (GEngine && Char->IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Canta dolu!"));
-		}
+		MMONotify::ToOwner(Char, TEXT("Canta dolu!"), FColor::Silver, 2.f);
 		return;
 	}
 	bCollected = true;
@@ -180,7 +178,8 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 	if (bIsGold)
 	{
 		Inv->AddGoldFrom(GoldAmount, TEXT("loot"));
-		if (GEngine)
+		// Yalniz toplayanin yerel ekraninda (eskiden sunucuda HERKESIN ganimeti host ekranina basiliyordu).
+		if (GEngine && Char->IsLocallyControlled())
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 210, 0),
 				FString::Printf(TEXT("+%d altin"), GoldAmount));
@@ -189,18 +188,16 @@ void AMMOLootPickup::OnOverlap(UPrimitiveComponent* /*OverlappedComp*/, AActor* 
 	else if (bIsEquipment)
 	{
 		Inv->AddEquipmentInstance(EquipItemId, EquipPlus, EquipRarity);
-		if (GEngine)
-		{
-			const FLinearColor RC = FMMOItemDatabase::GetRarityColor(EquipRarity);
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, RC.ToFColor(true),
-				FString::Printf(TEXT("[%s] %s +%d dustu  (I ile envanteri ac)"),
-					*FMMOItemDatabase::GetRarityName(EquipRarity), *EquipItemId.ToString(), EquipPlus));
-		}
+		const FLinearColor RC = FMMOItemDatabase::GetRarityColor(EquipRarity);
+		MMONotify::ToOwner(Char,
+			FString::Printf(TEXT("[%s] %s +%d dustu  (I ile envanteri ac)"),
+				*FMMOItemDatabase::GetRarityName(EquipRarity), *EquipItemId.ToString(), EquipPlus),
+			RC.ToFColor(true), 3.f);
 	}
 	else
 	{
 		Inv->AddItem(ItemId, ItemCount);
-		if (GEngine)
+		if (GEngine && Char->IsLocallyControlled())
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(60, 140, 255),
 				FString::Printf(TEXT("+%d %s"), ItemCount, *ItemId.ToString()));
