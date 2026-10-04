@@ -1,5 +1,7 @@
 # PR #1 doğrulama rehberi (yerelde derleme + kısa test)
 
+> Güncelleme: 14–17. adımlar çok oyunculu XP/ganimet mantığı için eklendi.
+
 PR: [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1). **Kod değişikliklerinin hiçbiri derlenmedi** (bulutta Unreal/MSVC yok). Bu sayfa derleme sonrası neyi, hangi sırayla doğrulayacağını tek yerde toplar. Ayrıntılı maddeler `PLAYTEST_CHECKLIST.md` sonundaki bölümlerde.
 
 ## 1. Derle
@@ -21,6 +23,8 @@ Yeni dosyalar (`Core/MMONotify.h/.cpp`) eklendi: derleme "dosya bulunamadı"/ba�
 | `Effects/MMOEffectTypes.h` | `UPROPERTY(NotReplicated)` struct üyesinde (UHT bunu kabul etmeli). |
 | `Components/MMOInventoryComponent.cpp` | `ApplySaveData` içindeki `SanitizeInstance`/`Dedupe` lambdaları, `TSet<int32>`. |
 | `Components/MMOStatsComponent.cpp` | `GameStateBase.h` include, `ApplyEffect` içindeki `EffectEnd`. |
+| `Characters/MMOMob.cpp/.h` | `HandleDeath` içindeki XP payı bloğu (`TPair`/`TMap<TWeakObjectPtr<>,float>`, `AddShare` lambdası), ganimet `ReserveLoot` lambdası. |
+| `World/MMOLootPickup.cpp/.h` | `FTimerHandle` include (`Engine/TimerHandle.h`), `TryCollect`, `GetOverlappingActors`. |
 
 ## 2. Hızlı davranış testi (2 pencere, listen server; ≈20 dk)
 
@@ -39,6 +43,10 @@ Yeni dosyalar (`Core/MMONotify.h/.cpp`) eklendi: derleme "dosya bulunamadı"/ba�
 | 11 | Ölü iken satıcıyla işlem / yükseltme | Reddedilir | D3 |
 | 12 | Sohbete sekme/U+202E içeren mesaj | Boşluğa dönüşür | D5 |
 | 13 | `MMOGiveItem HealthPotion 3`, `MMOGainXP 5000` | Development'ta çalışır (Shipping'de çalışmaz) | Y-6 |
+| 14 | Host bir moba canın ~%60'ını, istemci ~%40'ını vursun (istemci öldürsün) | XP yaklaşık %60 / %40 bölünür; ikisinin görev sayacı da 1 artar; `[MMOMETRIC] ev=kill` iki satır | XP payı |
+| 15 | İstemci tek hafif vuruş yapıp çekilsin, host öldürsün | İstemci en az 1 XP alır, host ~%99 | XP payı |
+| 16 | İki kişilik partiyle %50/%50 hasarla öldür | Her üye partinin payının yarısını alır (toplam %100; 8 kişide herkes 1/8) | Parti bölme |
+| 17 | Host mob öldürsün, istemci hemen cesedin üstünden geçsin (hasarsız) | İlk 10 sn ganimet toplayamaz; ~10 sn sonra üstünde duruyorsa otomatik toplar | Ganimet |
 
 İsteğe bağlı: parolalı sunucu (`-MMOPassword=test123`, istemci `?Password=test123`) ve NPC hız sınırı (`MaxRequestsPerMinute`'u 2 yapıp NPC'ye 3 kez tıkla).
 
