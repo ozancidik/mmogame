@@ -90,7 +90,19 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|AI")
 	float TimeoutSeconds = 12.f;
 
+	// Sunucu geneli hiz siniri (SECURITY_AUDIT Y-4): oyuncu basina 2 sn cooldown tek basina yetmez
+	// (cok sayida baglanti = cok istek = fatura/kota). Sinir asilinca istek atilmaz, NPC yedek replige duser.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "1"))
+	int32 MaxRequestsPerMinute = 30;
+
+	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "1"))
+	int32 MaxConcurrentRequests = 4;
+
 protected:
+	// Hiz siniri durumu (yalniz bu subsystem'de, replike degil).
+	TArray<double> RecentRequestTimes;
+	int32 InFlightRequests = 0;
+
 	/** Istegi kurar ve gonderir. */
 	void SendRequest(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady);
 

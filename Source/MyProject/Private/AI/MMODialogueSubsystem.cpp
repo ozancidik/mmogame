@@ -66,6 +66,19 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		return;
 	}
 
+	// Sunucu geneli hiz siniri: dakikada MaxRequestsPerMinute, ayni anda MaxConcurrentRequests.
+	const double NowSec = FPlatformTime::Seconds();
+	RecentRequestTimes.RemoveAll([NowSec](double T) { return NowSec - T > 60.0; });
+	if (RecentRequestTimes.Num() >= MaxRequestsPerMinute || InFlightRequests >= MaxConcurrentRequests)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Hiz siniri asildi (%d/dk, %d eszamanli); istek atlandi."),
+			RecentRequestTimes.Num(), InFlightRequests);
+		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
+		return;
+	}
+	RecentRequestTimes.Add(NowSec);
+	++InFlightRequests;
+
 	const bool bNvidia = (Provider == EMMOLLMProvider::NVIDIA);
 
 	// --- Istek govdesini saglayiciya gore kur ---
@@ -154,6 +167,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			{
 				return;
 			}
+			WeakThis->InFlightRequests = FMath::Max(0, WeakThis->InFlightRequests - 1);
 
 			if (!bConnectedOk || !Resp.IsValid())
 			{

@@ -3267,3 +3267,11 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - [ ] **Host ekrani temiz:** Uzak istemci ganimet toplarken host ekraninda "+N altin" ve "+N Esya" satirlari belirmemeli; host kendi ganimetinde eskisi gibi gormeli.
 - [ ] **Uzak istemci ekipman:** Uzak istemci bir ekipman toplayinca sohbetinde "[Nadirlik] Esya +N dustu" satiri gorunmeli. Canta doluyken ayni ganimete yaklasinca "Canta dolu!" gorunmeli ve ganimet yerde kalmali.
 - [ ] **Bilinen sinir:** Uzak istemci altin/yigin satirini artik hic gormuyor (envanter penceresinden/HUD'dan gorur); gerekirse ayri bir "ucan etiket" ile eklenmeli.
+
+## LLM NPC diyalogu: sunucu geneli hiz siniri (SECURITY_AUDIT Y-4 / NETWORK_AUDIT O11-7) — 2026-10-04 (DERLENMEDI)
+
+`UMMODialogueSubsystem`: dakikada en fazla `MaxRequestsPerMinute` (30) ve ayni anda en fazla `MaxConcurrentRequests` (4) HTTP istegi. Sinir asilirsa istek atilmaz, NPC kendi yedek replige duser (oyuncu basina 2 sn cooldown aynen duruyor). Anahtar yoksa davranis ayni. `MaxTokens` ayrica dusurulmedi (dusunme tokenlari ayni tavana sayiliyor).
+
+- [ ] **Normal kullanim:** Konusan NPC'ye (Muhafiz Kael) tikla: LLM cevabi (anahtar varsa) ya da yedek replik eskisi gibi gelmeli.
+- [ ] **Sinir:** Birkac oyuncu/pencereden dakikada 30'dan fazla NPC konusmasi tetikle (ya da `MaxRequestsPerMinute`'u editorde 2 yap): sinir asilinca Output Log'da `[MMODialogue] Hiz siniri asildi` uyarisi cikmali ve NPC yedek replik soylemeli, HTTP istegi gitmemeli. Bir dakika sonra yeniden calismali.
+- [ ] **Es zamanli sayac:** Basarisiz/zaman asimina ugrayan isteklerden sonra sayac sifirlanmali (sinir sonsuza dek kilitlenmemeli): LLM anahtarini bilerek yanlis yapip 5 istek at, anahtari duzelt, istek yeniden calismali.
