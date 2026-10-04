@@ -3046,3 +3046,14 @@ Merkez mesafeleri (hesaplandı): D-Kış Hükümdarı `(-3000,0)` 3041u; D-Lv42-
 - [ ] **Ölü/hedefsiz:** Ölü bir oyuncu hedef seçiliyken saldır: komut en yakın mobu seçmeli ya da "Menzilde dusman yok"; çökme/`Accessed None` yok. Hedef seçili olmadan `MMOAttack`: parti üyesi yanındaysa ona **vurmamalı** (otomatik hedef yalnız mob).
 - [ ] **Balon kuyruğu:** İki görevi arka arkaya hızla kabul et: ikinci balon ilkinin yerine geçmeli (9 sn süre sıfırlanır), taşma/üst üste binme yok. Uzun replikli bir görevi (`Q_AbyssStriders` alış, 252 karakter) küçük pencerede (<=1024 genişlik) aç: metin 5 satırda `...` ile kesiliyorsa not et.
 - [ ] **Spawner gerileme (Summer/Winter):** `Scripts/SmokeTest.ps1 -Map Summer_scene` ve `-Map Winter_scene`: çıkış kodu 0, "Hata satiri: 0", mob doğumu > 0; log'da yeni uyarı biçimi (`trace iskaladi=..., egim/yukseklik=..., navmesh=...`) yalnız gerçekten doğamayan cepte görünmeli. Boss spawner'lar (`SpawnRadius=150`) ve `bValidateSpawnOnNavGround=false` olan alanlar önceki gibi doğmalı.
+
+## PvP ret geri bildirimi düzeltmesi — 2026-10-04
+
+Uzak istemcinin sunucuda reddedilen yakın dövüş isteği artık sessiz kalmıyor. PvP kapalı, parti/klan dost ateşi, hedefin güvenli bölgede olması ve geçerli hedef bulunmaması durumları saldıran istemciye mevcut owner-only sohbet RPC'siyle iletiliyor. Saldıran doğrudan hub içindeyse sebep istemcide anında gösteriliyor. C++ derlemesi temiz geçti; aşağıdaki davranışlar PIE bekliyor.
+
+- [ ] Host + uzak istemci aynı partideyken istemci hosta saldırsın: istemcide `Parti uyesine vuramazsin`, hasar 0.
+- [ ] İki oyuncu aynı klandayken istemci saldırsın: istemcide `Klan uyesine vuramazsin`, hasar 0.
+- [ ] Hedef hub içinde, saldıran hub dışında ve menzildeyken saldırı: istemcide `Guvenli bolgede PvP yok`, hasar 0.
+- [ ] Saldıran hub içindeyken saldırı tuşu: yerel ekranda aynı güvenli bölge mesajı hemen görünmeli.
+- [ ] `MMOPvP 0` durumunda uzak istemci oyuncuya saldırsın: istemcide `PvP kapali`, hasar 0.
+- [ ] Mob saldırısı ve hub dışındaki izinli PvP vuruşu eskisi gibi hasar vermeli; reddedilme mesajı çıkmamalı.

@@ -913,6 +913,12 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	}
 	if (MMOTargeting::IsInsideHubSafeZone(this, GetActorLocation()))
 	{
+		// Bu kontrol istemcide de calisir; uzak oyuncu sunucu yanitini beklemeden
+		// neden saldiramadigini gorur.
+		if (GEngine && IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Guvenli bolgede PvP yok"));
+		}
 		return;
 	}
 
@@ -932,6 +938,24 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	}
 
 	const bool bLocalFeedback = IsLocallyControlled();
+	auto SendAttackFeedback = [this, bLocalFeedback](const FString& Text)
+	{
+		if (bLocalFeedback)
+		{
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, Text);
+			}
+			return;
+		}
+
+		// Listen-server'daki uzak pawn sunucuda locally controlled degildir.
+		// Var olan owner-only Client RPC'yi kullanarak ret sebebini saldirana ilet.
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController()))
+		{
+			PC->ClientReceiveChat(FString(), Text, 2);
+		}
+	};
 
 	// Hedef gecersizse (yok/olu) en yakin canli mob'a dus.
 	AMMOCharacter* Victim = Target;
@@ -942,10 +966,7 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 
 	if (!Victim || Victim == this)
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Menzilde dusman yok - yaklas"));
-		}
+		SendAttackFeedback(TEXT("Menzilde dusman yok - yaklas"));
 		return;
 	}
 
@@ -958,19 +979,13 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	// PvP kontrolu: hedef oyuncuysa PvP acik olmali.
 	if (Victim->IsPlayerControlled() && !IsPvPAllowed())
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("PvP kapali"));
-		}
+		SendAttackFeedback(TEXT("PvP kapali"));
 		return;
 	}
 	// Dostu-ates ve guvenli bolge kurallari (parti / klan / hub).
 	if (const TCHAR* BlockReason = nullptr; Victim->IsPlayerControlled() && !CanHarmPlayer(Victim, BlockReason))
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, BlockReason);
-		}
+		SendAttackFeedback(BlockReason ? FString(BlockReason) : TEXT("Bu hedefe saldiramazsin"));
 		return;
 	}
 
