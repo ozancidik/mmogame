@@ -3275,3 +3275,13 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - [ ] **Normal kullanim:** Konusan NPC'ye (Muhafiz Kael) tikla: LLM cevabi (anahtar varsa) ya da yedek replik eskisi gibi gelmeli.
 - [ ] **Sinir:** Birkac oyuncu/pencereden dakikada 30'dan fazla NPC konusmasi tetikle (ya da `MaxRequestsPerMinute`'u editorde 2 yap): sinir asilinca Output Log'da `[MMODialogue] Hiz siniri asildi` uyarisi cikmali ve NPC yedek replik soylemeli, HTTP istegi gitmemeli. Bir dakika sonra yeniden calismali.
 - [ ] **Es zamanli sayac:** Basarisiz/zaman asimina ugrayan isteklerden sonra sayac sifirlanmali (sinir sonsuza dek kilitlenmemeli): LLM anahtarini bilerek yanlis yapip 5 istek at, anahtari duzelt, istek yeniden calismali.
+
+## Oldurme kredisi: hasar katkisi (VERTICAL_SLICE_LV1_30 madde 10, kismi) — 2026-10-04 (DERLENMEDI)
+
+`AMMOMob`: sunucuda oyuncu basina verilen toplam hasar izlenir (`DamageContributions`); mob oldugunde `MaxHealth`'in en az **%20'sine** hasar veren, hayatta ve 3000u icindeki oyuncular da son vurusu yapan gibi **tam XP + gorev ilerlemesi** alir. Parti kredisi aynen duruyor. Mob tam canla eve donunce katkilar sifirlanir. Parti bonusu, ganimet sahipligi ve elit "parti olcekli can" bu turda **yapilmadi**.
+
+- [ ] **Kill stealing:** Host ve istemci partisiz. Host bir moba canin ~%60'ini vursun, istemci son vurusu yapsin: **ikisi de** XP almali (`+N EXP` ucan etiketi ve `[MMOMETRIC] ev=kill` satirlari iki oyuncu icin, ikincisi `party=1` etiketli); ikisinin gorev sayaci da artmali.
+- [ ] **Esik:** Istemci mobun canina %10 hasar verip cekilsin, host oldursun: istemci kredi **almamali**. %25 hasar verirse almali.
+- [ ] **Menzil:** Katki yapan oyuncu olurken 3000u'dan uzaktaysa kredi almamali; olu iken de almamali.
+- [ ] **Leash sifirlamasi:** Mobu cek, katki yaptir, mobu eve kacir (leash) ve tam canlansin; sonra baskasi oldursun: onceki katki sahibi kredi almamali.
+- [ ] **Regresyon:** Tek oyuncu ve parti oldurmeleri eskisi gibi; cift XP/cift gorev sayaci olmamali (ayni oyuncu hem katki sahibi hem olduren/parti uyesi olsa da bir kez).

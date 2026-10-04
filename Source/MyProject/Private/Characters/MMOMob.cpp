@@ -186,6 +186,15 @@ float AMMOMob::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
 
 	const float Applied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
+	// Hasar katkisi: oyuncu saldirganlarin mobda biraktigi toplam hasar (oldurme kredisi icin).
+	if (HasAuthority() && Applied > 0.f)
+	{
+		if (AMMOCharacter* AttackerChar = Cast<AMMOCharacter>(Attacker); AttackerChar && Attacker->IsPlayerControlled())
+		{
+			DamageContributions.FindOrAdd(AttackerChar) += Applied;
+		}
+	}
+
 	// Saldirgan bir oyuncuysa onu zorla hedefle (uzaktan vurulunca da mob tepki versin).
 	if (HasAuthority() && Applied > 0.f && Stats && !Stats->bIsDead && !bReturningHome)
 	{
@@ -439,6 +448,7 @@ void AMMOMob::Tick(float DeltaSeconds)
 			bEnraged = false;
 			Stats->ClearAllEffects();
 			Stats->Heal(Stats->MaxHealth);
+			DamageContributions.Reset(); // tam canlandi: onceki hasar katkilari gecersiz
 			// Zorla-hedefleme'yi de temizle: yoksa ForcedAggroDuration (8sn) dolmadiysa
 			// (donus yolu genelde daha kisa surdugu icin) mob eve varir varmaz kalan
 			// sure boyunca AggroRange'i yok sayip oyuncuya tekrar kosuyordu (yo-yo).
@@ -692,6 +702,21 @@ void AMMOMob::HandleDeath()
 			}
 		}
 		Recipients.AddUnique(Killer); // olduren her zaman kredi alir
+
+		// Hasar katkisi: mobun MaxHealth'inin en az %20'sine hasar veren, hayatta ve menzildeki oyuncular da
+		// kredi alir (son vurusu baskasi yapsa bile; "kill stealing" azalir). Parti kredisi aynen korunur.
+		{
+			const float MinContribution = Stats ? FMath::Max(1.f, Stats->MaxHealth * 0.2f) : 1.f;
+			for (const TPair<TWeakObjectPtr<AMMOCharacter>, float>& C : DamageContributions)
+			{
+				AMMOCharacter* Who = C.Key.Get();
+				if (Who && C.Value >= MinContribution
+					&& FVector::Dist(Who->GetActorLocation(), GetActorLocation()) <= PartyXPShareRange)
+				{
+					Recipients.AddUnique(Who);
+				}
+			}
+		}
 
 		for (AMMOCharacter* R : Recipients)
 		{

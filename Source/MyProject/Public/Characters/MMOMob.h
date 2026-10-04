@@ -179,6 +179,10 @@ protected:
 	TWeakObjectPtr<APawn> ForcedTarget;
 	float ForcedAggroUntil = -1.f;
 
+	// Hasar katkisi (yalniz sunucu, replike degil): oldurme kredisi son vurusu yapana ek olarak mobun
+	// MaxHealth'inin en az %20'sine hasar veren oyunculara da verilir (VERTICAL_SLICE_LV1_30 madde 10).
+	TMap<TWeakObjectPtr<AMMOCharacter>, float> DamageContributions;
+
 	// Hasar alan mobun saldirgani ne kadar sure zorla hedeflemeye devam edecegi.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Mob")
 	float ForcedAggroDuration = 8.f;

@@ -331,3 +331,9 @@ KO/Rise tarzı beklenen döngü (yalnız genel referans, doğrulanmadı): hub �
 **Çalıştırma:** `"C:/Program Files/Epic Games/UE_5.7/Engine/Binaries/ThirdParty/Python3/Win64/python.exe" Scripts/BalanceReport.py` (mevcut) çalıştırıldı; v2 iş 1'de. Bu belgedeki ek modeller geçici betiklerle üretildi ve depoda yoktur; iş 1 bunları kalıcılaştırır.
 
 **Bilinmeyenler (PIE'de ölçülmedi):** oyuncu yürüme hızı, öldürme başına gerçek süre, mob yoğunluğunun hissi, gerçek ölüm sıklığı, UI okunabilirliği, çok oyunculu davranış, elit karşılaşmaların süresi, Winter/Summer geçişi (Lv1–30'u kapsamaz).
+
+---
+
+## Güncelleme (2026-10-04, bulut)
+
+Madde 10'un **hasar katkısı kredisi** kısmı `AMMOMob`'a eklendi (mobun canının ≥%20'sine hasar veren oyuncular XP + görev kredisi alır; derlenmedi). Parti bonusu, ganimet sahipliği (ilk 10 sn) ve parti ölçekli elit can açık. Kalan işler ve model bulguları: `BALANCE_MODEL.md`.
