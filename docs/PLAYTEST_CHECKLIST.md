@@ -3241,3 +3241,12 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Sinirlar:** Can/mana maksimumu asmamali; tam dolunca yenilenme durmali; olu oyuncuda yenilenme olmamali.
 - [ ] **HUD:** Can ve mana cubugu 1 puanlik adimlarla akici dolmali (titreme/geri sarma yok), uzak istemcide de (can).
 - [ ] **Olcum (opsiyonel):** `stat net` ile can yenilenirken oyuncu basina giris trafigi, onceki turlara gore azalmis olmali.
+
+## Efekt suresi replikasyonu: RemainingTime -> EndServerTime (NETWORK_AUDIT Y3, madde 2) — 2026-10-04 (DERLENMEDI)
+
+`FMMOActiveEffect::RemainingTime` artik `NotReplicated` (yalniz sunucuda azalir); replike alan `EndServerTime` (sunucu dunya saati, uygulama/tazelemede degisir). HUD kalan sureyi `EndServerTime - GetServerWorldTimeSeconds()` ile hesaplar. Beklenen etki: buff/DoT/yavaslatma olan oyuncu ve mobun `ActiveEffects` dizisi artik her karede yeniden gonderilmez.
+
+- [ ] **HUD efekt kutusu:** Bir buff al (`MMOBuff Haste` ya da beceri): kutuda kalan saniye dogru geri saymali (host'ta ve uzak istemcide), cubuk suzulmeli; sure bitince kutu kaybolmali. Tazelenince (ayni buff'i tekrar al) sure basa donmeli.
+- [ ] **Uzak istemci saat farki:** Istemcide sayac sunucudakiyle ~1 sn icinde uyumlu olmali; negatif veya sicrayan deger olmamali (`Max(0, ...)`).
+- [ ] **Efekt mantigi degismedi:** Zehir (DoT) hasari, yavaslatma, saldiri/savunma/hiz buff'lari ve suresi dolunca kalkmasi eskisi gibi (yalniz sunucu mantigi RemainingTime kullanir).
+- [ ] **Olcum (opsiyonel):** Buff'li oyuncu varken `stat net` trafigi, onceki turlara gore dusmeli.

@@ -25,6 +25,7 @@
 #include "Player/MMOPlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerState.h"
@@ -297,9 +298,15 @@ void AMMOHUD::DrawActiveEffects(AMMOCharacter* PlayerChar, float StartX, float S
 	const float BoxH = 34.f;
 	const float Gap = 6.f;
 
+	// Kalan sure replike EndServerTime'dan hesaplanir (RemainingTime istemciye replike edilmez).
+	const UWorld* EffectWorld = GetWorld();
+	const AGameStateBase* EffectGS = EffectWorld ? EffectWorld->GetGameState() : nullptr;
+	const float ServerNow = EffectGS ? EffectGS->GetServerWorldTimeSeconds() : (EffectWorld ? EffectWorld->GetTimeSeconds() : 0.f);
+
 	for (int32 i = 0; i < Effects.Num(); ++i)
 	{
 		const FMMOActiveEffect& E = Effects[i];
+		const float Remaining = FMath::Max(0.f, E.EndServerTime - ServerNow);
 		const float BX = StartX + i * (BoxW + Gap);
 
 		// Buff = yesil, debuff = kirmizi ton.
@@ -322,11 +329,11 @@ void AMMOHUD::DrawActiveEffects(AMMOCharacter* PlayerChar, float StartX, float S
 		DrawText(Label, FLinearColor::White, BX + 5.f, StartY + 3.f, nullptr, 1.0f);
 
 		// Kalan sure (saniye).
-		DrawText(FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(E.RemainingTime)),
+		DrawText(FString::Printf(TEXT("%.0f"), FMath::CeilToFloat(Remaining)),
 			FLinearColor(0.9f, 0.9f, 0.9f), BX + 5.f, StartY + 18.f, nullptr, 0.85f);
 
 		// Suzulme cubugu (kalan/toplam).
-		const float Pct = E.Duration > 0.f ? FMath::Clamp(E.RemainingTime / E.Duration, 0.f, 1.f) : 0.f;
+		const float Pct = E.Duration > 0.f ? FMath::Clamp(Remaining / E.Duration, 0.f, 1.f) : 0.f;
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX, StartY + BoxH - 4.f, BoxW, 4.f);
 		DrawRect(Border, BX, StartY + BoxH - 4.f, BoxW * Pct, 4.f);
 	}

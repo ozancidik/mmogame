@@ -78,8 +78,14 @@ struct FMMOActiveEffect
 	UPROPERTY()
 	float Magnitude = 0.f;
 
-	UPROPERTY()
+	// Yalniz sunucuda azalir ve REPLIKE EDILMEZ (NETWORK_AUDIT Y3: her karede degisen alan butun
+	// ActiveEffects dizisini her karede yeniden gonderiyordu). Istemci kalan sureyi EndServerTime'dan hesaplar.
+	UPROPERTY(NotReplicated)
 	float RemainingTime = 0.f;
+
+	// Bitis zamani (AGameStateBase::GetServerWorldTimeSeconds bazli). Yalniz efekt uygulanirken/tazelenirken degisir.
+	UPROPERTY()
+	float EndServerTime = 0.f;
 
 	UPROPERTY()
 	float Duration = 0.f;

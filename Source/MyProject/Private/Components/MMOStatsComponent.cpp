@@ -11,6 +11,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "UI/MMOHUD.h"
 #include "Save/MMOSaveGame.h"
 #include "Characters/MMOMob.h"
@@ -621,12 +622,19 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	const float SourceHubRadius = (SourceMob && SourceMob->bHasHub) ? SourceMob->HubSafeRadius : 0.f;
 	const FVector SourceHubLocation = SourceMob ? SourceMob->HubLocation : FVector::ZeroVector;
 
+	// Bitis zamani (sunucu dunya saati): istemci kalan sureyi bundan hesaplar (replike alan yalniz uygulamada/tazelemede degisir).
+	const UWorld* EffectWorld = GetWorld();
+	const AGameStateBase* EffectGS = EffectWorld ? EffectWorld->GetGameState() : nullptr;
+	const float EffectNow = EffectGS ? EffectGS->GetServerWorldTimeSeconds() : (EffectWorld ? EffectWorld->GetTimeSeconds() : 0.f);
+	const float EffectEnd = EffectNow + Def->Duration;
+
 	// Ayni efekt zaten varsa: suresini tazele (KO tarzi yenileme; ust uste yigilmaz).
 	for (FMMOActiveEffect& E : ActiveEffects)
 	{
 		if (E.EffectId == EffectId)
 		{
 			E.RemainingTime = Def->Duration;
+			E.EndServerTime = EffectEnd;
 			E.TimeSinceLastTick = 0.f;
 			E.Instigator = EffectInstigator;
 			E.MobSourceHubLocation = SourceHubLocation;
@@ -641,6 +649,7 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	A.Type = Def->Type;
 	A.Magnitude = Def->Magnitude;
 	A.RemainingTime = Def->Duration;
+	A.EndServerTime = EffectEnd;
 	A.Duration = Def->Duration;
 	A.bIsDebuff = Def->bIsDebuff;
 	A.TickInterval = Def->TickInterval;
