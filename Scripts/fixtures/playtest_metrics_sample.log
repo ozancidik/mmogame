@@ -1,0 +1,15 @@
+Log file open, 10/05/26 12:00:00
+[2026.10.05-12.00.00:000][  0]LogInit: Display: Engine is initialized. (olcum satiri degil)
+[2026.10.05-12.00.05:000][ 10]LogTemp: Display: [MMOMETRIC] t=5.0 ev=gold who=Ozan src=loot amount=10 balance=10
+[2026.10.05-12.00.10:000][ 20]LogTemp: Display: [MMOMETRIC] t=10.0 ev=kill who=Ozan lv=1 mob=Goblin mlv=1 xp=30 party=1 elite=0
+[2026.10.05-12.00.20:000][ 30]LogTemp: Display: [MMOMETRIC] t=20.0 ev=kill who=Ozan lv=1 mob=Goblin mlv=1 xp=30 party=1 elite=0
+[2026.10.05-12.00.21:000][ 31]LogTemp: Display: [MMOMETRIC] t=21.0 ev=gold who=Ozan src=loot amount=12 balance=22
+[2026.10.05-12.00.25:000][ 35]LogTemp: Display: [MMOMETRIC] t=25.0 ev=kill who=Istemci lv=1 mob=WolfPup mlv=2 xp=20 party=2 elite=0
+[2026.10.05-12.00.30:000][ 40]LogTemp: Display: [MMOMETRIC] t=30.0 ev=kill lv=1 mob=Bozuk xp=999
+[2026.10.05-12.01.00:000][ 60]LogTemp: Display: [MMOMETRIC] t=60.0 ev=levelup who=Ozan from=1 to=2
+[2026.10.05-12.01.10:000][ 70]LogTemp: Display: [MMOMETRIC] t=70.0 ev=gold who=Ozan src=satin_alma amount=-40 balance=-18
+[2026.10.05-12.01.20:000][ 80]LogTemp: Display: [MMOMETRIC] t=80.0 ev=kill who=Ozan lv=2 mob=WolfPup mlv=2 xp=45 party=1 elite=0
+[2026.10.05-12.01.30:000][ 90]LogTemp: Display: [MMOMETRIC] t=90.0 ev=death who=Ozan lv=2 x=1 y=2 z=3 by=Orc xploss=5
+[2026.10.05-12.01.40:000][100]LogTemp: Display: [MMOMETRIC] t=100.0 ev=gold who=Ozan src=gorev amount=120 balance=102
+[2026.10.05-12.02.30:000][150]LogTemp: Display: [MMOMETRIC] t=150.0 ev=levelup who=Ozan from=2 to=3
+[2026.10.05-12.02.50:000][170]LogTemp: Display: [MMOMETRIC] t=170.0 ev=kill who=Ozan lv=3 mob=Orc mlv=3 xp=75 party=1 elite=0

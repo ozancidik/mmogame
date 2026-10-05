@@ -6,12 +6,15 @@ on:
   push:
     branches: [ master ]
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]  # etiket (protected-paths-ok) degisince yeniden kos
 
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # PR yol denetimi taban commit'e kadar diff alir
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -24,3 +27,10 @@ jobs:
           python Scripts/ProgressionModel.py --max 30 > /dev/null
           python Scripts/EconomyModel.py > /dev/null
           python Scripts/ContentMap.py > /dev/null
+      - name: PlaytestMetrics fixture testi (sahte [MMOMETRIC] logu)
+        run: python Scripts/TestPlaytestMetrics.py
+      - name: PR korunan yol denetimi (Content/Config/MMOSaveGame.h hata; Party/Trade uyari)
+        if: github.event_name == 'pull_request'
+        env:
+          ALLOW_PROTECTED_PATHS: ${{ contains(github.event.pull_request.labels.*.name, 'protected-paths-ok') && '1' || '0' }}
+        run: python Scripts/CheckPrPaths.py ${{ github.event.pull_request.base.sha }}

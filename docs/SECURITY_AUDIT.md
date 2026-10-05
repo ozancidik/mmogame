@@ -1,5 +1,3 @@
-| Y-5 | **Kod kapandı** | `<ad>-<hex>` varsayılan adı `Gezgin######` olur (`AGameModeBase::ChangeName`, derlenmedi; imza UE 5.7'de doğrulanmalı). Eski `MMOSave_<KULLANICI>-<hex>.sav` dosyaları yetim kalır. |
-| Y-4 | **Büyük kısmı** | LLM çıktısı 240 karakter + kontrol karakteri temizliği; sunucu geneli hız sınırı (dakikada 30, eşzamanlı 4; sınır aşılınca NPC yedek replik söyler). **Açık:** `MaxTokens` (düşünme tokenları aynı tavana sayıldığı için ölçümsüz düşürülmedi), günlük bütçe tavanı. |
 # Güvenlik Denetimi (Salt Okunur) - MyProject MMORPG
 
 Tarih: 2026-10-04. Yöntem: yalnızca statik inceleme (kod okuma, grep, git geçmişi taraması, motor kaynağı doğrulaması). Hiçbir dosya düzenlenmedi, derleme/commit/push yapılmadı, oyun çalıştırılmadı. Bu dosya tek yazma çıktısıdır.
@@ -251,7 +249,7 @@ Düzeltme: `.gitignore`'a `.idea/`, `*.sav`, `*.log`, `.env*`, `*.pem`, `*.key`,
 
 ---
 
-## 3. Uygulama durumu (2026-10-04 güncellemesi)
+## 7. Uygulama durumu (2026-10-04 güncellemesi)
 
 PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) üzerindeki değişiklikler **derlenmedi** (bulutta derleyici yok); yerelde `RunAllChecks.ps1` gerekir.
 
@@ -260,8 +258,8 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) üzerindek
 | K-1 | **Kısmen** | Çevrimiçi bir oyuncunun adıyla bağlanma reddedilir (`AMMOGameMode::PreLogin`); ad değişince başka kayıt yuvasının üzerine yazma engellenir (`ActiveSaveSlot`); isteğe bağlı sunucu parolası `-MMOPassword=`. **Açık:** çevrimdışı birinin adını `?Name=` ile kapıp kaydını yüklemek, `MMOLoad` ile sahiplenme. Kalıcı çözüm hesap sistemi (`ACCOUNT_BACKEND_COMPARISON.md`). |
 | Y-2 | **Büyük kısmı** | Ana stat toplam tavanı, altın/yığın/nadirlik tavanı, yanlış slot, yinelenen `InstanceId`, görev sayacı ve yinelenen kimlikler. **Açık:** klan alanı (sunucu kaydı gerekir), görev ön koşul zinciri tutarlılığı, dosya imzası/HMAC. |
 | Y-3 | Açık | Yerelde kullanıcı kararı (anahtar rotasyonu, ajan izinleri). |
-| Y-4 | **Kısmen** | LLM çıktısı 240 karakter + kontrol karakteri temizliği. **Açık:** genel token bütçesi, `MaxTokens` (düşünme tokenları aynı tavana sayıldığı için ölçümsüz düşürülmedi). |
-| Y-5 | Açık | Varsayılan oyuncu adı OS kullanıcı adını içeriyor; `GameInstance` giriş seçeneği geçersiz kılma gerekir. |
+| Y-4 | **Büyük kısmı** | LLM çıktısı 240 karakter + kontrol karakteri temizliği; sunucu geneli hız sınırı (dakikada 30, eşzamanlı 4; sınır aşılınca NPC yedek replik söyler). **Açık:** `MaxTokens` (düşünme tokenları aynı tavana sayıldığı için ölçümsüz düşürülmedi), günlük bütçe tavanı. |
+| Y-5 | **Kod kapandı** | `<ad>-<hex>` varsayılan adı `Gezgin######` olur (`AGameModeBase::ChangeName`, derlenmedi; imza UE 5.7'de doğrulanmalı). Eski `MMOSave_<KULLANICI>-<hex>.sav` dosyaları yetim kalır. |
 | Y-6 | **Kod kapandı** | Yedi debug Exec komutu ve üç Server RPC gövdesi `UE_BUILD_SHIPPING`'de erken döner. Shipping paketinde konsolun kapalı olduğu doğrulanmadı. |
 | Y-7 | **Kapandı** | `ServerSetName` uzak istemciler için 30 sn soğuma; sohbet girişi ve `/klan kur` önbelleği önceki turda. |
 | Y-8 | Önceki turda kapandı | Envanter/görev/beceri/stat özel alanları yalnız sahibe. |

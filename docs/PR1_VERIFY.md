@@ -1,6 +1,8 @@
 # PR #1 doğrulama rehberi (yerelde derleme + kısa test)
 
-> Güncelleme: 14–17. adımlar çok oyunculu XP/ganimet mantığı için eklendi.
+> Güncelleme: 14–18. adımlar çok oyunculu XP payı, parti bonusu, ganimet ve XP eğrisi için eklendi (eski 16 ve 19 aynı parti testiydi, 16'da birleştirildi).
+
+Sıralı test oturumu (bu sayfa + ilk 7 test + ölçüm koşusu): `PLAYTEST_RUNBOOK.md`.
 
 PR: [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1). **Kod değişikliklerinin hiçbiri derlenmedi** (bulutta Unreal/MSVC yok). Bu sayfa derleme sonrası neyi, hangi sırayla doğrulayacağını tek yerde toplar. Ayrıntılı maddeler `PLAYTEST_CHECKLIST.md` sonundaki bölümlerde.
 
@@ -45,15 +47,14 @@ Yeni dosyalar (`Core/MMONotify.h/.cpp`) eklendi: derleme "dosya bulunamadı"/ba�
 | 13 | `MMOGiveItem HealthPotion 3`, `MMOGainXP 5000` | Development'ta çalışır (Shipping'de çalışmaz) | Y-6 |
 | 14 | Host bir moba canın ~%60'ını, istemci ~%40'ını vursun (istemci öldürsün) | XP yaklaşık %60 / %40 bölünür; ikisinin görev sayacı da 1 artar; `[MMOMETRIC] ev=kill` iki satır | XP payı |
 | 15 | İstemci tek hafif vuruş yapıp çekilsin, host öldürsün | İstemci en az 1 XP alır, host ~%99 | XP payı |
-| 16 | İki kişilik partiyle %50/%50 hasarla öldür | Parti bonusu (+%10/ekstra üye) sonrası her üye %55 alır (=1,1/2; toplam %110); 8 kişide kişi başı 1,7/8 (≈%21) | Parti bölme |
+| 16 | İki kişilik partiyle %50/%50 hasarla öldür (8 kişiyle tekrar edilebilir) | Parti tek birim sayılır, bonus +%10/ekstra üye (`MMOXPTuning::PartyMultiplier`): 2 kişide her üye mob XP'sinin %55'ini alır (=1,1/2; toplam %110); 8 kişide kişi başı 1,7/8 (≈%21) | Parti bölme + bonus |
 | 17 | Host mob öldürsün, istemci hemen cesedin üstünden geçsin (hasarsız) | İlk 10 sn ganimet toplayamaz; ~10 sn sonra üstünde duruyorsa otomatik toplar | Ganimet |
 | 18 | Aynı arketipi Lv8/12/20/34+ seviyelerinde öldür, `[MMOMETRIC] xp=` değerini eski değerle kıyasla | Mob XP'si ~%70 / %40 / %25 / %100 (`MMOXPTuning`); Lv1–5 değişmez | XP eğrisi |
-| 19 | 2 kişilik partiyle %50/%50 öldür | Her üye partinin payının %55'ini alır (parti bonusu +%10/ekstra üye) | Parti bonusu |
 
 İsteğe bağlı: parolalı sunucu (`-MMOPassword=test123`, istemci `?Password=test123`) ve NPC hız sınırı (`MaxRequestsPerMinute`'u 2 yapıp NPC'ye 3 kez tıkla).
 
 ## 3. Sonuç
 
-- Derleme + `RunAllChecks.ps1` geçti, 1–19 geçti → PR'ı draft'tan çıkarıp birleştir.
+- Derleme + `RunAllChecks.ps1` geçti, 1–18 geçti → PR'ı draft'tan çıkarıp birleştir.
 - Başarısız adım varsa: hangi satır, ne gördün, log (`Saved/Logs/MyProject.log`, `[MMODBG]`/`Error:`) → bana yaz.
 - Bu PR'ın kapsamı dışında: parti/ticaret bileşenleri (yerelde Codex'te), `Config/`, `Content/`, kayıt biçimi.

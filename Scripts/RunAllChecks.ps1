@@ -29,6 +29,11 @@ Step "Statik C++ kontrolu (StaticLint.py; derleme degildir)" {
     $LASTEXITCODE -eq 0
 }
 
+Step "PlaytestMetrics fixture testi (TestPlaytestMetrics.py)" {
+    & $py (Join-Path $PSScriptRoot "TestPlaytestMetrics.py") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 if (-not $SkipBuild) {
     Step "Derleme (MyProjectEditor)" {
         $out = & $ue MyProjectEditor Win64 Development "-Project=$root\MyProject.uproject" -WaitMutex 2>&1

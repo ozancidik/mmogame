@@ -1,6 +1,8 @@
 # İlk oyun içi test planı (≈45 dk, 2 oyuncu)
 
-Bu plan `docs/PLAYTEST_CHECKLIST.md`'nin (2900+ satır) en riskli yerlerini sıraya koyar. Hepsi
+> **Sıra ve geçti/kaldı şablonu için önce `docs/PLAYTEST_RUNBOOK.md`.** Bu sayfa, runbook Kapı 2'nin komut/tuş ayrıntısıdır.
+
+Bu plan `docs/PLAYTEST_CHECKLIST.md`'nin (3300+ satır, 992 açık madde; 2026-10-05) en riskli yerlerini sıraya koyar. Hepsi
 derlendi ve görüntüsüz (headless) duman testinden geçti (`Scripts/SmokeTest.ps1`, `Scripts/NetSmokeTest.ps1`),
 ama **hiçbiri gerçek oyunda oynanmadı**. Önce 1–3 çalışmıyorsa diğerlerinin anlamı yok.
 

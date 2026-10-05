@@ -219,11 +219,13 @@ Görevli yolun sırası: `Q_Goblins` (5 öldürme) Lv1'de alınır, tesliminde L
 KO/Rise tarzı beklenen döngü (yalnız genel referans, doğrulanmadı): hub → kısa görev → bölge avı → parti → boss; ölümün bir bedeli; ekonomide anlamlı harcama; beceri/stat seçimleri. Maddeler bağımlılık sırasıyla. Boyut: S ≈ ≤1 gün, M ≈ 2–4 gün, L ≈ >1 hafta (tahmin `[VARSAYIM]`). Tüm sayısal hedefler `[PLACEHOLDER]`.
 
 ### 1. PIE telemetrisi + BalanceReport v2 — **M**
+- **Durum (2026-10-05): büyük kısmı yapıldı (master, PIE ölçümü yok).** `[MMOMETRIC]` `levelup`/`kill`/`death`/`gold` satırları ve `Scripts/PlaytestMetrics.py` özeti var; BalanceReport v2'nin işini `Scripts/ProgressionModel.py` (görevli, bölge sınırlı) görüyor. **Açık:** `quest_accept`/`quest_claim`/`first_*` olayları, (d) maddesinin karşılaştırması. Koşu adımları: `docs/PLAYTEST_RUNBOOK.md`.
 - **Oyuncu deneyimi:** Doğrudan yok; sonraki her ayarın ölçülebilir olması.
 - **Dosya kapsamı:** `MMOStatsComponent.cpp` (seviye atlama, ölüm cezası), `MMOMob.cpp` (öldürme, altın), `MMOInventoryComponent.cpp` (altın giriş/çıkış kaynağı: ganimet, satış, satın alma, yükseltme, iksir), `MMOQuestComponent.cpp` (kabul/teslim), `MMOPlayerController.cpp` (Şifacı), yeni `Scripts/PlaytestMetrics.py`, `Scripts/BalanceReport.py` v2 (bölge sınırlı + görev XP'si + senaryo seçeneği).
 - **Kabul ölçütü:** (a) 20 dk'lık PIE koşusunda sunucu logunda `[MMOMETRIC]` satırları: `levelup`, `kill`, `death`, `gold`, `quest_accept`, `quest_claim`, `first_*`; (b) tek komutla seviye başına süre/öldürme/ölüm/altın giriş-çıkış/XP kaynağı tablosu; (c) yalnız sunucu, oyun davranışı değişmez (derleme + `SmokeTest.ps1` geçer); (d) BalanceReport v2 çıktısı §1.5 tablosunu ±1 öldürmeyle yeniden üretir.
 
 ### 2. Başlangıç paketi ve doğuş doğrulaması — **S**
+- **Durum (2026-10-05): yapıldı (master, `AMMOCharacter::GrantStarterPack`; PIE'de doğrulanmadı).** Kısa Kılıç + Deri Zırh kuşanılı, 3 Can İksiri; yalnız kayıt dosyası olmayan yeni karakter dalında. Doğuşta 3 dk güvenlik testi `PLAYTEST_CHECKLIST.md`'de bekliyor.
 - **Oyuncu deneyimi:** İlk dakikada silahsız/iksirsiz kalmamak; ilk görev ödülünün (120 g) silaha yetmemesi çözülür.
 - **Dosya kapsamı:** `MMOCharacter.cpp` (yeni karakter dalı, ~satır 515–535), `MMOInventoryComponent.cpp` (verme + kuşanma). Sınıf ayrımı yok (eşya tablosunda sınıf kısıtı yok).
 - **Kabul ölçütü:** Yeni karakter ilk 10 sn'de Kısa Kılıç + Deri Zırh kuşanılı, 3 Can İksiri; kayıt-yükle-kayıt sonrası tekrar verilmez (envanter sayısı sabit); var olan kayıtlar etkilenmez; başlangıç altını 0 kalır; yeni karakterle doğuş noktasında 3 dk beklemede hiçbir mob saldırmaz (§2.3'teki QA açığının PIE doğrulaması).

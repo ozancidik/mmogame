@@ -1,5 +1,7 @@
 # Güncel durum, açık sorunlar ve ilk oyun içi test sırası
 
+> **Test oturumu için başlangıç noktası: `docs/PLAYTEST_RUNBOOK.md`** (derle → `PR1_VERIFY` 1–18 → aşağıdaki ilk 7 test → `[MMOMETRIC]` koşusu, geçti/kaldı şablonu). Bu belge durum ve açık sorun listesidir.
+
 **Tarih:** 2026-10-04. Kaynak: `PLAYTEST_CHECKLIST.md`, `SECURITY_AUDIT.md`, `NETWORK_AUDIT.md`, `VERTICAL_SLICE_LV1_30.md`, `FIRST_PLAYTEST.md` ve kod sayımı. Bu belge oynanarak doğrulanmış hiçbir şey içermez; etiketler: **[KOD]** kaynakta okundu, **[BELGE]** başka bir belgeden alındı, **[TAHMİN]** doğrulanmadı.
 
 ## 1. Durum
@@ -7,7 +9,7 @@
 - 48 mob arketipi, 73 görev, 53 ekipman, 73 beceri (12'si 2026-10-04'te boşluk dolgusu, PLACEHOLDER değerli), 12 efekt; Lv1'den Lv80'e kesintisiz görev zinciri **[KOD]**.
 - Sistemler: stat, envanter, beceri, görev, parti, ticaret, klan, arkadaş, depo, sohbet, PvP kuralları, bölge geçişi (host `MMOTravel`), kayıt **[KOD]**.
 - Otomatik kontroller (veri denetimi, derleme, Summer/Winter duman testi, ağ bağlantı testi) geçiyor **[BELGE]**. Bunlar oyunun oynanabildiğini göstermez.
-- `PLAYTEST_CHECKLIST.md` içinde ~880 madde var, yalnızca 4'ü işaretli **[BELGE]**. Doğrulama borcu özellik üretiminden hızlı büyüyor.
+- `PLAYTEST_CHECKLIST.md` içinde 992 açık (`- [ ]`) madde var, yalnızca 4'ü işaretli (2026-10-05 sayımı) **[KOD]**. Doğrulama borcu özellik üretiminden hızlı büyüyor.
 
 ## 2. İlk oyun içi test sırası (yukarıdan aşağı; bir adım bozuksa durup düzelt)
 

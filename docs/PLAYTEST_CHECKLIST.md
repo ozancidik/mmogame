@@ -4,6 +4,8 @@ Bu dosya, Claude'un otonom (sen yokken) geliştirdiği özelliklerin **senin PIE
 Her özellik derlenip commit'lendiğinde buraya eklenir. Test edip onayladıkça maddeleri işaretle (`[x]`).
 
 > Not: Claude kodu yazar, derler ve derlendiğini garanti eder. Oynanış/his/görsel doğrulaması sana kalır.
+>
+> **Sayım (2026-10-05):** 992 açık (`- [ ]`), 4 işaretli (`- [x]`) madde. Hepsini sırayla deneme; önce `docs/PLAYTEST_RUNBOOK.md`.
 
 ---
 
