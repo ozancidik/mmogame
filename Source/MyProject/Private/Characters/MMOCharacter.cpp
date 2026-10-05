@@ -775,6 +775,13 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			}
 		}
 	}
+	// Uzak istemci diskte kaydi olan (baska birine ait) bir adi alamaz: aksi halde SaveCharacterForTravel
+	// bu karakter icin surekli reddedilir ve host'un bolge gecisi kilitlenir (QA O-3). Kendi yuvasina donus serbest.
+	if (!IsLocallyControlled() && !ActiveSaveSlot.Equals(CandidateSlot, ESearchCase::IgnoreCase)
+		&& UGameplayStatics::DoesSaveGameExist(CandidateSlot, 0))
+	{
+		return;
+	}
 	if (CooldownWorld)
 	{
 		LastSetNameServerTime = CooldownWorld->GetTimeSeconds();
