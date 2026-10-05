@@ -135,17 +135,18 @@ for (cls, tree), ranks in sorted(tree_ranks.items()):
     if ranks != set(range(1, max(ranks) + 1)):
         errors.append(f"{cls}/{tree}: rutbeler bosluklu -> {sorted(ranks)}")
 
-# Bilgi: sinif basina Lv1-30 arasinda yeni beceri gelmeyen 5+ seviyelik pencereler
+# Beceri boslugu (UYARI, CI kirmaz): sinif basina Lv1'den tablodaki en yuksek beceri seviyesine kadar, ardisik iki
+# yeni-beceri seviyesi arasindaki fark (sonraki - onceki) SKILL_GAP_LEVELS veya fazlaysa. Lv1 baslangic noktasi sayilir.
+# Fark 5 = arada 4 bos seviye (orn. Lv28 -> Lv33: Lv29-32).
+SKILL_GAP_LEVELS = 5
 by_class = {}
 for k in skills.values():
     by_class.setdefault(k["cls"], set()).add(k["lvl"])
 for cls, lvls in sorted(by_class.items()):
-    pts = sorted(l for l in lvls if l <= 30)
-    after = sorted(l for l in lvls if l > 30)
-    nxt = after[0] if after else 31  # Lv30 sonrasi ilk beceri (yoksa 31)
-    for a, b in zip(pts, pts[1:] + [nxt]):
-        if b - a >= 5:
-            warnings.append(f"{cls}: Lv{a} sonrasi Lv{b} oncesine kadar yeni beceri yok ({b - a} seviye)")
+    pts = sorted(lvls | {1})
+    for a, b in zip(pts, pts[1:]):
+        if b - a >= SKILL_GAP_LEVELS:
+            warnings.append(f"{cls}: beceri boslugu Lv{a} -> Lv{b} (Lv{a + 1}-{b - 1} arasi yeni beceri yok, {b - a} seviye)")
 
 # On kosul dongusu
 for qid in quests:

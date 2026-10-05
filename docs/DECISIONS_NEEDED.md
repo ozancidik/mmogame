@@ -86,7 +86,7 @@ Ceza, **öldürme eşdeğeri** olarak (mevcut eğri, gereken XP ÷ ortalama XP/�
 
 ## 5. Lv28–33 beceri boşluğu
 
-**Neden önemli:** `ValidateData.py` dört sınıfta da "Lv28 sonrası Lv33 öncesine kadar yeni beceri yok (5 seviye)" UYARI basıyor **[Kesin]**. Lv28 ve Lv33 becerileri: `MMOSkillDatabase.cpp:99,101` (Savaşçı), `150,152` (Okçu), `201,203` (Büyücü), `270,272` (Rahip). Kod okununca daha büyük boşluk çıktı: dört sınıfta da Lv33'ten sonraki ilk beceri **Lv45** (12 seviye) **[Kesin]**; `ValidateData.py` yalnız Lv30 civarına kadar baktığı için bunu uyarmıyor (`Scripts/ValidateData.py:145`). Lv30'da 49–51 harcanmamış beceri puanı birikiyor (`VERTICAL_SLICE_LV1_30.md`).
+**Neden önemli:** `ValidateData.py` dört sınıfta da "beceri boslugu Lv28 -> Lv33 (Lv29-32 arasi yeni beceri yok, 5 seviye)" UYARI basıyor **[Kesin]**. Lv28 ve Lv33 becerileri: `MMOSkillDatabase.cpp:99,101` (Savaşçı), `150,152` (Okçu), `201,203` (Büyücü), `270,272` (Rahip). Kod okununca daha büyük boşluk çıktı: dört sınıfta da Lv33'ten sonraki ilk beceri **Lv45** (12 seviye) **[Kesin]**; `ValidateData.py` artık bunu uyarıyor: denetim tüm seviye aralığına (Lv1 → tablodaki en yüksek beceri seviyesi) genişletildi, eşik `SKILL_GAP_LEVELS = 5` (fark ≥ 5), yalnız UYARI (CI kırmaz). Dört sınıfta da uyarılan aralıklar: 28→33 (5), 33→45 (12), 45→58 (13), 58→70 (12), 70→80 (10) **[Kesin]**. Lv30'da 49–51 harcanmamış beceri puanı birikiyor (`VERTICAL_SLICE_LV1_30.md`).
 
 Ödülsüz aralığın uzunluğu (görevli model öldürme toplamı, mevcut eğri) **[Kesin, model]**: Lv28→33 ≈ 96 öldürme, Lv33→45 ≈ 245 öldürme.
 
@@ -96,7 +96,7 @@ Ceza, **öldürme eşdeğeri** olarak (mevcut eğri, gereken XP ÷ ortalama XP/�
 | (b) Lv33 becerilerini Lv31'e çek | 4 satırda tek sayı; uyarı kaybolur | 31→45 boşluğu 14 seviyeye **büyür**; sorunu taşır, çözmez |
 | (c) Her sınıfa Lv31 ve Lv39 civarı birer yeni beceri (8 satır) | İki aralık 3–6 seviyeye iner | Değerler `[PLACEHOLDER]`; puan fazlası artar |
 
-- **Önerim [Tahmin]:** (c), ama önce 33→45 boşluğunun kabul edilip edilmediğine karar ver; yalnız 28→33'ü kapatmak (b) yanlış hedef. `ValidateData.py` kontrolünün Lv80'e genişletilmesi ayrı küçük iş.
+- **Önerim [Tahmin]:** (c), ama önce 33→45 boşluğunun kabul edilip edilmediğine karar ver; yalnız 28→33'ü kapatmak (b) yanlış hedef. `ValidateData.py` kontrolü Lv80'e genişletildi (yapıldı); (c) sonrası 33→39 ve 39→45 (6'şar seviye) hâlâ uyarı verir.
 - **Değişecek dosya:** `Source/MyProject/Private/Skills/MMOSkillDatabase.cpp` (her sınıf bloğuna `MakeDef` satırı, mevcut kalıp; Savaşçı 99–101, Okçu 150–152, Büyücü 201–203, Rahip 270–272 civarı). (b) seçilirse yalnız satır 101, 152, 203, 272'de seviye alanı.
 - **Gereken veri:** `levelup` olaylarından Lv28→33 ve Lv33→45 süresi (dk). Beceri kullanımı için `[MMOMETRIC]` olayı **yok**; "oyuncu sıkılıyor mu" ancak test notuyla (runbook "Genel his") anlaşılır.
 

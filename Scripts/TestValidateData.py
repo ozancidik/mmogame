@@ -41,6 +41,35 @@ CASES = [
      "parti bonusu 0.90 [0, 0.5] disinda", True),
 ]
 
+# Beceri boslugu (UYARI) senaryolari: MMOSkillDatabase.cpp'deki her MakeDef'in ReqLevel alani bir eslemeyle yeniden
+# yazilir (sahte seviye tablosu). Gercek seviyeler: 1-28 arasi sik, sonra 33, 45, 58, 70, 80.
+SKILLS = P + "Skills/MMOSkillDatabase.cpp"
+SKILL_LVL = re.compile(r'(MakeDef\(TEXT\("[^"]+"\),\s*TEXT\("[^"]*"\),\s*C::(\w+),\s*T::\w+,\s*\d+,\s*)(\d+)')
+GAPLESS = {33: 31, 45: 34, 58: 37, 70: 40, 80: 43}  # tum farklar <= 4
+GAP_RE = re.compile(r"UYARI: \w+: beceri boslugu ")
+
+
+def remap_skills(src, warrior_extra=None):
+    def sub(m):
+        lv = int(m.group(3))
+        lv = GAPLESS.get(lv, lv)
+        if warrior_extra and m.group(2) == "Warrior":
+            lv = warrior_extra.get(lv, lv)
+        return m.group(1) + str(lv)
+    return SKILL_LVL.sub(sub, src)
+
+
+# (ad, donusum, cikti icinde OLMASI gereken satirlar, beklenen toplam bosluk uyarisi sayisi)
+SKILL_CASES = [
+    ("Bosluksuz sahte tablo -> bosluk uyarisi yok", remap_skills, [], 0),
+    ("Lv30 alti bosluk tek uyari (eski Lv1-30 kurali ile cift sayilmaz)", lambda s: remap_skills(s, {24: 22}),
+     ["UYARI: Warrior: beceri boslugu Lv22 -> Lv28 (Lv23-27 arasi yeni beceri yok, 6 seviye)"], 1),
+    ("Kasitli bosluk (Warrior Lv43 -> Lv60)", lambda s: remap_skills(s, {43: 60}),
+     ["UYARI: Warrior: beceri boslugu Lv40 -> Lv60 (Lv41-59 arasi yeni beceri yok, 20 seviye)"], 1),
+    ("Esik siniri (fark 4 uyarmaz, fark 5 uyarir)", lambda s: remap_skills(s, {43: 45}),
+     ["UYARI: Warrior: beceri boslugu Lv40 -> Lv45 (Lv41-44 arasi yeni beceri yok, 5 seviye)"], 1),
+]
+
 
 def run(tmp):
     r = subprocess.run([sys.executable, str(tmp / "Scripts" / "ValidateData.py")], capture_output=True, text=True)
@@ -78,11 +107,33 @@ def main():
                 failures.append(f"[{name}] yalniz UYARI bekleniyordu ama cikis kodu {code}\n{out}")
             else:
                 print(f"yakalandi: {name}")
+        for name, fn, expects, count in SKILL_CASES:
+            tmp = Path(td) / "case"
+            if tmp.exists():
+                shutil.rmtree(tmp)
+            shutil.copytree(base, tmp)
+            f = tmp / SKILLS
+            src = f.read_text(encoding="utf-8")
+            if not SKILL_LVL.search(src):
+                failures.append(f"[{name}] MakeDef seviye deseni bulunamadi")
+                continue
+            f.write_text(fn(src), encoding="utf-8")
+            code, out = run(tmp)
+            gaps = [l for l in out.splitlines() if GAP_RE.match(l)]
+            missing = [e for e in expects if e not in out]
+            if code != 0:
+                failures.append(f"[{name}] yalniz UYARI bekleniyordu ama cikis kodu {code}\n{out}")
+            elif missing:
+                failures.append(f"[{name}] beklenen satir yok: {missing}\n{out}")
+            elif len(gaps) != count or len(set(gaps)) != len(gaps):
+                failures.append(f"[{name}] {count} bosluk uyarisi bekleniyordu, {len(gaps)} geldi:\n" + "\n".join(gaps))
+            else:
+                print(f"yakalandi: {name}")
     for f in failures:
         print("KALDI:", f)
     if failures:
         return 1
-    print(f"ValidateData negatif testi gecti ({len(CASES)} senaryo).")
+    print(f"ValidateData negatif testi gecti ({len(CASES) + len(SKILL_CASES)} senaryo).")
     return 0
 
 
