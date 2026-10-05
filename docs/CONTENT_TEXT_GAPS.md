@@ -1,6 +1,13 @@
 # Lv1–30 Metin Boşluk Analizi (görev + NPC replikleri)
 
-**Durum:** Salt okunur analiz, 2026-10-05. Kod değiştirilmedi. Bu belgedeki bütün taslaklar **öneri, koda işlenmedi**.
+**UYGULANDI: 2026-10-05, commit 138c642** (Codex'in "Ticaret ve parti davet kapma korumalarini tamamla" commit'ine karisti: ayni anda commit alindi; MMOQuestTypes.cpp ve MMOGameMode.cpp degisiklikleri o commit'in icinde). Yalniz metin dizeleri; ID/sayi/odul/mantik degismedi. Derleme + `RunAllChecks.ps1 -SkipBuild` GECTI; oyunda gorulmedi.
+- Uygulanan (MMOQuestTypes.cpp, ASCII): G1 Q_Goblins; G2 Q_Trolls (kismen, asagida); G3 Q_Warlocks/OrcWarriors/DireWolves; G5 Q_SpiderQueen/StoneGolem; G6 Q_FrostWraiths; G7 Q_ObsidianWarlord; G8 Q_ObsidianStalkers/Sentinels/Raiders; G10 Q_Gold500/1000/5000 + Q_Level5. Hub: Kael FallbackLines'a G1 satiri (MMOGameMode.cpp).
+- Q_Trolls: fiil duzeltildi ("avla") ama "Bataklik kiyisi" yazilmadi, "Kiyilarda" notr birakildi; troller haritada baslangic alaninda, yer karari §3 soru 5 acik.
+- Uygulanmayan: G4 ve G9 (yalniz Lore.md/replik degisikligi; Lore.md'ye dokunulmadi, GenQuestDialogue.py ile uretilecek). G2 "alis" metni de ayni sebeple. Q_Orcs, Q_Gold15000/30000: belgede taslak yok.
+- Hub satirlari: yalniz tek basina anlasilan Kael G1 eklendi. Karakaya/Obsidyen/Ayazdis/Alev bolge satirlari uygulanmadi (havuz seviyeye bakmiyor, §3 soru 8 acik). Lyra satirlari uygulanmadi (havuz iyilestirme onayi balonu olarak da kullaniliyor, "Tanrica" sorusu §3 soru 1 acik). Merek G4/G10 satirlari goreve bagli ("onu kendin getireceksin") oldugu icin uygulanmadi.
+- Q_DuskGuardians "geçit" (§4) yeni bolgeye ait, taslak yok, dokunulmadi.
+
+**Durum (asagisi ilk analiz):** Salt okunur analiz, 2026-10-05. Bu belgedeki taslaklar yukaridaki notta belirtilenler disinda **öneri, koda işlenmedi**.
 
 **Okunan kaynaklar:** `docs/Lore.md`, `docs/NpcDialogue.md`, `docs/VERTICAL_SLICE_LV1_30.md`, `Source/MyProject/Private/Quests/MMOQuestTypes.cpp`, `Quests/MMOQuestDialogue.cpp`, `World/MMO*NPC.cpp` ve `MMOHealerNPC.h`, `Core/MMOGameMode.cpp` (Kael ve elit spawner bölümü), `Items/MMOItemDatabase.cpp` ile `MMOConsumableDatabase.cpp` (ödül adları), `UI/MMOHUD.cpp` (görev metninin gösterildiği yer).
 
