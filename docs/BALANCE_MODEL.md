@@ -96,3 +96,33 @@ Betik: `python3 Scripts/EconomyModel.py [--upgrade-to N]`. Gelir = öldürme (il
 - [Muhtemel] Lv1–9 altın **kıt** (gelir/gider 0,5–1,3): ilk set ancak görev altınıyla alınır, bu "kıtlık yalnız Lv1–8" hedefiyle uyumlu. Lv16'dan itibaren gelir giderin 9–224 katı: ekipman ve +3 yükseltme altını hiç zorlamıyor, altın birikir. `VERTICAL_SLICE_LV1_30.md`'nin "faucet bol, sink zayıf" bulgusunu doğruluyor.
 - Yükseltme maliyeti `50×(artı+1)`, seviyeden bağımsız; ekipman fiyatı yalnız `12×(atk+def) + 25×seviye + 50` ile büyüyor. Gelir ise mob altınıyla ~×1,2/seviye büyüyor, bu yüzden oran açılıyor.
 - **Karar bekleyen:** yeni altın sink'i (ör. yükseltme/iksir/şifacı maliyetini seviyeyle ölçekle) ya da gelir düşürme. Ölçüm (`[MMOMETRIC]` `gold` olayları) olmadan körlemesine olur. Q_Gold* görevleri birikimi ödüllendirdiği için bu dengesizliği büyütüyor.
+
+## Uygulanan ayar (2026-10-04, DERLENMEDI): XP çarpan eğrisi, parti bonusu, Q_Gold
+
+**Tek ayar noktası:** `Source/MyProject/Private/Core/MMOXPTuning.cpp`. Mob XP'si mob seviyesine, görev ödül XP'si görev kapı seviyesine göre çarpılır (tablo değerleri ham kalır; çarpan `MakeMob`/`MakeQuest` içinde uygulanır). `Scripts/ProgressionModel.py` varsayılan olarak **aynı eğriyi dosyadan okur** (`--raw` ile çarpansız).
+
+| Seviye | 1 | 5 | 8 | 10 | 12 | 16 | 20 | 25 | 30 | 34+ |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Mob XP çarpanı | 1,00 | 1,00 | 0,70 | 0,50 | 0,40 | 0,30 | 0,25 | 0,33 | 0,55 | 1,00 |
+| Görev XP çarpanı | 1,00 (≤4) | | 0,60 | | 0,40 | 0,30 | 0,26 | 0,25 | 0,26 | 1,00 |
+
+Lv1–5 aynen (hızlı giriş), Lv34+ kalibre içerik değişmedi. Eğri, modelde seviye başına öldürme sayısını hedef bantlara yaklaştırmak için rasgele arama ile bulundu ve yuvarlandı.
+
+**Model sonucu (görevli, öldürme/seviye; önce → sonra):**
+
+| Bant | Önce | Sonra | Hedef `[PLACEHOLDER]` |
+|---|---:|---:|---|
+| 1–5 | 6,4 | 6,4 | 3–5 (modelin tabanı: görev öldürmeleri) |
+| 6–10 | 6,0 | 6,0 | 6–9 |
+| 11–15 | 1,2 | 1,2 | 9–13 |
+| 16–20 | 3,2 | 3,2 | 11–15 |
+| 21–25 | 5,4 | 12,9 | 13–18 |
+| 26–30 | 4,4 | 18,5 | 14–20 |
+
+Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/seviye ve kesintisiz (Lv34'te çarpan 1,0'a döner).
+
+**Dürüst sınır [Muhtemel]:** Lv11–20 modelde hâlâ "bedava" kalıyor. Sebep: Lv5–10 görevlerinin **zorunlu öldürme sayıları** (≈70 öldürme × yüksek seviyeli mob XP'si) ve ödülleri, Lv11–20 eşiklerinin üstünde birikim sağlıyor; çarpan eğrisini ne kadar düşürsem de (denenen yüzlerce kombinasyon) bu bantlar kıpırdamıyor. Bunu düzeltmek için Lv6–12 mob/görev XP'sini çok daha agresif düşürmek (yani Lv6–10'u da yavaşlatmak) ya da görev öldürme sayılarını artırmak gerekir. Ölçüm (`[MMOMETRIC]`) olmadan yapılmadı.
+
+**Parti bonusu:** Parti hasar payı artık ekstra üye başına +%10 çarpılır (`AMMOMob::HandleDeath`): 2 kişide toplam ×1,1, 8 kişide ×1,7; kişi başı pay `bonus/üye sayısı`. Tek başına oynayan için değişiklik yok.
+
+**`Q_Gold*`:** Ham XP ödülleri düşürüldü: `Q_Gold500` 300→150, `Q_Gold1000` 500→250, `Q_Gold5000` 6000→4000 (üstüne kapı-seviyesi çarpanı uygulanır). Altını harcatma seçeneği uygulanmadı: ekonomi modeline göre bu tutarlar toplam gelirin yanında önemsiz, yani gerçek bir altın çıkışı üretmez.

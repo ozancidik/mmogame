@@ -47,11 +47,13 @@ Yeni dosyalar (`Core/MMONotify.h/.cpp`) eklendi: derleme "dosya bulunamadı"/ba�
 | 15 | İstemci tek hafif vuruş yapıp çekilsin, host öldürsün | İstemci en az 1 XP alır, host ~%99 | XP payı |
 | 16 | İki kişilik partiyle %50/%50 hasarla öldür | Her üye partinin payının yarısını alır (toplam %100; 8 kişide herkes 1/8) | Parti bölme |
 | 17 | Host mob öldürsün, istemci hemen cesedin üstünden geçsin (hasarsız) | İlk 10 sn ganimet toplayamaz; ~10 sn sonra üstünde duruyorsa otomatik toplar | Ganimet |
+| 18 | Aynı arketipi Lv8/12/20/34+ seviyelerinde öldür, `[MMOMETRIC] xp=` değerini eski değerle kıyasla | Mob XP'si ~%70 / %40 / %25 / %100 (`MMOXPTuning`); Lv1–5 değişmez | XP eğrisi |
+| 19 | 2 kişilik partiyle %50/%50 öldür | Her üye partinin payının %55'ini alır (parti bonusu +%10/ekstra üye) | Parti bonusu |
 
 İsteğe bağlı: parolalı sunucu (`-MMOPassword=test123`, istemci `?Password=test123`) ve NPC hız sınırı (`MaxRequestsPerMinute`'u 2 yapıp NPC'ye 3 kez tıkla).
 
 ## 3. Sonuç
 
-- Derleme + `RunAllChecks.ps1` geçti, 1–17 geçti → PR'ı draft'tan çıkarıp birleştir.
+- Derleme + `RunAllChecks.ps1` geçti, 1–19 geçti → PR'ı draft'tan çıkarıp birleştir.
 - Başarısız adım varsa: hangi satır, ne gördün, log (`Saved/Logs/MyProject.log`, `[MMODBG]`/`Error:`) → bana yaz.
 - Bu PR'ın kapsamı dışında: parti/ticaret bileşenleri (yerelde Codex'te), `Config/`, `Content/`, kayıt biçimi.

@@ -3310,3 +3310,13 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - **Yanlis slottaki esya** cantaya, doluysa depoya (kapasite yuklemede asilabilir; esya silinmez, yanlis slotta kalmaz); `NextInstanceId` depodakileri de sayar.
 - **`?Name=` 20 karakter:** motor ham ad degerini 20 karakterle keser; PreLogin ayni kesimle karsilastirir. 16 rastgele ad cakisirsa GUID tabanli benzersiz yedek ad verilir.
 - **NPC hiz siniri:** baslatilamayan istek dakika sinirini tuketmez.
+
+# XP hiz ayari, parti bonusu, Q_Gold* — 2026-10-04 (DERLENMEDI, PIE yok)
+
+> Ayrintilar ve model sonuclari: `docs/BALANCE_MODEL.md` ("Uygulanan ayar"). Degerler `[PLACEHOLDER]`; **asil dogrulama `[MMOMETRIC]` olcumu**.
+
+- [ ] **Carpan egrisi calisiyor mu:** Yeni karakter, solo Savasci. Lv1-5 mob/gorev XP'si eskisi gibi hizli olmali. `[MMOMETRIC] ev=kill` satirlarinda ayni mob icin `xp=` degeri eskisinden dusuk: Lv8 mobu ~%70, Lv12 ~%40, Lv20 ~%25, Lv34+ eskisi gibi (%100). (`MMOGainXP` ile seviye atlayip ayni arketipi ayni seviye farkiyla oldurerek karsilastir.)
+- [ ] **Seviye basina oldurme (Lv20-30):** Lv21-30 arasi seviye basina ~13-20 oldurme olmali (model 12,9 / 18,5). Lv11-20 hala cok hizli cikabilir (modelde 1,2 / 3,2): bu **beklenen sinir**, olcumle karar ver.
+- [ ] **Lv34 gecisi:** Lv33 -> Lv35 arasinda mob XP'sinde ani siçrama/dusus olmamali (carpan 0,55 -> 1,0, dogrusal).
+- [ ] **Gorev odulleri:** `Q_Gold500` 150, `Q_Gold1000` 250 XP; `Q_Gold5000` kapi Lv16 oldugundan ~1200 XP; Lv8+ gorev odulleri eskisinden dusuk (gorev penceresi ve teslim mesajinda gorunen XP).
+- [ ] **Parti bonusu:** 2 kisilik partide ayni mobu birlikte (%50/%50 hasar) oldurun: her uye payin **%55'ini** (=1,1/2) almali; toplam parti XP'si solo oldurmenin ~1,1 kati. 4 kisilik partide kisi basi 1,3/4 = %32,5. Tek basina oldurme: degisiklik yok.

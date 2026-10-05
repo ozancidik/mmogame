@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Quests/MMOQuestTypes.h"
+#include "Core/MMOXPTuning.h"
 
 namespace
 {
@@ -15,7 +16,8 @@ namespace
 		Q.Type = Type;
 		Q.TargetMob = (TargetMob && *TargetMob) ? FName(TargetMob) : NAME_None;
 		Q.TargetCount = Count;
-		Q.RewardXP = RewardXP;
+		// Ham tablo odul XP'si kapi seviyesine gore olceklenir (MMOXPTuning).
+		Q.RewardXP = FMath::Max(0, FMath::RoundToInt(RewardXP * MMOXPTuning::QuestMultiplier(ReqLevel)));
 		Q.RewardGold = RewardGold;
 		Q.RequiredLevel = ReqLevel;
 		Q.PrereqQuestId = (Prereq && *Prereq) ? FName(Prereq) : NAME_None;
@@ -288,7 +290,7 @@ namespace
 		Table.Last().RewardConsumableCount = 2;
 
 		Table.Add(MakeQuest(TEXT("Q_Gold500"), TEXT("Tuccar Ruhu"), TEXT("500 altin biriktir."),
-			T::HaveGold, TEXT(""), 500, 300, 0, 1));
+			T::HaveGold, TEXT(""), 500, 150, 0, 1)); // XP 300->150 (Q_Gold* bedava XP ayari)
 
 		// Elit yan gorev: Orumcek Ana (bagimsiz — kurt surusunu bitirenlere acilir).
 		Table.Add(MakeQuest(TEXT("Q_SpiderQueen"), TEXT("Orumcek Ana"), TEXT("Magaranin dehsetini yok et: Orumcek Ana'yi oldur."),
@@ -337,7 +339,7 @@ namespace
 
 		// Buyuk servet (bagimsiz altin biriktirme).
 		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("1000 altin biriktir."),
-			T::HaveGold, TEXT(""), 1000, 500, 0, 3));
+			T::HaveGold, TEXT(""), 1000, 250, 0, 3)); // XP 500->250
 
 		// --- Lv16-40 kilometre tasi gorevleri (SPAWNER/MOB GEREKTIRMEZ) ---
 		// Bu blok bilerek sadece ReachLevel/HaveGold tipinde: ikisi de oyuncunun mevcut
@@ -368,7 +370,7 @@ namespace
 
 		// Altin biriktirme zinciri devami: Q_Gold1000 -> Q_Gold5000 -> Q_Gold15000.
 		Table.Add(MakeQuest(TEXT("Q_Gold5000"), TEXT("Vadinin Tuccari"), TEXT("5000 altin biriktir."),
-			T::HaveGold, TEXT(""), 5000, 6000, 0, 16, TEXT("Q_Gold1000")));
+			T::HaveGold, TEXT(""), 5000, 4000, 0, 16, TEXT("Q_Gold1000"))); // XP 6000->4000 (kapi Lv16 carpani x0.3 ile ~1200)
 
 		Table.Add(MakeQuest(TEXT("Q_Gold15000"), TEXT("Efsanevi Servet"), TEXT("15000 altin biriktir."),
 			T::HaveGold, TEXT(""), 15000, 14000, 0, 28, TEXT("Q_Gold5000")));

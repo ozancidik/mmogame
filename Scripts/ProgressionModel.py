@@ -17,6 +17,7 @@ Bu bir MODEL'dir, oynanis olcumu degil: yurume/geri donus, olum, parti ve gercek
 Cikti hedefleri [PLACEHOLDER]: docs/VERTICAL_SLICE_LV1_30.md 3. is (XP hiz yeniden ayari).
 
 Ayar denemesi (kodu DEGISTIRMEZ; yalniz modele uygular):
+  Varsayilan: koddaki carpan egrisi (Source/.../Core/MMOXPTuning.cpp); --raw ile carpansiz.
   --mob-mult   "1:1.0,10:0.6,30:0.35"   mob XP carpani, mob seviyesine gore parcali dogrusal
   --quest-mult "1:1.0,16:0.5,30:0.4"    gorev odul XP carpani, gorev kapi seviyesine gore
 """
@@ -76,6 +77,22 @@ def avg_xp_per_kill(level):
     return sum(pool) / len(pool) if pool else None
 
 
+def load_code_curves():
+    """Source/.../Core/MMOXPTuning.cpp'deki XP_TUNING_MOB / XP_TUNING_QUEST egri noktalarini okur (kodla ayni degerler)."""
+    path = SRC / "Core" / "MMOXPTuning.cpp"
+    if not path.exists():
+        return None, None
+    txt = path.read_text(encoding="utf-8", errors="replace")
+    res = []
+    for key in ("XP_TUNING_MOB", "XP_TUNING_QUEST"):
+        m = re.search(key + r":[^\n]*\n[^{]*\{(.*?)\};", txt, re.S)
+        if not m:
+            return None, None
+        pts = re.findall(r"\{\s*(\d+)\s*,\s*([\d.]+)f\s*\}", m.group(1))
+        res.append(",".join(f"{a}:{b}" for a, b in pts))
+    return res[0], res[1]
+
+
 def parse_curve(text):
     """"lv:deger,lv:deger" -> parcali dogrusal f(lv) (uclarda sabit)."""
     if not text:
@@ -92,8 +109,12 @@ def parse_curve(text):
     return f
 
 
-def simulate(max_level, mob_mult=lambda lv: 1.0, quest_mult=lambda lv: 1.0):
+def simulate(max_level, mob_mult=None, quest_mult=None):
     """Seviye basina (lv, gerekenXP, ortXP/kill, kill gorevsiz, kill gorevli, kum.gorevXP, kum.Q_Gold, grind) satirlari."""
+    if mob_mult is None or quest_mult is None:
+        mtxt, qtxt = load_code_curves()  # varsayilan: koddaki (MMOXPTuning) carpanlar
+        mob_mult = mob_mult or parse_curve(mtxt or "")
+        quest_mult = quest_mult or parse_curve(qtxt or "")
     is_gold = lambda q: q["id"].startswith("Q_Gold")
     is_kill = lambda q: q["type"].startswith("Kill") and q["count"] > 0
 
@@ -145,11 +166,15 @@ def band_avgs(out):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--max", type=int, default=79, help="son seviye (L -> L+1)")
-    ap.add_argument("--mob-mult", default="")
-    ap.add_argument("--quest-mult", default="")
+    ap.add_argument("--mob-mult", default=None, help="varsayilan: koddaki MMOXPTuning egrisi")
+    ap.add_argument("--quest-mult", default=None)
+    ap.add_argument("--raw", action="store_true", help="carpansiz (ham tablo) XP ile hesapla")
     args = ap.parse_args()
 
-    out = simulate(args.max, parse_curve(args.mob_mult), parse_curve(args.quest_mult))
+    ident = parse_curve("")
+    mob_f = ident if args.raw else (parse_curve(args.mob_mult) if args.mob_mult is not None else None)
+    quest_f = ident if args.raw else (parse_curve(args.quest_mult) if args.quest_mult is not None else None)
+    out = simulate(args.max, mob_f, quest_f)
 
     print(f"Normal mob: {len(normals)}  Gorev: {len(quests)} (Q_Gold*: {sum(1 for q in quests if q['id'].startswith('Q_Gold'))})")
     print("Not: gorevli sutun, kapisi acilmis TUM gorevlerin (Q_Gold* haric) yapildigini varsayar (iyimser).")

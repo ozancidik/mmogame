@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/MMOMobArchetype.h"
+#include "Core/MMOXPTuning.h"
 
 namespace
 {
@@ -14,7 +15,8 @@ namespace
 		A.Strength = Str;
 		A.Vitality = Vit;
 		A.AttackDamage = Dmg;
-		A.XPReward = XP;
+		// Ham tablo XP'si seviye carpaniyla olceklenir (MMOXPTuning; ilerleme hizi tek noktadan ayarlanir).
+		A.XPReward = FMath::Max(1, FMath::RoundToInt(XP * MMOXPTuning::MobMultiplier(Level)));
 		A.MinGold = MinGold;
 		A.MaxGold = MaxGold;
 		A.MoveSpeed = Speed;
