@@ -3434,3 +3434,11 @@ Arac kaniti: `MMOStatsComponent/MMOCharacter/MMOInventoryComponent/MMOMob/MMOGam
 - [ ] Aynı oyuncular partiye veya aynı klana girsin: tıkla-saldır hasar vermemeli ve saldıran istemci geçici ret ipucunu görmeli.
 - [ ] Host `MMOPvP 0` yazsın: oyuncuya tıkla-saldır hasar vermemeli; mob hedefleme ve otomatik saldırı eskisi gibi çalışmalı.
 - [ ] Hub içinde oyuncu veya mob hedefle: hasar olmamalı ve tek yenilenen `Guvenli bolgede saldiri yok` satırı görünmeli; ekran mesajı yığılmamalı.
+
+## Sunucu genelinde elit duyurusu — 2026-10-05
+
+Elit ölüm duyurusu mob aktöründeki NetMulticast'tan çıkarıldı. Sunucu artık bağlı `AMMOPlayerController` listesini dolaşıp her oyuncunun sahip istemcisine Reliable sohbet RPC'si gönderir. Böylece mobun ağ ilgililik/cull mesafesi dışındaki oyuncular da duyuruyu alır. C++ derlemesi temiz geçti; çoklu istemci PIE doğrulaması bekliyor.
+
+- [ ] Host + iki istemci aç; istemci B elit mobdan ağ cull mesafesinin (12000 uu) dışında dursun. Host/istemci A eliti öldürsün: üç oyuncunun sohbetinde de tek `[Dunya]` satırı görünmeli.
+- [ ] Aynı testi listen server hostu öldürücü vuruşu yaparken tekrarla: hostta satır bir kez görünmeli, çift duyuru olmamalı.
+- [ ] Normal mob öldür: dünya duyurusu oluşmamalı.

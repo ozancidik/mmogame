@@ -19,6 +19,7 @@
 #include "Components/MMOTradeComponent.h"
 #include "Components/MMOClanComponent.h"
 #include "Components/MMOFriendsComponent.h"
+#include "Player/MMOPlayerController.h"
 #include "AIController.h"
 #include "NavigationSystem.h"
 #include "Engine/SkeletalMesh.h"
@@ -33,7 +34,6 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Net/UnrealNetwork.h"
-#include "UI/MMOHUD.h"
 #include "GameFramework/PlayerController.h"
 
 AMMOMob::AMMOMob()
@@ -383,24 +383,6 @@ void AMMOMob::MulticastPlayCreatureAttack_Implementation()
 	CurrentAnim = nullptr; // saldiri bitince durum animasyonu yeniden secilsin
 	const float Len = AnimAttack->GetPlayLength();
 	AttackAnimUntil = (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) + Len;
-}
-
-void AMMOMob::MulticastEliteDeathAnnounce_Implementation(const FString& MobDisplayName, const FString& KillerDisplayName)
-{
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor(255, 160, 40),
-			FString::Printf(TEXT("[DUNYA] %s, %s tarafindan devrildi!"), *MobDisplayName, *KillerDisplayName));
-	}
-	// Sohbet kaydina da sistem satiri olarak dus (debug mesajlari paketli oyunda gorunmez).
-	if (APlayerController* LocalPC = GEngine ? GEngine->GetFirstLocalPlayerController(GetWorld()) : nullptr)
-	{
-		if (AMMOHUD* HUD = Cast<AMMOHUD>(LocalPC->GetHUD()))
-		{
-			HUD->AddChatLine(FString::Printf(TEXT("[Dunya] %s, %s tarafindan devrildi!"), *MobDisplayName, *KillerDisplayName),
-				FLinearColor(1.f, 0.65f, 0.2f));
-		}
-	}
 }
 
 void AMMOMob::ApplyTint(const FLinearColor& Color)
@@ -905,9 +887,10 @@ void AMMOMob::HandleDeath()
 			}
 		}
 
-		// Elit/dunya boss'u dustugunde TUM sunucuya duyur (bug-hunt: onceden sadece
-		// olduren ve menzildeki parti uyeleri gorurdu - onemli bir sunucu-genelinde
-		// olay hic bildirilmiyordu).
+		// NETWORK_AUDIT O7: mob actorunun NetMulticast RPC'si yalniz bu mob kendisine
+		// relevant olan istemcilere ulasir. Dunya duyurusunu sunucudaki PlayerController
+		// listesinden sahip-istemci RPC'siyle yolla; boylece cull mesafesinin disindaki
+		// oyuncular da nadir elit olayini guvenilir bicimde sohbetlerinde gorur.
 		if (bIsElite)
 		{
 			FString KillerName = TEXT("bilinmeyen bir maceraci");
@@ -915,7 +898,15 @@ void AMMOMob::HandleDeath()
 			{
 				KillerName = KillerPS->GetPlayerName();
 			}
-			MulticastEliteDeathAnnounce(MobName, KillerName);
+			const FString Announcement = FString::Printf(
+				TEXT("[Dunya] %s, %s tarafindan devrildi!"), *MobName, *KillerName);
+			for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			{
+				if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(It->Get()))
+				{
+					PC->ClientReceiveChat(FString(), Announcement, 2);
+				}
+			}
 		}
 	}
 
