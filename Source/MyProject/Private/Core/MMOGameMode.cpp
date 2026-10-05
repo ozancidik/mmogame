@@ -21,6 +21,8 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Components/MMOStatsComponent.h"
+#include "Player/MMOPlayerController.h"
+#include "TimerManager.h"
 
 AMMOGameMode::AMMOGameMode()
 {
@@ -79,7 +81,7 @@ void AMMOGameMode::MMOProbeSurface(float X, float Y, float Radius)
 namespace
 {
 	// Baglanti secenegindeki (?Name=) baslangic adini ServerSetName ile AYNI karakter kuralina sokar
-	// (harf/rakam, '_', '-', bosluk; en cok 24 karakter). Kontrol karakterleri (satir sonu vb.) sohbet
+	// (harf/rakam, '_', '-', bosluk; en cok 20 karakter: motor ?Name= degerini 20'ye keser). Kontrol karakterleri (satir sonu vb.) sohbet
 	// satirlarini taklit etmek icin kullanilabildiginden atilir.
 	FString SanitizeInitialName(const FString& In)
 	{
@@ -91,10 +93,12 @@ namespace
 				Out.AppendChar(Ch);
 			}
 		}
-		return Out.Left(24).TrimStartAndEnd();
+		return Out.Left(20).TrimStartAndEnd();
 	}
 
-	// "<ad>-<8+ onaltilik hane>" kalibi: Null OSS'in uretilen varsayilan oyuncu adi.
+	// "<ad>-<12+ onaltilik hane>" kalibi: Null OSS'in uretilen varsayilan oyuncu adi
+	// (gercek ornek "CIDIK-<14 hex>"). Mesru adlar ("Ozan-20261005", "Kral-12345678", "Ali-deadbeef")
+	// 12 haneden kisa kuyruk tasidigi icin eslesmez.
 	bool LooksLikeOsDefaultName(const FString& Name)
 	{
 		int32 Dash = INDEX_NONE;
@@ -104,9 +108,11 @@ namespace
 		}
 		const FString Suffix = Name.Mid(Dash + 1);
 		// Motor ?Name= degerini 20 karakterle keser: uzun on ekte (bilgisayar adi) onaltilik kuyruk kesilmis olabilir.
-		// 20 karakterlik ad + onaltilik (kisa da olsa) kuyruk = kesilmis OS varsayilan adi sayilir.
-		const bool bTruncatedByEngine = Name.Len() >= 20 && Suffix.Len() >= 4;
-		if (Suffix.Len() < 8 && !bTruncatedByEngine)
+		// Kesik kalip: tam 20 karakter + en az 4 hane kuyruk + kuyrukta en az bir rakam ("...-Fade"/"...-Dead" gibi
+		// yalniz harf-hex kuyruklar mesru ad sayilir).
+		const bool bTruncatedByEngine = Name.Len() == 20 && Suffix.Len() >= 4
+			&& Suffix.FindLastCharByPredicate([](TCHAR C) { return FChar::IsDigit(C); }) != INDEX_NONE;
+		if (Suffix.Len() < 12 && !bTruncatedByEngine)
 		{
 			return false;
 		}
@@ -123,6 +129,19 @@ namespace
 
 void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, bool bNameChange)
 {
+	// Motorun ServerChangeName/SetName yolu (bNameChange == true) PlayerState adini dogrudan yazar ve
+	// tum ad korumalarini (karakter kurali, 20 sinir, cevrimici/yuva cakismasi, soguma, K-1) atlar.
+	// Uzak istemcinin elle cagirabildigi bu yolu karakterin kendi ServerSetName yoluna (AMMOCharacter::MMOSetName)
+	// yonlendiriyoruz: ayni kapilardan gecer. Pawn yoksa istek yok sayilir. Baslangic adi (false) asagida.
+	if (bNameChange)
+	{
+		if (AMMOCharacter* Char = Controller ? Cast<AMMOCharacter>(Controller->GetPawn()) : nullptr)
+		{
+			Char->MMOSetName(NewName);
+		}
+		return;
+	}
+
 	FString UseName = NewName;
 	if (!bNameChange)
 	{
@@ -189,6 +208,25 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 		}
 	}
 	Super::ChangeName(Controller, UseName, bNameChange);
+
+	// Baglanti adi degistirildiyse (gecersiz karakter, kullanimda, OS varsayilan adi) oyuncu kayit yuvasinin
+	// neden baska oldugunu bilsin. Istemci HUD'u bu anda henuz hazir degil: kisa gecikmeyle sohbet satiri.
+	if (UseName != NewName && Controller)
+	{
+		if (UWorld* NoticeWorld = GetWorld())
+		{
+			const TWeakObjectPtr<AController> WeakController(Controller);
+			const FString Notice = FString::Printf(TEXT("Baglanti adin uygun olmadigi icin adin '%s' olarak ayarlandi. Kayitli karakterin icin gecerli bir ?Name= ile yeniden baglan."), *UseName);
+			FTimerHandle NoticeHandle;
+			NoticeWorld->GetTimerManager().SetTimer(NoticeHandle, FTimerDelegate::CreateWeakLambda(this, [WeakController, Notice]()
+			{
+				if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(WeakController.Get()))
+				{
+					PC->ClientReceiveChat(FString(), Notice, 2);
+				}
+			}), 3.f, false);
+		}
+	}
 }
 
 void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)

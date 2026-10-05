@@ -746,15 +746,25 @@ void AMMOCharacter::MMOSetName(const FString& NewName)
 
 void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 {
-	const FString Trimmed = NewName.TrimStartAndEnd();
-	if (Trimmed.IsEmpty() || Trimmed.Len() > 24)
+	// Reddedilen istekler uzak sahibine gecici ipucu olarak bildirilir (Unreliable, sohbeti doldurmaz;
+	// ayni metin 0.5 sn icinde tekrarlanmaz). Eskiden sessizce atiliyordu.
+	const auto Reject = [this](const FString& Reason)
 	{
+		MMONotify::ToOwner(this, Reason, FColor::Orange, 4.f, MMONotify::EMMONotifyKind::Hint);
+	};
+
+	// En fazla 20 karakter: motor ?Name= degerini 20'ye keser; daha uzun bir ad bir daha ?Name= ile secilemezdi.
+	const FString Trimmed = NewName.TrimStartAndEnd();
+	if (Trimmed.IsEmpty() || Trimmed.Len() > 20)
+	{
+		Reject(TEXT("Ad 1-20 karakter olmali"));
 		return;
 	}
 	for (const TCHAR Ch : Trimmed)
 	{
 		if (!FChar::IsAlnum(Ch) && Ch != TEXT('_') && Ch != TEXT('-') && Ch != TEXT(' '))
 		{
+			Reject(TEXT("Adda yalniz harf, rakam, bosluk, '_' ve '-' olabilir"));
 			return;
 		}
 	}
@@ -762,8 +772,10 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	const UWorld* CooldownWorld = GetWorld();
 	if (CooldownWorld && !IsLocallyControlled())
 	{
-		if (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime < SetNameCooldown)
+		const float CooldownLeft = SetNameCooldown - (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime);
+		if (CooldownLeft > 0.f)
 		{
+			Reject(FString::Printf(TEXT("Ad degistirmek icin %.0f sn beklemelisin"), CooldownLeft));
 			return;
 		}
 	}
@@ -778,6 +790,7 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			if (Other != this && Other->IsPlayerControlled()
 				&& Other->GetSaveSlotName().Equals(CandidateSlot, ESearchCase::IgnoreCase))
 			{
+				Reject(TEXT("Bu ad su an baska bir oyuncuda"));
 				return;
 			}
 		}
