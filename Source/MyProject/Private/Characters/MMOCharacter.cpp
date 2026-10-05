@@ -1503,6 +1503,11 @@ void AMMOCharacter::ClientShowHint_Implementation(const FString& Text)
 
 void AMMOCharacter::MMONpcTalk()
 {
+	// Gelistirici LLM testi: Shipping'de ucretli LLM istegi atilmasin (SECURITY_AUDIT Y-6 / Y-4).
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
 	// Bu Exec komutu client-side calisir (RPC degil), o yuzden kendi cooldown'unu
 	// tutar — yoksa konsoldan spamlanirsa sinirsiz eszamanli/ucretli LLM istegi atilir.
 	const UWorld* World = GetWorld();
@@ -1815,7 +1820,9 @@ void AMMOCharacter::ServerGiveItem_Implementation(FName ItemId, int32 Count)
 
 void AMMOCharacter::MMOClass(const FString& ClassName)
 {
-	if (!SkillComponent)
+	// Konsol kisayolu = gelistirici araci (SECURITY_AUDIT Y-6); oyuncu sinif secimi HUD panelinden
+	// (RequestSetupForClass) yapilir ve Shipping'de de calisir.
+	if (!MMODebugCommandsEnabled() || !SkillComponent)
 	{
 		return;
 	}

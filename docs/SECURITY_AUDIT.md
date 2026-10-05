@@ -273,3 +273,21 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) üzerindek
 - `-MMOPassword=` sunucu komut satirinda gorunur (islem listesi, kisayol/betik gecmisi) ve istemci `?Password=` degeri motorun `LogNet` "Login request: ..." satirina duser (sunucu log dosyasi). Kod DEGISTIRILMEDI.
 - Yerel/ozel host icin kabul edilebilir; kamuya acik sunucuda parolayi ortam degiskeninden okuyup `Login request` logunu kapat ya da maskele (LogNet verbosity), log dosyalarini paylasma.
 - Bu parola kimlik dogrulamanin yerini tutmaz (K-1 notu gecerli); kalici cozum hesap sistemi.
+
+## 9. Uygulama notu (2026-10-05): kod gerektiren dusuk riskli maddeler
+
+### 9.1 Debug/hile Exec komutlari (Y-6) - son liste
+
+`MMODebugCommandsEnabled()` (`MMOCharacter.cpp`) Shipping'de `false` doner; asagidaki komut/RPC govdeleri erken cikar:
+
+| Komut / RPC | Dosya | Shipping'de |
+|---|---|---|
+| `MMODamage`, `MMOHeal`, `MMOGainXP`, `MMOUseMana` | `MMOCharacter` | etkisiz |
+| `MMOGiveItem` + `ServerGiveItem` | `MMOCharacter` | etkisiz |
+| `MMOBuff` + `ServerApplyBuff` | `MMOCharacter` | etkisiz |
+| `MMOSpawnMob` + `ServerSpawnMob` | `MMOCharacter` | etkisiz |
+| `MMOClass` (konsol kisayolu; HUD sinif paneli `RequestSetupForClass` ile calismaya devam eder) | `MMOCharacter` | etkisiz (bu turda eklendi) |
+| `MMONpcTalk` (ucretli LLM test istegi) | `MMOCharacter` | etkisiz (bu turda eklendi) |
+| `MMOProbeSpawn`, `MMOProbeSurface` | `MMOGameMode` | `#if !UE_BUILD_SHIPPING` ile bos |
+
+Oyun komutu sayilip ACIK birakilanlar: `MMOSave`, `MMOLoad`, `MMOSetName`, `MMOTravel` (host), `MMOUse`, `MMOAttack`, `MMOStat`, parti (`MMOInvite/PartyAccept/PartyLeave/PartyKick`), ticaret (`MMOTrade*`), `Say`; `MMOPvP` yalniz host (`ServerSetPvP` `IsLocalController` kapisi) oldugu icin acik (PvP'yi acmanin tek yolu). Not: UHT `UFUNCTION`'i `#if` icinde kabul etmedigi icin fonksiyonlar derlenir, govdeler Shipping'de bostur. Paketlenmis Shipping'de `~` konsolunun kapali oldugu hala dogrulanmadi.
