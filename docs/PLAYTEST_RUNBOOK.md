@@ -57,3 +57,5 @@ Genel his (hız, zorluk, kafa karıştıran yer):
 ```
 
 Bulgular `PLAYTEST_PRIORITY.md` §3'e işlenir; geçen maddeler `PLAYTEST_CHECKLIST.md`'de `[x]` yapılır.
+
+Kapı 3 çıktısı, `docs/DECISIONS_NEEDED.md`'deki 7 kararın (XP hızı, ölüm cezası, altın sink'i, hız hedefi vb.) her birinin "Gereken veri" satırını besler; karar vermeden önce o sayfaya bak.
