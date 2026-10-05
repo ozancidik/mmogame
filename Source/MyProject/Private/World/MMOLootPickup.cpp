@@ -229,7 +229,13 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 	// oyuncu yer actiktan sonra tekrar toplayabilsin.
 	if (bIsEquipment && Inv->EquipmentBag.Num() >= UMMOInventoryComponent::MaxBagSize)
 	{
-		MMONotify::ToOwner(Char, TEXT("Canta dolu!"), FColor::Silver, 2.f);
+		const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+		double& LastTime = LastBagFullNotifyTime.FindOrAdd(TWeakObjectPtr<AMMOCharacter>(Char), -BagFullNotifyInterval);
+		if (Now - LastTime >= BagFullNotifyInterval)
+		{
+			LastTime = Now;
+			MMONotify::ToOwner(Char, TEXT("Canta dolu!"), FColor::Silver, 2.f);
+		}
 		return;
 	}
 	bCollected = true;

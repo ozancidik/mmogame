@@ -96,6 +96,11 @@ protected:
 	double ReservedUntilTime = 0.0;
 	FTimerHandle ReservationTimer;
 
+	// "Canta dolu" bildirimi spam onlemi (yalniz sunucu): oyuncu pickup'in uzerinde gidip gelirken her
+	// overlap'te mesaj yagmasin; ayni oyuncuya bu pickup'tan en cok BagFullNotifyInterval saniyede bir.
+	TMap<TWeakObjectPtr<AMMOCharacter>, double> LastBagFullNotifyTime;
+	static constexpr double BagFullNotifyInterval = 3.0;
+
 	// OnOverlap ve rezervasyon bitiminde ortadaki oyuncular icin ortak toplama mantigi.
 	void TryCollect(AMMOCharacter* Char);
 	void OnReservationExpired();
