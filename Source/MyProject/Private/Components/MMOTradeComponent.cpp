@@ -626,10 +626,10 @@ void UMMOTradeComponent::TryExecuteTrade()
 		return;
 	}
 
-	// Altin tasmasi (AddGold sikistirir; sessizce altin yutmasin diye once reddet).
+	// Altin tavani asimi (AddGold sikistirir; sessizce altin yutmasin diye once reddet).
 	const int64 GoldA = (int64)IA->Gold - OfferA.Gold + OfferB.Gold;
 	const int64 GoldB = (int64)IB->Gold - OfferB.Gold + OfferA.Gold;
-	if (GoldA > MAX_int32 || GoldB > MAX_int32)
+	if (GoldA > UMMOInventoryComponent::MaxGold || GoldB > UMMOInventoryComponent::MaxGold)
 	{
 		EndTradeServer(TEXT("Ticaret iptal edildi: altin siniri asilir."));
 		return;

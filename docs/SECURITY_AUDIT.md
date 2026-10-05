@@ -291,3 +291,9 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) üzerindek
 | `MMOProbeSpawn`, `MMOProbeSurface` | `MMOGameMode` | `#if !UE_BUILD_SHIPPING` ile bos |
 
 Oyun komutu sayilip ACIK birakilanlar: `MMOSave`, `MMOLoad`, `MMOSetName`, `MMOTravel` (host), `MMOUse`, `MMOAttack`, `MMOStat`, parti (`MMOInvite/PartyAccept/PartyLeave/PartyKick`), ticaret (`MMOTrade*`), `Say`; `MMOPvP` yalniz host (`ServerSetPvP` `IsLocalController` kapisi) oldugu icin acik (PvP'yi acmanin tek yolu). Not: UHT `UFUNCTION`'i `#if` icinde kabul etmedigi icin fonksiyonlar derlenir, govdeler Shipping'de bostur. Paketlenmis Shipping'de `~` konsolunun kapali oldugu hala dogrulanmadi.
+
+### 9.2 Altin tavani (Y-2 tutarsizligi)
+
+Tek sabit: `UMMOInventoryComponent::MaxGold = 999999999`. `AddGold` (int64 toplam + clamp `[0, MaxGold]`), ticaret tasma reddi (`MMOTradeComponent`) ve `ApplySaveData` AYNI sabiti kullanir (eskiden calisma zamani INT32_MAX, kayit 999999999: 1 milyar ustu yuklemede sessizce kirpiliyordu). Kayit formati (`MMOSaveGame.h`) degismedi.
+
+Tasma kurali (mevcut davranis korundu, sessizlik giderildi): loot/gorev/satis gibi tek tarafli kazanc tavani asarsa fazlasi KIRPILIR (kaybolur) ve sahibe "Altin siniri (999999999): fazlasi kaybedildi" ipucu gider; ticaret tavani asacaksa takas ONCE reddedilir ("altin siniri asilir"), iki taraf da altinini korur. Negatif/harcama yolu ve int64 koruma bozulmadi.

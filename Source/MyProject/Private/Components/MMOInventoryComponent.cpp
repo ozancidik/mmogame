@@ -64,11 +64,19 @@ void UMMOInventoryComponent::AddGold(int32 Amount)
 	// GUVENLIK/BUG-HUNT (qa-kontrolcu bulgusu, hardening): Gold+Amount int32'de tasarsa
 	// (Gold gercekten ~2.1 milyara yaklastiginda, normal uzun-vadeli oynanista ihtimal
 	// dahilinde) sonuc negatife doner ve FMath::Max(0,...) oyuncunun TUM altinini
-	// sifirlardi. int64'te topla, sonra guvenle [0, INT32_MAX] araligina sikistir.
+	// sifirlardi. int64'te topla, sonra guvenle [0, MaxGold] araligina sikistir (MaxGold kayit tavaniyla ayni).
 	const int64 Sum = (int64)Gold + (int64)Amount;
 	const int32 OldGold = Gold;
-	Gold = (int32)FMath::Clamp<int64>(Sum, 0, MAX_int32);
+	Gold = (int32)FMath::Clamp<int64>(Sum, 0, MaxGold);
 	OnGoldChanged.Broadcast(Gold);
+
+	// Tavan asimi sessiz olmasin: kazanc kirpildiysa sahibe haber ver (ticarette once reddedildigi icin
+	// buraya yalnizca loot/gorev/satis gibi tek tarafli kazanclar duser).
+	if (Amount > 0 && Sum > MaxGold)
+	{
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Altin siniri (%d): fazlasi kaybedildi"), MaxGold),
+			FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+	}
 
 	// Olcum gunlugu (yalniz oyuncular): gercekte degisen miktar (+kazanc / -harcama).
 	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); OwnerPawn && OwnerPawn->IsPlayerControlled() && Gold != OldGold)
@@ -891,10 +899,9 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2): elle duzenlenmis kayitta sinirsiz altin/yigin/
 	// gecersiz nadirlik olmasin. Bilinmeyen esya kimlikleri bilerek SILINMEZ (surumler arasi
 	// kaldirilan esya oyuncunun kaybi olurdu); yalniz degerler makul araliga cekilir.
-	constexpr int32 SaveGoldCap = 999999999;
 	constexpr int32 SaveStackCap = MaxStackSize;   // AddItem ile ayni tavan (calisma zamani == kayit)
 	constexpr int32 SaveMaxStacks = MaxItemStacks;
-	Gold = FMath::Clamp(In.Gold, 0, SaveGoldCap);
+	Gold = FMath::Clamp(In.Gold, 0, MaxGold);   // calisma zamani tavaniyla AYNI sabit
 	// Yiginlar: AddItem ItemId basina tek yigin tutar; bozuk kayittaki ayni kimlikli yiginlar
 	// birlestirilir (64 sinirini bosuna doldurmasin), sonra adet kirpilir.
 	Items.Reset();

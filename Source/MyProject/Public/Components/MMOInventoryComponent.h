@@ -49,7 +49,13 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Items, Category = "MMO|Inventory")
 	TArray<FMMOItemStack> Items;
 
-	/** Altin ekler. Sadece otorite. */
+	// Altin tavani: calisma zamani (AddGold), ticaret (tavan asimi reddi) ve kayit (ApplySaveData) AYNI
+	// sabiti kullanir; boylece oyunda tutulan altin kaydet-yukle sonrasi da aynen kalir. Toplamlar
+	// int64'te hesaplanir.
+	static constexpr int32 MaxGold = 999999999;
+
+	/** Altin ekler (sonuc [0, MaxGold]). Tavani asan KAZANC kirpilir ve sahibe bildirilir (ticaret
+	 *  tavan asimini once reddeder, altin yutmaz). Sadece otorite. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Inventory")
 	void AddGold(int32 Amount);
 
