@@ -3442,3 +3442,12 @@ Elit ölüm duyurusu mob aktöründeki NetMulticast'tan çıkarıldı. Sunucu ar
 - [ ] Host + iki istemci aç; istemci B elit mobdan ağ cull mesafesinin (12000 uu) dışında dursun. Host/istemci A eliti öldürsün: üç oyuncunun sohbetinde de tek `[Dunya]` satırı görünmeli.
 - [ ] Aynı testi listen server hostu öldürücü vuruşu yaparken tekrarla: hostta satır bir kez görünmeli, çift duyuru olmamalı.
 - [ ] Normal mob öldür: dünya duyurusu oluşmamalı.
+
+## Mob hedef tarama maliyeti — 2026-10-05
+
+Sunucu her mob için bağlı oyuncu listesini her karede taramak yerine en yakın hedefi 0,2 saniyede bir yeniler. Aradaki karelerde önbellekteki hedefin ölüm, canlanma koruması ve hub güvenli bölgesi kuralları yine kontrol edilir; geçersiz hedef taramayı hemen yeniden zorlar. Zorla aggro, leash, navmesh hareketi ve saldırı cooldown'u aynı kalır. Zorlanmış C++ derlemesi temiz geçti; Summer/Winter headless smoke sırasıyla 47/33 mobla, hata olmadan tamamlandı.
+
+- [ ] İki istemci bir mobun zıt taraflarında dursun; daha yakın oyuncu değiştiğinde mob en geç yaklaşık 0,2 saniye içinde yeni yakına yönelmeli.
+- [ ] Hedeflenen oyuncu ölür veya canlanma korumasına girerse mob beklemeden saldırıyı bırakmalı; eski MoveTo komutu oyuncunun dibine taşımamalı.
+- [ ] Hedef hub güvenli alanına girince mob kovalamayı bırakıp leash davranışıyla dönmeli.
+- [ ] 40+ mob ve iki istemciyle `stat game` / `stat unit` ölç; Game Thread süresini önceki yapıyla karşılaştır. Beklenen kazanç oyuncu-listesi taramasında yaklaşık 60 Hz -> 5 Hz'dir; gerçek toplam kazanç PIE'de ölçülmedi.

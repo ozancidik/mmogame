@@ -473,46 +473,71 @@ void AMMOMob::Tick(float DeltaSeconds)
 		return;
 	}
 
-	// En yakin CANLI oyuncuyu bul (MP: birden fazla oyuncu olabilir).
-	APawn* Player = nullptr;
-	float Dist = TNumericLimits<float>::Max();
+	// NETWORK_AUDIT O8: en yakin oyuncu taramasini her mobda her frame yapmak yerine
+	// 5 Hz'de yenile. Aradaki framelerde onbellekteki tek hedef yine olu/korumali/hub
+	// kurallarindan gecirilir; gecersiz olursa tarama bir sonraki frame zorlanir.
+	const float NowSel = TheWorld->GetTimeSeconds();
 	bool bSkippedProtected = false;
-	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	auto IsEligibleTarget = [this, &bSkippedProtected](APawn* Candidate) -> bool
 	{
-		const APlayerController* PC = It->Get();
-		APawn* Candidate = PC ? PC->GetPawn() : nullptr;
 		if (!Candidate)
 		{
-			continue;
+			return false;
 		}
 		if (const AMMOCharacter* PChar = Cast<AMMOCharacter>(Candidate))
 		{
 			if (PChar->GetStats() && PChar->GetStats()->bIsDead)
 			{
-				continue; // olu oyuncuya saldirma
+				return false; // olu oyuncuya saldirma
 			}
 			if (PChar->IsSpawnProtected())
 			{
 				bSkippedProtected = true;
-				continue; // canlanma korumasindaki oyuncuyu hedef alma
+				return false; // canlanma korumasindaki oyuncuyu hedef alma
 			}
 		}
 		if (bHasHub && HubSafeRadius > 0.f
 			&& FVector::Dist2D(Candidate->GetActorLocation(), HubLocation) < HubSafeRadius)
 		{
 			bSkippedProtected = true;
-			continue; // hub guvenli bolgesindeki oyuncuya saldirma
+			return false; // hub guvenli bolgesindeki oyuncuya saldirma
 		}
-		const float D = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
-		if (D < Dist)
-		{
-			Dist = D;
-			Player = Candidate;
-		}
+		return true;
+	};
+
+	APawn* Player = CachedAggroTarget.Get();
+	if (Player && !IsEligibleTarget(Player))
+	{
+		CachedAggroTarget.Reset();
+		Player = nullptr;
+		NextAggroScanTime = 0.f;
 	}
 
+	if (NowSel >= NextAggroScanTime)
+	{
+		Player = nullptr;
+		float BestDist = TNumericLimits<float>::Max();
+		for (FConstPlayerControllerIterator It = TheWorld->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			APawn* Candidate = PC ? PC->GetPawn() : nullptr;
+			if (!IsEligibleTarget(Candidate))
+			{
+				continue;
+			}
+			const float CandidateDist = FVector::Dist(GetActorLocation(), Candidate->GetActorLocation());
+			if (CandidateDist < BestDist)
+			{
+				BestDist = CandidateDist;
+				Player = Candidate;
+			}
+		}
+		CachedAggroTarget = Player;
+		NextAggroScanTime = NowSel + AggroScanInterval;
+	}
+	float Dist = Player ? FVector::Dist(GetActorLocation(), Player->GetActorLocation()) : TNumericLimits<float>::Max();
+
 	// Zorla hedef (hasar alindiginda ayarlanir) aktifse onu kullan; AggroRange sinirini asar.
-	const float NowSel = TheWorld ? TheWorld->GetTimeSeconds() : 0.f;
 	APawn* Forced = ForcedTarget.Get();
 	bool bForcedActive = false;
 	if (Forced && NowSel < ForcedAggroUntil)

@@ -160,6 +160,12 @@ protected:
 	float LastRepathTime = -100.f;
 	bool bDeathHandled = false;
 
+	// Oyuncu listesini her frame her mob icin taramak O(mob x oyuncu x FPS) maliyetiydi.
+	// Sunucu en yakin hedefi kisa araliklarla yeniler; arada tek hedefin gecerliligini kontrol eder.
+	TWeakObjectPtr<APawn> CachedAggroTarget;
+	float NextAggroScanTime = 0.f;
+	static constexpr float AggroScanInterval = 0.2f;
+
 	// --- Leash (eve donus) ---
 	FVector HomeLocation = FVector::ZeroVector;
 	bool bReturningHome = false;
