@@ -284,6 +284,12 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		return;
 	}
 
+	// Zaten tamamlanmis gorevin odulu ikinci kez verilmez (bozuk kayit ayni gorevi hem aktif
+	// hem tamamlanmis listede tasiyabilirdi; ApplySaveData bunu da temizler, bu ikinci savunma).
+	if (CompletedQuests.Contains(QuestId))
+	{
+		return;
+	}
 	FMMOQuestProgress* P = FindActive(QuestId);
 	if (!P || !IsQuestComplete(*Def, *P))
 	{
@@ -340,7 +346,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		}
 	}
 
-	CompletedQuests.Add(QuestId);
+	CompletedQuests.AddUnique(QuestId);
 	ActiveQuests.RemoveAll([QuestId](const FMMOQuestProgress& X) { return X.QuestId == QuestId; });
 
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin)"), *Def->Name, Def->RewardXP, Def->RewardGold), FColor(120, 255, 120), 3.f);
@@ -375,12 +381,25 @@ void UMMOQuestComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2): bos/yinelenen kimlikleri at, sayaci hedef
 	// adedine sikistir (elle yazilmis "KillProgress=999999" ile anlik tamamlama olmasin).
 	// Bilinmeyen gorev kimlikleri SILINMEZ (surumler arasi yeniden adlandirma ilerlemeyi kaybettirmesin).
+	// Once tamamlanmis liste (tekrarsiz), sonra aktif liste: tamamlanmis bir gorev aktifte de
+	// gorunuyorsa aktiften dusurulur (aksi halde odulu ikinci kez alinabilirdi).
+	CompletedQuests.Reset();
+	TSet<FName> SeenDone;
+	for (const FName& Id : In.CompletedQuests)
+	{
+		if (!Id.IsNone() && !SeenDone.Contains(Id))
+		{
+			SeenDone.Add(Id);
+			CompletedQuests.Add(Id);
+		}
+	}
+
 	ActiveQuests = In.ActiveQuests;
 	TSet<FName> SeenActive;
 	for (int32 i = ActiveQuests.Num() - 1; i >= 0; --i)
 	{
 		FMMOQuestProgress& P = ActiveQuests[i];
-		if (P.QuestId.IsNone() || SeenActive.Contains(P.QuestId))
+		if (P.QuestId.IsNone() || SeenActive.Contains(P.QuestId) || SeenDone.Contains(P.QuestId))
 		{
 			ActiveQuests.RemoveAt(i);
 			continue;
@@ -390,17 +409,6 @@ void UMMOQuestComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		if (const FMMOQuestDef* Def = FMMOQuestDatabase::Find(P.QuestId))
 		{
 			P.KillProgress = FMath::Min(P.KillProgress, FMath::Max(1, Def->TargetCount));
-		}
-	}
-
-	CompletedQuests.Reset();
-	TSet<FName> SeenDone;
-	for (const FName& Id : In.CompletedQuests)
-	{
-		if (!Id.IsNone() && !SeenDone.Contains(Id))
-		{
-			SeenDone.Add(Id);
-			CompletedQuests.Add(Id);
 		}
 	}
 }
