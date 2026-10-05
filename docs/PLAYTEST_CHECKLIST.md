@@ -3322,3 +3322,14 @@ Yeni `Core/MMONotify.h/.cpp`. Envanter (15 mesaj) ve gorev (7 mesaj) bilesenleri
 - [ ] **Lv34 gecisi:** Lv30 -> Lv34 arasi dogrusal 0,55 -> 1,0 rampa (Lv31-33 mob carpani ~0,66 / 0,78 / 0,89; gorev 0,26 -> 1,0): mob XP'sinde ani siçrama/dusus olmamali.
 - [ ] **Gorev odulleri:** `Q_Gold500` 150, `Q_Gold1000` 250 XP; `Q_Gold5000` kapi Lv16 oldugundan ~1200 XP; Lv8+ gorev odulleri eskisinden dusuk (gorev penceresi ve teslim mesajinda gorunen XP).
 - [ ] **Parti bonusu:** 2 kisilik partide ayni mobu birlikte (%50/%50 hasar) oldurun: her uye payin **%55'ini** (=1,1/2) almali; toplam parti XP'si solo oldurmenin ~1,1 kati. 4 kisilik partide kisi basi 1,3/4 = %32,5. Tek basina oldurme: degisiklik yok.
+
+# QA iterasyon 4: kayit yukleme kelepceleri, ganimet spami, uzak istemci mesajlari — 2026-10-05 (DERLENMEDI, PIE yok)
+
+- [ ] **Stat kaydi (sinif tabani):** Lv10 Buyucu (taban 46) kaydini elle duzenle: `UnspentStatPoints=999`, INT'i +50 artir; `MMOLoad`: (statlar - 46) + harcanmamis <= 9*StatPointsPerLevel olmali; Output Log'da `harcanmamis stat puani ... kirpildi`. Gecerli kayit (her 4 sinif, puan harcanmis/harcanmamis) yuklemede **degismemeli**; sinif degistirip kaydet/yukle de degismemeli.
+- [ ] **Canta 12 siniri:** Kayitta `EquipmentBag` 15 esya: yuklemede canta 12, 3 esya depoda; depo da doluysa (24) depo 27 olur ve `depo dolu` uyarisi cikar; hicbir esya kaybolmamali.
+- [ ] **Bozuk kimlik:** Kayitta bir esyanin `InstanceId` degeri 0 ya da 2147483647, `NextInstanceId=2147483647`: esya yuklenmeli (yeni kimlikle), kusan/sat/yukselt calismali, yeni loot kimligi cakismamali. Bos `ItemId`'li girdi atilmali.
+- [ ] **Yigin:** Ayni `ItemId`'li iki yigin (or. 2x HealthPotion 10) tek yigin (20) olmali; 70 farkli yiginli kayitta 6'si icin `yigin siniri` uyarisi.
+- [ ] **Gorev kaydi:** Ayni gorev hem `ActiveQuests` hem `CompletedQuests`'te: yuklemede aktif listede gorunmemeli, odulu ikinci kez alinamamali; tamamlanmis listede tekrar olmamali.
+- [ ] **"Canta dolu" spami:** Canta 12 doluyken yerdeki ekipmanin uzerinde ileri-geri yuru: mesaj en cok **3 sn'de bir** gelmeli (ikinci oyuncu icin bagimsiz).
+- [ ] **Mob olumu:** Mob oldugunde Blueprint `OnCharacterDied` (olum animasyonu/efekti) yine **bir kez** oynamali (host ve istemcide); XP/ganimet degismemeli.
+- [ ] **Uzak istemci mesajlari (B5):** Istemci olarak su mesajlarin sohbet/sistem satirinda gorundugunu dogrula (host'ta eskisi gibi ekranda): sinif degisimi (`Zaten bu siniftasin`, `... sn beklemelisin`, `Savasta sinif degistirilemez`, `Sinif: ... Puanlar iade edildi`), `Ustalik rutbesi: N`, hedefsiz skill'de `Menzilde hedef yok`, `Oldun! -N EXP`, `Iksir icildi`, `Kullanildi: ...`, `Karakter yuklendi`, `Adin '...' olarak ayarlandi`. Host'ta mesaj **cift** cikmamali.
