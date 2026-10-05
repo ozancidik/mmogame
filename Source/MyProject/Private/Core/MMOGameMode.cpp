@@ -103,7 +103,10 @@ namespace
 			return false;
 		}
 		const FString Suffix = Name.Mid(Dash + 1);
-		if (Suffix.Len() < 8)
+		// Motor ?Name= degerini 20 karakterle keser: uzun on ekte (bilgisayar adi) onaltilik kuyruk kesilmis olabilir.
+		// 20 karakterlik ad + onaltilik (kisa da olsa) kuyruk = kesilmis OS varsayilan adi sayilir.
+		const bool bTruncatedByEngine = Name.Len() >= 20 && Suffix.Len() >= 1;
+		if (Suffix.Len() < 8 && !bTruncatedByEngine)
 		{
 			return false;
 		}
@@ -126,7 +129,30 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 		// Baslangic adi: guvensiz karakterleri at; bos kalirsa ya da OS kullanici adi kalibindaysa rastgele ad ver.
 		const FString Clean = SanitizeInitialName(NewName);
 		UseName = Clean;
-		if (Clean.IsEmpty() || LooksLikeOsDefaultName(Clean))
+		// PreLogin yalniz o an var olan PlayerController'lara bakar; iki istemci ayni anda ayni ?Name= ile
+			// girerse ikisi de gecer (ayni kayit yuvasi = esya cogaltma). Burada diger denetleyicilerle tekrar kontrol et.
+			bool bNameInUse = false;
+			if (!Clean.IsEmpty())
+			{
+				const FString CleanKey = Clean.Replace(TEXT(" "), TEXT("_"));
+				if (const UWorld* CheckWorld = GetWorld())
+				{
+					for (FConstPlayerControllerIterator CIt = CheckWorld->GetPlayerControllerIterator(); CIt; ++CIt)
+					{
+						const APlayerController* Other = CIt->Get();
+						if (Other && Other != Controller && Other->PlayerState)
+						{
+							const FString OtherKey = Other->PlayerState->GetPlayerName().TrimStartAndEnd().Replace(TEXT(" "), TEXT("_"));
+							if (OtherKey.Equals(CleanKey, ESearchCase::IgnoreCase))
+							{
+								bNameInUse = true;
+								break;
+							}
+						}
+					}
+				}
+			}
+			if (Clean.IsEmpty() || bNameInUse || LooksLikeOsDefaultName(Clean))
 		{
 			// Cevrimici baska bir oyuncuyla VE diskteki bir kayit yuvasiyla cakismayan rastgele ad
 			// (kayit yuvasi = ad; var olan bir yuva baska birinin karakterini yukler/ezer).
