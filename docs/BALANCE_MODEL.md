@@ -140,9 +140,9 @@ Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/se
 
 **`Scripts/EconomyModel.py`:** grind=0 seviyelerinde gelir için öldürme sayısı artık 0 kabul edilmez: `max(görev hedefleri, 0,5 × görevsiz öldürme)` (`--min-kill-frac`, varsayılan 0,5). Gerekçe: oyuncu görev hedefine giderken ve ganimet için yine mob keser; "görevsiz grind'in yarısı" kadar yan öldürme **varsayımdır** `[PLACEHOLDER]`, `[MMOMETRIC]` `kill` olaylarıyla düzeltilmeli. Etkisi küçük: 9 seviye tabana çekildi, Lv1→30 gelir ~269.900 → **~276.200** (gider oranı 11,0x → 11,3x); Lv10–15 kademesi 8.008 → 9.908, Lv16–24 70.497 → 74.868. Ekonomi sonucu (sink zayıf) değişmez. `--min-kill-frac 0` eski hesabı verir.
 
-## ÖNERİ (uygulanmadı): Lv11–20 için aday XP eğrileri (B7)
+## Lv11–20 için aday XP eğrileri (B7) — **B UYGULANDI (2026-10-05, `MMOXPTuning.cpp`)**
 
-Yalnız model denemesi; `MMOXPTuning.cpp` **değişmedi**. Karar ve seçim kullanıcıda; ölçüm (`[MMOMETRIC]`) önerilir. Komutla tekrar üretilebilir:
+Eğri **B** koda uygulandı (kalan adaylar A/C karşılaştırma için durur). Değerler hâlâ `[PLACEHOLDER]`; `[MMOMETRIC]` ölçümüyle ayarlanır. Komutla tekrar üretilebilir:
 
 ```
 python3 Scripts/ProgressionModel.py --max 30 --mob-mult "<mob>" --quest-mult "<görev>"

@@ -12,7 +12,7 @@
 
 | # | Karar | Önerim | Etiket | Ölçümden önce verilebilir mi? |
 |---|---|---|---|---|
-| 1 | Lv1–5 hızlı başlangıç korunsun mu | Koru, Lv6–20'yi B eğrisiyle yavaşlat | [Muhtemel] | Evet (tasarım); ince ayar ölçümle |
+| 1 | Lv1–5 hızlı başlangıç korunsun mu | **UYGULANDI (2026-10-05): B eğrisi `MMOXPTuning.cpp`ta**; ince ayar ölçümle | [Muhtemel] | Evet |
 | 2 | Ölüm cezası | `max(%10 eşik, 2 öldürme XP'si)` | [Muhtemel] | Hayır, `death` olayı gerekli |
 | 3 | Altın sink'i / `Q_Gold*` | `Q_Gold*` altını harcatsın + yükseltme maliyeti seviyeyle ölçeklensin | [Muhtemel] | Kısmen (Q_Gold evet, ölçek hayır) |
 | 4 | Kimlik/hesap | İlk playtest için parola + tanıdık oyuncu yeter | [Muhtemel] | Evet |
