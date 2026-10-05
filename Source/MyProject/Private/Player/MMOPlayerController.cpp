@@ -147,9 +147,10 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	FString Msg = Message.Left(MaxChatInputLength).Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" ")).TrimStartAndEnd();
 	// NETWORK_AUDIT D5/D9: kontrol karakterleri ve cift yonlu/sifir genislikli bicim karakterleri
 	// (U+200B-200F, U+202A-202E, U+2066-2069) satir gorunumunu taklit/bozmak icin kullanilabilir: bosluga cevrilir.
+	// SECURITY_AUDIT D-9: ASCII <32 + DEL (127) + C1 kontrolleri (0x80-0x9F) de ayni sekilde temizlenir.
 	for (TCHAR& C : Msg)
 	{
-		if (C < 32 || (C >= 0x200B && C <= 0x200F) || (C >= 0x202A && C <= 0x202E) || (C >= 0x2066 && C <= 0x2069))
+		if (C < 32 || (C >= 127 && C <= 0x9F) || (C >= 0x200B && C <= 0x200F) || (C >= 0x202A && C <= 0x202E) || (C >= 0x2066 && C <= 0x2069))
 		{
 			C = TEXT(' ');
 		}
