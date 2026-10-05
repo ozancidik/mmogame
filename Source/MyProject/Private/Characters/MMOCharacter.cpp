@@ -768,14 +768,16 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			return;
 		}
 	}
-	// Soguma yalniz uzak istemcilere uygulanir: host/yerel konsol (test akisi) kisitlanmaz.
+	// Soguma (SECURITY_AUDIT Y-7): uzak istemci 30 sn, host/yerel konsol 5 sn (test akisi bozulmasin ama
+	// arkadaslara bildirim yagmasi da olmasin). Reddedilince sahibe ipucu gider (Reject).
 	const UWorld* CooldownWorld = GetWorld();
-	if (CooldownWorld && !IsLocallyControlled())
+	if (CooldownWorld)
 	{
-		const float CooldownLeft = SetNameCooldown - (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime);
+		const float CooldownDuration = IsLocallyControlled() ? SetNameCooldownLocal : SetNameCooldown;
+		const float CooldownLeft = CooldownDuration - (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime);
 		if (CooldownLeft > 0.f)
 		{
-			Reject(FString::Printf(TEXT("Ad degistirmek icin %.0f sn beklemelisin"), CooldownLeft));
+			Reject(FString::Printf(TEXT("Ad degistirmek icin %.0f sn beklemelisin"), FMath::CeilToFloat(CooldownLeft)));
 			return;
 		}
 	}

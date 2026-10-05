@@ -351,8 +351,11 @@ protected:
 	static constexpr float RemoteManualSaveCooldown = 10.f;
 	// Ad degistirme soguma suresi (SECURITY_AUDIT Y-7): her basarili degisim arkadaslara
 	// iki bildirim yolluyor; cooldown'suz iki ad arasinda gidip gelmek spam uretirdi.
+	// TEK soguma damgasi: MMOSetName ve motorun ChangeName yolu (GameMode yonlendirir) ayni ServerSetName
+	// kapisindan gectigi icin cift soguma olmaz. Uzak istemci 30 sn, host/yerel konsol 5 sn.
 	float LastSetNameServerTime = -100.f;
 	static constexpr float SetNameCooldown = 30.f;
+	static constexpr float SetNameCooldownLocal = 5.f;
 
 	// --- Server RPC'ler (istemci istegi -> sunucu uygular) ---
 	UFUNCTION(Server, Reliable)
