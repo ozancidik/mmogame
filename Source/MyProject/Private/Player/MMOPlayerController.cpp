@@ -1157,9 +1157,10 @@ void AMMOPlayerController::PlayerTick(float DeltaTime)
 		}
 		else if (AMMOCharacter* MyChar = Cast<AMMOCharacter>(P))
 		{
-			// Menzilde: yol bulmayi durdur, saldir (MMOAttack kendi cooldown'u ile vurur).
+			// Menzilde: secili hedefi sunucuya tasiyarak saldir. nullptr kullanmak PvP
+			// hedefini kaybedip her zaman en yakin moba dusuyordu.
 			StopMovement();
-			MyChar->MMOAttack();
+			MyChar->AttackTarget(Enemy);
 		}
 	}
 	// Aksi halde zemin hedefi varsa oraya yol bul.

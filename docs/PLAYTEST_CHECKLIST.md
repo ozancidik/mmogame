@@ -3425,3 +3425,12 @@ Arac kaniti: `MMOStatsComponent/MMOCharacter/MMOInventoryComponent/MMOMob/MMOGam
 - [ ] **Ganimet rezervasyonu:** Mob olunce XP payi olmayan 3. oyuncu 10 sn icinde ganimete yurusun: alamamali; **tam o ganimetin ustunde dururken** 10 sn dolunca otomatik alabilmeli (yeniden yurumeden).
 - [ ] **Uzak istemci mesaj yogunlugu:** Istemci olarak 12 esyayi satici ile art arda sat: sohbet satirlari okunur kalmali, ping artmamali; bir esya satilirken baska mesaj kaybolmamali.
 - [ ] **Efekt suresi istemcide:** Istemci olarak Hizli/Guclu buff al: HUD'daki geri sayim yaklasik sunucuyla (+-1 sn) ayni olmali ve 0'da kalkmali; yeniden atilinca (tazeleme) sure basa donmeli.
+
+## Tıkla-saldır PvP hedef aktarımı — 2026-10-05
+
+`AMMOPlayerController::PlayerTick` menzildeki seçili `TargetEnemy` öğesini artık `AttackTarget(Enemy)` ile gönderir. Önceki `MMOAttack()` çağrısı hedefi `nullptr` yapıp her durumda en yakın moba düşüyordu. Varsayılan PvP kapalı kalır; host açıkça `MMOPvP 1` yapmadan oyuncu hasarı verilmez. C++ derlemesi temiz geçti, davranış PIE bekliyor.
+
+- [ ] Host + uzak istemci hub dışında dursun; host `MMOPvP 1` yazsın. İstemci hosta sol tıklayıp menzile gelsin: host canı yakın dövüş cooldown'unda azalmalı.
+- [ ] Aynı oyuncular partiye veya aynı klana girsin: tıkla-saldır hasar vermemeli ve saldıran istemci geçici ret ipucunu görmeli.
+- [ ] Host `MMOPvP 0` yazsın: oyuncuya tıkla-saldır hasar vermemeli; mob hedefleme ve otomatik saldırı eskisi gibi çalışmalı.
+- [ ] Hub içinde oyuncu veya mob hedefle: hasar olmamalı ve tek yenilenen `Guvenli bolgede saldiri yok` satırı görünmeli; ekran mesajı yığılmamalı.
