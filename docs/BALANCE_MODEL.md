@@ -126,3 +126,5 @@ Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/se
 **Parti bonusu:** Parti hasar payı artık ekstra üye başına +%10 çarpılır (`AMMOMob::HandleDeath`): 2 kişide toplam ×1,1, 8 kişide ×1,7; kişi başı pay `bonus/üye sayısı`. Tek başına oynayan için değişiklik yok.
 
 **`Q_Gold*`:** Ham XP ödülleri düşürüldü: `Q_Gold500` 300→150, `Q_Gold1000` 500→250, `Q_Gold5000` 6000→4000 (üstüne kapı-seviyesi çarpanı uygulanır). Altını harcatma seçeneği uygulanmadı: ekonomi modeline göre bu tutarlar toplam gelirin yanında önemsiz, yani gerçek bir altın çıkışı üretmez.
+
+**Ekonomi yan etkisi (model):** XP eğrisi yavaşlatılınca daha çok öldürme = daha çok altın. `Scripts/EconomyModel.py` yeni eğriyle Lv1→30 gelirini ~153.000'den **~270.000**'e çıkarıyor (kademe giderinin ~11 katı; önceki ~6,3). Yani XP yavaşlatması altın sink'i ihtiyacını artırdı; altın sink'i (yükseltme/iksir/şifacı maliyetini seviyeyle ölçekleme) ayrı ve hâlâ açık bir karar.
