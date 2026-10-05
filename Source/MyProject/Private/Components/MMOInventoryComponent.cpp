@@ -215,7 +215,7 @@ void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMO
 	// getirir). Loot/odul/satin-alma sessizce kaybolur; oyuncu once bosaltmali.
 	if (EquipmentBag.Num() >= MaxBagSize)
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -528,14 +528,14 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	// (hileli istemci satici olmadan her yerden alisveris RPC'si atmasin).
 	if (!IsOwnerNearVendor())
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
 	const int32 Price = FMMOItemDatabase::GetBuyPrice(*Def);
 	if (Gold < Price)
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -545,7 +545,7 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	// oyuncu gercekten para harciyor; parayi dusmeden ONCE kontrol et.
 	if (EquipmentBag.Num() >= MaxBagSize)
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -576,7 +576,7 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 
 	if (!IsOwnerNearVendor())
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -585,7 +585,7 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 	const int32 Room = GetAddRoom(PotionId);
 	if (Room <= 0)
 	{
-		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("En fazla %d tasiyabilirsin"), MaxStackSize), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("En fazla %d tasiyabilirsin"), MaxStackSize), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 	const int32 Wanted = Count;
@@ -593,7 +593,7 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 
 	if (Gold < FMMOItemDatabase::PotionPrice * Count)
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -627,7 +627,7 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 
 	if (!IsOwnerNearVendor())
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -641,7 +641,7 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 	const int32 Room = GetAddRoom(ItemId);
 	if (Room <= 0)
 	{
-		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("En fazla %d tasiyabilirsin"), MaxStackSize), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("En fazla %d tasiyabilirsin"), MaxStackSize), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 	const int32 Wanted = Count;
@@ -649,7 +649,7 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 
 	if (Gold < Def->Price * Count)
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -693,7 +693,7 @@ void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
 
 	if (!IsOwnerNearVendor())
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -762,7 +762,7 @@ void UMMOInventoryComponent::DepositEquipment(int32 InstanceId)
 
 	auto Notify = [this](const TCHAR* Msg)
 	{
-		MMONotify::ToOwner(GetOwner(), Msg, FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), Msg, FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 	};
 
 	if (!IsOwnerNearWarehouse())
@@ -804,7 +804,7 @@ void UMMOInventoryComponent::WithdrawEquipment(int32 InstanceId)
 
 	auto Notify = [this](const TCHAR* Msg)
 	{
-		MMONotify::ToOwner(GetOwner(), Msg, FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), Msg, FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 	};
 
 	if (!IsOwnerNearWarehouse())

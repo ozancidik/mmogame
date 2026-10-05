@@ -140,7 +140,7 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 		}
 		else
 		{
-			MMONotify::ToOwner(Owner, TEXT("Zaten bu siniftasin"), FColor::Silver, 2.f);
+			MMONotify::ToOwner(Owner, TEXT("Zaten bu siniftasin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		}
 		return;
 	}
@@ -157,7 +157,7 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 		{
 			MMONotify::ToOwner(Owner,
 				FString::Printf(TEXT("Sinif degisimi icin %.0f sn beklemelisin"), ClassChangeCooldownSec - (Now - LastClassChangeTime)),
-				FColor(255, 120, 80), 2.f);
+				FColor(255, 120, 80), 2.f, MMONotify::EMMONotifyKind::Hint);
 			return;
 		}
 	}
@@ -165,7 +165,7 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 	{
 		MMONotify::ToOwner(Owner,
 			FString::Printf(TEXT("Savasta sinif degistirilemez (%.0f sn hasar almamalisin)"), S->CombatDuration),
-			FColor(255, 120, 80), 2.f);
+			FColor(255, 120, 80), 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -588,7 +588,7 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	if (Owner->GetStats()->Mana < Def->ManaCost)
 	{
 		// ToOwner: yerelde ekrana, sunucuda uzak sahibe (kisa tek satir; cooldown geri alma RPC'si ayrica gider).
-		MMONotify::ToOwner(Owner, TEXT("Yeterli mana yok!"), FColor(80, 120, 255), 1.f);
+		MMONotify::ToOwner(Owner, TEXT("Yeterli mana yok!"), FColor(80, 120, 255), 1.f, MMONotify::EMMONotifyKind::Hint);
 		return false;
 	}
 
@@ -616,7 +616,7 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	{
 		// Bu dal yalniz otoritede calisir (istemci yukarida ServerUseSkill'e doner): uzak istemci
 		// eskiden ">> Skill" gorup sessizce reddediliyordu; sebebi ToOwner ile gonder (B5).
-		MMONotify::ToOwner(Owner, TEXT("Menzilde hedef yok"), FColor::Silver, 1.f);
+		MMONotify::ToOwner(Owner, TEXT("Menzilde hedef yok"), FColor::Silver, 1.f, MMONotify::EMMONotifyKind::Hint);
 		return false;
 	}
 

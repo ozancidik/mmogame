@@ -178,26 +178,24 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	// yoktu — hileli istemci gorevliye hic yaklasmadan gorev kabul edebiliyordu (bug-hunt).
 	if (!IsOwnerNearQuestGiver())
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Gorevli yakininda degilsin"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Gorevli yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
 	// On kosul gorev tamamlanmadan alinamaz (zincir).
 	if (!Def->PrereqQuestId.IsNone() && !IsCompleted(Def->PrereqQuestId))
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			const FMMOQuestDef* Pre = FMMOQuestDatabase::Find(Def->PrereqQuestId);
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver,
-				FString::Printf(TEXT("Once '%s' gorevini bitir"), Pre ? *Pre->Name : TEXT("onceki")));
-		}
+		// ToOwner: uzak istemci de gorsun (eskiden yalniz yerel kontrollu sahibe ekran mesajiydi).
+		const FMMOQuestDef* Pre = FMMOQuestDatabase::Find(Def->PrereqQuestId);
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Once '%s' gorevini bitir"), Pre ? *Pre->Name : TEXT("onceki")),
+			FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
 	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	if (Owner && Owner->GetStats() && Owner->GetStats()->Level < Def->RequiredLevel)
 	{
-		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -288,6 +286,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	// hem tamamlanmis listede tasiyabilirdi; ApplySaveData bunu da temizler, bu ikinci savunma).
 	if (CompletedQuests.Contains(QuestId))
 	{
+		MMONotify::ToOwner(GetOwner(), TEXT("Bu gorevin odulunu zaten aldin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 	FMMOQuestProgress* P = FindActive(QuestId);
@@ -299,7 +298,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	// Sunucu-otoriter dogrulama: odul alma da gorevliye yakinlik istemeli (bug-hunt).
 	if (!IsOwnerNearQuestGiver())
 	{
-		MMONotify::ToOwner(GetOwner(), TEXT("Gorevli yakininda degilsin"), FColor::Silver, 2.f);
+		MMONotify::ToOwner(GetOwner(), TEXT("Gorevli yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 

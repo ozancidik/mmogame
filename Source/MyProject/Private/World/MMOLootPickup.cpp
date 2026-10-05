@@ -277,7 +277,7 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 		if (Now - LastTime >= BagFullNotifyInterval)
 		{
 			LastTime = Now;
-			MMONotify::ToOwner(Char, TEXT("Canta dolu!"), FColor::Silver, 2.f);
+			MMONotify::ToOwner(Char, TEXT("Canta dolu!"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		}
 		return;
 	}
@@ -301,7 +301,7 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 			{
 				LastTime = Now;
 				MMONotify::ToOwner(Char, FString::Printf(TEXT("%s yigini dolu (en fazla %d)"),
-					*ItemId.ToString(), UMMOInventoryComponent::MaxStackSize), FColor::Silver, 2.f);
+					*ItemId.ToString(), UMMOInventoryComponent::MaxStackSize), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 			}
 			return;
 		}

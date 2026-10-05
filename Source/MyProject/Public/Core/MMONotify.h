@@ -15,8 +15,23 @@ class AActor;
 namespace MMONotify
 {
 	/**
-	 * OwnerActor bir APawn ise: yerel kontrollu pawn'da ekrana basar; uzak istemcinin pawn'inda (sunucuda)
-	 * sahibine owner-only chat RPC'siyle (sistem kanali) iletir. Pawn degilse hicbir sey yapmaz.
+	 * Mesaj turu. Result: sonuc satiri (satin alma, gorev, sinif, kayit...) - uzak istemcide kalici
+	 * sohbet sistem satiri (Reliable). Hint: gecici ret/ipucu ("Altin yetersiz", "Menzilde hedef yok")
+	 * - uzak istemcide karakter ustunde kisa balon (Unreliable ClientShowHint), sohbeti doldurmaz.
+	 * Yerel (host) pawn'da ikisi de ekran mesajidir.
 	 */
-	MYPROJECT_API void ToOwner(const AActor* OwnerActor, const FString& Text, const FColor& Color, float Duration);
+	enum class EMMONotifyKind : uint8
+	{
+		Result,
+		Hint
+	};
+
+	/**
+	 * OwnerActor bir APawn ise: yerel kontrollu pawn'da ekrana basar; uzak istemcinin pawn'inda (sunucuda)
+	 * Kind'a gore sahibine chat RPC'siyle (Result, sistem kanali) ya da hint RPC'siyle (Hint) iletir.
+	 * Ayni pawn + ayni metin ~0.5 sn icinde tekrar gonderilmez (uzak yol; ret yolu spam'i RPC kuyrugunu sisirmesin).
+	 * Pawn degilse hicbir sey yapmaz. Kind verilmezse Result (eski davranis).
+	 */
+	MYPROJECT_API void ToOwner(const AActor* OwnerActor, const FString& Text, const FColor& Color, float Duration,
+		EMMONotifyKind Kind = EMMONotifyKind::Result);
 }
