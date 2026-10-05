@@ -683,13 +683,15 @@ int32 AMMOMob::ScaleXPForLevelGap(int32 BaseXP, int32 PlayerLevel, int32 InMobLe
 
 void AMMOMob::HandleDeath()
 {
-	Super::HandleDeath(); // Blueprint OnCharacterDied olayini tetikler.
-
+	// Once guard, sonra Super: ikinci bir cagri (ornegin sunucuda OnDeath + gec gelen OnRep) Blueprint
+	// OnCharacterDied olayini da ikinci kez tetiklemesin. Ilk cagridaki davranis ayni.
 	if (bDeathHandled)
 	{
 		return;
 	}
 	bDeathHandled = true;
+
+	Super::HandleDeath(); // Blueprint OnCharacterDied olayini tetikler.
 
 	// XP/loot/yok-etme YALNIZCA sunucuda. Bu fonksiyon istemcide de calisir
 	// (bIsDead replike -> OnRep_IsDead -> OnDeath.Broadcast -> HandleDeath), o yuzden
