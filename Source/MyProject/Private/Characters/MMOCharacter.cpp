@@ -538,10 +538,9 @@ bool AMMOCharacter::SaveCharacterForTravel()
 		ActiveSaveSlot = TargetSlot;
 	}
 
-	if (bOk && GEngine && IsLocallyControlled())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120), TEXT("Kaydedildi"));
-	}
+	// "Kaydedildi" mesaji burada DEGIL: bu yol otomatik kayitta (60 sn), klan/ticaret/seyahat
+	// kaydinda da calisir ve oyuncuya her seferinde mesaj yagmamali. Yalniz elle kayit
+	// (MMOSave / ServerSaveCharacter) ToOwner ile bildirir.
 	return bOk;
 }
 
@@ -678,7 +677,10 @@ void AMMOCharacter::MMOSave()
 {
 	if (HasAuthority())
 	{
-		SaveCharacter();
+		if (SaveCharacterForTravel())
+		{
+			MMONotify::ToOwner(this, TEXT("Kaydedildi"), FColor(120, 220, 120), 2.f);
+		}
 	}
 	else
 	{
@@ -708,7 +710,11 @@ void AMMOCharacter::ServerSaveCharacter_Implementation()
 		return;
 	}
 	LastRemoteManualSaveTime = World->GetTimeSeconds();
-	SaveCharacter();
+	// Elle kayit: uzak sahibine de bildir (otomatik kayit sessiz kalir; bkz. SaveCharacterForTravel).
+	if (SaveCharacterForTravel())
+	{
+		MMONotify::ToOwner(this, TEXT("Kaydedildi"), FColor(120, 220, 120), 2.f);
+	}
 }
 
 void AMMOCharacter::ServerLoadCharacter_Implementation()
@@ -1126,14 +1132,23 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	// Vurus animasyonu varyasyonunu sunucuda sec ki tum makineler ayni hareketi gorsun.
 	MulticastMeleeFX(Victim->GetActorLocation() + FVector(0.f, 0.f, 40.f), FMath::RandRange(0, 2));
 
-	if (GEngine && bLocalFeedback && Victim->GetStats())
+	if (Victim->GetStats())
 	{
 		const bool bKilled = Victim->GetStats()->bIsDead;
-		GEngine->AddOnScreenDebugMessage(-1, 1.5f, bKilled ? FColor::Red : FColor::Yellow,
-			FString::Printf(TEXT("VURDUN: %.0f hasar | hedef HP %.0f/%.0f%s"),
-				ActualDamage,
-				Victim->GetStats()->Health, Victim->GetStats()->MaxHealth,
-				bKilled ? TEXT("  >>> OLDU!") : TEXT("")));
+		const FString HitText = FString::Printf(TEXT("VURDUN: %.0f hasar | hedef HP %.0f/%.0f%s"),
+			ActualDamage,
+			Victim->GetStats()->Health, Victim->GetStats()->MaxHealth,
+			bKilled ? TEXT("  >>> OLDU!") : TEXT(""));
+		if (GEngine && bLocalFeedback)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 1.5f, bKilled ? FColor::Red : FColor::Yellow, HitText);
+		}
+		else if (!bLocalFeedback && bKilled)
+		{
+			// Uzak istemciye yalniz OLDURUCU vurus (ToOwner sohbet satiri birakir; her vurusta
+			// gondermek sohbeti doldururdu). Hasar sayilari/kritik geri bildirimi ayri yoldan gider.
+			MMONotify::ToOwner(this, HitText, FColor::Red, 1.5f);
+		}
 	}
 }
 

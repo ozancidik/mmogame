@@ -16,6 +16,49 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Net/UnrealNetwork.h"
 
+namespace
+{
+	// "+N altin" bildirimi: ayni oyuncunun kisa surede topladigi altinlar TEK mesajda toplanir
+	// (ToOwner uzak istemciye sohbet satiri birakir; her pickup'ta ayri satir spam olurdu).
+	struct FPendingGoldNotify
+	{
+		int64 Sum = 0;
+	};
+	TMap<TWeakObjectPtr<AMMOCharacter>, FPendingGoldNotify> GPendingGoldNotify;
+	constexpr float GoldNotifyWindow = 0.5f;
+
+	void QueueGoldNotify(AMMOCharacter* Char, int32 Amount)
+	{
+		if (!Char || Amount <= 0)
+		{
+			return;
+		}
+		const TWeakObjectPtr<AMMOCharacter> Weak(Char);
+		const bool bTimerRunning = GPendingGoldNotify.Contains(Weak);
+		GPendingGoldNotify.FindOrAdd(Weak).Sum += Amount;
+		if (bTimerRunning)
+		{
+			return; // pencere acik, bu miktar pencere sonunda gonderilir
+		}
+		UWorld* World = Char->GetWorld();
+		if (!World)
+		{
+			GPendingGoldNotify.Remove(Weak);
+			return;
+		}
+		FTimerHandle Handle;
+		World->GetTimerManager().SetTimer(Handle, FTimerDelegate::CreateLambda([Weak]()
+		{
+			const FPendingGoldNotify Done = GPendingGoldNotify.FindRef(Weak);
+			GPendingGoldNotify.Remove(Weak);
+			if (AMMOCharacter* C = Weak.Get(); C && Done.Sum > 0)
+			{
+				MMONotify::ToOwner(C, FString::Printf(TEXT("+%lld altin"), Done.Sum), FColor(255, 210, 0), 2.f);
+			}
+		}), GoldNotifyWindow, false);
+	}
+}
+
 AMMOLootPickup::AMMOLootPickup()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -272,12 +315,8 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 	if (bIsGold)
 	{
 		Inv->AddGoldFrom(GoldAmount, TEXT("loot"));
-		// Yalniz toplayanin yerel ekraninda (eskiden sunucuda HERKESIN ganimeti host ekranina basiliyordu).
-		if (GEngine && Char->IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 210, 0),
-				FString::Printf(TEXT("+%d altin"), GoldAmount));
-		}
+		// Yalniz toplayana (yerelde ekran, uzak istemcide sohbet satiri); kisa surede toplananlar tek mesaj.
+		QueueGoldNotify(Char, GoldAmount);
 	}
 	else if (bIsEquipment)
 	{
