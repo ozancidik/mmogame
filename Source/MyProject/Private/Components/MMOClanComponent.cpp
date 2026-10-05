@@ -13,6 +13,8 @@
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogMMOClanAudit, Log, All);
+
 namespace
 {
 	// Katilma sirasi sayaci (sunucu sureci boyunca artar; kucuk = daha eski uye).
@@ -222,6 +224,8 @@ void UMMOClanComponent::EnsureLeader(const FString& InClanName, bool bExcludeSel
 	Best->bIsLeader = true;
 	Best->bActingLeader = true;
 	Best->MarkChanged();
+	UE_LOG(LogMMOClanAudit, Display, TEXT("event=clan_leader_transfer clan=\"%s\" leader=\"%s\" acting=1"),
+		*Best->ClanName, *ClanPlayerNameOf(Best->GetOwnerCharacter()));
 	Best->NotifyClan(Best->ClanName, FString::Printf(TEXT("%s artik klan lideri."), *ClanPlayerNameOf(Best->GetOwnerCharacter())), false);
 }
 
@@ -277,6 +281,8 @@ void UMMOClanComponent::CmdCreate(const FString& Name)
 	JoinSeq = ++GClanJoinCounter;
 	GSavedClanBySlot.Add(Self->GetSaveSlotName(), N); // onbellek: yeni klan hemen gorunsun
 	MarkChanged();
+	UE_LOG(LogMMOClanAudit, Display, TEXT("event=clan_create clan=\"%s\" actor=\"%s\" slot=\"%s\""),
+		*ClanName, *ClanPlayerNameOf(Self), *Self->GetSaveSlotName());
 	NotifyOwner(FString::Printf(TEXT("Klan kuruldu: [%s]. Davet: /klan davet"), *ClanName));
 	Self->SaveCharacter();
 }
@@ -416,6 +422,8 @@ void UMMOClanComponent::CmdAccept()
 	bActingLeader = false;
 	JoinSeq = ++GClanJoinCounter;
 	MarkChanged();
+	UE_LOG(LogMMOClanAudit, Display, TEXT("event=clan_join clan=\"%s\" actor=\"%s\" inviter=\"%s\""),
+		*ClanName, *ClanPlayerNameOf(Self), *ClanPlayerNameOf(Inviter));
 	NotifyClan(ClanName, FString::Printf(TEXT("%s klana katildi."), *ClanPlayerNameOf(Self)), false);
 	Self->SaveCharacter();
 }
@@ -445,6 +453,8 @@ void UMMOClanComponent::CmdLeave()
 	bActingLeader = false;
 	JoinSeq = 0;
 	MarkChanged();
+	UE_LOG(LogMMOClanAudit, Display, TEXT("event=clan_leave clan=\"%s\" actor=\"%s\" was_leader=%d"),
+		*OldName, *ClanPlayerNameOf(Self), bWasLeader ? 1 : 0);
 	NotifyOwner(FString::Printf(TEXT("[%s] klanindan ayrildin."), *OldName));
 	NotifyClan(OldName, FString::Printf(TEXT("%s klandan ayrildi."), *ClanPlayerNameOf(Self)), false);
 	if (bWasLeader)
@@ -509,6 +519,8 @@ void UMMOClanComponent::CmdKick(const FString& TargetName)
 	VC->bActingLeader = false;
 	VC->JoinSeq = 0;
 	VC->MarkChanged();
+	UE_LOG(LogMMOClanAudit, Display, TEXT("event=clan_kick clan=\"%s\" actor=\"%s\" target=\"%s\""),
+		*OldName, *ClanPlayerNameOf(Self), *VictimName);
 	VC->NotifyOwner(FString::Printf(TEXT("[%s] klanindan atildin."), *OldName));
 	NotifyClan(OldName, FString::Printf(TEXT("%s klandan atildi."), *VictimName), false);
 	Victim->SaveCharacter();

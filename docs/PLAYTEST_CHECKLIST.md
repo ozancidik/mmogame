@@ -3471,3 +3471,13 @@ Başarılı ticaretler sunucu loguna `LogMMOTradeAudit` kategorisinde tek yapıl
 - [ ] Teklif onayından önce iptal et ve ayrıca oyuncuları 800 uu'dan fazla uzaklaştır: her işlem için yalnız bir `event=trade_cancel` satırı oluşmalı, neden doğru olmalı.
 - [ ] Çanta doluluğu veya değişmiş teklif nedeniyle sunucu takası reddetsin: `trade_cancel` görünmeli, `trade_complete` görünmemeli ve hiçbir eşya/altın kaybolmamalı.
 - [ ] Tamamlanan ticarette yalnız bir `trade_complete` görünmeli; ayrıca yanıltıcı `trade_cancel` satırı oluşmamalı.
+
+## Klan denetim günlüğü — 2026-10-05
+
+Klan durumunu değiştiren sunucu işlemleri `LogMMOClanAudit` kategorisinde yapılandırılmış satırlar üretir: klan kurma, davet kabulüyle katılma, ayrılma, lider tarafından atılma ve çevrimiçi lidere otomatik yetki devri. Klan/oyuncu/davetçi/hedef ve liderlik bilgileri yalnız işlem başarıyla uygulandıktan sonra yazılır. Zorlanmış C++ derlemesi temiz geçti; ilk derleme paralel NetSmokeTest DLL'yi tuttuğu için başarısız oldu, test kapanınca yeniden derleme başarıyla tamamlandı.
+
+- [ ] `/klan kur Deneme` sonrasında tek `event=clan_create` satırı görünmeli; klan, kurucu ve kayıt yuvası eşleşmeli.
+- [ ] Daveti kabul eden oyuncu için tek `event=clan_join` oluşmalı; klan, katılan ve davetçi doğru olmalı. Süresi dolmuş/reddedilmiş davette log oluşmamalı.
+- [ ] Üye `/klan ayril` yaptığında `event=clan_leave` ve doğru `was_leader` değeri görünmeli.
+- [ ] Lider `/klan at Isim` yaptığında tek `event=clan_kick` oluşmalı; başarısız veya çevrimdışı hedefte log oluşmamalı.
+- [ ] Lider ayrılır/bağlantısı kopar ve çevrimiçi üye varsa `event=clan_leader_transfer` yalnız bir kez oluşmalı; seçilen en eski çevrimiçi üye olmalı.
