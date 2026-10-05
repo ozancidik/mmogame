@@ -37,6 +37,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	AMMOCharacter* GetSelectedTarget() const;
 
+	// Sunucu (ya da yerel kapi) hedefe saldiriyi reddetti (PvP kapali / parti-klan / hub / dogum korumasi):
+	// otomatik saldiriyi ve kovalamayi durdurur. SelectedTarget kalir (secili ama saldirilmaz);
+	// ayni hedefe kisa sure tekrar tikla-kovala kurulmaz (basili tutulan sol tus dongusu).
+	void ReleaseAttackTarget(const AMMOCharacter* Rejected);
+
 	// --- Sohbet (KO tarzi genel + parti) ---
 	// Enter: sol altta yazi kutusu acar; Enter gonderir, Esc/odak kaybi kapatir.
 	// "/p mesaj" yalniz parti uyelerine gider. Konsol yedegi: "Say merhaba".
@@ -167,6 +172,12 @@ protected:
 
 	// Z ile secilen hedef (KO'daki m_iIDTarget). Saldiri baslatmaz; R ile saldiriya gecilir.
 	TWeakObjectPtr<AMMOCharacter> SelectedTarget;
+
+	// Saldirisi reddedilen hedef ve zamani (ReleaseAttackTarget). RejectedTargetSeconds boyunca
+	// ayni hedefe tiklamak yalniz secer, kovalamaz.
+	TWeakObjectPtr<AMMOCharacter> RejectedTarget;
+	float RejectedTargetTime = -100.f;
+	static constexpr float RejectedTargetSeconds = 3.f;
 
 	// Z ile hedef arama menzili.
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Control")

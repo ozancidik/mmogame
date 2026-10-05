@@ -291,7 +291,15 @@ public:
 protected:
 	// "MMONpcTalk" debug komutunun spam korumasi (client-side, RPC olmadigi icin
 	// sunucu-tarafi mesafe/cooldown guard'lari devreye girmiyor — bkz. MMONpcTalk).
+	// Sunucu saldiriyi reddettiginde (PvP kapali / parti-klan / hub / dogum korumasi) sahibe:
+	// otomatik saldiri/kovalamayi birak. Yalniz oyuncu hedefleri icin (mob reddi yok).
+	UFUNCTION(Client, Unreliable)
+	void ClientReleaseAttackTarget(AMMOCharacter* Rejected);
+
 	float LastNpcTalkDebugTime = -100.f;
+	// Reddedilen oyuncu hedefini sahibin kontrolcusunda biraktirir (yerel: dogrudan, uzak: Client RPC).
+	void ReleaseAttackTargetOnOwner(AMMOCharacter* Rejected);
+
 	static constexpr float NpcTalkDebugCooldown = 2.f;
 
 	virtual void BeginPlay() override;

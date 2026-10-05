@@ -607,6 +607,19 @@ void AMMOPlayerController::OnTargetNearestEnemy()
 	AMMOMob* Nearest = MMOTargeting::FindNearestMob(this, P->GetActorLocation(), TargetSearchRange);
 
 	SelectTarget(Nearest);
+void AMMOPlayerController::ReleaseAttackTarget(const AMMOCharacter* Rejected)
+{
+	// Reddedilen hedef artik kovalanan hedef degilse (oyuncu baska yere tikladi) dokunma.
+	if (!Rejected || TargetEnemy.Get() != Rejected)
+	{
+		return;
+	}
+	RejectedTarget = TargetEnemy;
+	RejectedTargetTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	TargetEnemy.Reset();
+	StopMovement();
+}
+
 
 	if (!Nearest && GEngine)
 	{
@@ -857,7 +870,6 @@ void AMMOPlayerController::DoLeftClickAction()
 	{
 		// Hedefe git ve saldir.
 		SelectedTarget = HitChar;
-		TargetEnemy = HitChar;
 		bHasMoveTarget = false;
 	}
 	else
@@ -894,6 +906,14 @@ void AMMOPlayerController::OnRightMousePressed()
 	// Pencere acikken sag tik, imlecin ustundeki pencereye calisir (kitap: slota koy; envanter: +1 dene), kamera donmez.
 	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
+		// Yakin zamanda saldirisi reddedilen hedef (PvP kapali vb.): yalniz sec, kovalama.
+		const float ClickNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		const bool bRecentlyRejected = RejectedTarget.Get() == HitChar
+			&& ClickNow - RejectedTargetTime < RejectedTargetSeconds;
+		if (!bRecentlyRejected)
+		{
+			TargetEnemy = HitChar;
+		}
 		if (H->IsAnyWindowOpen())
 		{
 			float MX = 0.f, MY = 0.f;

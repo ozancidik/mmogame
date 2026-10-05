@@ -1054,6 +1054,11 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 		{
 			GEngine->AddOnScreenDebugMessage(4101, 1.f, FColor::Silver, TEXT("Guvenli bolgede saldiri yok"));
 		}
+		// Oyuncu hedefi hub'da kovalanmaz (mob hedefi etkilenmez: cikinca saldirisi surer).
+		if (Target && IsPlayerPawn(Target))
+		{
+			ReleaseAttackTargetOnOwner(Target);
+		}
 		return;
 	}
 
@@ -1124,12 +1129,22 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	if (IsPlayerPawn(Victim) && !IsPvPAllowed())
 	{
 		SendAttackFeedback(TEXT("PvP kapali"));
+		ReleaseAttackTargetOnOwner(Victim);
 		return;
 	}
 	// Dostu-ates ve guvenli bolge kurallari (parti / klan / hub).
 	if (const TCHAR* BlockReason = nullptr; IsPlayerPawn(Victim) && !CanHarmPlayer(Victim, BlockReason))
 	{
 		SendAttackFeedback(BlockReason ? FString(BlockReason) : TEXT("Bu hedefe saldiramazsin"));
+		ReleaseAttackTargetOnOwner(Victim);
+		return;
+	}
+	// Dogum korumali oyuncuya vurulamaz: vurus reddedilmeden saldirinin yan etkileri
+	// (kendi korumasini bitirme / savas durumuna girme) UYGULANMAZ.
+	if (IsPlayerPawn(Victim) && Victim->IsSpawnProtected())
+	{
+		SendAttackFeedback(TEXT("Hedef korumali"));
+		ReleaseAttackTargetOnOwner(Victim);
 		return;
 	}
 
@@ -1500,6 +1515,33 @@ void AMMOCharacter::ClientShowHint_Implementation(const FString& Text)
 	{
 		return;
 	}
+void AMMOCharacter::ReleaseAttackTargetOnOwner(AMMOCharacter* Rejected)
+{
+	AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController());
+	if (!PC || !Rejected)
+	{
+		return;
+	}
+	if (IsLocallyControlled())
+	{
+		PC->ReleaseAttackTarget(Rejected);
+	}
+	else if (HasAuthority())
+	{
+		// Uzak istemci: tikla-kovala dongusu sunucuya her 0,6 sn RPC atmasin diye hedefi biraktir.
+		// Unreliable: kaybolursa istemci bir sonraki vurusta yine reddedilir ve yeniden gonderilir.
+		ClientReleaseAttackTarget(Rejected);
+	}
+}
+
+void AMMOCharacter::ClientReleaseAttackTarget_Implementation(AMMOCharacter* Rejected)
+{
+	if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController()))
+	{
+		PC->ReleaseAttackTarget(Rejected);
+	}
+}
+
 	HUD->AddFloatingLabel(GetActorLocation() + FVector(0.f, 0.f, 170.f), Text);
 }
 
