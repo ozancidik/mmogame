@@ -139,3 +139,19 @@ Kod derlendi, PIE'de OYNANMADI.
 Degisiklik gerekmedi. Istemci `?Name=CIDIK-<hex>` ile baglandiginda sunucu `Gezgin######` atadi (net smoke logunda). PIE'de elle:
 
 - [ ] `?Name=` olmadan (veya OS adiyla) baglanan ikinci oyuncunun adi karakter ustu etiket, `/who`, sohbet ve parti listesinde `Gezgin######` olarak gorunmeli; bilgisayar/kullanici adi hicbir UI'da gorunmemeli.
+
+## 14. QA Tur-3 orta/dusuk duzeltmeleri (ORTA-1/2/3, DUSUK-1/3)
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 istemci gerekir.
+
+- [ ] **ORTA-1** PvP kapali (varsayilan), hub disinda: istemci hostun karakterine sol tikla ve yanina yaklas. Beklenen: en fazla bir kez "PvP kapali" balonu, sonra kovalama DURUR (karakter yurumeyi birakir, host cani dusmez). Hedef secili kalir (HUD hedef bari). Ayni hedefe 3 sn icinde tekrar tiklamak yalniz secer, kovalamaz; 3 sn sonra tek vurus denemesi ve yine birakma.
+- [ ] Sol tusu hostun uzerinde BASILI tut: RPC/balon spami olmamali (3 sn araliklarla en fazla bir deneme).
+- [ ] Ayni testi parti uyesi ve klan uyesi icin tekrarla (PvP acik: `MMOPvP 1`): "Parti uyesine vuramazsin" / "Klan uyesine vuramazsin" sonrasi kovalama durmali.
+- [ ] Hub guvenli bolgesinde oyuncuya tikla: "Guvenli bolgede saldiri yok", kovalama durmali. Hub icinde moba tiklayinca hedef BIRAKILMAMALI (cikinca saldirisi surer).
+- [ ] Regresyon: oyuncu hedefi birakildiktan sonra yakindaki moba tikla/saldir normal calismali; PvP acikken (`MMOPvP 1`, hub disi, parti/klan yok) iki oyuncu birbirine vurabilmeli ve kovalama kesilmemeli.
+- [ ] **DUSUK-1** PvP acik: birini oldur, yeniden doganin uzerine hemen tikla-saldir. Beklenen: "Hedef korumali" balonu, 0 hasar yazisi YOK; saldiranin kendi dogum korumasi ve savas durumu degismez (sinif degistirme/bolge gecisi "savasta" diye reddedilmemeli); kovalama durur.
+- [ ] **ORTA-2** Parti: A, B'ye `/parti` (ya da MMOInvite) ile davet atar. B `/parti ret` yazar: B "Parti daveti reddedildi.", A (uzak istemci de olsa) "<B> parti davetini reddetti." gormeli; B `/parti kabul` artik "Bekleyen" daveti bulamamali (parti kurulmaz).
+- [ ] B davet beklerken A tekrar davet atarsa A "zaten gonderildi" ipucunu gormeli; C davet atarsa C "bekleyen baska bir daveti var" gormeli; hic oyuncu yakin degilken davet atan "Yakinda davet edilecek oyuncu yok" gormeli (uzak istemcide de).
+- [ ] Davet 30 sn sonra gecersiz: B 30 sn bekleyip `/parti kabul` yazinca "Davetin suresi doldu"/parti kurulmamasi; daveti 30 sn sonra baska oyuncu atabilmeli. `/yardim` metninde `/parti (davet; kabul, ret, ayril)` gorunmeli; `/parti xyz` kullanim satirini vermeli. Konsol: `MMOPartyDecline` ayni davranisi vermeli.
+- [ ] **ORTA-3** `G` gorev penceresi: Seviye 6+ ile `Q_Warlocks`/`Q_DireWolves`, Lv25+ ile `Q_ObsidianWarlord`, `Q_Gold1000` ve uzun esya adli odullu gorevlerde aciklama + odul satiri panelin (480 px) icinde kalmali; uzun aciklama "..." ile bitmeli ve "Odul: ..." kismi her zaman gorunmeli. Satirlara tiklayarak gorev alma/odul alma hala calismali; cok gorevli durumda satir hizasi bozulmamali. (Ekran goruntusu al.)
+- [ ] **DUSUK-3** `?Name=MehmetCelikoglu-2024` (tam 20 karakter) ile baglanan oyuncu `Gezgin######` OLMAMALI; `?Name=CIDIK-3F9A1B7C2D4E5F` ve cok uzun bilgisayar adindan kesilmis `...-1A2B` gibi adlar yine `Gezgin######` olmali.
