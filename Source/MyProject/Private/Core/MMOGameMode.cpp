@@ -105,7 +105,7 @@ namespace
 		const FString Suffix = Name.Mid(Dash + 1);
 		// Motor ?Name= degerini 20 karakterle keser: uzun on ekte (bilgisayar adi) onaltilik kuyruk kesilmis olabilir.
 		// 20 karakterlik ad + onaltilik (kisa da olsa) kuyruk = kesilmis OS varsayilan adi sayilir.
-		const bool bTruncatedByEngine = Name.Len() >= 20 && Suffix.Len() >= 1;
+		const bool bTruncatedByEngine = Name.Len() >= 20 && Suffix.Len() >= 4;
 		if (Suffix.Len() < 8 && !bTruncatedByEngine)
 		{
 			return false;

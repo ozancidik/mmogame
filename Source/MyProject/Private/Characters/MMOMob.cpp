@@ -708,10 +708,16 @@ void AMMOMob::HandleDeath()
 		{
 			// Olumcul vurus oyuncu olmayan/gecersiz bir kaynaktan geldi (ornegin cikis yapan oyuncunun DoT'u):
 			// en cok hasar veren oyuncu duyuru ve gorev kredisi icin "olduren" sayilir; XP yine hasar payina gore dagilir.
+			// Yalniz suresi dolmamis (ContributionExpirySeconds icinde vurmus) katkilar aday olur; mobu terk eden
+			// oyuncu yedek "olduren" secilip tam XP/ganimet almasin. Gecerli aday yoksa Killer null kalir (XP verilmez).
+			const UWorld* FallbackWorld = GetWorld();
+			const float FallbackNow = FallbackWorld ? FallbackWorld->GetTimeSeconds() : 0.f;
 			float Best = 0.f;
 			for (const TPair<TWeakObjectPtr<AMMOCharacter>, float>& C : DamageContributions)
 			{
-				if (C.Key.IsValid() && C.Value > Best)
+				const float* LastHit = LastContributionTime.Find(C.Key);
+				const bool bFresh = FallbackWorld && LastHit && (FallbackNow - *LastHit <= ContributionExpirySeconds);
+				if (bFresh && C.Key.IsValid() && C.Value > Best)
 				{
 					Best = C.Value;
 					Killer = C.Key.Get();

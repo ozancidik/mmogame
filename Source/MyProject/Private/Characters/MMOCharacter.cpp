@@ -779,6 +779,7 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	if (!IsLocallyControlled() && !ActiveSaveSlot.Equals(CandidateSlot, ESearchCase::IgnoreCase)
 		&& UGameplayStatics::DoesSaveGameExist(CandidateSlot, 0))
 	{
+		MMONotify::ToOwner(this, TEXT("Bu ad kayitli bir karaktere ait: degistirilemedi. Kendi karakterin icin ?Name= ile yeniden baglan."), FColor::Orange, 6.f);
 		return;
 	}
 	if (CooldownWorld)
