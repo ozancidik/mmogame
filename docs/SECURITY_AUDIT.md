@@ -267,3 +267,9 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) üzerindek
 | D-10 | Kapandı | HTTP hata gövdesi 200 karakterle loglanır. |
 | D-11 | Açık | `DefaultEngine.ini` AndroidFileServer token'ı (`Config/` bulutta düzenlenmez). |
 | D-12 | Önceki turda kapandı | `.gitignore` (`.idea/`, `*.sav`, `.env`). |
+
+## 8. Ek not (2026-10-05, QA denetimi): komut satiri parolasi
+
+- `-MMOPassword=` sunucu komut satirinda gorunur (islem listesi, kisayol/betik gecmisi) ve istemci `?Password=` degeri motorun `LogNet` "Login request: ..." satirina duser (sunucu log dosyasi). Kod DEGISTIRILMEDI.
+- Yerel/ozel host icin kabul edilebilir; kamuya acik sunucuda parolayi ortam degiskeninden okuyup `Login request` logunu kapat ya da maskele (LogNet verbosity), log dosyalarini paylasma.
+- Bu parola kimlik dogrulamanin yerini tutmaz (K-1 notu gecerli); kalici cozum hesap sistemi.
