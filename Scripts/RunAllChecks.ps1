@@ -34,6 +34,13 @@ Step "PlaytestMetrics fixture testi (TestPlaytestMetrics.py)" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Denetim negatif testleri (TestStaticLint/TestValidateData)" {
+    & $py (Join-Path $PSScriptRoot "TestStaticLint.py") | Out-Host
+    $a = $LASTEXITCODE
+    & $py (Join-Path $PSScriptRoot "TestValidateData.py") | Out-Host
+    ($a -eq 0) -and ($LASTEXITCODE -eq 0)
+}
+
 if (-not $SkipBuild) {
     Step "Derleme (MyProjectEditor)" {
         $out = & $ue MyProjectEditor Win64 Development "-Project=$root\MyProject.uproject" -WaitMutex 2>&1

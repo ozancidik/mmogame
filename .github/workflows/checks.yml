@@ -18,9 +18,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Veri denetimi (mob/item/gorev/beceri/efekt)
+      - name: Veri denetimi (tablolar + spawner/gorev/odul/satici/XP knot oynanabilirligi)
         run: python Scripts/ValidateData.py
-      - name: Statik C++ kontrolu (suslu/parantez dengesi, generated.h)
+      - name: Statik C++ kontrolu (denge, generated.h, RPC/OnRep/override/include kaliplari)
         run: python Scripts/StaticLint.py
       - name: Ilerleme ve ekonomi modelleri calisiyor mu
         run: |
@@ -29,6 +29,10 @@ jobs:
           python Scripts/ContentMap.py > /dev/null
       - name: PlaytestMetrics fixture testi (sahte [MMOMETRIC] logu)
         run: python Scripts/TestPlaytestMetrics.py
+      - name: Denetimlerin negatif testleri (kasitli bozuk kopya yakalaniyor mu)
+        run: |
+          python Scripts/TestStaticLint.py
+          python Scripts/TestValidateData.py
       - name: PR korunan yol denetimi (Content/Config/MMOSaveGame.h hata; Party/Trade uyari)
         if: github.event_name == 'pull_request'
         env:
