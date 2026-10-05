@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Characters/MMOCharacter.h"
+#include "Core/MMONotify.h"
 #include "Characters/MMOMob.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
@@ -668,10 +669,8 @@ bool AMMOCharacter::LoadCharacter()
 	bInitialLoadComplete = true;
 	ActiveSaveSlot = Slot;
 
-	if (GEngine && IsLocallyControlled())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor(120, 200, 255), TEXT("Karakter yuklendi"));
-	}
+	// LoadCharacter yalniz sunucuda calisir: uzak istemciye de ToOwner ile (B5).
+	MMONotify::ToOwner(this, TEXT("Karakter yuklendi"), FColor(120, 200, 255), 2.5f);
 	return true;
 }
 
@@ -797,11 +796,9 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			FriendsComponent->AnnouncePresence(true);
 		}
 	}
-	if (GEngine && IsLocallyControlled())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor(120, 200, 255),
-			FString::Printf(TEXT("Adin '%s' olarak ayarlandi. Kalici kayit icin simdi MMOSave/MMOLoad kullan."), *Trimmed));
-	}
+	MMONotify::ToOwner(this,
+		FString::Printf(TEXT("Adin '%s' olarak ayarlandi. Kalici kayit icin simdi MMOSave/MMOLoad kullan."), *Trimmed),
+		FColor(120, 200, 255), 3.f);
 }
 
 void AMMOCharacter::PawnClientRestart()
@@ -935,10 +932,10 @@ void AMMOCharacter::HandleDeath()
 					MMOMetrics::Seconds(), *MMOMetrics::WhoName(this), Stats->Level, DeathLoc.X, DeathLoc.Y, DeathLoc.Z,
 					KillerMob ? *KillerMob->ArchetypeId.ToString() : TEXT("none"), Lost);
 
-				if (Lost > 0 && IsLocallyControlled() && GEngine)
+				if (Lost > 0)
 				{
-					GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor(255, 120, 120),
-						FString::Printf(TEXT("Oldun! -%d EXP"), Lost));
+					// Sunucu dali: uzak oyuncu da XP kaybini gorsun (B5).
+					MMONotify::ToOwner(this, FString::Printf(TEXT("Oldun! -%d EXP"), Lost), FColor(255, 120, 120), 3.f);
 				}
 			}
 
@@ -1658,11 +1655,10 @@ void AMMOCharacter::UseHealthPotion()
 	if (Inventory->RemoveItem(PotionId, 1))
 	{
 		Stats->Heal(PotionHealAmount);
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 80, 80),
-				FString::Printf(TEXT("Iksir icildi: +%.0f HP (kalan %d)"), PotionHealAmount, Inventory->GetItemCount(PotionId)));
-		}
+		// Otorite dali (istemci yukarida RPC'ye doner): uzak istemciye de ToOwner ile (B5).
+		MMONotify::ToOwner(this,
+			FString::Printf(TEXT("Iksir icildi: +%.0f HP (kalan %d)"), PotionHealAmount, Inventory->GetItemCount(PotionId)),
+			FColor(255, 80, 80), 2.f);
 	}
 }
 
@@ -1728,11 +1724,9 @@ void AMMOCharacter::UseConsumable(FName ItemId)
 			Stats->ApplyEffect(Def->EffectId, this);
 		}
 
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 200, 255),
-				FString::Printf(TEXT("Kullanildi: %s (kalan %d)"), *Def->Name, Inventory->GetItemCount(ItemId)));
-		}
+		MMONotify::ToOwner(this,
+			FString::Printf(TEXT("Kullanildi: %s (kalan %d)"), *Def->Name, Inventory->GetItemCount(ItemId)),
+			FColor(120, 200, 255), 2.f);
 	}
 }
 
