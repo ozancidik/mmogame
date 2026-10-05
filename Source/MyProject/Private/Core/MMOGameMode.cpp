@@ -26,7 +26,7 @@
 
 AMMOGameMode::AMMOGameMode()
 {
-	// Varsay�lan HUD'u MMO HUD'�m�z yap.
+	// Varsayilan HUD'u MMO HUD'imizi yap.
 	HUDClass = AMMOHUD::StaticClass();
 	bUseSeamlessTravel = true;
 }
@@ -108,10 +108,22 @@ namespace
 		}
 		const FString Suffix = Name.Mid(Dash + 1);
 		// Motor ?Name= degerini 20 karakterle keser: uzun on ekte (bilgisayar adi) onaltilik kuyruk kesilmis olabilir.
-		// Kesik kalip: tam 20 karakter + en az 4 hane kuyruk + kuyrukta en az bir rakam ("...-Fade"/"...-Dead" gibi
-		// yalniz harf-hex kuyruklar mesru ad sayilir).
-		const bool bTruncatedByEngine = Name.Len() == 20 && Suffix.Len() >= 4
-			&& Suffix.FindLastCharByPredicate([](TCHAR C) { return FChar::IsDigit(C); }) != INDEX_NONE;
+		// Kesik kalip: tam 20 karakter + en az 4 hane kuyruk + kuyrukta hem en az bir rakam hem en az bir
+		// a-f harfi (rastgele onaltilik kuyruk neredeyse hep ikisini de icerir; "...-Fade"/"...-Dead" gibi
+		// yalniz harf ve "...-2024" gibi yalniz rakam kuyruklar mesru ad sayilir).
+		// Ornekler (ad -> sonuc):
+		//   "CIDIK-3F9A1B7C2D4E5F"        (20)  -> OS adi   (kuyruk 14 hane, hex)
+		//   "DESKTOP-ABCDEFG-1A2B"        (20)  -> OS adi   (kesik: rakam + harf var)
+		//   "MehmetCelikoglu-2024"        (20)  -> mesru    (kuyruk yalniz rakam)
+		//   "KralAslanSavasci-Fade"       (21)  -> mesru    (20 karakter degil)
+		//   "UzunBirIsimYazdim-Dead"      (22)  -> mesru    (20 karakter degil)
+		//   "Ozan-20261005", "Kral-12345678", "Ali-deadbeef" -> mesru (kuyruk < 12 hane, kesik kalip degil)
+		const bool bSuffixHasDigit = Suffix.FindLastCharByPredicate([](TCHAR C) { return FChar::IsDigit(C); }) != INDEX_NONE;
+		const bool bSuffixHasHexLetter = Suffix.FindLastCharByPredicate([](TCHAR C)
+		{
+			return (C >= TEXT('a') && C <= TEXT('f')) || (C >= TEXT('A') && C <= TEXT('F'));
+		}) != INDEX_NONE;
+		const bool bTruncatedByEngine = Name.Len() == 20 && Suffix.Len() >= 4 && bSuffixHasDigit && bSuffixHasHexLetter;
 		if (Suffix.Len() < 12 && !bTruncatedByEngine)
 		{
 			return false;
