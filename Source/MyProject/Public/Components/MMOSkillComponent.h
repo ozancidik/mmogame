@@ -164,6 +164,12 @@ protected:
 	UFUNCTION(Client, Reliable)
 	void ClientRestoreSkillCooldowns(const TArray<FName>& SkillIds, const TArray<float>& RemainingSeconds);
 
+	// Sunucu beceri istegini reddedince (cooldown/hedef yok/mana/vb.) istemcinin iyimser cooldown'unu
+	// geri alir: RemainingSeconds <= 0 ise siler, > 0 ise sunucunun gercek kalan suresine ceker.
+	// Unreliable: kayip olursa en kotu ihtimalle bayat bekleme birkac saniye daha gorunur.
+	UFUNCTION(Client, Unreliable)
+	void ClientSkillRejected(FName SkillId, float RemainingSeconds);
+
 	// Sinif degisimleri arasi bekleme (sunucu, saniye) ve son degisim zamani.
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|Skills", meta = (ClampMin = "0"))
 	float ClassChangeCooldownSec = 60.f;

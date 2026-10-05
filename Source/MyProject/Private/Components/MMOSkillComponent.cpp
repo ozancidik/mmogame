@@ -587,10 +587,8 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	// Mana on kontrolu (replike degerle; kesin karar sunucuda).
 	if (Owner->GetStats()->Mana < Def->ManaCost)
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor(80, 120, 255), TEXT("Yeterli mana yok!"));
-		}
+		// ToOwner: yerelde ekrana, sunucuda uzak sahibe (kisa tek satir; cooldown geri alma RPC'si ayrica gider).
+		MMONotify::ToOwner(Owner, TEXT("Yeterli mana yok!"), FColor(80, 120, 255), 1.f);
 		return false;
 	}
 
@@ -655,15 +653,37 @@ void UMMOSkillComponent::ServerUseSkill_Implementation(FName SkillId, AMMOCharac
 	{
 		if (Now < *End - 0.1f)
 		{
-			return; // cooldown dolmadi (otorite reddi)
+			// cooldown dolmadi (otorite reddi): istemcinin iyimser tam suresini gercek kalana cek.
+			ClientSkillRejected(SkillId, *End - Now);
+			return;
 		}
 	}
 	// UseSkill kendi kapisini yeniden uygular; cakismamasi icin kaydi temizle,
 	// UseSkill mana harcayip etkiyi calistirir ve cooldown'u yeniden yazar.
 	CooldownEndTimes.Remove(SkillId);
 	RequestedTargetForCast = RequestedTarget;
-	UseSkill(SkillId);
+	const bool bCast = UseSkill(SkillId);
 	RequestedTargetForCast.Reset();
+	if (!bCast)
+	{
+		// Reddedildi (hedef yok, mana yetersiz, vb.): kayit yukarida silindi, istemci de bekleme gostermesin.
+		ClientSkillRejected(SkillId, 0.f);
+	}
+}
+
+void UMMOSkillComponent::ClientSkillRejected_Implementation(FName SkillId, float RemainingSeconds)
+{
+	if (const UWorld* World = GetWorld())
+	{
+		if (RemainingSeconds > 0.05f)
+		{
+			CooldownEndTimes.Add(SkillId, World->GetTimeSeconds() + RemainingSeconds);
+		}
+		else
+		{
+			CooldownEndTimes.Remove(SkillId);
+		}
+	}
 }
 
 void UMMOSkillComponent::FillSaveData(FMMOCharacterSaveData& Out) const
