@@ -488,11 +488,10 @@ bool AMMOCharacter::SaveCharacterForTravel()
 		&& UGameplayStatics::DoesSaveGameExist(TargetSlot, 0))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Save refused: %s -> %s already exists (name changed since load)"), *ActiveSaveSlot, *TargetSlot);
-		if (GEngine && IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange,
-				TEXT("Bu ad baska bir kayda ait: kaydedilmedi. Once MMOLoad ile o kaydi yukle ya da farkli bir ad sec."));
-		}
+		// Uzak oyuncuya da ulasir (B5): aksi halde cikista ilerlemesini kaybettigini hic ogrenmezdi.
+		MMONotify::ToOwner(this,
+			TEXT("Bu ad baska bir kayda ait: kaydedilmedi. Once MMOLoad ile o kaydi yukle ya da farkli bir ad sec."),
+			FColor::Orange, 5.f);
 		return false;
 	}
 
@@ -640,6 +639,10 @@ bool AMMOCharacter::LoadCharacter()
 		FriendsComponent->ApplySaveData(D);
 	}
 
+	// Kayit verisi uygulandi: yuvayi hemen simdi sahiplen. Konum-bekleme (navmesh) dalindan ONCE olmali;
+	// aksi halde ActiveSaveSlot bos/bayat kalir ve K-1 korumasi pasif olur ya da mesru kayitlar reddedilir.
+	ActiveSaveSlot = Slot;
+
 	// Eski/bozuk kayit koordinati harita disinda, boslukta veya navmesh disinda olabilir.
 	// Boyle bir konuma isiklanmak oyuncuyu kalici olarak kilitler. Ilk dogus konumu
 	// guvenli geri donus noktasidir; yeni kayitlarda harita adi da eslesmelidir.
@@ -666,7 +669,6 @@ bool AMMOCharacter::LoadCharacter()
 			*UGameplayStatics::GetCurrentLevelName(this, true));
 	}
 	bInitialLoadComplete = true;
-	ActiveSaveSlot = Slot;
 
 	// LoadCharacter yalniz sunucuda calisir: uzak istemciye de ToOwner ile (B5).
 	MMONotify::ToOwner(this, TEXT("Karakter yuklendi"), FColor(120, 200, 255), 2.5f);
