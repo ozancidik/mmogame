@@ -297,3 +297,21 @@ Oyun komutu sayilip ACIK birakilanlar: `MMOSave`, `MMOLoad`, `MMOSetName`, `MMOT
 Tek sabit: `UMMOInventoryComponent::MaxGold = 999999999`. `AddGold` (int64 toplam + clamp `[0, MaxGold]`), ticaret tasma reddi (`MMOTradeComponent`) ve `ApplySaveData` AYNI sabiti kullanir (eskiden calisma zamani INT32_MAX, kayit 999999999: 1 milyar ustu yuklemede sessizce kirpiliyordu). Kayit formati (`MMOSaveGame.h`) degismedi.
 
 Tasma kurali (mevcut davranis korundu, sessizlik giderildi): loot/gorev/satis gibi tek tarafli kazanc tavani asarsa fazlasi KIRPILIR (kaybolur) ve sahibe "Altin siniri (999999999): fazlasi kaybedildi" ipucu gider; ticaret tavani asacaksa takas ONCE reddedilir ("altin siniri asilir"), iki taraf da altinini korur. Negatif/harcama yolu ve int64 koruma bozulmadi.
+
+### 9.3 LLM (Y-4)
+
+- `MaxTokens` 2048 -> 400 (NVIDIA yolu; dusunme yok). Anthropic yolu ayri `AnthropicMaxTokens = 1024` kullanir: Opus 5'te dusunme + metin ayni tavana sayildigi icin 400 cevabi kesip yedege dusurebilir (olculmedi; Anthropic'e gecilirse yedek replik sikligina bak).
+- Mevcut sunucu geneli sinir (dakikada 30, eszamanli 4) korundu; eklenenler: oyuncu basina sunucu cooldown'u 2 sn -> 5 sn (dakikada en fazla 12 istek), ve oturum toplam butcesi `MaxSessionRequests = 400` (`SessionRequestCount`; dolunca istek atilmaz, NPC yedek replige duser; 0 = sinirsiz; baslatilamayan istek butceyi tuketmez).
+- Oyuncu metni LLM'e gecmez (dogrulandi): `RequestNpcLine` yalniz `NpcName`/`NpcRole` (NPC aktor alanlari, tasarimci verisi) ve `PlayerInfo` alir; iki cagiran da sunucunun kurdugu sabit sablonu ("seviye N bir maceraci") verir; oyuncu adi/sohbet dahil degil. `RequestRaw` yalniz kodda tanimli; hicbir RPC'ye bagli degil. Yorum `RequestNpcLine` basina eklendi.
+
+### 9.4 `MMOSetName` soguma (Y-7)
+
+Tek damga (`LastSetNameServerTime`) ve tek kapi (`ServerSetName`): motorun `ChangeName` yolu da `MMOSetName` uzerinden ayni kapiya yonlendirildigi icin cift soguma yok. Uzak istemci 30 sn (degismedi), host/yerel konsol 5 sn (eskiden sinirsizdi). Reddedilince sahibe `ToOwner(Hint)` gider ("Ad degistirmek icin N sn beklemelisin"). Basarisiz dogrulama (gecersiz karakter, kullanimda vb.) soguma baslatmaz.
+
+### 9.5 Sohbet kontrol karakterleri (D-9)
+
+`ServerSendChat` basinda zaten ASCII < 32 ve bidi/sifir genislikli karakterler bosluga cevriliyordu (`\n` dahil); bu turda DEL (127) ve C1 kontrolleri (0x80-0x9F) eklendi. Klan adi homoglif denetimi hala acik.
+
+### 9.6 Varsayilan oyuncu adi / OS adi (Y-5) - dogrulandi, degisiklik yok
+
+`AMMOGameMode::ChangeName(bNameChange=false)`: `?Name=` `SanitizeInitialName` ile suzulur; bos, cevrimici/yuva cakismali ya da `<ad>-<12+ hex>` (Null OSS OS adi) kalibindaysa `Gezgin######` verilir. Bu turdaki NetSmokeTest'te dogrulandi: istemci `?Name=CIDIK-<32 hex>` ile baglandi, sunucu `Join succeeded: Gezgin393932` yazdi (PlayerState adi OS adi degil). OS/bilgisayar adi yalniz sunucu log dosyasinda (`LogNet: Login request` / `UniqueId: NULL:CIDIK-...`) kalir; kod hicbir yerde `UniqueId`'yi oyuncuya gostermez (grep temiz). Log notu bolum 8'de.
