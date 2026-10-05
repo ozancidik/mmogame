@@ -183,6 +183,11 @@ protected:
 	// Oldurme XP'si bu paya orantili dagitilir (esik yok; VERTICAL_SLICE_LV1_30 madde 10).
 	TMap<TWeakObjectPtr<AMMOCharacter>, float> DamageContributions;
 
+	// Oyuncunun mobu son vurdugu dunya zamani. ContributionExpirySeconds boyunca vurmayan oyuncunun katkisi
+	// oldurmede sayilmaz (mobu yari yolda birakip giden, sonradan olduren oyuncunun XP'sini yemesin).
+	TMap<TWeakObjectPtr<AMMOCharacter>, float> LastContributionTime;
+	static constexpr float ContributionExpirySeconds = 90.f;
+
 	// Bu mobun ganimetini ilk LootReserveSeconds saniye toplayabilecek oyuncular (XP payi olanlar; sunucu).
 	TArray<TWeakObjectPtr<AMMOCharacter>> LootOwners;
 

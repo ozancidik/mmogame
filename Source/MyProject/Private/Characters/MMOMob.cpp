@@ -195,6 +195,10 @@ float AMMOMob::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
 		if (AMMOCharacter* AttackerChar = Cast<AMMOCharacter>(Attacker); AttackerChar && Attacker->IsPlayerControlled())
 		{
 			DamageContributions.FindOrAdd(AttackerChar) += Applied;
+			if (const UWorld* W = GetWorld())
+			{
+				LastContributionTime.FindOrAdd(AttackerChar) = W->GetTimeSeconds();
+			}
 		}
 	}
 
@@ -452,6 +456,7 @@ void AMMOMob::Tick(float DeltaSeconds)
 			Stats->ClearAllEffects();
 			Stats->Heal(Stats->MaxHealth);
 			DamageContributions.Reset(); // tam canlandi: onceki hasar katkilari gecersiz
+			LastContributionTime.Reset();
 			// Zorla-hedefleme'yi de temizle: yoksa ForcedAggroDuration (8sn) dolmadiysa
 			// (donus yolu genelde daha kisa surdugu icin) mob eve varir varmaz kalan
 			// sure boyunca AggroRange'i yok sayip oyuncuya tekrar kosuyordu (yo-yo).
@@ -691,8 +696,28 @@ void AMMOMob::HandleDeath()
 	// authority guard'i olmadan uzak istemcide hayalet loot ve istemci-Destroy olusur.
 
 	// Olduren oyuncuya (ve partisi varsa menzildeki uyelere) XP + gorev ilerlemesi ver.
+	AMMOCharacter* Killer = nullptr;
+	bool bFatalFromKiller = false;
 	if (HasAuthority())
-	if (AMMOCharacter* Killer = Cast<AMMOCharacter>(LastDamageInstigator.Get()))
+	{
+		Killer = Cast<AMMOCharacter>(LastDamageInstigator.Get());
+		bFatalFromKiller = Killer != nullptr;
+		if (!Killer)
+		{
+			// Olumcul vurus oyuncu olmayan/gecersiz bir kaynaktan geldi (ornegin cikis yapan oyuncunun DoT'u):
+			// en cok hasar veren oyuncu duyuru ve gorev kredisi icin "olduren" sayilir; XP yine hasar payina gore dagilir.
+			float Best = 0.f;
+			for (const TPair<TWeakObjectPtr<AMMOCharacter>, float>& C : DamageContributions)
+			{
+				if (C.Key.IsValid() && C.Value > Best)
+				{
+					Best = C.Value;
+					Killer = C.Key.Get();
+				}
+			}
+		}
+	}
+	if (HasAuthority() && Killer)
 	{
 		const float PartyXPShareRange = 3000.f;
 		// Parti bonusu: MMOXPTuning::PartyMultiplier (ekstra uye basina +%10; 8 kisilik parti = x1.7 toplam, kisi basi 1.7/8).
@@ -717,10 +742,28 @@ void AMMOMob::HandleDeath()
 		};
 
 		// Olumcul vurusun hasari (can bitti): TakeDamage donmeden once hesaba katilmali (bkz. Stats->LastAppliedDamage).
-		if (Stats && Stats->LastAppliedDamage > 0.f && Killer->IsPlayerControlled())
+		if (Stats && Stats->LastAppliedDamage > 0.f && bFatalFromKiller && Killer->IsPlayerControlled())
 		{
 			DamageContributions.FindOrAdd(Killer) += Stats->LastAppliedDamage;
+			if (const UWorld* W = GetWorld())
+			{
+				LastContributionTime.FindOrAdd(Killer) = W->GetTimeSeconds();
+			}
 			Stats->LastAppliedDamage = 0.f;
+		}
+
+		// Uzun suredir vurmayan oyuncularin katkisi gecersiz (mobu yari yolda birakip gitmis olabilirler).
+		if (const UWorld* W = GetWorld())
+		{
+			const float Now = W->GetTimeSeconds();
+			for (auto It = DamageContributions.CreateIterator(); It; ++It)
+			{
+				const float* Last = LastContributionTime.Find(It.Key());
+				if (!Last || Now - *Last > ContributionExpirySeconds)
+				{
+					It.RemoveCurrent();
+				}
+			}
 		}
 
 		float TotalDamage = 0.f;
