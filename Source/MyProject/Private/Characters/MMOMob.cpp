@@ -732,9 +732,15 @@ void AMMOMob::HandleDeath()
 		// Parti artik toplam XP'yi yalniz paylastirmakla kalmaz, kucuk bir kazanc da saglar (tek basina oynamaya ustun gelmez).
 
 		// XP payi: oyuncu basina verilen hasarin toplam hasara orani (%1 hasar = %1 XP). Parti tek birim
-		// sayilir: partinin toplam hasar payi parti UYE SAYISINA bolunur ve parti bonusu (+%10/ekstra uye)
-		// uygulanir (8 kisilik partide herkes payin 1.7/8'ini alir); payi alan uyeler menzildeki (3000u) uyelerdir. Gorev ilerlemesi (kredi) paya bagli
-		// degildir: son vurusu yapan ve payi olan herkes tam kredi alir.
+		// sayilir: partinin toplam hasar payi, MENZILDEKI (3000u) CANLI uye sayisina bolunur ve parti bonusu
+		// (+%10/ekstra uye) ayni sayiyla uygulanir (8 kisi de menzildeyse herkes payin 1.7/8'ini alir; biri uzakta/oluyse
+		// 7 kisilik pay: 1.6/7). Uzak/olu uyenin hasari grup payina girer, ama payi bolen sayiya katilmaz (pay kaybolmaz).
+		// Gorev ilerlemesi (kredi) paya bagli degildir: son vurusu yapan ve payi olan herkes tam kredi alir.
+		auto IsShareEligible = [this, PartyXPShareRange](const AMMOCharacter* C)
+		{
+			return C && C->GetStats() && !C->GetStats()->bIsDead
+				&& FVector::Dist(C->GetActorLocation(), GetActorLocation()) <= PartyXPShareRange;
+		};
 		TArray<TPair<AMMOCharacter*, float>> Shares;
 		auto AddShare = [&Shares](AMMOCharacter* C, float Share)
 		{
@@ -783,17 +789,17 @@ void AMMOMob::HandleDeath()
 		if (TotalDamage <= 0.f)
 		{
 			// Katki kaydi yok (olum oyuncu hasari disindan geldi): olduren (veya partisi) tum payi alir;
-			// parti ise pay uye sayisina bolunur.
+			// parti ise pay menzildeki canli uye sayisina bolunur.
 			float KillerShare = 1.f;
 			if (UMMOPartyComponent* Party = Killer->GetPartyComponent())
 			{
 				if (Party->IsInParty())
 				{
-					TArray<AMMOCharacter*> AllMembers;
-					Party->GetPartyInRange(GetActorLocation(), 1.0e9f, AllMembers);
-					KillerShare = MMOXPTuning::PartyMultiplier(AllMembers.Num()) / FMath::Max(1, AllMembers.Num());
 					TArray<AMMOCharacter*> InRange;
 					Party->GetPartyInRange(GetActorLocation(), PartyXPShareRange, InRange);
+					InRange.RemoveAll([&IsShareEligible](const AMMOCharacter* M) { return !IsShareEligible(M); });
+					const int32 Eligible = FMath::Max(1, InRange.Num());
+					KillerShare = MMOXPTuning::PartyMultiplier(Eligible) / Eligible;
 					for (AMMOCharacter* M : InRange)
 					{
 						AddShare(M, KillerShare);
@@ -831,12 +837,18 @@ void AMMOMob::HandleDeath()
 						GroupDamage += *D;
 					}
 				}
-				// Grubun payi uye sayisina bolunur (tek basina oynayan icin grup = 1 kisi, bolunme yok).
+				// Grubun payi menzildeki canli uye sayisina bolunur; parti bonusu da ayni sayiyla (tek basina oynayan icin
+				// grup = 1 kisi, bolunme yok). Menzilde canli kimse yoksa pay verilmez.
 				const float GroupShare = FMath::Clamp(GroupDamage / TotalDamage, 0.f, 1.f);
-				const float PerMemberShare = GroupShare * MMOXPTuning::PartyMultiplier(Group.Num()) / FMath::Max(1, Group.Num());
+				int32 EligibleCount = 0;
+				for (const AMMOCharacter* G : Group)
+				{
+					EligibleCount += IsShareEligible(G) ? 1 : 0;
+				}
+				const float PerMemberShare = GroupShare * MMOXPTuning::PartyMultiplier(EligibleCount) / FMath::Max(1, EligibleCount);
 				for (AMMOCharacter* G : Group)
 				{
-					if (FVector::Dist(G->GetActorLocation(), GetActorLocation()) <= PartyXPShareRange)
+					if (IsShareEligible(G))
 					{
 						AddShare(G, PerMemberShare);
 					}

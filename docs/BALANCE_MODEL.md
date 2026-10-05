@@ -123,7 +123,7 @@ Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/se
 
 **Dürüst sınır [Muhtemel]:** Lv11–20 modelde hâlâ "bedava" kalıyor. Sebep: Lv5–10 görevlerinin **zorunlu öldürme sayıları** (≈70 öldürme × yüksek seviyeli mob XP'si) ve ödülleri, Lv11–20 eşiklerinin üstünde birikim sağlıyor; çarpan eğrisini ne kadar düşürsem de (denenen yüzlerce kombinasyon) bu bantlar kıpırdamıyor. Bunu düzeltmek için Lv6–12 mob/görev XP'sini çok daha agresif düşürmek (yani Lv6–10'u da yavaşlatmak) ya da görev öldürme sayılarını artırmak gerekir. Ölçüm (`[MMOMETRIC]`) olmadan yapılmadı.
 
-**Parti bonusu:** Parti hasar payı artık ekstra üye başına +%10 çarpılır (`AMMOMob::HandleDeath`): 2 kişide toplam ×1,1, 8 kişide ×1,7; kişi başı pay `bonus/üye sayısı`. Tek başına oynayan için değişiklik yok.
+**Parti bonusu:** Parti hasar payı artık ekstra üye başına +%10 çarpılır (`AMMOMob::HandleDeath`): 2 kişide toplam ×1,1, 8 kişide ×1,7; kişi başı pay `bonus/üye sayısı`. **Üye sayısı = mobun 3000 birim çevresindeki CANLI parti üyeleri** (uzakta/ölü/AFK üye böleni büyütmez; ör. 3 kişilik partide biri uzaktaysa kalan ikisi 1,1/2 = %55 alır, 1,2/3 = %40 değil). Uzak üyenin verdiği hasar grup payına yine girer. `MMOXPTuning::PartyMultiplier` aynı sayıyla çağrılır. Tek başına oynayan için değişiklik yok.
 
 **`Q_Gold*`:** Ham XP ödülleri düşürüldü: `Q_Gold500` 300→150, `Q_Gold1000` 500→250, `Q_Gold5000` 6000→4000 (üstüne kapı-seviyesi çarpanı uygulanır). Altını harcatma seçeneği uygulanmadı: ekonomi modeline göre bu tutarlar toplam gelirin yanında önemsiz, yani gerçek bir altın çıkışı üretmez.
 

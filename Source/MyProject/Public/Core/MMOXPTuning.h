@@ -19,6 +19,6 @@ namespace MMOXPTuning
 	/** Gorev kapi (gereken) seviyesine gore gorev odul XP carpani (parcali dogrusal, uclarda sabit). */
 	MYPROJECT_API float QuestMultiplier(int32 GateLevel);
 
-	/** Parti XP bonusu: 1 + 0.10 * max(0, PartySize-1) (8 kisi = x1.7 toplam). Bolme (uye sayisina) AMMOMob::HandleDeath'te. */
+	/** Parti XP bonusu: 1 + 0.10 * max(0, PartySize-1) (8 kisi = x1.7 toplam). PartySize = menzildeki CANLI uye sayisi; bolme de ayni sayiyla AMMOMob::HandleDeath'te. */
 	MYPROJECT_API float PartyMultiplier(int32 PartySize);
 }

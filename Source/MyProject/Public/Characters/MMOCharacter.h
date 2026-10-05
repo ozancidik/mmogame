@@ -279,7 +279,8 @@ public:
 	void MMONpcTalk();
 
 	// Sunucu mob XP'si verdiginde sahibi istemciye bildirir: karakterin ustunde "+N EXP"
-	// ucar; Percent < 100 ise seviye farki indirimi "(%P)" olarak eklenir. Yalniz gorsel.
+	// ucar; Percent = alinan XP'nin mobun tam XP'sine orani (seviye farki indirimi, hasar payi ve parti bolumu/bonusu
+	// DAHIL); < 100 ise "(%P)" olarak eklenir (yani yalniz ceza degil, pay da gosterir). Yalniz gorsel.
 	UFUNCTION(Client, Unreliable)
 	void ClientNotifyXPGain(int32 Amount, int32 Percent);
 
