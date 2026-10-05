@@ -841,22 +841,47 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	constexpr int32 SaveStackCap = 999;
 	constexpr int32 SaveMaxStacks = 64;
 	Gold = FMath::Clamp(In.Gold, 0, SaveGoldCap);
-	Items = In.Items;
-	Items.RemoveAll([](const FMMOItemStack& Stack)
+	// Yiginlar: AddItem ItemId basina tek yigin tutar; bozuk kayittaki ayni kimlikli yiginlar
+	// birlestirilir (64 sinirini bosuna doldurmasin), sonra adet kirpilir.
+	Items.Reset();
+	for (const FMMOItemStack& Stack : In.Items)
 	{
-		return Stack.ItemId.IsNone() || Stack.Count <= 0;
-	});
-	for (FMMOItemStack& Stack : Items)
+		if (Stack.ItemId.IsNone() || Stack.Count <= 0)
+		{
+			continue;
+		}
+		FMMOItemStack* Existing = Items.FindByPredicate([&Stack](const FMMOItemStack& S) { return S.ItemId == Stack.ItemId; });
+		if (Existing)
+		{
+			Existing->Count = static_cast<int32>(FMath::Min<int64>(static_cast<int64>(Existing->Count) + Stack.Count, SaveStackCap));
+		}
+		else
+		{
+			Items.Add(Stack);
+			Items.Last().Count = FMath::Min(Stack.Count, SaveStackCap);
+		}
+	}
+	// 64'u asan yigin: sessizce silinmez, her biri loglanir (yigin depoya konamaz: depo yalniz ekipman tutar).
+	for (int32 i = SaveMaxStacks; i < Items.Num(); ++i)
 	{
-		Stack.Count = FMath::Min(Stack.Count, SaveStackCap);
+		UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: yigin siniri (%d) asildi, %s x%d yuklenmedi"),
+			SaveMaxStacks, *Items[i].ItemId.ToString(), Items[i].Count);
 	}
 	if (Items.Num() > SaveMaxStacks)
 	{
 		Items.SetNum(SaveMaxStacks);
 	}
+	// Ornek kimligi bu sinirin ustundeyse (veya <= 0) yeni kimlik alir: "Id + 1" ve NextInstanceId++
+	// INT32_MAX'te tasmasin. Sinir yarim aralik; calisma zamaninda yine ~1 milyar kimlik pay kalir.
+	static constexpr int32 SaveInstanceIdCap = MAX_int32 / 2;
+	static constexpr int32 NeedsNewId = -1;
 	// Nadirlik enum araligi disindaysa Siradan'a cek (stat carpani tablosu disina cikmasin).
 	auto SanitizeInstance = [](FMMOEquipmentInstance& Inst)
 	{
+		if (!Inst.ItemId.IsNone() && (Inst.InstanceId <= 0 || Inst.InstanceId > SaveInstanceIdCap))
+		{
+			Inst.InstanceId = NeedsNewId; // asagidaki Dedupe yeni kimlik verir; esya silinmez
+		}
 		Inst.Plus = FMath::Clamp(Inst.Plus, 0, FMMOItemDatabase::MaxPlus);
 		if ((uint8)Inst.Rarity >= (uint8)EMMOItemRarity::MAX)
 		{
@@ -864,21 +889,21 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		}
 	};
 	EquipmentBag = In.EquipmentBag;
+	// Gecersiz (bos ItemId) girdiler atilir; kimligi bozuk ama ItemId'si olan esya tutulur (yeni kimlik alir).
+	EquipmentBag.RemoveAll([](const FMMOEquipmentInstance& Inst) { return Inst.ItemId.IsNone(); });
 	for (FMMOEquipmentInstance& Inst : EquipmentBag)
 	{
 		SanitizeInstance(Inst);
 	}
-	NextInstanceId = FMath::Max(1, In.NextInstanceId);
+	NextInstanceId = FMath::Clamp(In.NextInstanceId, 1, SaveInstanceIdCap);
 
 	// Depo: gecersiz girdileri at, arti seviyesini sinirla. Kapasite asilmissa (bozuk/eski
 	// kayit) hicbir item silinmez; yalniz yeni depolama reddedilir.
 	Warehouse = In.Warehouse;
-	Warehouse.RemoveAll([](const FMMOEquipmentInstance& Inst) { return !Inst.IsValidInstance(); });
+	Warehouse.RemoveAll([](const FMMOEquipmentInstance& Inst) { return Inst.ItemId.IsNone(); });
 	for (FMMOEquipmentInstance& Inst : Warehouse)
 	{
 		SanitizeInstance(Inst);
-		// Ornek kimligi cakismasin: NextInstanceId depodaki en buyuk kimligin ustunde kalsin.
-		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
 	}
 
 	// Kusanilan dizi her zaman MAX (4) slot olmali. Kayittaki dizi daha uzunsa (bozuk/
@@ -898,6 +923,18 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		}
 	}
 	EquippedItems.SetNum(MaxSlots);
+	// Canta MaxBagSize (12) ile sinirli: fazlasi (bozuk kayit / yukaridaki geri koyma) depoya tasinir.
+	// Depo da doluysa kapasite asilir ve loglanir; esya SILINMEZ (yukleme kurali).
+	while (EquipmentBag.Num() > MaxBagSize)
+	{
+		const FMMOEquipmentInstance Overflow = EquipmentBag.Pop();
+		if (Warehouse.Num() >= MaxWarehouseSize)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: canta %d'yi asiyor ve depo dolu; %s depoya kapasite ustu tasindi (depo %d/%d)"),
+				MaxBagSize, *Overflow.ItemId.ToString(), Warehouse.Num() + 1, MaxWarehouseSize);
+		}
+		Warehouse.Add(Overflow);
+	}
 	// Yanlis slota kusanilmis esya (ornegin silah "Zirh" slotunda) cantaya geri konur;
 	// normal EquipFromBag bunu zaten engeller, elle duzenlenmis kayit atlayabilirdi.
 	for (int32 i = 0; i < MaxSlots; ++i)
@@ -927,6 +964,7 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 
 	// Bozuk/eski kayitta kayitli sayac en buyuk kimligin gerisinde kalmis olabilir: yeni
 	// (ticaret/loot) kimlikleri mevcut bir esyayla cakismasin diye Max(Id)+1'e cek.
+	// Kimlikler SanitizeInstance'ta SaveInstanceIdCap ile sinirli oldugu icin +1 tasmaz.
 	for (const FMMOEquipmentInstance& Inst : EquipmentBag)
 	{
 		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1);
@@ -937,7 +975,7 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	}
 	for (const FMMOEquipmentInstance& Inst : Warehouse)
 	{
-		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1); // yanlis slottan depoya tasinanlar dahil
+		NextInstanceId = FMath::Max(NextInstanceId, Inst.InstanceId + 1); // yanlis slottan/cantadan depoya tasinanlar dahil
 	}
 
 	// Yinelenen InstanceId (canta/kusanilan/depo arasinda): ilki kalir, digerlerine yeni
@@ -950,7 +988,7 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		{
 			return;
 		}
-		if (SeenIds.Contains(Inst.InstanceId))
+		if (Inst.InstanceId == NeedsNewId || SeenIds.Contains(Inst.InstanceId))
 		{
 			Inst.InstanceId = NextInstanceId++;
 		}
