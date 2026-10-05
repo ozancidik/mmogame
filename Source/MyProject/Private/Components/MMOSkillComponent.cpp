@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Components/MMOSkillComponent.h"
+#include "Core/MMONotify.h"
 #include "Skills/MMOSkillDatabase.h"
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
@@ -128,8 +129,8 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 
 	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	UMMOStatsComponent* S = Owner ? Owner->GetStats() : nullptr;
-	const bool bLocalFeedback = GEngine && IsLocallyControlledOwner();
-
+	// Geri bildirim MMONotify::ToOwner ile (B5): ChangeClass yalniz sunucuda calisir; eskiden
+	// IsLocallyControlled kosulu yuzunden uzak istemci ret sebebini/sonucu hic gormuyordu.
 	if (NewClass == CharacterClass)
 	{
 		// Yeni karakterde varsayilan Warrior secimini de gecerli bir secim say.
@@ -137,9 +138,9 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 		{
 			Owner->bClassChoicePending = false;
 		}
-		else if (bLocalFeedback)
+		else
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Zaten bu siniftasin"));
+			MMONotify::ToOwner(Owner, TEXT("Zaten bu siniftasin"), FColor::Silver, 2.f);
 		}
 		return;
 	}
@@ -154,21 +155,17 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 		const float Now = CW->GetTimeSeconds();
 		if (Now - LastClassChangeTime < ClassChangeCooldownSec)
 		{
-			if (bLocalFeedback)
-			{
-				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 120, 80),
-					FString::Printf(TEXT("Sinif degisimi icin %.0f sn beklemelisin"), ClassChangeCooldownSec - (Now - LastClassChangeTime)));
-			}
+			MMONotify::ToOwner(Owner,
+				FString::Printf(TEXT("Sinif degisimi icin %.0f sn beklemelisin"), ClassChangeCooldownSec - (Now - LastClassChangeTime)),
+				FColor(255, 120, 80), 2.f);
 			return;
 		}
 	}
 	if (S->IsInCombat())
 	{
-		if (bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(255, 120, 80),
-				FString::Printf(TEXT("Savasta sinif degistirilemez (%.0f sn hasar almamalisin)"), S->CombatDuration));
-		}
+		MMONotify::ToOwner(Owner,
+			FString::Printf(TEXT("Savasta sinif degistirilemez (%.0f sn hasar almamalisin)"), S->CombatDuration),
+			FColor(255, 120, 80), 2.f);
 		return;
 	}
 
@@ -198,12 +195,10 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 	// Sinif secildi: yeni karakter ipucu paneli kapanir (replike, sahibine gider).
 	Owner->bClassChoicePending = false;
 
-	if (bLocalFeedback)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor(120, 200, 255),
-			FString::Printf(TEXT("Sinif: %s. Puanlar iade edildi (stat %d, skill %d)"),
-				*GetMMOClassDisplayName(NewClass), S->UnspentStatPoints, S->UnspentSkillPoints));
-	}
+	MMONotify::ToOwner(Owner,
+		FString::Printf(TEXT("Sinif: %s. Puanlar iade edildi (stat %d, skill %d)"),
+			*GetMMOClassDisplayName(NewClass), S->UnspentStatPoints, S->UnspentSkillPoints),
+		FColor(120, 200, 255), 4.f);
 }
 
 void UMMOSkillComponent::GetClassBaseStats(EMMOClass InClass, int32& OutStr, int32& OutDex, int32& OutInt, int32& OutVit)
@@ -456,11 +451,8 @@ bool UMMOSkillComponent::RequestInvestMastery(EMMOSkillTree Tree)
 	MasteryRankArray[Idx] += 1;
 	SyncLearnedFromMastery();
 
-	if (GEngine && IsLocallyControlledOwner())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120),
-			FString::Printf(TEXT("Ustalik rutbesi: %d"), MasteryRankArray[Idx]));
-	}
+	// Yalniz sunucuda calisir (istemci yukarida RPC'ye doner): uzak istemciye de ulassin (B5).
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Ustalik rutbesi: %d"), MasteryRankArray[Idx]), FColor(120, 220, 120), 2.f);
 	return true;
 }
 
@@ -624,10 +616,9 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 		|| Def->Effect == EMMOSkillEffect::AoETarget);
 	if (bNeedsTarget && !FindNearestEnemy(Def->Range))
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Menzilde hedef yok"));
-		}
+		// Bu dal yalniz otoritede calisir (istemci yukarida ServerUseSkill'e doner): uzak istemci
+		// eskiden ">> Skill" gorup sessizce reddediliyordu; sebebi ToOwner ile gonder (B5).
+		MMONotify::ToOwner(Owner, TEXT("Menzilde hedef yok"), FColor::Silver, 1.f);
 		return false;
 	}
 
