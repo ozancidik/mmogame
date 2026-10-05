@@ -74,11 +74,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "MMO|AI")
 	float Temperature = 0.7f;
 
-	// Cikti uzunlugu tavani. DIKKAT: Opus 5'te dusunme (thinking) varsayilan ACIK ve
-	// dusunme + metin BIRLIKTE bu tavana sayilir. Kisa replik icin bile bol birakiyoruz;
-	// yoksa dusunme butceyi yer, cevap kesilir (stop_reason=max_tokens) ve sessizce yedege duser.
-	UPROPERTY(EditAnywhere, Category = "MMO|AI")
-	int32 MaxTokens = 2048;
+	// Cikti uzunlugu tavani (replik <= 2 cumle, oyuna 240 karakter girer; SECURITY_AUDIT Y-4: eskiden 2048,
+	// istek basina maliyet/gecikme tavani gereksiz genisti). NVIDIA yolunda dusunme yok, 400 bol bol yeter.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "64"))
+	int32 MaxTokens = 400;
+
+	// Anthropic yolunda DIKKAT: Opus 5'te dusunme (thinking) varsayilan ACIK ve dusunme + metin BIRLIKTE
+	// max_tokens'a sayilir; 400 dusunmeyi yetersiz birakirsa cevap kesilir (stop_reason=max_tokens) ve
+	// sessizce yedege duser. Bu yuzden Anthropic icin taban ayri tutulur (olculmedi; Anthropic'e gecilirse
+	// yedege dusme sikligina bak).
+	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "64"))
+	int32 AnthropicMaxTokens = 1024;
 
 	// Dusuk gecikme icin effort=low. (Dusunmeyi tamamen KAPATMIYORUZ: kapaliyken
 	// model ara sira <thinking> etiketlerini gorunur metne sizdirabiliyor ki bu
@@ -97,6 +103,15 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "1"))
 	int32 MaxConcurrentRequests = 4;
+
+	// Oturum (bu GameInstance / host sureci omru) basina toplam LLM cagrisi butcesi. Dakikalik sinir kotu
+	// niyetli ama yavas bir sizintiyi (gun boyu 30/dk) tutamaz; butce dolunca NPC'ler yedek replige duser,
+	// oyun etkilenmez. 0 = sinirsiz. Host yeniden baslayinca sifirlanir.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "0"))
+	int32 MaxSessionRequests = 400;
+
+	// Bu oturumda atilan toplam LLM istegi sayisi (yalniz sunucuda artar).
+	int32 SessionRequestCount = 0;
 
 protected:
 	// Hiz siniri durumu (yalniz bu subsystem'de, replike degil).

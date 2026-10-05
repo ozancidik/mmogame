@@ -97,8 +97,10 @@ protected:
 	// Host'ta (listen server) istemci+sunucu ayni obje oldugundan istemci damgasindan AYRI tutulur.
 	float LastNpcTalkServerTime = -100.f;
 
+	// Oyuncu basina en fazla dakikada 12 LLM istegi (SECURITY_AUDIT Y-4); sunucu geneli tavan ve
+	// oturum butcesi UMMODialogueSubsystem'de.
 	UPROPERTY(EditDefaultsOnly, Category = "MMO|AI")
-	float NpcTalkServerCooldown = 2.f;
+	float NpcTalkServerCooldown = 5.f;
 
 	// Sifaci icin ayni cift-katman throttle (talker'daki desenin ayni si). Bug-hunt bulgusu:
 	// sol tus basili tutulunca DoLeftClickAction HER KAREDE calisiyor; sifacida hic throttle

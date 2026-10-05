@@ -33,6 +33,10 @@ bool UMMODialogueSubsystem::HasApiKey() const
 void UMMODialogueSubsystem::RequestNpcLine(const FString& NpcName, const FString& NpcRole,
 	const FString& PlayerInfo, FMMOOnDialogueReady OnReady)
 {
+	// GUVENLIK (SECURITY_AUDIT Y-4, prompt enjeksiyonu): LLM'e oyuncunun yazdigi HICBIR metin gecmez.
+	// NpcName/NpcRole tasarimci verisidir (NPC aktorunun alanlari), PlayerInfo cagiranlarda sunucunun
+	// kurdugu sabit sablondur ("seviye N bir maceraci"; oyuncu adi/sohbet dahil degil). Yeni cagiran
+	// eklenirse serbest oyuncu metnini buraya baglama.
 	// Sistem promptu = NPC'nin kimligi ve uslup kurallari. Oyun ici oldugu icin
 	// kisa, ekranda tek balonluk repliklere zorluyoruz.
 	const FString SystemPrompt = FString::Printf(TEXT(
@@ -76,8 +80,16 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		return;
 	}
+	// Oturum butcesi (SECURITY_AUDIT Y-4): dolunca istek atilmaz, NPC yedek replige duser.
+	if (MaxSessionRequests > 0 && SessionRequestCount >= MaxSessionRequests)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oturum LLM butcesi doldu (%d); istek atlandi."), MaxSessionRequests);
+		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
+		return;
+	}
 	RecentRequestTimes.Add(NowSec);
 	++InFlightRequests;
+	++SessionRequestCount;
 
 	const bool bNvidia = (Provider == EMMOLLMProvider::NVIDIA);
 
@@ -117,7 +129,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		// NOT: thinking parametresini GONDERMIYORUZ; effort=low ile hizli+ucuz tutuyoruz.
 		const TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
 		Root->SetStringField(TEXT("model"), Model);
-		Root->SetNumberField(TEXT("max_tokens"), MaxTokens);
+		Root->SetNumberField(TEXT("max_tokens"), AnthropicMaxTokens); // dusunme + metin birlikte (bkz. baslik)
 		Root->SetStringField(TEXT("system"), SystemPrompt);
 
 		const TSharedRef<FJsonObject> OutputConfig = MakeShared<FJsonObject>();
@@ -217,6 +229,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			*bSlotReleased = true;
 			InFlightRequests = FMath::Max(0, InFlightRequests - 1);
 			RecentRequestTimes.RemoveSingle(NowSec); // atilmayan istek dakika sinirini tuketmesin
+			SessionRequestCount = FMath::Max(0, SessionRequestCount - 1); // ... ne de oturum butcesini
 			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		}
 	}
