@@ -2,6 +2,7 @@
 
 #include "Characters/MMOMob.h"
 #include "Core/MMOMetrics.h"
+#include "Core/MMOXPTuning.h"
 #include "Characters/MMOMobArchetype.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -694,13 +695,8 @@ void AMMOMob::HandleDeath()
 	if (AMMOCharacter* Killer = Cast<AMMOCharacter>(LastDamageInstigator.Get()))
 	{
 		const float PartyXPShareRange = 3000.f;
-		// Parti bonusu: ekstra uye basina toplam parti XP'sine +%10 (8 kisilik parti = x1.7 toplam, kisi basi 1.7/8).
+		// Parti bonusu: MMOXPTuning::PartyMultiplier (ekstra uye basina +%10; 8 kisilik parti = x1.7 toplam, kisi basi 1.7/8).
 		// Parti artik toplam XP'yi yalniz paylastirmakla kalmaz, kucuk bir kazanc da saglar (tek basina oynamaya ustun gelmez).
-		const float PartyXPBonusPerExtraMember = 0.10f;
-		auto PartyBonus = [PartyXPBonusPerExtraMember](int32 PartySize)
-		{
-			return 1.f + PartyXPBonusPerExtraMember * FMath::Max(0, PartySize - 1);
-		};
 
 		// XP payi: oyuncu basina verilen hasarin toplam hasara orani (%1 hasar = %1 XP). Parti tek birim
 		// sayilir: partinin toplam hasar payi parti UYE SAYISINA bolunur ve parti bonusu (+%10/ekstra uye)
@@ -744,7 +740,7 @@ void AMMOMob::HandleDeath()
 				{
 					TArray<AMMOCharacter*> AllMembers;
 					Party->GetPartyInRange(GetActorLocation(), 1.0e9f, AllMembers);
-					KillerShare = PartyBonus(AllMembers.Num()) / FMath::Max(1, AllMembers.Num());
+					KillerShare = MMOXPTuning::PartyMultiplier(AllMembers.Num()) / FMath::Max(1, AllMembers.Num());
 					TArray<AMMOCharacter*> InRange;
 					Party->GetPartyInRange(GetActorLocation(), PartyXPShareRange, InRange);
 					for (AMMOCharacter* M : InRange)
@@ -786,7 +782,7 @@ void AMMOMob::HandleDeath()
 				}
 				// Grubun payi uye sayisina bolunur (tek basina oynayan icin grup = 1 kisi, bolunme yok).
 				const float GroupShare = FMath::Clamp(GroupDamage / TotalDamage, 0.f, 1.f);
-				const float PerMemberShare = GroupShare * PartyBonus(Group.Num()) / FMath::Max(1, Group.Num());
+				const float PerMemberShare = GroupShare * MMOXPTuning::PartyMultiplier(Group.Num()) / FMath::Max(1, Group.Num());
 				for (AMMOCharacter* G : Group)
 				{
 					if (FVector::Dist(G->GetActorLocation(), GetActorLocation()) <= PartyXPShareRange)

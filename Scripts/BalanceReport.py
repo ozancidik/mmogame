@@ -6,11 +6,16 @@ Calistir:
 Her seviye L (1..79) icin: L->L+1 icin gereken XP, mob seviyesi [L-8, L+3] araligindaki en cok XP veren normal mob
 (seviye farki kurali AMMOMob::ScaleXPForLevelGap ile) ve gereken oldurme sayisi. Plan hedefi
 12-25 oldurme (docs/PROGRESSION_PLAN.md). Gorev XP'si dahil DEGIL (en kotu durum).
+
+Not: mob XP'sine MMOXPTuning carpani uygulanir (ProgressionModel ile ayni egri; Core/MMOXPTuning.cpp'den okunur,
+ayni floor(x+0.5) yuvarlama ile). Egri okunamazsa script hata ile cikar.
 """
 
 import math
 import re
 from pathlib import Path
+
+from ProgressionModel import load_code_curves, mob_xp, parse_curve, round_half_up
 
 ROOT = Path(__file__).resolve().parent.parent
 mob_src = (ROOT / "Source/MyProject/Private/Characters/MMOMobArchetype.cpp").read_text(encoding="utf-8", errors="replace")
@@ -23,6 +28,11 @@ pat = re.compile(
 for m in pat.finditer(mob_src):
     mid, lv, xp, tail = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4) or ""
     mobs.append(dict(id=mid, lv=lv, xp=xp, elite="bIsElite = true" in tail))
+
+# ProgressionModel ile ayni egri: ham MakeMob XP'si -> MakeMob icindeki carpanli deger.
+mob_mult = parse_curve(load_code_curves()[0])
+for m in mobs:
+    m["xp"] = mob_xp(m["xp"], m["lv"], mob_mult)
 
 
 def need(level):
@@ -40,7 +50,7 @@ def scaled(xp, player, mob):
         mult = max(0.1, 1 - 0.1 * gray)
     elif leech > 0:
         mult = max(0.2, 1 - 0.1 * leech)
-    return max(1, round(xp * mult))
+    return max(1, round_half_up(xp * mult))
 
 
 normals = [m for m in mobs if not m["elite"]]

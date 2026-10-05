@@ -45,7 +45,7 @@ Yeni dosyalar (`Core/MMONotify.h/.cpp`) eklendi: derleme "dosya bulunamadı"/ba�
 | 13 | `MMOGiveItem HealthPotion 3`, `MMOGainXP 5000` | Development'ta çalışır (Shipping'de çalışmaz) | Y-6 |
 | 14 | Host bir moba canın ~%60'ını, istemci ~%40'ını vursun (istemci öldürsün) | XP yaklaşık %60 / %40 bölünür; ikisinin görev sayacı da 1 artar; `[MMOMETRIC] ev=kill` iki satır | XP payı |
 | 15 | İstemci tek hafif vuruş yapıp çekilsin, host öldürsün | İstemci en az 1 XP alır, host ~%99 | XP payı |
-| 16 | İki kişilik partiyle %50/%50 hasarla öldür | Her üye partinin payının yarısını alır (toplam %100; 8 kişide herkes 1/8) | Parti bölme |
+| 16 | İki kişilik partiyle %50/%50 hasarla öldür | Parti bonusu (+%10/ekstra üye) sonrası her üye %55 alır (=1,1/2; toplam %110); 8 kişide kişi başı 1,7/8 (≈%21) | Parti bölme |
 | 17 | Host mob öldürsün, istemci hemen cesedin üstünden geçsin (hasarsız) | İlk 10 sn ganimet toplayamaz; ~10 sn sonra üstünde duruyorsa otomatik toplar | Ganimet |
 | 18 | Aynı arketipi Lv8/12/20/34+ seviyelerinde öldür, `[MMOMETRIC] xp=` değerini eski değerle kıyasla | Mob XP'si ~%70 / %40 / %25 / %100 (`MMOXPTuning`); Lv1–5 değişmez | XP eğrisi |
 | 19 | 2 kişilik partiyle %50/%50 öldür | Her üye partinin payının %55'ini alır (parti bonusu +%10/ekstra üye) | Parti bonusu |

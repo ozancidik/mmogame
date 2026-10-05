@@ -25,6 +25,7 @@ Ayar denemesi (kodu DEGISTIRMEZ; yalniz modele uygular):
 import argparse
 import math
 import re
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -69,7 +70,7 @@ def scaled(xp, player, mob):
         mult = max(0.1, 1 - 0.1 * gray)
     elif leech > 0:
         mult = max(0.2, 1 - 0.1 * leech)
-    return max(1, round(xp * mult))
+    return max(1, round_half_up(xp * mult))
 
 
 def avg_xp_per_kill(level):
@@ -78,19 +79,37 @@ def avg_xp_per_kill(level):
 
 
 def load_code_curves():
-    """Source/.../Core/MMOXPTuning.cpp'deki XP_TUNING_MOB / XP_TUNING_QUEST egri noktalarini okur (kodla ayni degerler)."""
+    """Source/.../Core/MMOXPTuning.cpp'deki XP_TUNING_MOB / XP_TUNING_QUEST egri noktalarini okur (kodla ayni degerler).
+
+    Dosya yoksa ya da egri ayristirilamazsa sessizce carpansiz hesaplamaz: hata ile cikar (CI yakalasin).
+    """
     path = SRC / "Core" / "MMOXPTuning.cpp"
     if not path.exists():
-        return None, None
+        sys.exit(f"HATA: {path} bulunamadi (XP carpan egrisi okunamadi; carpansiz hesap icin --raw).")
     txt = path.read_text(encoding="utf-8", errors="replace")
     res = []
     for key in ("XP_TUNING_MOB", "XP_TUNING_QUEST"):
         m = re.search(key + r":[^\n]*\n[^{]*\{(.*?)\};", txt, re.S)
-        if not m:
-            return None, None
-        pts = re.findall(r"\{\s*(\d+)\s*,\s*([\d.]+)f\s*\}", m.group(1))
+        pts = re.findall(r"\{\s*(\d+)\s*,\s*([\d.]+)f\s*\}", m.group(1)) if m else []
+        if not pts:
+            sys.exit(f"HATA: {path.name} icinde {key} egrisi ayristirilamadi (format degisti mi?).")
         res.append(",".join(f"{a}:{b}" for a, b in pts))
     return res[0], res[1]
+
+
+def round_half_up(x):
+    """FMath::RoundToInt kopyasi: floor(x + 0.5) (Python round() banker's rounding kullanir)."""
+    return math.floor(x + 0.5)
+
+
+def mob_xp(xp, mob_level, mob_mult):
+    """MakeMob: max(1, RoundToInt(xp * carpan))."""
+    return max(1, round_half_up(xp * mob_mult(mob_level)))
+
+
+def quest_xp(xp, gate_level, quest_mult):
+    """MakeQuest: max(0, RoundToInt(xp * carpan))."""
+    return max(0, round_half_up(xp * quest_mult(gate_level)))
 
 
 def parse_curve(text):
@@ -113,8 +132,8 @@ def simulate(max_level, mob_mult=None, quest_mult=None):
     """Seviye basina (lv, gerekenXP, ortXP/kill, kill gorevsiz, kill gorevli, kum.gorevXP, kum.Q_Gold, grind) satirlari."""
     if mob_mult is None or quest_mult is None:
         mtxt, qtxt = load_code_curves()  # varsayilan: koddaki (MMOXPTuning) carpanlar
-        mob_mult = mob_mult or parse_curve(mtxt or "")
-        quest_mult = quest_mult or parse_curve(qtxt or "")
+        mob_mult = mob_mult or parse_curve(mtxt)
+        quest_mult = quest_mult or parse_curve(qtxt)
     is_gold = lambda q: q["id"].startswith("Q_Gold")
     is_kill = lambda q: q["type"].startswith("Kill") and q["count"] > 0
 
@@ -123,7 +142,7 @@ def simulate(max_level, mob_mult=None, quest_mult=None):
     avail = lambda q: q["count"] if q["type"] == "ReachLevel" else q["req"]
 
     def avg_xp(level):
-        pool = [scaled(m["xp"] * mob_mult(m["lv"]), level, m["lv"]) for m in normals if level - 8 <= m["lv"] <= level + 3]
+        pool = [scaled(mob_xp(m["xp"], m["lv"], mob_mult), level, m["lv"]) for m in normals if level - 8 <= m["lv"] <= level + 3]
         return sum(pool) / len(pool) if pool else None
 
     cum_need = 0
@@ -134,8 +153,8 @@ def simulate(max_level, mob_mult=None, quest_mult=None):
         cum_need += n
         xpk = avg_xp(lv)
         done = [q for q in quests if avail(q) <= lv and not is_gold(q)]
-        q_xp = sum(q["xp"] * quest_mult(q["req"]) for q in done)
-        g_xp = sum(q["xp"] * quest_mult(q["req"]) for q in quests if avail(q) <= lv and is_gold(q))
+        q_xp = sum(quest_xp(q["xp"], q["req"], quest_mult) for q in done)
+        g_xp = sum(quest_xp(q["xp"], q["req"], quest_mult) for q in quests if avail(q) <= lv and is_gold(q))
         if xpk is None:
             out.append((lv, n, None, None, None, q_xp, g_xp, None))
             continue

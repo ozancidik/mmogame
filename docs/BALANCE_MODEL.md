@@ -106,7 +106,7 @@ Betik: `python3 Scripts/EconomyModel.py [--upgrade-to N]`. Gelir = öldürme (il
 | Mob XP çarpanı | 1,00 | 1,00 | 0,70 | 0,50 | 0,40 | 0,30 | 0,25 | 0,33 | 0,55 | 1,00 |
 | Görev XP çarpanı | 1,00 (≤4) | | 0,60 | | 0,40 | 0,30 | 0,26 | 0,25 | 0,26 | 1,00 |
 
-Lv1–5 aynen (hızlı giriş), Lv34+ kalibre içerik değişmedi. Eğri, modelde seviye başına öldürme sayısını hedef bantlara yaklaştırmak için rasgele arama ile bulundu ve yuvarlandı.
+Lv1–5 aynen (hızlı giriş). Lv30 → Lv34 arası doğrusal 0,55 → 1,0 rampa (mob; Lv31–33 ≈ 0,66 / 0,78 / 0,89; görev 0,26 → 1,0); yalnız Lv34+ kalibre içerik çarpansız. Eğri, modelde seviye başına öldürme sayısını hedef bantlara yaklaştırmak için rasgele arama ile bulundu ve yuvarlandı.
 
 **Model sonucu (görevli, öldürme/seviye; önce → sonra):**
 
@@ -119,7 +119,7 @@ Lv1–5 aynen (hızlı giriş), Lv34+ kalibre içerik değişmedi. Eğri, modeld
 | 21–25 | 5,4 | 12,9 | 13–18 |
 | 26–30 | 4,4 | 18,5 | 14–20 |
 
-Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/seviye ve kesintisiz (Lv34'te çarpan 1,0'a döner).
+Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/seviye ve kesintisiz (Lv30–34 doğrusal rampa, Lv34'te çarpan 1,0).
 
 **Dürüst sınır [Muhtemel]:** Lv11–20 modelde hâlâ "bedava" kalıyor. Sebep: Lv5–10 görevlerinin **zorunlu öldürme sayıları** (≈70 öldürme × yüksek seviyeli mob XP'si) ve ödülleri, Lv11–20 eşiklerinin üstünde birikim sağlıyor; çarpan eğrisini ne kadar düşürsem de (denenen yüzlerce kombinasyon) bu bantlar kıpırdamıyor. Bunu düzeltmek için Lv6–12 mob/görev XP'sini çok daha agresif düşürmek (yani Lv6–10'u da yavaşlatmak) ya da görev öldürme sayılarını artırmak gerekir. Ölçüm (`[MMOMETRIC]`) olmadan yapılmadı.
 

@@ -289,6 +289,9 @@ namespace
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
 		Table.Last().RewardConsumableCount = 2;
 
+		// Q_Gold500/1000/5000 ham XP'si elle dusuruldu (merkezi egri yerine): kapi Lv1/3'te carpan 1.0 oldugu icin
+		// erken "bedava XP" (altin biriktirme = harcama yok) egriyle kesilemiyordu (Q_Gold5000'e ayrica kapi Lv16 carpani da uygulanir).
+		// Q_Gold15000+ icin merkezi egri yeterli, dokunulmadi.
 		Table.Add(MakeQuest(TEXT("Q_Gold500"), TEXT("Tuccar Ruhu"), TEXT("500 altin biriktir."),
 			T::HaveGold, TEXT(""), 500, 150, 0, 1)); // XP 300->150 (Q_Gold* bedava XP ayari)
 
