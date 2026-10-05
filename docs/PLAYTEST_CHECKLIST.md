@@ -3481,3 +3481,14 @@ Klan durumunu değiştiren sunucu işlemleri `LogMMOClanAudit` kategorisinde yap
 - [ ] Üye `/klan ayril` yaptığında `event=clan_leave` ve doğru `was_leader` değeri görünmeli.
 - [ ] Lider `/klan at Isim` yaptığında tek `event=clan_kick` oluşmalı; başarısız veya çevrimdışı hedefte log oluşmamalı.
 - [ ] Lider ayrılır/bağlantısı kopar ve çevrimiçi üye varsa `event=clan_leader_transfer` yalnız bir kez oluşmalı; seçilen en eski çevrimiçi üye olmalı.
+
+## Lv31 ve Lv39 beceri boşlukları — 2026-10-05
+
+Dört sınıfa Lv31 alan/rol becerisi ve Lv39 tek hedef veya acil şifa becerisi eklendi: Savaşçı `Yer Sarsıntısı`/`Kafa Yarıcı`, Okçu `Dikenli Sağnak`/`Mızraklı Ok`, Büyücü `Alev Patlaması`/`Yıldız Düşü`, Rahip `Işıltılı Nova`/`Kurtuluş Işığı`. Mevcut mastery rütbelerini kullandıkları için ek rütbe puanı istemeden seviye kapısında açılırlar. Değerler `docs/CONTENT_PLAN_LV11_45.md` modelinden alınan PLACEHOLDER değerlerdir. ValidateData 81 beceriyi temiz doğruladı, 14 negatif senaryo geçti ve zorlanmış C++ derlemesi başarılı oldu; oynanış/denge PIE bekliyor.
+
+- [ ] Dört sınıfta rütbe 6 (Rahipte ilgili ağaçta rütbe 4) yatırıp Lv30→31 geç: yeni Lv31 becerisi otomatik öğrenilmeli, fazladan puan eksilmemeli.
+- [ ] Lv38→39 geçişinde sınıfın ikinci yeni becerisi otomatik öğrenilmeli; kaydet/yükle sonrası öğrenilmiş ve hotbar'a atanabilir kalmalı.
+- [ ] `Yer Sarsıntısı` 460 yarıçapta hasar + Slow; `Dikenli Sağnak` hedef alanında hasar + Poison; `Alev Patlaması` 470 yarıçapta hasar; `Işıltılı Nova` 440 yarıçapta hasar vermeli.
+- [ ] `Kafa Yarıcı`, `Mızraklı Ok` ve `Yıldız Düşü` yalnız seçili tek hedefi vurmalı; menzil dışı ve mana yetersizliği sunucuda reddedilmeli.
+- [ ] `Kurtuluş Işığı` seçili parti üyesini 1100 iyileştirmeli; geçerli hedef yoksa mevcut HealTarget kuralıyla kendini iyileştirmeli; 260 mana ve 30 sn cooldown uygulanmalı.
+- [ ] Lv28/Lv33/Lv45 komşu becerilerle hasar, mana ve cooldown hissini karşılaştır; yeni beceriler eski becerileri bütün eksenlerde geçmemeli. Ölçüm sonrası PLACEHOLDER değerleri güncelle.
