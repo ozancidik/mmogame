@@ -174,12 +174,26 @@ def simulate(max_level, mob_mult=None, quest_mult=None):
 
 
 def band_avgs(out):
+    """(a, b, lo, hi, ort. gorevsiz, ort. gorevli, grind=0 olan seviye sayisi, bant seviye sayisi)."""
     res = []
     for a, b, lo, hi in TARGETS:
         sel = [o for o in out if a <= o[0] <= b and o[2] is not None]
         if sel:
-            res.append((a, b, lo, hi, sum(o[3] for o in sel) / len(sel), sum(o[4] for o in sel) / len(sel)))
+            free = sum(1 for o in sel if o[7] == 0)
+            res.append((a, b, lo, hi, sum(o[3] for o in sel) / len(sel), sum(o[4] for o in sel) / len(sel), free, len(sel)))
     return res
+
+
+def band_flag(lo, hi, s_q, free, total):
+    """Bant bayragi. Bantin TUM seviyelerinde grind=0 ise (gorev XP'si ihtiyaci asiyor) 'gorevli' sayi yalniz
+    gorevlerin ZORUNLU oldurme hedefleridir; XP hizi hakkinda bir sey soylemez, bu yuzden hiz bayragi yerine ayri
+    etiket basilir. Kismen grind=0 olan bantta hiz bayragi korunur ama not dusulur."""
+    if free == total:
+        return "  gorev XP'si yeterli (grind gerekmiyor; sayi = yalniz gorev oldurme hedefleri)"
+    flag = "" if lo <= s_q <= hi else ("  < hedef (cok hizli)" if s_q < lo else "  > hedef (cok yavas)")
+    if free:
+        flag += f"  [{free}/{total} seviyede grind=0]"
+    return flag
 
 
 def main():
@@ -199,21 +213,23 @@ def main():
     print("Not: gorevli sutun, kapisi acilmis TUM gorevlerin (Q_Gold* haric) yapildigini varsayar (iyimser).")
     print("kum.gorev% = kapisi acilmis gorevlerin (Q_Gold* haric) kumulatif odul XP'si / o seviyeye kadar kumulatif gereken XP.")
     print("             %100 ustu: gorev odulleri tek basina oyuncuyu o seviyeye tasir (grind gerekmez).")
+    print("G = grind 0: gorev XP'si bu seviyenin ihtiyacini zaten karsiliyor; 'gorevli' sayi yalniz gorevlerin zorunlu oldurme")
+    print("    hedefleridir (0 olabilir) ve XP hizi olcusu DEGILDIR.")
     print(f"{'Lv':>3} {'gerekenXP':>10} {'ort XP/kill':>11} {'kill (gorevsiz)':>16} {'kill (gorevli)':>15} {'kum.gorevXP':>12} {'kum.gorev%':>11} {'kum.Q_Gold':>11}")
     cum = 0
-    for lv, n, xpk, knq, kq, q_xp, g_xp, _gr in out:
+    for lv, n, xpk, knq, kq, q_xp, g_xp, gr in out:
         cum += n
         pct = 100.0 * q_xp / cum if cum else 0.0
         if xpk is None:
             print(f"{lv:>3} {n:>10} {'-':>11} {'-':>16} {'-':>15} {q_xp:>12.0f} {pct:>10.0f}% {g_xp:>11.0f}  UYARI: uygun normal mob yok")
         else:
-            print(f"{lv:>3} {n:>10} {xpk:>11.0f} {knq:>16.1f} {kq:>15.1f} {q_xp:>12.0f} {pct:>10.0f}% {g_xp:>11.0f}")
+            mark = "  G" if gr == 0 else ""
+            print(f"{lv:>3} {n:>10} {xpk:>11.0f} {knq:>16.1f} {kq:>15.1f} {q_xp:>12.0f} {pct:>10.0f}% {g_xp:>11.0f}{mark}")
 
     print("\nBant ozeti (ortalama oldurme/seviye) ve hedef [PLACEHOLDER]:")
     print(f"{'bant':<8} {'gorevsiz':>9} {'gorevli':>8}  hedef")
-    for a, b, lo, hi, s_nq, s_q in band_avgs(out):
-        flag = "" if lo <= s_q <= hi else ("  < hedef (cok hizli)" if s_q < lo else "  > hedef (cok yavas)")
-        print(f"{a}-{b:<5} {s_nq:>9.1f} {s_q:>8.1f}  {lo}-{hi}{flag}")
+    for a, b, lo, hi, s_nq, s_q, free, total in band_avgs(out):
+        print(f"{a}-{b:<5} {s_nq:>9.1f} {s_q:>8.1f}  {lo}-{hi}{band_flag(lo, hi, s_q, free, total)}")
     tot_nq = sum(o[3] for o in out if o[3] is not None and o[0] <= 30)
     tot_q = sum(o[4] for o in out if o[4] is not None and o[0] <= 30)
     print(f"\nLv1->30 toplam oldurme: gorevsiz ~{tot_nq:.0f}, gorevli ~{tot_q:.0f}")

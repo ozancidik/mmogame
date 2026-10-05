@@ -128,3 +128,48 @@ Lv1→30 toplam: ~117 → ~241 öldürme. Lv31–45 modelde 17–25 öldürme/se
 **`Q_Gold*`:** Ham XP ödülleri düşürüldü: `Q_Gold500` 300→150, `Q_Gold1000` 500→250, `Q_Gold5000` 6000→4000 (üstüne kapı-seviyesi çarpanı uygulanır). Altını harcatma seçeneği uygulanmadı: ekonomi modeline göre bu tutarlar toplam gelirin yanında önemsiz, yani gerçek bir altın çıkışı üretmez.
 
 **Ekonomi yan etkisi (model):** XP eğrisi yavaşlatılınca daha çok öldürme = daha çok altın. `Scripts/EconomyModel.py` yeni eğriyle Lv1→30 gelirini ~153.000'den **~270.000**'e çıkarıyor (kademe giderinin ~11 katı; önceki ~6,3). Yani XP yavaşlatması altın sink'i ihtiyacını artırdı; altın sink'i (yükseltme/iksir/şifacı maliyetini seviyeyle ölçekleme) ayrı ve hâlâ açık bir karar.
+
+## Model düzeltmesi (2026-10-05): "grind=0" bantları ayrı etiketlenir
+
+**Sorun (dürüst kayıt):** Görev XP'si kümülatif ihtiyacı aştığında modelin `grind` terimi 0 olur ve "kill (görevli)" sütunu yalnız görevlerin **zorunlu öldürme hedefleri** kalır (Lv11, 14, 15, 17, 19'da bu 0). Önceki bant özetindeki Lv1–5 "çok yavaş" ve Lv11–20 "çok hızlı" bayrakları bu yüzden **yanıltıcıydı**: o bantlarda sayı XP hızını değil, görev metnindeki öldürme sayısını ölçüyor. Yukarıdaki "Sonuç" ve "önce → sonra" tablolarındaki Lv1–20 "görevli" değerlerini bu gözle oku. **[MODEL]**
+
+**Değişiklik (`Scripts/ProgressionModel.py`):**
+- Seviye satırında grind=0 ise sonda `G` işareti.
+- Bant özetinde bandın **tüm** seviyelerinde grind=0 ise hız bayrağı yerine `gorev XP'si yeterli (grind gerekmiyor; sayi = yalniz gorev oldurme hedefleri)` etiketi; kısmen grind=0 ise hız bayrağı + `[n/5 seviyede grind=0]`.
+- Mevcut eğriyle sonuç: **Lv1–20'nin 20 seviyesinin tamamı grind=0** (Lv1–5, 6–10, 11–15, 16–20 hepsi "görev XP'si yeterli"). Lv21–25 12,9 öldürme/seviye (hedefin hemen altı), Lv26–30 hedefte.
+
+**`Scripts/EconomyModel.py`:** grind=0 seviyelerinde gelir için öldürme sayısı artık 0 kabul edilmez: `max(görev hedefleri, 0,5 × görevsiz öldürme)` (`--min-kill-frac`, varsayılan 0,5). Gerekçe: oyuncu görev hedefine giderken ve ganimet için yine mob keser; "görevsiz grind'in yarısı" kadar yan öldürme **varsayımdır** `[PLACEHOLDER]`, `[MMOMETRIC]` `kill` olaylarıyla düzeltilmeli. Etkisi küçük: 9 seviye tabana çekildi, Lv1→30 gelir ~269.900 → **~276.200** (gider oranı 11,0x → 11,3x); Lv10–15 kademesi 8.008 → 9.908, Lv16–24 70.497 → 74.868. Ekonomi sonucu (sink zayıf) değişmez. `--min-kill-frac 0` eski hesabı verir.
+
+## ÖNERİ (uygulanmadı): Lv11–20 için aday XP eğrileri (B7)
+
+Yalnız model denemesi; `MMOXPTuning.cpp` **değişmedi**. Karar ve seçim kullanıcıda; ölçüm (`[MMOMETRIC]`) önerilir. Komutla tekrar üretilebilir:
+
+```
+python3 Scripts/ProgressionModel.py --max 30 --mob-mult "<mob>" --quest-mult "<görev>"
+```
+
+| Aday | `--mob-mult` | `--quest-mult` |
+|---|---|---|
+| Mevcut (kod) | `1:1.0,5:1.0,8:0.7,10:0.5,12:0.4,16:0.3,20:0.25,25:0.33,30:0.55,34:1.0` | `1:1.0,4:1.0,8:0.6,12:0.4,16:0.3,20:0.26,25:0.25,30:0.26,34:1.0` |
+| A – yalnız görev Lv6–20 | mevcut | `1:1.0,4:1.0,6:0.35,8:0.2,12:0.15,16:0.2,20:0.26,25:0.25,30:0.26,34:1.0` |
+| B – mob+görev Lv6–20 | `1:1.0,5:1.0,8:0.4,10:0.25,12:0.2,16:0.2,20:0.22,25:0.33,30:0.55,34:1.0` | `1:1.0,4:1.0,5:0.5,8:0.1,12:0.08,16:0.1,20:0.18,25:0.25,30:0.26,34:1.0` |
+| C – Lv1'den itibaren | `1:1.0,4:0.8,6:0.35,8:0.2,10:0.15,12:0.18,16:0.2,20:0.22,25:0.33,30:0.55,34:1.0` | `1:0.5,4:0.4,6:0.2,8:0.1,12:0.08,16:0.1,20:0.18,25:0.25,30:0.26,34:1.0` |
+
+Sonuç (görevli öldürme/seviye; parantezde grind=0 seviye sayısı / 5):
+
+| Bant | Hedef | Mevcut | A | B | C |
+|---|---|---:|---:|---:|---:|
+| 1–5 | 3–5 | 6,4 (5) | 6,4 (5) | 6,4 (5) | 6,4 (5) |
+| 6–10 | 6–9 | 6,0 (5) | 6,0 (5) | 6,0 (5) | 6,0 (5) |
+| 11–15 | 9–13 | 1,2 (5) | 1,2 (5) | 1,2 (5) | 4,7 (3) |
+| 16–20 | 11–15 | 3,2 (5) | 4,7 (4) | 9,6 (1) | **12,9 (0)** |
+| 21–25 | 13–18 | 12,9 | **14,2** | **15,8** | **15,8** |
+| 26–30 | 14–20 | 18,5 | 18,5 | 18,7 | 18,7 |
+| Lv1→30 toplam | | ~241 | ~255 | ~289 | ~323 |
+
+**Bulgular [MODEL]:**
+- Lv11–20 düğümlerini tek başına düşürmek (A) neredeyse etkisiz: Lv11–20'yi "bedava" yapan şey Lv1–10'da biriken fazla XP (Lv1–5 görev ödülleri ihtiyacın %350–600'ü + Lv1–10 görevlerinin ~75 zorunlu öldürmesi).
+- B, Lv16–20'yi hedefe yaklaştırır ve Lv21–25'i hedefe sokar; Lv11–15 yine bedava.
+- Lv11–15'i bile kısmen grind'e sokmak için C gibi **Lv1–5 "hızlı giriş"ten vazgeçmek** gerekir (görev XP ×0,5, Lv4+ mob ×0,8). Bu bir tasarım kararıdır; C'de bile Lv11–15 hedefin (9–13) altında (4,7).
+- Kalan seçenekler (model dışı, karar bekliyor): Lv1–10 görevlerinin **ham** ödül XP'sini düşürmek, Lv11–15'e yeni öldürme görevleri eklemek, ya da Lv1–15'i bilinçli "hikâye/görev bandı" kabul edip hedef bandını değiştirmek.
+- Adayların ekonomi etkisi ölçülmedi (`EconomyModel.py` koddaki eğriyi okur); B/C daha çok öldürme = biraz daha çok altın demektir.

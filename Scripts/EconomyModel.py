@@ -8,6 +8,11 @@ ProgressionModel.py'nin seviye basina oldurme sayisini kullanir ve sunlari hesap
 Kademe basina (kademe seviyeleri arasi) gelir/gider oranini basar. MODEL: iksir/sifaci/ticaret/ganimet satisi,
 olum ve parti yok; yukseltme basarisizliginda kaybolan altin ve yanma yok (iyimser gider); loot satisi yok
 (kotumser gelir). Sonuclar [PLACEHOLDER] degerlendirme icindir, oynanis olcumu degildir.
+
+Grind=0 tabani: ProgressionModel'de gorev XP'si ihtiyaci astigi seviyelerde (grind=0) 'gorevli' oldurme sayisi yalniz
+gorevlerin zorunlu hedefleridir ve 0 olabilir; oyuncu gercekte gorev hedefine giderken/ganimet icin yine mob keser.
+Bu seviyelerde gelir icin oldurme = max(gorev hedefleri, --min-kill-frac x gorevsiz oldurme sayisi) varsayilir
+(varsayilan 0.5 = "gorevsiz grind'in yarisi kadar yan oldurme"; [PLACEHOLDER], olcumle ([MMOMETRIC] kill) degismeli).
 """
 
 import argparse
@@ -61,13 +66,19 @@ def avg_gold(level):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--upgrade-to", type=int, default=3, help="her parcayi bu +N seviyeye yukselt (varsayilan 3)")
+    ap.add_argument("--min-kill-frac", type=float, default=0.5,
+                    help="grind=0 seviyelerinde gelir icin oldurme tabani = bu oran x gorevsiz oldurme (varsayilan 0.5)")
     args = ap.parse_args()
 
     out = pm.simulate(80 - 1)
     income_by_level = {}
-    for lv, _n, _xpk, _knq, kills, _qx, _gx, _gr in out:
+    floored = 0
+    for lv, _n, _xpk, knq, kills, _qx, _gx, grind in out:
         if kills is None:
             continue
+        if grind == 0 and kills < args.min_kill_frac * knq:
+            kills = args.min_kill_frac * knq
+            floored += 1
         gold_kills = kills * avg_gold(lv)
         quest_here = sum(g for (t, c, g, req) in quest_gold.values()
                          if (c if t == "ReachLevel" else req) == lv)
@@ -79,6 +90,7 @@ def main():
     tier_lvls = sorted(tiers)
     print(f"Kademe: 4 parcanin alisi + her parca +{args.upgrade_to} yukseltme ({upgrade_cost(args.upgrade_to)} altin/parca).")
     print("Gelir: oldurme x ort. mob altini + gorev altin odulleri (Q_Gold* odulu 0).")
+    print(f"Grind=0 tabani: {floored} seviyede oldurme = {args.min_kill_frac:g} x gorevsiz oldurme varsayildi (--min-kill-frac).")
     print(f"{'kademe Lv':>9} {'aralik':>9} {'gelir':>10} {'gider':>10} {'gelir/gider':>11}  parca sayisi")
     for i, tl in enumerate(tier_lvls):
         nxt = tier_lvls[i + 1] if i + 1 < len(tier_lvls) else 80
