@@ -3462,3 +3462,12 @@ Sunucu her mob için bağlı oyuncu listesini her karede taramak yerine en yakı
 - [ ] İstek 20 saniye geçtikten sonra kabul edilsin: iki liste de değişmemeli ve süre doldu mesajı görünmeli.
 - [ ] A, B'yi silsin: çevrimiçiyse iki listeden de kalkmalı. B çevrimdışıyken eski tek yönlü kayıt kalsa bile B daha sonra A'nın çevrimiçi durumunu/seviyesini görememeli.
 - [ ] Liste sınırı 30 olan tarafla istek/kabul dene: taşma olmamalı, iki liste yarım güncellenmemeli.
+
+## Ticaret denetim günlüğü — 2026-10-05
+
+Başarılı ticaretler sunucu loguna `LogMMOTradeAudit` kategorisinde tek yapılandırılmış `event=trade_complete` satırı yazar: iki oyuncu adı, iki yöndeki altın, ekipman kimliği/InstanceId/+ seviyesi/nadirliği ve sonuç bakiyeleri. Aktif ticaretin iptali `event=trade_cancel`, revizyon ve sunucunun iptal nedeni ile kaydedilir. Başarısız ve geri alınan işlemler tamamlanmış gibi loglanmaz. Zorlanmış C++ derlemesi temiz geçti; log içeriği PIE'de doğrulanacak.
+
+- [ ] İki oyuncu farklı +/nadirlikte ekipman ve altın takas etsin: Output Log'da tam bir `event=trade_complete` satırı oluşmalı; iki taraf, InstanceId'ler ve sonuç bakiyeleri gerçek envanterle eşleşmeli.
+- [ ] Teklif onayından önce iptal et ve ayrıca oyuncuları 800 uu'dan fazla uzaklaştır: her işlem için yalnız bir `event=trade_cancel` satırı oluşmalı, neden doğru olmalı.
+- [ ] Çanta doluluğu veya değişmiş teklif nedeniyle sunucu takası reddetsin: `trade_cancel` görünmeli, `trade_complete` görünmemeli ve hiçbir eşya/altın kaybolmamalı.
+- [ ] Tamamlanan ticarette yalnız bir `trade_complete` görünmeli; ayrıca yanıltıcı `trade_cancel` satırı oluşmamalı.

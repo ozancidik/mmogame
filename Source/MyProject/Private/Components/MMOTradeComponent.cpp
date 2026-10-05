@@ -12,6 +12,8 @@
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogMMOTradeAudit, Log, All);
+
 namespace
 {
 	FString TradeNameOf(const AMMOCharacter* C)
@@ -59,6 +61,21 @@ namespace
 			}
 		}
 		return true;
+	}
+
+	FString DescribeTradeItems(const TArray<FMMOEquipmentInstance>& Items)
+	{
+		FString Result;
+		for (const FMMOEquipmentInstance& Item : Items)
+		{
+			if (!Result.IsEmpty())
+			{
+				Result += TEXT(",");
+			}
+			Result += FString::Printf(TEXT("%s#%d+%d:r%d"), *Item.ItemId.ToString(), Item.InstanceId,
+				Item.Plus, static_cast<int32>(Item.Rarity));
+		}
+		return Result.IsEmpty() ? TEXT("-") : Result;
 	}
 }
 
@@ -515,6 +532,12 @@ void UMMOTradeComponent::EndTradeServer(const FString& Reason)
 	// Karsi tarafi, o da bizimle eslesmisse temizle (bayat esleme baska bir ticareti bozmasin).
 	AMMOCharacter* P = Partner.Get();
 	UMMOTradeComponent* PC = P ? P->GetTradeComponent() : nullptr;
+	if (bTradeActive && !Reason.Equals(TEXT("Ticaret tamamlandi."), ESearchCase::CaseSensitive))
+	{
+		UE_LOG(LogMMOTradeAudit, Display,
+			TEXT("event=trade_cancel a=\"%s\" b=\"%s\" revision=%d reason=\"%s\""),
+			*TradeNameOf(GetOwnerCharacter()), *TradeNameOf(P), OfferRevision, *Reason);
+	}
 
 	NotifyOwner(Reason);
 	ResetLocalState();
@@ -675,6 +698,14 @@ void UMMOTradeComponent::TryExecuteTrade()
 	IB->AddGold(-OfferB.Gold);
 	IA->AddGold(OfferB.Gold);
 	IB->AddGold(OfferA.Gold);
+
+	// NETWORK_AUDIT O12: ekonomi mutasyonu tamamlaninca iki taraf, altin ve ekipman kimliklerini
+	// tek yapilandirilmis sunucu satirinda kaydet. Log mutasyondan sonra, state sifirlanmadan once
+	// yazilir; basarisiz/geri alinan denemeler trade_cancel olarak ayri izlenir.
+	UE_LOG(LogMMOTradeAudit, Display,
+		TEXT("event=trade_complete a=\"%s\" b=\"%s\" gold_a_to_b=%d gold_b_to_a=%d items_a_to_b=\"%s\" items_b_to_a=\"%s\" balance_a=%d balance_b=%d"),
+		*TradeNameOf(A), *TradeNameOf(B), OfferA.Gold, OfferB.Gold,
+		*DescribeTradeItems(FromA), *DescribeTradeItems(FromB), IA->Gold, IB->Gold);
 
 	EndTradeServer(TEXT("Ticaret tamamlandi."));
 
