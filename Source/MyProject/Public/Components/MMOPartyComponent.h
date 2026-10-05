@@ -52,6 +52,8 @@ public:
 	void RequestInviteNearest();
 	void RequestAccept();
 	void RequestLeave();
+	// Gelen parti davetini reddeder (davetciye bildirim gider).
+	void RequestDecline();
 	// Bir uyeyi partiden cikarir (sunucu sadece lider cagirdiysa uygular).
 	void RequestKick(AMMOCharacter* Target);
 
@@ -81,7 +83,8 @@ protected:
 	static constexpr float InviteCooldown = 3.f;
 
 	// Bekleyen bir davetin gecerlilik suresi (kabul aninda kontrol edilir).
-	static constexpr float InviteExpirySeconds = 60.f;
+	// 30 sn: kotu niyetli birinin hedefin davet kutusunu uzun sure isgal etmesini sinirlar (ticaretle ayni).
+	static constexpr float InviteExpirySeconds = 30.f;
 	// Kabul aninda davet edenle aralarindaki izin verilen azami mesafe (davet menzilinden
 	// (1600) biraz genis tutulur ki dogal hareket reddi tetiklemesin).
 	static constexpr float InviteAcceptMaxDistance = 3000.f;
@@ -103,6 +106,9 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerAccept();
+
+	UFUNCTION(Server, Reliable)
+	void ServerDecline();
 
 	UFUNCTION(Server, Reliable)
 	void ServerLeave();

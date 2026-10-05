@@ -6,6 +6,23 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Net/UnrealNetwork.h"
+#include "Core/MMONotify.h"
+#include "GameFramework/PlayerState.h"
+
+namespace
+{
+	FString PartyNameOf(const AMMOCharacter* C)
+	{
+		if (C)
+		{
+			if (const APlayerState* PS = C->GetPlayerState())
+			{
+				return PS->GetPlayerName();
+			}
+		}
+		return TEXT("Oyuncu");
+	}
+}
 
 UMMOPartyComponent::UMMOPartyComponent()
 {
@@ -129,6 +146,18 @@ void UMMOPartyComponent::RequestAccept()
 	}
 }
 
+void UMMOPartyComponent::RequestDecline()
+{
+	if (HasAuthorityInternal())
+	{
+		ServerDecline_Implementation();
+	}
+	else
+	{
+		ServerDecline();
+	}
+}
+
 void UMMOPartyComponent::RequestLeave()
 {
 	if (HasAuthorityInternal())
@@ -182,6 +211,10 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Yakinda davet edilecek oyuncu yok"));
 		}
+		else if (!Inviter->IsLocallyControlled())
+		{
+			MMONotify::ToOwner(Inviter, TEXT("Yakinda davet edilecek oyuncu yok"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		}
 		return;
 	}
 
@@ -193,25 +226,51 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 
 	// Hedefteki gecerli daveti ezme. Daveti kosulsuz degistirmek, kotu niyetli bir
 	// oyuncunun gercek daveti kurban kabul etmeden hemen once kapmasina izin veriyordu.
+	// Davetciye geri bildirim verilir (eskiden sessizdi: davet gitti mi, reddedildi mi ayirt edilemiyordu).
 	if (TP->PendingInviteFrom.Get() == Inviter && TP->PendingInviteTime >= 0.f
 		&& Now - TP->PendingInviteTime < InviteExpirySeconds)
 	{
-		return; // ayni daveti yenileyip sureyi uzatma
+		// ayni daveti yenileyip sureyi uzatma
+		MMONotify::ToOwner(Inviter, TEXT("Bu oyuncuya parti daveti zaten gonderildi; yanitini bekle."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
 	}
 	if (TP->PendingInviteFrom.IsValid() && TP->PendingInviteFrom.Get() != Inviter
 		&& TP->PendingInviteTime >= 0.f && Now - TP->PendingInviteTime < InviteExpirySeconds)
 	{
-		return; // baska oyuncunun bekleyen davetini kapma
+		// baska oyuncunun bekleyen davetini kapma
+		MMONotify::ToOwner(Inviter, TEXT("Oyuncunun bekleyen baska bir daveti var; biraz sonra tekrar dene."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
 	}
 
 	TP->PendingInviteFrom = Inviter;
 	TP->PendingInviteTime = Now;
 	TP->ClientNotifyInvited(Inviter);
 
-	if (GEngine && Inviter->IsLocallyControlled())
+	MMONotify::ToOwner(Inviter, TEXT("Parti daveti gonderildi"), FColor(120, 220, 120), 2.f, MMONotify::EMMONotifyKind::Hint);
+}
+
+void UMMOPartyComponent::ServerDecline_Implementation()
+{
+	AMMOCharacter* Self = GetOwnerCharacter();
+	AMMOCharacter* Inviter = PendingInviteFrom.Get();
+	const float InviteTime = PendingInviteTime;
+	PendingInviteFrom = nullptr;
+	PendingInviteTime = -1.f;
+	if (!Self)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(120, 220, 120), TEXT("Parti daveti gonderildi"));
+		return;
 	}
+
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (!Inviter || Inviter == Self || InviteTime < 0.f || Now - InviteTime > InviteExpirySeconds)
+	{
+		MMONotify::ToOwner(Self, TEXT("Bekleyen parti daveti yok."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+
+	MMONotify::ToOwner(Self, TEXT("Parti daveti reddedildi."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+	MMONotify::ToOwner(Inviter, FString::Printf(TEXT("%s parti davetini reddetti."), *PartyNameOf(Self)), FColor(255, 170, 120), 3.f);
 }
 
 void UMMOPartyComponent::ServerAccept_Implementation()
@@ -297,7 +356,7 @@ void UMMOPartyComponent::ClientNotifyInvited_Implementation(AMMOCharacter* From)
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor(120, 200, 255),
-			TEXT("Parti daveti aldin! Kabul icin konsola: MMOPartyAccept"));
+			TEXT("Parti daveti aldin! Kabul: /parti kabul (MMOPartyAccept), ret: /parti ret (MMOPartyDecline)"));
 	}
 }
 

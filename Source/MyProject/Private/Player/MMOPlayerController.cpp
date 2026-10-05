@@ -163,7 +163,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	}
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
-		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, kabul, sil isim, liste), /yardim"), 2);
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /parti (davet; kabul, ret, ayril), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, kabul, sil isim, liste), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
@@ -183,6 +183,41 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 			++Count;
 		}
 		ClientReceiveChat(FString(), FString::Printf(TEXT("Cevrimici (%d): %s"), Count, *List), 2);
+		return;
+	}
+	// Parti: "/parti" (en yakin oyuncuya davet), "/parti kabul", "/parti ret", "/parti ayril".
+	if (Msg.Equals(TEXT("/parti"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/parti "), ESearchCase::IgnoreCase))
+	{
+		UMMOPartyComponent* Party = nullptr;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			Party = Me->GetPartyComponent();
+		}
+		const FString Sub = Msg.RightChop(6).TrimStartAndEnd();
+		if (!Party)
+		{
+			ClientReceiveChat(FString(), TEXT("Parti su an kullanilamaz."), 2);
+		}
+		else if (Sub.IsEmpty() || Sub.Equals(TEXT("davet"), ESearchCase::IgnoreCase))
+		{
+			Party->RequestInviteNearest();
+		}
+		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
+		{
+			Party->RequestAccept();
+		}
+		else if (Sub.Equals(TEXT("ret"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("decline"), ESearchCase::IgnoreCase))
+		{
+			Party->RequestDecline();
+		}
+		else if (Sub.Equals(TEXT("ayril"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("leave"), ESearchCase::IgnoreCase))
+		{
+			Party->RequestLeave();
+		}
+		else
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /parti, /parti kabul, /parti ret, /parti ayril"), 2);
+		}
 		return;
 	}
 	// Ticaret: "/trade" (en yakin oyuncuya davet), "/trade kabul", "/trade iptal".
@@ -572,6 +607,19 @@ AMMOCharacter* AMMOPlayerController::GetSelectedTarget() const
 	return Target;
 }
 
+void AMMOPlayerController::ReleaseAttackTarget(const AMMOCharacter* Rejected)
+{
+	// Reddedilen hedef artik kovalanan hedef degilse (oyuncu baska yere tikladi) dokunma.
+	if (!Rejected || TargetEnemy.Get() != Rejected)
+	{
+		return;
+	}
+	RejectedTarget = TargetEnemy;
+	RejectedTargetTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	TargetEnemy.Reset();
+	StopMovement();
+}
+
 void AMMOPlayerController::SelectTarget(AMMOCharacter* NewTarget)
 {
 	// KO TargetSelect: hedef degistiyse auto-attack iptal edilir.
@@ -607,19 +655,6 @@ void AMMOPlayerController::OnTargetNearestEnemy()
 	AMMOMob* Nearest = MMOTargeting::FindNearestMob(this, P->GetActorLocation(), TargetSearchRange);
 
 	SelectTarget(Nearest);
-void AMMOPlayerController::ReleaseAttackTarget(const AMMOCharacter* Rejected)
-{
-	// Reddedilen hedef artik kovalanan hedef degilse (oyuncu baska yere tikladi) dokunma.
-	if (!Rejected || TargetEnemy.Get() != Rejected)
-	{
-		return;
-	}
-	RejectedTarget = TargetEnemy;
-	RejectedTargetTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	TargetEnemy.Reset();
-	StopMovement();
-}
-
 
 	if (!Nearest && GEngine)
 	{
@@ -871,6 +906,14 @@ void AMMOPlayerController::DoLeftClickAction()
 		// Hedefe git ve saldir.
 		SelectedTarget = HitChar;
 		bHasMoveTarget = false;
+		// Yakin zamanda saldirisi reddedilen hedef (PvP kapali vb.): yalniz sec, kovalama.
+		const float ClickNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		const bool bRecentlyRejected = RejectedTarget.Get() == HitChar
+			&& ClickNow - RejectedTargetTime < RejectedTargetSeconds;
+		if (!bRecentlyRejected)
+		{
+			TargetEnemy = HitChar;
+		}
 	}
 	else
 	{
@@ -906,14 +949,6 @@ void AMMOPlayerController::OnRightMousePressed()
 	// Pencere acikken sag tik, imlecin ustundeki pencereye calisir (kitap: slota koy; envanter: +1 dene), kamera donmez.
 	if (AMMOHUD* H = Cast<AMMOHUD>(GetHUD()))
 	{
-		// Yakin zamanda saldirisi reddedilen hedef (PvP kapali vb.): yalniz sec, kovalama.
-		const float ClickNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-		const bool bRecentlyRejected = RejectedTarget.Get() == HitChar
-			&& ClickNow - RejectedTargetTime < RejectedTargetSeconds;
-		if (!bRecentlyRejected)
-		{
-			TargetEnemy = HitChar;
-		}
 		if (H->IsAnyWindowOpen())
 		{
 			float MX = 0.f, MY = 0.f;

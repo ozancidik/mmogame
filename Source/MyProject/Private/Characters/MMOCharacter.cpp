@@ -1366,6 +1366,14 @@ void AMMOCharacter::MMOPartyAccept()
 	}
 }
 
+void AMMOCharacter::MMOPartyDecline()
+{
+	if (PartyComponent)
+	{
+		PartyComponent->RequestDecline();
+	}
+}
+
 void AMMOCharacter::MMOPartyLeave()
 {
 	if (PartyComponent)
@@ -1507,14 +1515,6 @@ void AMMOCharacter::ClientNotifyXPGain_Implementation(int32 Amount, int32 Percen
 	HUD->AddFloatingLabel(GetActorLocation() + FVector(0.f, 0.f, 130.f), Label);
 }
 
-void AMMOCharacter::ClientShowHint_Implementation(const FString& Text)
-{
-	const APlayerController* PC = Cast<APlayerController>(GetController());
-	AMMOHUD* HUD = PC ? Cast<AMMOHUD>(PC->GetHUD()) : nullptr;
-	if (!HUD || Text.IsEmpty())
-	{
-		return;
-	}
 void AMMOCharacter::ReleaseAttackTargetOnOwner(AMMOCharacter* Rejected)
 {
 	AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController());
@@ -1542,6 +1542,14 @@ void AMMOCharacter::ClientReleaseAttackTarget_Implementation(AMMOCharacter* Reje
 	}
 }
 
+void AMMOCharacter::ClientShowHint_Implementation(const FString& Text)
+{
+	const APlayerController* PC = Cast<APlayerController>(GetController());
+	AMMOHUD* HUD = PC ? Cast<AMMOHUD>(PC->GetHUD()) : nullptr;
+	if (!HUD || Text.IsEmpty())
+	{
+		return;
+	}
 	HUD->AddFloatingLabel(GetActorLocation() + FVector(0.f, 0.f, 170.f), Text);
 }
 

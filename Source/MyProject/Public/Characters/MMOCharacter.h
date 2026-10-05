@@ -241,6 +241,9 @@ public:
 	void MMOPartyAccept();   // gelen daveti kabul et
 
 	UFUNCTION(Exec)
+	void MMOPartyDecline();  // gelen parti davetini reddet
+
+	UFUNCTION(Exec)
 	void MMOPartyLeave();    // partiden ayril
 
 	UFUNCTION(Exec)
@@ -288,18 +291,18 @@ public:
 	UFUNCTION(Client, Unreliable)
 	void ClientShowHint(const FString& Text);
 
-protected:
-	// "MMONpcTalk" debug komutunun spam korumasi (client-side, RPC olmadigi icin
-	// sunucu-tarafi mesafe/cooldown guard'lari devreye girmiyor — bkz. MMONpcTalk).
 	// Sunucu saldiriyi reddettiginde (PvP kapali / parti-klan / hub / dogum korumasi) sahibe:
 	// otomatik saldiri/kovalamayi birak. Yalniz oyuncu hedefleri icin (mob reddi yok).
 	UFUNCTION(Client, Unreliable)
 	void ClientReleaseAttackTarget(AMMOCharacter* Rejected);
 
-	float LastNpcTalkDebugTime = -100.f;
+protected:
 	// Reddedilen oyuncu hedefini sahibin kontrolcusunda biraktirir (yerel: dogrudan, uzak: Client RPC).
 	void ReleaseAttackTargetOnOwner(AMMOCharacter* Rejected);
 
+	// "MMONpcTalk" debug komutunun spam korumasi (client-side, RPC olmadigi icin
+	// sunucu-tarafi mesafe/cooldown guard'lari devreye girmiyor — bkz. MMONpcTalk).
+	float LastNpcTalkDebugTime = -100.f;
 	static constexpr float NpcTalkDebugCooldown = 2.f;
 
 	virtual void BeginPlay() override;
