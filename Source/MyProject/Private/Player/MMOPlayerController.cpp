@@ -162,7 +162,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 	}
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
-		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, sil isim, liste), /yardim"), 2);
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, kabul, sil isim, liste), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
@@ -262,7 +262,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		}
 		return;
 	}
-	// Arkadas listesi: "/arkadas ekle <isim>", "/arkadas sil <isim>", "/arkadas" veya "/arkadas liste".
+	// Arkadas listesi: "/arkadas ekle <isim>", "/arkadas kabul", "/arkadas sil <isim>" veya "/arkadas liste".
 	if (Msg.Equals(TEXT("/arkadas"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/arkadas "), ESearchCase::IgnoreCase))
 	{
 		UMMOFriendsComponent* Friends = nullptr;
@@ -287,13 +287,17 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		{
 			Friends->CmdAdd(Arg);
 		}
+		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
+		{
+			Friends->CmdAccept();
+		}
 		else if (Sub.Equals(TEXT("sil"), ESearchCase::IgnoreCase))
 		{
 			Friends->CmdRemove(Arg);
 		}
 		else
 		{
-			ClientReceiveChat(FString(), TEXT("Kullanim: /arkadas ekle isim, /arkadas sil isim, /arkadas liste"), 2);
+			ClientReceiveChat(FString(), TEXT("Kullanim: /arkadas ekle isim, /arkadas kabul, /arkadas sil isim, /arkadas liste"), 2);
 		}
 		return;
 	}

@@ -3451,3 +3451,14 @@ Sunucu her mob için bağlı oyuncu listesini her karede taramak yerine en yakı
 - [ ] Hedeflenen oyuncu ölür veya canlanma korumasına girerse mob beklemeden saldırıyı bırakmalı; eski MoveTo komutu oyuncunun dibine taşımamalı.
 - [ ] Hedef hub güvenli alanına girince mob kovalamayı bırakıp leash davranışıyla dönmeli.
 - [ ] 40+ mob ve iki istemciyle `stat game` / `stat unit` ölç; Game Thread süresini önceki yapıyla karşılaştır. Beklenen kazanç oyuncu-listesi taramasında yaklaşık 60 Hz -> 5 Hz'dir; gerçek toplam kazanç PIE'de ölçülmedi.
+
+## Karşılıklı arkadaşlık onayı — 2026-10-05
+
+`/arkadas ekle isim` artık hedefin listesine sessizce erişim vermek yerine 20 saniyelik sunucu taraflı istek oluşturur; hedef `/arkadas kabul` dediğinde iki liste birlikte güncellenir. Aynı hedefte bekleyen isteğin yenilenmesi veya başka davetçi tarafından ezilmesi engellenir. Çevrimiçi durum ve seviye yalnız iki listede de ilişki varsa gösterilir; tek yönlü eski kayıtlar bilgi sızdırmaz. Çevrimiçi arkadaş silinince iki taraf da güncellenir. Zorlanmış C++ derlemesi temiz geçti; çoklu istemci PIE doğrulaması bekliyor.
+
+- [ ] A, `/arkadas ekle B` yazsın: A yalnız “istek gönderildi”, B kabul komutunu görmeli; kabulden önce A/B listelerinde karşı tarafın çevrimiçi seviyesi görünmemeli.
+- [ ] B, 20 saniye içinde `/arkadas kabul` yazsın: iki oyuncu da birbirini çevrimiçi ve doğru seviyede görmeli; kaydet/yükle sonrası ilişki iki tarafta kalmalı.
+- [ ] Aynı istek beklerken A tekrar göndersin ve C de B'ye göndersin: süre yenilenmemeli, C isteği A'nın isteğini ezmemeli.
+- [ ] İstek 20 saniye geçtikten sonra kabul edilsin: iki liste de değişmemeli ve süre doldu mesajı görünmeli.
+- [ ] A, B'yi silsin: çevrimiçiyse iki listeden de kalkmalı. B çevrimdışıyken eski tek yönlü kayıt kalsa bile B daha sonra A'nın çevrimiçi durumunu/seviyesini görememeli.
+- [ ] Liste sınırı 30 olan tarafla istek/kabul dene: taşma olmamalı, iki liste yarım güncellenmemeli.

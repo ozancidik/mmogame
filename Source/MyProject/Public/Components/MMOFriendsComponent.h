@@ -9,7 +9,7 @@
 class AMMOCharacter;
 
 /**
- * Basit arkadas listesi bileseni. Sunucu-otoriteli, tek yonlu (karsilikli onay yok; prototip).
+ * Sunucu-otoriteli, karsilikli onayli arkadas listesi bileseni.
  * Karakter basina kayitli arkadas adlari tutulur (FMMOCharacterSaveData::Friends).
  * Komutlar sohbetten gelir (AMMOPlayerController::ServerSendChat sunucuda calisir),
  * bu yuzden ayri RPC yok: Cmd* fonksiyonlari yalniz otoritede calisir.
@@ -37,6 +37,7 @@ public:
 
 	// --- Sohbet komutlari (yalniz sunucu/otorite; ServerSendChat icinden cagrilir) ---
 	void CmdAdd(const FString& Name);
+	void CmdAccept();
 	void CmdRemove(const FString& Name);
 	void CmdList();
 
@@ -61,4 +62,10 @@ protected:
 	float LastFriendSaveTime = -100.f;
 	void SaveThrottled(AMMOCharacter* Me);
 	static constexpr float FriendSaveCooldown = 5.f;
+
+	// Yalniz sunucuda tutulan, kisa omurlu arkadaslik istegi. Kayda/replikasyona girmez;
+	// kabul edilince iki oyuncunun listesi birlikte guncellenir.
+	TWeakObjectPtr<AMMOCharacter> PendingFriendInviter;
+	float PendingFriendInviteExpiry = -1.f;
+	static constexpr float FriendInviteDuration = 20.f;
 };

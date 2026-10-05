@@ -153,14 +153,94 @@ void UMMOFriendsComponent::CmdAdd(const FString& Name)
 		NotifyOwner(TEXT("Bu oyuncu eklenemez."));
 		return;
 	}
-	if (HasFriend(Canonical))
+	UMMOFriendsComponent* TargetFriends = FriendsCompOf(Target);
+	if (!TargetFriends)
+	{
+		NotifyOwner(TEXT("Bu oyuncuya arkadaslik istegi gonderilemiyor."));
+		return;
+	}
+	const FString MyName = FriendPlayerNameOf(Me);
+	if (HasFriend(Canonical) && TargetFriends->HasFriend(MyName))
 	{
 		NotifyOwner(FString::Printf(TEXT("%s zaten arkadas listende."), *Canonical));
 		return;
 	}
-	Friends.Add(Canonical);
-	NotifyOwner(FString::Printf(TEXT("%s arkadas listene eklendi."), *Canonical));
+	if (TargetFriends->Friends.Num() >= MaxFriends && !TargetFriends->HasFriend(MyName))
+	{
+		NotifyOwner(FString::Printf(TEXT("%s oyuncusunun arkadas listesi dolu."), *Canonical));
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+	if (TargetFriends->PendingFriendInviter.IsValid() && Now < TargetFriends->PendingFriendInviteExpiry)
+	{
+		if (TargetFriends->PendingFriendInviter.Get() == Me)
+		{
+			NotifyOwner(FString::Printf(TEXT("%s icin arkadaslik istegin zaten bekliyor."), *Canonical));
+		}
+		else
+		{
+			NotifyOwner(FString::Printf(TEXT("%s su anda baska bir arkadaslik istegini yanitliyor."), *Canonical));
+		}
+		return;
+	}
+
+	TargetFriends->PendingFriendInviter = Me;
+	TargetFriends->PendingFriendInviteExpiry = Now + FriendInviteDuration;
+	NotifyOwner(FString::Printf(TEXT("%s oyuncusuna arkadaslik istegi gonderildi."), *Canonical));
+	TargetFriends->NotifyOwner(FString::Printf(
+		TEXT("%s sana arkadaslik istegi gonderdi. Kabul: /arkadas kabul (20 sn)"), *MyName));
+}
+
+void UMMOFriendsComponent::CmdAccept()
+{
+	AMMOCharacter* Me = GetOwnerCharacter();
+	const UWorld* World = GetWorld();
+	if (!HasAuthorityInternal() || !Me || !World)
+	{
+		return;
+	}
+
+	AMMOCharacter* Inviter = PendingFriendInviter.Get();
+	const float Now = World->GetTimeSeconds();
+	PendingFriendInviter.Reset();
+	const bool bExpired = Now > PendingFriendInviteExpiry;
+	PendingFriendInviteExpiry = -1.f;
+	if (!Inviter || bExpired || Inviter->GetWorld() != World)
+	{
+		NotifyOwner(TEXT("Bekleyen arkadaslik istegi yok veya suresi doldu."));
+		return;
+	}
+
+	UMMOFriendsComponent* InviterFriends = FriendsCompOf(Inviter);
+	const FString MyName = FriendPlayerNameOf(Me);
+	const FString InviterName = FriendPlayerNameOf(Inviter);
+	if (!InviterFriends || MyName.IsEmpty() || InviterName.IsEmpty())
+	{
+		NotifyOwner(TEXT("Arkadaslik istegi tamamlanamadi."));
+		return;
+	}
+	if ((!HasFriend(InviterName) && Friends.Num() >= MaxFriends)
+		|| (!InviterFriends->HasFriend(MyName) && InviterFriends->Friends.Num() >= MaxFriends))
+	{
+		NotifyOwner(TEXT("Arkadas listelerinden biri dolu; istek tamamlanamadi."));
+		InviterFriends->NotifyOwner(TEXT("Arkadaslik istegi liste siniri nedeniyle tamamlanamadi."));
+		return;
+	}
+
+	if (!HasFriend(InviterName))
+	{
+		Friends.Add(InviterName);
+	}
+	if (!InviterFriends->HasFriend(MyName))
+	{
+		InviterFriends->Friends.Add(MyName);
+	}
+	NotifyOwner(FString::Printf(TEXT("%s ile arkadas oldunuz."), *InviterName));
+	InviterFriends->NotifyOwner(FString::Printf(TEXT("%s arkadaslik istegini kabul etti."), *MyName));
 	SaveThrottled(Me);
+	InviterFriends->SaveThrottled(Inviter);
 }
 
 void UMMOFriendsComponent::CmdRemove(const FString& Name)
@@ -183,6 +263,24 @@ void UMMOFriendsComponent::CmdRemove(const FString& Name)
 			const FString Removed = Friends[i];
 			Friends.RemoveAt(i);
 			NotifyOwner(FString::Printf(TEXT("%s arkadas listenden silindi."), *Removed));
+			// Karsi taraf cevrimiciyse iliskiyi iki listeden de kaldir. Cevrimdisi eski kayit
+			// tek yonlu kalsa bile CmdList/AnnouncePresence karsiliklilik aradigi icin durum ve
+			// seviye takibi yapamaz; bir sonraki kabul iliskiyi yeniden kurabilir.
+			if (AMMOCharacter* Other = FindOnlineByName(GetWorld(), Removed))
+			{
+				if (UMMOFriendsComponent* OtherFriends = FriendsCompOf(Other))
+				{
+					for (int32 OtherIndex = OtherFriends->Friends.Num() - 1; OtherIndex >= 0; --OtherIndex)
+					{
+						if (OtherFriends->Friends[OtherIndex].Equals(FriendPlayerNameOf(Me), ESearchCase::IgnoreCase))
+						{
+							OtherFriends->Friends.RemoveAt(OtherIndex);
+						}
+					}
+					OtherFriends->NotifyOwner(FString::Printf(TEXT("%s arkadasligini kaldirdi."), *FriendPlayerNameOf(Me)));
+					OtherFriends->SaveThrottled(Other);
+				}
+			}
 			SaveThrottled(Me);
 			return;
 		}
@@ -220,10 +318,16 @@ void UMMOFriendsComponent::CmdList()
 	for (const FString& F : Friends)
 	{
 		const AMMOCharacter* C = FindOnlineByName(GetWorld(), F);
-		if (C)
+		const UMMOFriendsComponent* OtherFriends = FriendsCompOf(C);
+		const FString MyName = FriendPlayerNameOf(GetOwnerCharacter());
+		if (C && OtherFriends && OtherFriends->HasFriend(MyName))
 		{
 			const int32 Lv = C->GetStats() ? C->GetStats()->Level : 0;
 			ListText += FString::Printf(TEXT("\n%s - cevrimici (Lv%d)"), *F, Lv);
+		}
+		else if (C)
+		{
+			ListText += FString::Printf(TEXT("\n%s - karsilikli onay bekliyor"), *F);
 		}
 		else
 		{
@@ -282,7 +386,7 @@ void UMMOFriendsComponent::AnnouncePresence(bool bOnline, const FString& NameOve
 		const APlayerController* PC = It->Get();
 		const AMMOCharacter* Other = PC ? Cast<AMMOCharacter>(PC->GetPawn()) : nullptr;
 		const UMMOFriendsComponent* FC = FriendsCompOf(Other);
-		if (FC && Other != Me && FC->HasFriend(MyName))
+		if (FC && Other != Me && FC->HasFriend(MyName) && HasFriend(FriendPlayerNameOf(Other)))
 		{
 			FC->NotifyOwner(Text);
 		}
