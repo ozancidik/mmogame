@@ -247,6 +247,15 @@ void UMMOTradeComponent::ServerInviteNearest_Implementation()
 		return;
 	}
 
+	// Ayni daveti tekrar yollamak hedefteki zaman damgasini yenilemesin. Aksi halde
+	// davetci her cooldown sonunda hedefi bildirimle doldurup daveti suresiz tutabiliyordu.
+	if (TC->PendingInviteFrom.Get() == Self && TC->PendingInviteTime >= 0.f
+		&& Now - TC->PendingInviteTime < InviteExpirySeconds)
+	{
+		NotifyOwner(TEXT("Bu oyuncuya ticaret daveti zaten gonderildi; yanitini bekle."));
+		return;
+	}
+
 	// Davet kapma korumasi: hedefin gecerli baska bir bekleyen daveti varsa ezme.
 	if (TC->PendingInviteFrom.IsValid() && TC->PendingInviteFrom.Get() != Self
 		&& TC->PendingInviteTime >= 0.f && Now - TC->PendingInviteTime < InviteExpirySeconds)

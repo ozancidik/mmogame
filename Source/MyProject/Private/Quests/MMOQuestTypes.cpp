@@ -35,7 +35,7 @@ namespace
 		using T = EMMOQuestType;
 
 		// --- Ana gorev zinciri (her biri bir oncekini gerektirir) ---
-		Table.Add(MakeQuest(TEXT("Q_Goblins"), TEXT("Goblin Avi"), TEXT("Koydeki goblinleri temizle: 5 Goblin oldur."),
+		Table.Add(MakeQuest(TEXT("Q_Goblins"), TEXT("Goblin Avi"), TEXT("Cakili vadilerde pusu kuran goblin cetelerini dagit: 5 Goblin oldur."),
 			T::KillSpecificMob, TEXT("Goblin"), 5, 200, 120, 1));
 		Table.Last().RewardConsumableId = FName(TEXT("HealthPotion"));
 		Table.Last().RewardConsumableCount = 3;
@@ -59,7 +59,7 @@ namespace
 		// Q_Boss (1500XP/1000g) oyuncuyu ~Lv15-16'da birakip icerigi bitiriyordu; bu zincir
 		// Lv8-13 mob'lariyla o boslugun ilk kademesini doldurur. Oduller Q_Boss'un uzerine
 		// kademeli cikar (1800 -> 4500 XP). NOT: Lv16-80 hala bos, bilerek boyle.
-		Table.Add(MakeQuest(TEXT("Q_FrostWraiths"), TEXT("Buz Hayaletleri"), TEXT("Ucuncu bolgenin buzul sisini dagit: 5 Buz Hayaleti oldur."),
+		Table.Add(MakeQuest(TEXT("Q_FrostWraiths"), TEXT("Buz Hayaletleri"), TEXT("Ayazdis'in sisinde dolasan Uzun Kis olulerini dagit: 5 Buz Hayaleti oldur."),
 			T::KillSpecificMob, TEXT("FrostWraith"), 5, 1800, 1200, 8, TEXT("Q_Boss")));
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
 		Table.Last().RewardConsumableCount = 3;
@@ -109,19 +109,19 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineBlade"));
 
 		// --- Besinci bolge zinciri (Lv25-30): Q_MagmaTyrant'tan sonra ---
-		Table.Add(MakeQuest(TEXT("Q_ObsidianStalkers"), TEXT("Obsidyen Avcilari"), TEXT("Obsidyen avcilarini durdur: 5 Obsidyen Avcisi oldur."),
+		Table.Add(MakeQuest(TEXT("Q_ObsidianStalkers"), TEXT("Obsidyen Avcilari"), TEXT("Kara camin golgesinde avlanan zehirli avcilari durdur: 5 Obsidyen Avcisi oldur."),
 			T::KillSpecificMob, TEXT("ObsidianStalker"), 5, 9000, 9000, 25, TEXT("Q_MagmaTyrant")));
 		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianBoots"));
 
-		Table.Add(MakeQuest(TEXT("Q_ObsidianSentinels"), TEXT("Obsidyen Muhafizlari"), TEXT("Gecidi koruyan muhafizlari devir: 5 Obsidyen Muhafizi oldur."),
+		Table.Add(MakeQuest(TEXT("Q_ObsidianSentinels"), TEXT("Obsidyen Muhafizlari"), TEXT("Sirtlarin yolunu tutan agir bekcileri devir: 5 Obsidyen Muhafizi oldur."),
 			T::KillSpecificMob, TEXT("ObsidianSentinel"), 5, 11000, 11000, 27, TEXT("Q_ObsidianStalkers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianHelm"));
 
-		Table.Add(MakeQuest(TEXT("Q_ObsidianRaiders"), TEXT("Obsidyen Akincilari"), TEXT("Obsidyen akincilarini dagit: 5 Obsidyen Akincisi oldur."),
+		Table.Add(MakeQuest(TEXT("Q_ObsidianRaiders"), TEXT("Obsidyen Akincilari"), TEXT("Kara cam kalkanli ork akincilarini dagit: 5 Obsidyen Akincisi oldur."),
 			T::KillSpecificMob, TEXT("ObsidianRaider"), 5, 13000, 13000, 29, TEXT("Q_ObsidianSentinels")));
 		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianPlate"));
 
-		Table.Add(MakeQuest(TEXT("Q_ObsidianWarlord"), TEXT("Obsidyen Reisi"), TEXT("Obsidyen ordusunun reisini devir: Obsidyen Reisi'ni oldur."),
+		Table.Add(MakeQuest(TEXT("Q_ObsidianWarlord"), TEXT("Obsidyen Reisi"), TEXT("Karakaya'da dusen reisin kanindan gelen yeni reisi devir: Obsidyen Reisi'ni oldur."),
 			T::KillSpecificMob, TEXT("ObsidianWarlord"), 1, 17000, 18000, 30, TEXT("Q_ObsidianRaiders")));
 		Table.Last().RewardEquipmentId = FName(TEXT("ObsidianBlade"));
 
@@ -284,7 +284,7 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_Cleanup"), TEXT("Temizlik"), TEXT("Bolgedeki tehlikeyi azalt: 10 canavar oldur."),
 			T::KillAnyMob, TEXT(""), 10, 350, 200, 1));
 
-		Table.Add(MakeQuest(TEXT("Q_Level5"), TEXT("Guclen"), TEXT("Kendini gelistir: 5. seviyeye ulas."),
+		Table.Add(MakeQuest(TEXT("Q_Level5"), TEXT("Guclen"), TEXT("Ilk sinavini gec: 5. seviyeye ulas."),
 			T::ReachLevel, TEXT(""), 5, 400, 250, 1));
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
 		Table.Last().RewardConsumableCount = 2;
@@ -292,16 +292,16 @@ namespace
 		// Q_Gold500/1000/5000 ham XP'si elle dusuruldu (merkezi egri yerine): kapi Lv1/3'te carpan 1.0 oldugu icin
 		// erken "bedava XP" (altin biriktirme = harcama yok) egriyle kesilemiyordu (Q_Gold5000'e ayrica kapi Lv16 carpani da uygulanir).
 		// Q_Gold15000+ icin merkezi egri yeterli, dokunulmadi.
-		Table.Add(MakeQuest(TEXT("Q_Gold500"), TEXT("Tuccar Ruhu"), TEXT("500 altin biriktir."),
+		Table.Add(MakeQuest(TEXT("Q_Gold500"), TEXT("Tuccar Ruhu"), TEXT("Pazar bos keseye selam vermez: 500 altin biriktir."),
 			T::HaveGold, TEXT(""), 500, 150, 0, 1)); // XP 300->150 (Q_Gold* bedava XP ayari)
 
 		// Elit yan gorev: Orumcek Ana (bagimsiz — kurt surusunu bitirenlere acilir).
-		Table.Add(MakeQuest(TEXT("Q_SpiderQueen"), TEXT("Orumcek Ana"), TEXT("Magaranin dehsetini yok et: Orumcek Ana'yi oldur."),
+		Table.Add(MakeQuest(TEXT("Q_SpiderQueen"), TEXT("Orumcek Ana"), TEXT("Solgun Ormanlar'in en karanlik oyugundaki agi yak: Orumcek Ana'yi oldur."),
 			T::KillSpecificMob, TEXT("SpiderQueen"), 1, 900, 600, 5, TEXT("Q_Wolves")));
 		Table.Last().RewardEquipmentId = FName(TEXT("PlateArmor"));
 
 		// Kadim Golem (elit zinciri: Orumcek Ana'yi bitirenlere acilir).
-		Table.Add(MakeQuest(TEXT("Q_StoneGolem"), TEXT("Kadim Golem"), TEXT("Harabelerin bekcisini devir: Kadim Golem'i oldur."),
+		Table.Add(MakeQuest(TEXT("Q_StoneGolem"), TEXT("Kadim Golem"), TEXT("Yanlis bir sozle uyanan tas bekciyi yeniden uykuya yatir: Kadim Golem'i oldur."),
 			T::KillSpecificMob, TEXT("StoneGolem"), 1, 1000, 700, 6, TEXT("Q_SpiderQueen")));
 		Table.Last().RewardEquipmentId = FName(TEXT("DragonBlade"));
 
@@ -311,7 +311,7 @@ namespace
 		Table.Last().RewardEquipmentId = FName(TEXT("DragonHelm"));
 
 		// Trol avi (bagimsiz yan gorev).
-		Table.Add(MakeQuest(TEXT("Q_Trolls"), TEXT("Trol Avi"), TEXT("Ormandaki trolleri sec: 3 Trol oldur."),
+		Table.Add(MakeQuest(TEXT("Q_Trolls"), TEXT("Trol Avi"), TEXT("Kiyilarda dolasan trolleri avla: 3 Trol oldur."),
 			T::KillSpecificMob, TEXT("Troll"), 3, 550, 380, 5));
 
 		// Ikinci bolge yan gorevi: Kara Buyuculeri sec (Lv7 normal; band spawner'dan cikar).
@@ -321,7 +321,7 @@ namespace
 		// zorluk arttikca odul-carpaninin DUSMESI ters bir tesvikti. Tam 3x'e degil, orta bir
 		// yukseltmeye gidildi (genel ekonomi zaten "altin cabuk anlamsizlasiyor" bulgusuna
 		// sahip - fazladan altin enjekte etmek yerine sadece tersine tutarsizligi kapatildi).
-		Table.Add(MakeQuest(TEXT("Q_Warlocks"), TEXT("Kara Buyuculer"), TEXT("Ikinci bolgedeki kara buyuculeri devir: 4 Kara Buyucu oldur."),
+		Table.Add(MakeQuest(TEXT("Q_Warlocks"), TEXT("Kara Buyuculer"), TEXT("Karakaya'da orklari bir bayrak altinda toplayan buyuculeri sustur: 4 Kara Buyucu oldur."),
 			T::KillSpecificMob, TEXT("Warlock"), 4, 800, 650, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("BattleAxe"));
 
@@ -329,19 +329,19 @@ namespace
 		// Q_Warlocks ile ayni bagimsiz-yan-gorev deseni; SteelHelmet o zamana kadar hicbir
 		// gorevde odul olarak kullanilmamisti (sadece elit loot/dukkanda vardi). Altin
 		// odulu 480->620 (bkz. Q_Warlocks yorumu).
-		Table.Add(MakeQuest(TEXT("Q_OrcWarriors"), TEXT("Ork Savascilari"), TEXT("Ikinci bolgedeki ork savascilarini devir: 4 Ork Savascisi oldur."),
+		Table.Add(MakeQuest(TEXT("Q_OrcWarriors"), TEXT("Ork Savascilari"), TEXT("Karakaya Gecidi'ni tutan baltali savascilari devir: 4 Ork Savascisi oldur."),
 			T::KillSpecificMob, TEXT("OrcWarrior"), 4, 750, 620, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("SteelHelmet"));
 
 		// Ikinci bolge yan gorevi: Korku Kurtlarini sec (Lv6 normal; band spawner'dan cikar).
 		// SteelBoots de ayni sekilde hicbir gorevde odul olarak kullanilmamisti. Altin odulu
 		// 480->600 (bkz. Q_Warlocks yorumu).
-		Table.Add(MakeQuest(TEXT("Q_DireWolves"), TEXT("Korku Kurtlari"), TEXT("Ikinci bolgedeki korku kurtlarini devir: 4 Korku Kurdu oldur."),
+		Table.Add(MakeQuest(TEXT("Q_DireWolves"), TEXT("Korku Kurtlari"), TEXT("Karakaya'nin kayaliklarinda yuvalanan iri kurtlari avla: 4 Korku Kurdu oldur."),
 			T::KillSpecificMob, TEXT("DireWolf"), 4, 750, 600, 6));
 		Table.Last().RewardEquipmentId = FName(TEXT("SteelBoots"));
 
 		// Buyuk servet (bagimsiz altin biriktirme).
-		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("1000 altin biriktir."),
+		Table.Add(MakeQuest(TEXT("Q_Gold1000"), TEXT("Buyuk Servet"), TEXT("Hazirliksiz maceracinin hesabi bellidir: 1000 altin biriktir."),
 			T::HaveGold, TEXT(""), 1000, 250, 0, 3)); // XP 500->250
 
 		// --- Lv16-40 kilometre tasi gorevleri (SPAWNER/MOB GEREKTIRMEZ) ---
@@ -372,7 +372,7 @@ namespace
 		Table.Last().RewardConsumableCount = 8;
 
 		// Altin biriktirme zinciri devami: Q_Gold1000 -> Q_Gold5000 -> Q_Gold15000.
-		Table.Add(MakeQuest(TEXT("Q_Gold5000"), TEXT("Vadinin Tuccari"), TEXT("5000 altin biriktir."),
+		Table.Add(MakeQuest(TEXT("Q_Gold5000"), TEXT("Vadinin Tuccari"), TEXT("Adin tuccarlar arasinda gecsin: 5000 altin biriktir."),
 			T::HaveGold, TEXT(""), 5000, 4000, 0, 16, TEXT("Q_Gold1000"))); // XP 6000->4000 (kapi Lv16 carpani x0.3 ile ~1200)
 
 		Table.Add(MakeQuest(TEXT("Q_Gold15000"), TEXT("Efsanevi Servet"), TEXT("15000 altin biriktir."),

@@ -784,7 +784,8 @@ void AMMOGameMode::SpawnMobArea()
 			TEXT("Su tepede kurt uludu butun gece. Uzagindan gec, tek basinaysan hic yaklasma."),
 			TEXT("Ork izleri gorduk doguda. Hafife alma, suruyle gezerler."),
 			TEXT("Haydutlar yollari kesti. Kervanla git, tek atliyi avlarlar."),
-			TEXT("Kapidan gecen cok, geri donen az. Sen donenlerden ol.")
+			TEXT("Kapidan gecen cok, geri donen az. Sen donenlerden ol."),
+			TEXT("Goblin tek basina korkutmaz. Besi birden cikarsa sirtini tasa ver.")
 		};
 		UGameplayStatics::FinishSpawningActor(Kael, TalkerTM);
 	}

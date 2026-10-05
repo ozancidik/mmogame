@@ -191,6 +191,19 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 		return;
 	}
 
+	// Hedefteki gecerli daveti ezme. Daveti kosulsuz degistirmek, kotu niyetli bir
+	// oyuncunun gercek daveti kurban kabul etmeden hemen once kapmasina izin veriyordu.
+	if (TP->PendingInviteFrom.Get() == Inviter && TP->PendingInviteTime >= 0.f
+		&& Now - TP->PendingInviteTime < InviteExpirySeconds)
+	{
+		return; // ayni daveti yenileyip sureyi uzatma
+	}
+	if (TP->PendingInviteFrom.IsValid() && TP->PendingInviteFrom.Get() != Inviter
+		&& TP->PendingInviteTime >= 0.f && Now - TP->PendingInviteTime < InviteExpirySeconds)
+	{
+		return; // baska oyuncunun bekleyen davetini kapma
+	}
+
 	TP->PendingInviteFrom = Inviter;
 	TP->PendingInviteTime = Now;
 	TP->ClientNotifyInvited(Inviter);
