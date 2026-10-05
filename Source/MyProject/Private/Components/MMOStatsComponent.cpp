@@ -14,6 +14,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "UI/MMOHUD.h"
 #include "Save/MMOSaveGame.h"
+#include "Components/MMOSkillComponent.h"
 #include "Characters/MMOMob.h"
 
 UMMOStatsComponent::UMMOStatsComponent()
@@ -840,13 +841,17 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// Harcanmamis puanlar yalniz level-up'tan gelir; bozuk bir kaydin negatif
 	// veya asiri buyuk bakiyesi class-change iadesini tasirmasin.
 	const int32 LevelsGained = Level - 1;
-	UnspentStatPoints = FMath::Clamp(In.UnspentStatPoints, 0, LevelsGained * FMath::Max(0, StatPointsPerLevel));
+	const int32 PointsFromLevels = LevelsGained * FMath::Max(0, StatPointsPerLevel);
 	UnspentSkillPoints = FMath::Clamp(In.UnspentSkillPoints, 0, LevelsGained * FMath::Max(0, SkillPointsPerLevel));
-	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2): ana statlar dogrulamasiz kopyalaniyordu; elle
-	// duzenlenmis bir kayit sinirsiz can/saldiri verebilirdi. Sinif baslangic toplami en cok
-	// 50 (Savasci/Okcu), her seviye StatPointsPerLevel ekler; bu toplami asan fazlayi en
-	// buyuk statlardan keser. Harcanmamis puanlar ayri tutuldugu icin gecerli kayitlar etkilenmez.
-	const int32 MaxStatTotal = 50 + LevelsGained * FMath::Max(0, StatPointsPerLevel);
+	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2 + QA): ana statlar ve harcanmamis puan birlikte
+	// dogrulanir: (harcanmis statlar + harcanmamis puan) <= sinif tabani + (Level-1)*StatPointsPerLevel.
+	// Sinif tabanlari farkli (Savasci/Okcu 50, Rahip 48, Buyucu 46); SkillComponent::ApplySaveData
+	// sinifi zaten yukledi ama kayittaki sinifi ayni kuralla (gecersiz -> Savasci) burada da okuyoruz.
+	const EMMOClass SavedClass = static_cast<uint8>(In.CharacterClass) <= static_cast<uint8>(EMMOClass::Priest)
+		? In.CharacterClass : EMMOClass::Warrior;
+	int32 Base[4] = { 0, 0, 0, 0 };
+	UMMOSkillComponent::GetClassBaseStats(SavedClass, Base[0], Base[1], Base[2], Base[3]);
+	const int32 MaxStatTotal = Base[0] + Base[1] + Base[2] + Base[3] + PointsFromLevels;
 	int32 Loaded[4] = { In.Strength, In.Dexterity, In.Intelligence, In.Vitality };
 	int32 Total = 0;
 	for (int32& V : Loaded)
@@ -854,22 +859,30 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		V = FMath::Clamp(V, 1, MaxStatTotal);
 		Total += V;
 	}
+	// Fazlayi, taban ustu payi en buyuk olan stattan keser (sinif tabaninin altina inmez).
 	while (Total > MaxStatTotal)
 	{
 		int32 Largest = 0;
 		for (int32 i = 1; i < 4; ++i)
 		{
-			if (Loaded[i] > Loaded[Largest])
+			if (Loaded[i] - Base[i] > Loaded[Largest] - Base[Largest])
 			{
 				Largest = i;
 			}
 		}
-		if (Loaded[Largest] <= 1)
+		if (Loaded[Largest] <= FMath::Max(1, Base[Largest]))
 		{
 			break;
 		}
 		--Loaded[Largest];
 		--Total;
+	}
+	// Harcanmamis puan yalniz statlara dagitilmamis kalan pay kadar olabilir (ve level-up toplamini asamaz).
+	UnspentStatPoints = FMath::Clamp(In.UnspentStatPoints, 0, FMath::Clamp(MaxStatTotal - Total, 0, PointsFromLevels));
+	if (UnspentStatPoints != In.UnspentStatPoints)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: harcanmamis stat puani %d -> %d kirpildi (sinif tabani + seviye toplamini asiyordu)"),
+			In.UnspentStatPoints, UnspentStatPoints);
 	}
 	Strength = Loaded[0];
 	Dexterity = Loaded[1];
