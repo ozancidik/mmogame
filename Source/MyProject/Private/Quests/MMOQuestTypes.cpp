@@ -91,9 +91,20 @@ namespace
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
 		Table.Last().RewardConsumableCount = 4;
 
+		// Ana zinciri bloke etmeyen, ayni bolgedeki mevcut spawner'i kullanan yan gorev.
+		Table.Add(MakeQuest(TEXT("Q_EmberPack"), TEXT("Kor Surusu"), TEXT("Gecidin ardindaki surunun artigini temizle: 6 Kor Tazisi daha oldur."),
+			T::KillSpecificMob, TEXT("EmberHound"), 6, 1800, 1400, 17, TEXT("Q_EmberHounds")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		Table.Add(MakeQuest(TEXT("Q_MagmaGolems"), TEXT("Magma Golemleri"), TEXT("Lav golunun bekcilerini kir: 5 Magma Golemi oldur."),
 			T::KillSpecificMob, TEXT("MagmaGolem"), 5, 6500, 4200, 18, TEXT("Q_EmberHounds")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AdamantineBoots"));
+
+		Table.Add(MakeQuest(TEXT("Q_GolemQuarry"), TEXT("Golem Ocagi"), TEXT("Golemlerin lav ocagini sondur: 6 Magma Golemi daha oldur."),
+			T::KillSpecificMob, TEXT("MagmaGolem"), 6, 2100, 1600, 19, TEXT("Q_MagmaGolems")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
 
 		Table.Add(MakeQuest(TEXT("Q_AshOrcs"), TEXT("Kul Orklari"), TEXT("Kul ovasindaki ork akincilarini dagit: 6 Kul Orku oldur."),
 			T::KillSpecificMob, TEXT("AshOrc"), 6, 7800, 5000, 20, TEXT("Q_MagmaGolems")));

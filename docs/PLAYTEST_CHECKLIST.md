@@ -3492,3 +3492,13 @@ Dört sınıfa Lv31 alan/rol becerisi ve Lv39 tek hedef veya acil şifa becerisi
 - [ ] `Kafa Yarıcı`, `Mızraklı Ok` ve `Yıldız Düşü` yalnız seçili tek hedefi vurmalı; menzil dışı ve mana yetersizliği sunucuda reddedilmeli.
 - [ ] `Kurtuluş Işığı` seçili parti üyesini 1100 iyileştirmeli; geçerli hedef yoksa mevcut HealTarget kuralıyla kendini iyileştirmeli; 260 mana ve 30 sn cooldown uygulanmalı.
 - [ ] Lv28/Lv33/Lv45 komşu becerilerle hasar, mana ve cooldown hissini karşılaştır; yeni beceriler eski becerileri bütün eksenlerde geçmemeli. Ölçüm sonrası PLACEHOLDER değerleri güncelle.
+
+## Lv17 ve Lv19 Alev Vadisi yan görevleri — 2026-10-05
+
+Ana görev zincirini bloke etmeyen iki yan görev eklendi. `Kor Sürüsü`, mevcut Kor Tazısı spawner'ını; `Golem Ocağı`, mevcut Magma Golemi spawner'ını kullanır. ValidateData 75 görevi temiz doğruladı, 14 negatif senaryo geçti ve zorlanmış C++ derlemesi başarılı oldu. Görev akışı ve ödül teslimi PIE bekliyor.
+
+- [ ] `Q_EmberHounds` tamamlandıktan ve karakter Lv17 olduktan sonra `Kor Sürüsü` görünmeli; önce görünmemeli.
+- [ ] `Kor Sürüsü` kabul edildikten sonra 6 `EmberHound` öldür; yalnız doğru arketip sayılmalı ve ödül olarak 1800 XP, 1400 altın, 5 Büyük Can İksiri verilmelidir.
+- [ ] `Q_MagmaGolems` tamamlandıktan ve karakter Lv19 olduktan sonra `Golem Ocağı` görünmeli; 6 `MagmaGolem` öldürülünce 2100 XP, 1600 altın, 5 Büyük Mana İksiri verilmelidir.
+- [ ] İki yan görevi kabul etmeden ana zincirde `Q_AshOrcs` görevine ilerle; yan görevler ana zinciri engellememelidir.
+- [ ] Her iki görevin kısmi ilerlemesinde kaydet/yükle yap; sayaç korunmalı, ödül yalnız bir kez alınabilmelidir.
