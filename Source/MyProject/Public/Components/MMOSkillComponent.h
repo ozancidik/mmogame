@@ -108,6 +108,9 @@ public:
 	void FillSaveData(struct FMMOCharacterSaveData& Out) const;
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);
 
+	// Sinifin baslangic ana stat dagilimi (SetupForClass, ChangeClass ve kayit dogrulamasi ortak).
+	static void GetClassBaseStats(EMMOClass InClass, int32& OutStr, int32& OutDex, int32& OutInt, int32& OutVit);
+
 protected:
 	// Skill id -> cooldown bitis zamani (dunya saati; her makine kendi kopyasini tutar).
 	TMap<FName, float> CooldownEndTimes;
@@ -126,8 +129,6 @@ protected:
 	 */
 	void ChangeClass(EMMOClass NewClass);
 
-	// Sinifin baslangic ana stat dagilimi (SetupForClass ve ChangeClass ortak).
-	static void GetClassBaseStats(EMMOClass InClass, int32& OutStr, int32& OutDex, int32& OutInt, int32& OutVit);
 
 	// Sinifin en dusuk seviyeli Basic skilini ogretir ve slot 0'a koyar.
 	void GrantStarterSkill();
