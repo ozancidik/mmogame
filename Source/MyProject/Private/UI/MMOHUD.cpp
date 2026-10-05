@@ -2430,16 +2430,53 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 	const float RowH = FMath::Min(46.f, RowSpace / (float)FMath::Max(1, TotalRows));
 	const float CellH = FMath::Max(1.f, RowH - 4.f);
 	// Iki metin satirini gercek font yuksekliklerine gore hucreye sigdir.
-	const auto DrawQuestRowText = [this, RowX, RowH, CellH](const FString& Title, const FString& Detail, float Y)
+	// DetailHead (aciklama) pencere genisligine sigmazsa "..." ile kisaltilir; DetailTail (odul
+	// satiri) her zaman korunur. Yukseklik/tiklanabilir bolge hesabi degismez (tek metin satiri).
+	const auto DrawQuestRowText = [this, RowX, RowW, RowH, CellH](const FString& Title, const FString& DetailHead, const FString& DetailTail, float Y)
 	{
 		float TextW = 0.f, TitleH = 0.f, DetailH = 0.f;
 		GetTextSize(Title, TextW, TitleH, nullptr, 0.78f);
-		GetTextSize(Detail, TextW, DetailH, nullptr, 0.64f);
+		GetTextSize(DetailHead + DetailTail, TextW, DetailH, nullptr, 0.64f);
 		const float Scale = FMath::Min(1.f, FMath::Max(1.f, CellH - 5.f) / FMath::Max(1.f, TitleH + DetailH));
 		const float DetailY = FMath::Max(4.f + TitleH * Scale,
 			FMath::Min(FMath::Min(24.f, RowH * 0.5f), CellH - 1.f - DetailH * Scale));
+
+		// Satir ici sol bosluk 6 px; sag tarafta da 6 px pay birak.
+		const float MaxW = RowW - 12.f;
+		const float DetailScale = 0.64f * Scale;
+		const auto Fits = [this, MaxW, DetailScale](const FString& S)
+		{
+			float W = 0.f, H = 0.f;
+			GetTextSize(S, W, H, nullptr, DetailScale);
+			return W <= MaxW;
+		};
+		FString Detail = DetailHead + DetailTail;
+		if (!Fits(Detail))
+		{
+			// En uzun sigan aciklama onekini ikili aramayla bul (karede ~7 olcum).
+			int32 Lo = 0, Hi = DetailHead.Len();
+			while (Lo < Hi)
+			{
+				const int32 Mid = (Lo + Hi + 1) / 2;
+				if (Fits(DetailHead.Left(Mid) + TEXT("...") + DetailTail)) { Lo = Mid; } else { Hi = Mid - 1; }
+			}
+			Detail = DetailHead.Left(Lo) + TEXT("...") + DetailTail;
+			if (!Fits(Detail))
+			{
+				// Odul satirinin kendisi bile sigmiyor (cok uzun esya adi): butunu kes.
+				const FString Full = DetailHead + DetailTail;
+				Lo = 0; Hi = Full.Len();
+				while (Lo < Hi)
+				{
+					const int32 Mid = (Lo + Hi + 1) / 2;
+					if (Fits(Full.Left(Mid) + TEXT("..."))) { Lo = Mid; } else { Hi = Mid - 1; }
+				}
+				Detail = Full.Left(Lo) + TEXT("...");
+			}
+		}
+
 		DrawText(Title, FLinearColor::White, RowX + 6.f, Y + 3.f, nullptr, 0.78f * Scale);
-		DrawText(Detail, FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, Y + DetailY, nullptr, 0.64f * Scale);
+		DrawText(Detail, FLinearColor(0.7f, 0.75f, 0.85f), RowX + 6.f, Y + DetailY, nullptr, DetailScale);
 	};
 
 	DrawText(TEXT("Alinabilir gorevler (tikla = al)"), FLinearColor(0.6f, 0.9f, 0.6f), RowX, RowY, nullptr, 0.9f);
@@ -2459,7 +2496,8 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 		QuestAcceptRegions.Add(R);
 
 		DrawQuestRowText(FString::Printf(TEXT("%s   [Lv%d gerekli]"), *Def.Name, Def.RequiredLevel),
-			FString::Printf(TEXT("%s   Odul: %d XP, %d altin%s"), *Def.Description, Def.RewardXP, Def.RewardGold, *BuildQuestRewardItemSuffix(Def)), RowY);
+			Def.Description,
+			FString::Printf(TEXT("   Odul: %d XP, %d altin%s"), Def.RewardXP, Def.RewardGold, *BuildQuestRewardItemSuffix(Def)), RowY);
 		RowY += RowH;
 	}
 
@@ -2485,6 +2523,7 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 		}
 		DrawQuestRowText(FString::Printf(TEXT("%s   %d/%d %s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
 			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")),
+			FString(),
 			FString::Printf(TEXT("Odul: %d XP, %d altin%s"), Def->RewardXP, Def->RewardGold, *BuildQuestRewardItemSuffix(*Def)), RowY);
 		RowY += RowH;
 	}
