@@ -81,6 +81,27 @@ namespace
 			T::KillSpecificMob, TEXT("FrostLich"), 1, 4500, 3000, 13, TEXT("Q_OrcBerserkers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("MithrilBlade"));
 
+		// Lv11-15 bosluk dolgusu: ana zinciri kilitlemeyen gecis gorevleri.
+		Table.Add(MakeQuest(TEXT("Q_AyazdisPatrol"), TEXT("Ayazdis Devriyesi"), TEXT("Buzulun kenarinda devriye at, muhafizlar nefes alsin: 14 canavar oldur."),
+			T::KillAnyMob, TEXT(""), 14, 3000, 800, 11, TEXT("Q_VenomSpiders")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 3;
+
+		Table.Add(MakeQuest(TEXT("Q_ThawStalkers"), TEXT("Cozulme Avcilari"), TEXT("Buz Lordu'nun dususuyle cozulen yamaclarda avlanan sinsi yaratiklari durdur: 8 Cozulme Avcisi oldur."),
+			T::KillSpecificMob, TEXT("ThawStalker"), 8, 4700, 1000, 13, TEXT("Q_FrostLich")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 3;
+
+		Table.Add(MakeQuest(TEXT("Q_CrustWardens"), TEXT("Kabuk Bekcileri"), TEXT("Yari buz yari curuf kabuklu bekcileri kir: 8 Kabuk Bekcisi oldur."),
+			T::KillSpecificMob, TEXT("CrustWarden"), 8, 4950, 1100, 14, TEXT("Q_FrostLich")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 4;
+
+		Table.Add(MakeQuest(TEXT("Q_ScorchedRaiders"), TEXT("Kavrulmus Akincilar"), TEXT("Alev Vadisi'ne yuruyen kavrulmus ork akincilarini dagit: 10 Kavrulmus Akinci oldur."),
+			T::KillSpecificMob, TEXT("ScorchedRaider"), 10, 5200, 1200, 15, TEXT("Q_FrostLich")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 4;
+
 		// --- Dorduncu bolge zinciri (Lv16-24, Alev Vadisi): Q_FrostLich'ten SONRA baslar ---
 		// Q_FrostLich (4500XP/3000g) zincirin ucuncu kademesini bitiriyordu; bu zincir Lv16-22
 		// mob'lari + Lv24 eliti ile bir sonraki kademeyi acar. Oduller Q_FrostLich'in uzerine

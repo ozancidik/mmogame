@@ -3502,3 +3502,17 @@ Ana görev zincirini bloke etmeyen iki yan görev eklendi. `Kor Sürüsü`, mevc
 - [ ] `Q_MagmaGolems` tamamlandıktan ve karakter Lv19 olduktan sonra `Golem Ocağı` görünmeli; 6 `MagmaGolem` öldürülünce 2100 XP, 1600 altın, 5 Büyük Mana İksiri verilmelidir.
 - [ ] İki yan görevi kabul etmeden ana zincirde `Q_AshOrcs` görevine ilerle; yan görevler ana zinciri engellememelidir.
 - [ ] Her iki görevin kısmi ilerlemesinde kaydet/yükle yap; sayaç korunmalı, ödül yalnız bir kez alınabilmelidir.
+
+## Lv13-15 Çözülme Yolu içerik dilimi — 2026-10-06
+
+Çözülme Avcısı (Lv13), Kabuk Bekçisi (Lv14) ve Kavrulmuş Akıncı (Lv15) ile bunları üreten Summer_scene cebi eklendi. Cep `(-5000,-3000,50)` konumunda 225 u yarıçapla on ardışık headless probda 64/64 güvenli zemin ve nav sonucu verdi. Ayazdiş Devriyesi ile üç Çözülme yan görevi ana zinciri kilitlemeden eklendi. ValidateData 51 mob/79 görev/29 spawner ile temiz; 14 negatif senaryo, statik kontroller, Summer/Winter duman testleri, çok oyunculu bağlantı testi ve zorlanmış UE 5.7 derlemesi geçti. Görsel/oynanış PIE bekliyor.
+
+- [ ] Summer_scene'de `(-5000,-3000)` çevresine git: beş normal mob yalnız `ThawStalker`, `CrustWarden`, `ScorchedRaider` bandından doğmalı; boşlukta, dik yüzeyde veya navmesh dışında doğum olmamalı.
+- [ ] Çözülme Avcısı vurunca yaklaşık %35 Zehir; Kabuk Bekçisi %45 can altında Öfke; Kavrulmuş Akıncı vurunca yaklaşık %30 Yavaşlatma ve %40 can altında Öfke uygulamalı.
+- [ ] Kavrulmuş Akıncı Warrok mesh/animasyonuyla zemine doğru oturmalı; diğer iki mobun renk, ölçek ve saldırı animasyonları okunaklı olmalı.
+- [ ] `Q_VenomSpiders` tamamlanınca Lv11'de `Ayazdiş Devriyesi` görünmeli; herhangi 14 mob sayılmalı ve ödül 3000 XP, 800 altın, 3 Büyük Can İksiri olmalı.
+- [ ] `Q_FrostLich` tamamlandıktan sonra Lv13/14/15 kapılarında üç Çözülme görevi görünmeli; görevler paralel kabul edilebilmeli ve yalnız kendi arketiplerini saymalıdır.
+- [ ] Hedef/ödüller: 8 Çözülme Avcısı → 4700 XP/1000 altın/3 Büyük Mana; 8 Kabuk Bekçisi → 4950/1100/4 Büyük Can; 10 Kavrulmuş Akıncı → 5200/1200/4 Büyük Mana.
+- [ ] Çözülme görevlerini almadan `Q_EmberHounds` ana zincirine ilerle; yan görevler ilerlemeyi engellememelidir.
+- [ ] PlayerStart ve hub NPC'lerinde 3 dakika bekle: Çözülme mobları hub'a gelmemeli. Çözülme cebinden en yakın eski cebe mob sürükleyip iki grubun istemsiz birlikte aggro olup olmadığını kontrol et.
+- [ ] Kısmi görev ilerlemesinde kaydet/yükle yap; sayaçlar korunmalı, her ödül yalnız bir kez alınabilmelidir.

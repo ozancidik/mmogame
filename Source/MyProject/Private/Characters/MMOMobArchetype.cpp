@@ -120,6 +120,24 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.5f;
 
+		// --- Gecis kademesi NORMAL moblari (Lv13-15; Cozulme Yolu) ---
+		// Lv12 OrcBerserker ile Lv16 EmberHound arasindaki boslugu dolduran ara kademe.
+		// AggroRange 600, bolge moblari icin hub guvenlik sinirini korur.
+		Table.Add(MakeMob(TEXT("ThawStalker"), TEXT("Cozulme Avcisi"), 13, 33, 29, 47.f, 780, 130, 310, 430.f, 600.f, 1.15f, FLinearColor(0.38f, 0.62f, 0.62f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("CrustWarden"), TEXT("Kabuk Bekcisi"), 14, 35, 42, 50.f, 925, 150, 360, 245.f, 600.f, 1.4f, FLinearColor(0.55f, 0.38f, 0.28f)));
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.45f;
+
+		Table.Add(MakeMob(TEXT("ScorchedRaider"), TEXT("Kavrulmus Akinci"), 15, 39, 37, 55.f, 1100, 175, 415, 345.f, 600.f, 1.3f, FLinearColor(0.7f, 0.3f, 0.12f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.3f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- Dorduncu bolge NORMAL moblari (Lv16-22; MinMobLevel=16/MaxMobLevel=22 bandli spawner ile cikar) ---
 		// Tema: Alev Vadisi (volkanik) — ucuncu bolgenin buzul temasinin karsiti.
 		// Olcekleme Lv8-12 egrisini AYNEN surdurur: seviye basina kabaca +2.5 Str, +2.5 Vit,

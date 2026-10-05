@@ -694,6 +694,22 @@ void AMMOGameMode::SpawnMobArea()
 			UGameplayStatics::FinishSpawningActor(ObsidianSpawner, ObsidianTM);
 		}
 
+		// Cozulme Yolu (Lv13-15): 2026-10-06 Summer_scene headless grid probunda
+		// (-5000,-3000) merkezinin 225u halkasi 10x64/64 zemin+nav sonucu verdi.
+		// Zemin Z~0, spawner tabani Z=50. Merkez; en yakin eski normal cep olan
+		// Obsidyen bolgesinden ~2506u ve PlayerStart'tan ~5121u uzakta.
+		const FVector ThawLoc(-5000.f, -3000.f, 50.f);
+		const FTransform ThawTM(FRotator::ZeroRotator, ThawLoc);
+		if (AMMOMobSpawner* ThawSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThawTM))
+		{
+			ThawSpawner->MaxMobs = 5;
+			ThawSpawner->SpawnRadius = 225.f;
+			ThawSpawner->MinMobLevel = 13;
+			ThawSpawner->MaxMobLevel = 15;
+			ThawSpawner->bValidateSpawnOnNavGround = true;
+			UGameplayStatics::FinishSpawningActor(ThawSpawner, ThawTM);
+		}
+
 		const FVector ObsidianBossLoc(-4000.f, 0.f, 50.f);
 		const FTransform ObsidianBossTM(FRotator::ZeroRotator, ObsidianBossLoc);
 		if (AMMOMobSpawner* ObsidianBossSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ObsidianBossTM))

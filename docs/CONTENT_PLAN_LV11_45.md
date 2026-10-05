@@ -76,9 +76,9 @@ Notlar:
 		Table.Last().EnrageHealthPct = 0.4f;
 ```
 
-### A.2 Spawner (yalnız rol; koordinat sonra runtime probla ölçülecek)
+### A.2 Spawner (yalnız Summer; koordinat runtime probla ölçüldü)
 
-**Rol:** "Çözülme Yolu" geçiş cebi. Oyuncunun Ayazdiş'ten (Üçüncü bölge, Lv8–12) Alev Vadisi'ne (Dördüncü bölge, Lv16–22) yürürken uğradığı, ikisinin arasında kalan tampon alan. Yalnız bu üç mobu üretir (1/3'er olasılık).
+**Rol:** "Çözülme Yolu" geçiş cebi. Güvenli ve düz zemin ölçümü nedeniyle erken bölge kümelerinin dışına yerleştirilmiştir; Ayazdiş sonrasında görev yönlendirmesiyle ulaşılır. Yalnız bu üç mobu üretir (1/3'er olasılık).
 
 | Alan | Değer | Gerekçe |
 |---|---|---|
@@ -91,12 +91,13 @@ Notlar:
 
 **Probe ölçütleri (koordinat uydurmayın; mevcut Obsidyen/Rift probunun aynısı):** halka (225/250 u) 16/16 ya da 64/64 nokta zeminde (±60 u) ve bağlı navmesh'te, eğim sınırı içinde, PlayerStart'a **tam yol**; en yakın eski cep ve doğuş noktası/NPC'lerden **≥ ~1300 u** (mob doğma yarıçapı 225 + gezinme 450 + aggro 600 = ~1275 u'dan oyuncu fark edilir; `MMOGameMode.cpp` Rift yorumu); Üçüncü ve Dördüncü bölgeye komşu, ikisine de aggro menzilinde değil. `ExtendSummerNavigation.py` ile navmesh ±8500'e genişletildi, zemin var `[KOD]`.
 
-**C++ iskeleti** (koordinat `TODO`; ölçmeden commit etme, aksi hâlde mob (0,0,0)'da doğar):
+**Ölçülen sonuç (2026-10-06):** Summer_scene `(-5000,-3000,50)`, yarıçap 225; on ardışık probun tamamı `64/64`, iz/egim/nav reddi `0`. Merkez PlayerStart'tan yaklaşık 5121 u, Obsidyen normal cebinden 2506 u uzakta. Daha yakın `(-1700,-2700)` adayı tek probda 64/64 verse de tekrarlı örneklerde 57–63/64'e düştüğü için kullanılmadı.
+
+**C++ uygulaması** (ölçülen koordinat):
 
 ```cpp
-		// Cozulme Yolu (Lv13-15): ThawStalker/CrustWarden/ScorchedRaider bandi. KOORDINAT OLCULMEDEN COMMIT ETME
-		// (Obsidyen/Rift kalibi: headless Summer_scene grid probu, halka 16/16 + hub'a tam yol, bkz. docs/CONTENT_PLAN_LV11_45.md A.2).
-		const FVector ThawLoc(0.f, 0.f, 0.f); // TODO: probla olculen X, Y, Z (zemin + 50u)
+		// Cozulme Yolu (Lv13-15): 10x64/64 headless Summer_scene probu, zemin Z~0.
+		const FVector ThawLoc(-5000.f, -3000.f, 50.f);
 		const FTransform ThawTM(FRotator::ZeroRotator, ThawLoc);
 		if (AMMOMobSpawner* ThawSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThawTM))
 		{
@@ -365,7 +366,7 @@ PIE doğrulaması (hepsi `[VARSAYIM]`, oynanmadı): yeni karakter, konsol komutu
 
 | Konu | Not | Etiket |
 |---|---|---|
-| Çözülme spawner koordinatı | Probsuz commit yok; yedek `ThirdZone` genişletmesi öğrenme/Test kırar (A.2) | bloklayıcı |
+| Çözülme spawner koordinatı | `(-5000,-3000,50)`, 10×64/64 headless prob; yedek `ThirdZone` genişletmesi kullanılmadı | çözüldü |
 | Lv16–20 hız kayması | Çekirdek görevler bandı 9,6 → 5,9 yapıyor (A.4) | model; ölçüm şart |
 | Altın | Yeni görev altını +%37 (Lv10–15 kademesi); sink kararı açık | `DECISIONS_NEEDED.md` 3 |
 | Lv13 Adamantin düşme | Lv13 mob Lv16 ekipmanı düşürebilir | bilgi |
