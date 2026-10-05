@@ -56,9 +56,21 @@ public:
 	/** AddGold + olcum gunlugu kaynak etiketi (loot/gorev/satis/satin_alma/yukseltme/iyilestirme/ticaret). Sadece otorite. */
 	void AddGoldFrom(int32 Amount, const TCHAR* Source);
 
-	/** Item ekler (varsa yigina ekler, yoksa yeni yigin). Sadece otorite. */
+	// Sarf malzemesi tavanlari: kayit (ApplySaveData) ayni sinirlari uygular, boylece calisma
+	// zamaninda tutulan her adet kaydet-yukle sonrasi da kalir (eskiden AddItem sinirsizdi, yukleme kirpardi).
+	static constexpr int32 MaxStackSize = 999;
+	static constexpr int32 MaxItemStacks = 64;
+
+	/** Bu esyadan simdi en fazla kac adet eklenebilir (yigin tavani 999, farkli yigin tavani 64). */
+	int32 GetAddRoom(FName ItemId) const;
+
+	/**
+	 * Item ekler (varsa yigina ekler, yoksa yeni yigin). Sadece otorite.
+	 * Tavan asilirsa fazlasi EKLENMEZ ve sessizce yok edilmez: gercekten eklenen adet dondurulur,
+	 * cagiran kalani yerde birakir / reddeder / bildirir.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Inventory")
-	void AddItem(FName ItemId, int32 Count = 1);
+	int32 AddItem(FName ItemId, int32 Count = 1);
 
 	/** Item harcar (yeterli adet varsa dusurur, yigin biterse siler). Sadece otorite. Basarirsa true. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Inventory")

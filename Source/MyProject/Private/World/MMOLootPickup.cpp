@@ -238,6 +238,31 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 		}
 		return;
 	}
+	// Sarf malzemesi: yigin tavani (999) dolarsa fazlasi yok edilmez. Sigdigi kadar alinir,
+	// kalan miktar yerde durur (tek-sefer isareti yalniz TAMAMI alininca konur). Ayni fonksiyon
+	// icinde senkron oldugu icin dupe riski yok (bCollected yukarida denetlendi).
+	if (!bIsGold && !bIsEquipment)
+	{
+		const int32 Added = Inv->AddItem(ItemId, ItemCount);
+		if (Added > 0 && GEngine && Char->IsLocallyControlled())
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(60, 140, 255),
+				FString::Printf(TEXT("+%d %s"), Added, *ItemId.ToString()));
+		}
+		if (Added < ItemCount)
+		{
+			ItemCount -= Added;
+			const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+			double& LastTime = LastBagFullNotifyTime.FindOrAdd(TWeakObjectPtr<AMMOCharacter>(Char), -BagFullNotifyInterval);
+			if (Now - LastTime >= BagFullNotifyInterval)
+			{
+				LastTime = Now;
+				MMONotify::ToOwner(Char, FString::Printf(TEXT("%s yigini dolu (en fazla %d)"),
+					*ItemId.ToString(), UMMOInventoryComponent::MaxStackSize), FColor::Silver, 2.f);
+			}
+			return;
+		}
+	}
 	bCollected = true;
 	if (Collision)
 	{
@@ -263,15 +288,7 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 				*FMMOItemDatabase::GetRarityName(EquipRarity), *EquipItemId.ToString(), EquipPlus),
 			RC.ToFColor(true), 3.f);
 	}
-	else
-	{
-		Inv->AddItem(ItemId, ItemCount);
-		if (GEngine && Char->IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(60, 140, 255),
-				FString::Printf(TEXT("+%d %s"), ItemCount, *ItemId.ToString()));
-		}
-	}
+	// (Sarf malzemesi yukarida, tavan denetimiyle verildi.)
 
 	Destroy();
 }

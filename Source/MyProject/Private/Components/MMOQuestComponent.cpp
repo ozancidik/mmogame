@@ -322,6 +322,17 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 			return;
 		}
 	}
+	// Sarf odulu icin de yer ayir: yigin tavani (999) asilacaksa fazlasi sessizce yok olmasin;
+	// odul alinmaz, oyuncu yer acip tekrar dener (ekipman cantasi kuraliyla ayni).
+	if (!Def->RewardConsumableId.IsNone() && Def->RewardConsumableCount > 0)
+	{
+		const UMMOInventoryComponent* Inv = Owner ? Owner->GetInventory() : nullptr;
+		if (Inv && Inv->GetAddRoom(Def->RewardConsumableId) < Def->RewardConsumableCount)
+		{
+			ClientClaimRewardFailed(TEXT("Sarf esyasi cantasi dolu (yigin tavani). Biraz harcayip gorev odulunu tekrar al."));
+			return;
+		}
+	}
 	if (Owner)
 	{
 		if (Owner->GetStats() && Def->RewardXP > 0)

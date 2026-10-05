@@ -86,29 +86,52 @@ void UMMOInventoryComponent::AddGoldFrom(int32 Amount, const TCHAR* Source)
 	GoldSourceTag = nullptr;
 }
 
-void UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
+int32 UMMOInventoryComponent::GetAddRoom(FName ItemId) const
+{
+	if (ItemId.IsNone())
+	{
+		return 0;
+	}
+	for (const FMMOItemStack& Stack : Items)
+	{
+		if (Stack.ItemId == ItemId)
+		{
+			return FMath::Max(0, MaxStackSize - FMath::Max(0, Stack.Count));
+		}
+	}
+	return Items.Num() >= MaxItemStacks ? 0 : MaxStackSize;
+}
+
+int32 UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
 {
 	if (!HasAuthorityInternal() || ItemId.IsNone() || Count <= 0)
 	{
-		return;
+		return 0;
+	}
+
+	// Tavan: fazlasi eklenmez (yukleme kirpmasi kalici kayip olurdu); eklenen adet dondurulur.
+	const int32 ToAdd = FMath::Min(Count, GetAddRoom(ItemId));
+	if (ToAdd <= 0)
+	{
+		return 0;
 	}
 
 	for (FMMOItemStack& Stack : Items)
 	{
 		if (Stack.ItemId == ItemId)
 		{
-			Stack.Count = static_cast<int32>(FMath::Min<int64>(
-				static_cast<int64>(FMath::Max(0, Stack.Count)) + Count, MAX_int32));
+			Stack.Count = FMath::Max(0, Stack.Count) + ToAdd; // GetAddRoom tavani asmamayi garanti eder
 			OnInventoryChanged.Broadcast();
-			return;
+			return ToAdd;
 		}
 	}
 
 	FMMOItemStack NewStack;
 	NewStack.ItemId = ItemId;
-	NewStack.Count = Count;
+	NewStack.Count = ToAdd;
 	Items.Add(NewStack);
 	OnInventoryChanged.Broadcast();
+	return ToAdd;
 }
 
 bool UMMOInventoryComponent::RemoveItem(FName ItemId, int32 Count)
@@ -557,16 +580,32 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 		return;
 	}
 
-	const int32 Price = FMMOItemDatabase::PotionPrice * Count;
-	if (Gold < Price)
+	// Yigin tavani (999): toplam tavani asan kisim satin alinmaz; altin yalniz gercekten verilen kadar duser.
+	const FName PotionId(TEXT("HealthPotion"));
+	const int32 Room = GetAddRoom(PotionId);
+	if (Room <= 0)
+	{
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("En fazla %d tasiyabilirsin"), MaxStackSize), FColor::Silver, 2.f);
+		return;
+	}
+	const int32 Wanted = Count;
+	Count = FMath::Min(Count, Room);
+
+	if (Gold < FMMOItemDatabase::PotionPrice * Count)
 	{
 		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
 		return;
 	}
 
+	const int32 Added = AddItem(PotionId, Count);
+	if (Added <= 0)
+	{
+		return;
+	}
+	const int32 Price = FMMOItemDatabase::PotionPrice * Added;
 	AddGoldFrom(-Price, TEXT("satin_alma"));
-	AddItem(FName(TEXT("HealthPotion")), Count);
-	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d iksir (-%d altin)"), Count, Price), FColor(120, 220, 120), 2.f);
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d iksir (-%d altin)%s"), Added, Price,
+		Added < Wanted ? TEXT(" - tavana ulasildi") : TEXT("")), FColor(120, 220, 120), 2.f);
 }
 
 void UMMOInventoryComponent::ServerBuyPotion_Implementation(int32 Count)
@@ -598,16 +637,31 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 		return;
 	}
 
-	const int32 Price = Def->Price * Count;
-	if (Gold < Price)
+	// Yigin tavani (999 / 64 farkli yigin): fazlasi satin alinmaz; altin yalniz verilen kadar duser.
+	const int32 Room = GetAddRoom(ItemId);
+	if (Room <= 0)
+	{
+		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("En fazla %d tasiyabilirsin"), MaxStackSize), FColor::Silver, 2.f);
+		return;
+	}
+	const int32 Wanted = Count;
+	Count = FMath::Min(Count, Room);
+
+	if (Gold < Def->Price * Count)
 	{
 		MMONotify::ToOwner(GetOwner(), TEXT("Altin yetersiz"), FColor::Silver, 2.f);
 		return;
 	}
 
+	const int32 Added = AddItem(ItemId, Count);
+	if (Added <= 0)
+	{
+		return;
+	}
+	const int32 Price = Def->Price * Added;
 	AddGoldFrom(-Price, TEXT("satin_alma"));
-	AddItem(ItemId, Count);
-	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d %s (-%d altin)"), Count, *Def->Name, Price), FColor(120, 220, 120), 2.f);
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d %s (-%d altin)%s"), Added, *Def->Name, Price,
+		Added < Wanted ? TEXT(" - tavana ulasildi") : TEXT("")), FColor(120, 220, 120), 2.f);
 }
 
 void UMMOInventoryComponent::ServerBuyConsumable_Implementation(FName ItemId, int32 Count)
@@ -838,8 +892,8 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// gecersiz nadirlik olmasin. Bilinmeyen esya kimlikleri bilerek SILINMEZ (surumler arasi
 	// kaldirilan esya oyuncunun kaybi olurdu); yalniz degerler makul araliga cekilir.
 	constexpr int32 SaveGoldCap = 999999999;
-	constexpr int32 SaveStackCap = 999;
-	constexpr int32 SaveMaxStacks = 64;
+	constexpr int32 SaveStackCap = MaxStackSize;   // AddItem ile ayni tavan (calisma zamani == kayit)
+	constexpr int32 SaveMaxStacks = MaxItemStacks;
 	Gold = FMath::Clamp(In.Gold, 0, SaveGoldCap);
 	// Yiginlar: AddItem ItemId basina tek yigin tutar; bozuk kayittaki ayni kimlikli yiginlar
 	// birlestirilir (64 sinirini bosuna doldurmasin), sonra adet kirpilir.

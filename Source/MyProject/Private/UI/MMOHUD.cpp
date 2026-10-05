@@ -1674,11 +1674,15 @@ void AMMOHUD::DrawWarehouse(AMMOCharacter* PlayerChar)
 		FLinearColor(0.7f, 0.7f, 0.75f), PX + 14.f, PY + 38.f, nullptr, 0.8f);
 
 	// 24 depo satiri pencereye sigsin diye satirlar dukkandan daha ince.
-	const float RowH = 18.f;
+	const float StartY = PY + 90.f;
+	// Depo yuklemede 24'u asabilir (esya silinmez kurali): fazla satirlar panelin disina tasip
+	// tiklanamaz olmasin diye satir yuksekligi en kalabalik listeye gore kuculur.
+	const int32 MaxListRows = FMath::Max(UMMOInventoryComponent::MaxWarehouseSize,
+		FMath::Max(Inv->Warehouse.Num(), Inv->EquipmentBag.Num()));
+	const float RowH = FMath::Min(18.f, (PH - 90.f - 12.f) / (float)MaxListRows);
 	const float ColW = (PW - 42.f) * 0.5f;
 	const float LeftX = PX + 14.f;
 	const float RightX = PX + 28.f + ColW;
-	const float StartY = PY + 90.f;
 
 	auto DrawEntry = [&](const FMMOEquipmentInstance& Inst, float X, float Y, TArray<FMMOClickRegion>& Out)
 	{
@@ -1694,7 +1698,7 @@ void AMMOHUD::DrawWarehouse(AMMOCharacter* PlayerChar)
 		Out.Add(R);
 		DrawText(FString::Printf(TEXT("[%s] %s +%d (Lv%d)"), *FMMOItemDatabase::GetRarityName(Inst.Rarity),
 			*Def->Name, Inst.Plus, Def->RequiredLevel),
-			FMMOItemDatabase::GetRarityColor(Inst.Rarity), X + 6.f, Y + 2.f, nullptr, 0.65f);
+			FMMOItemDatabase::GetRarityColor(Inst.Rarity), X + 6.f, Y + (RowH >= 16.f ? 2.f : 0.f), nullptr, 0.65f);
 	};
 
 	DrawText(FString::Printf(TEXT("CANTA %d/%d (tikla: depoya koy)"), Inv->EquipmentBag.Num(), UMMOInventoryComponent::MaxBagSize),
