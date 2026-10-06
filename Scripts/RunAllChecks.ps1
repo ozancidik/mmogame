@@ -1,10 +1,11 @@
 # Tum otomatik kontrolleri sirayla calistirir ve ozet verir. Editor KAPALI olmali. Kullanim:
-#   powershell -File Scripts/RunAllChecks.ps1 [-SkipBuild] [-SkipNet]
-# Sirasi: veri denetimi -> derleme -> Summer duman -> Winter duman -> cok oyunculu baglanti.
+#   powershell -File Scripts/RunAllChecks.ps1 [-SkipBuild] [-SkipNet] [-FullCompile]
+# Sirasi: veri denetimi -> derleme -> (istege bagli -FullCompile: PCH siz tek-dosya /W4) -> Summer duman -> Winter duman -> cok oyunculu baglanti.
 # Cikis 0 = hepsi gecti.
 param(
     [switch]$SkipBuild,
-    [switch]$SkipNet
+    [switch]$SkipNet,
+    [switch]$FullCompile
 )
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -45,6 +46,36 @@ if (-not $SkipBuild) {
     Step "Derleme (MyProjectEditor)" {
         $out = & $ue MyProjectEditor Win64 Development "-Project=$root\MyProject.uproject" -WaitMutex 2>&1
         ($out | Select-String "Result: Succeeded") -ne $null
+    }
+}
+
+# PCH'siz tek-dosya /W4 derleme (adaptive unity / eksik include yakalar). Normal derleme PCH+unity
+# kullandigi icin eksik #include'lari gizler (ORTA-2: MMOCharacterSaveJson.cpp). Sabit liste: en cok
+# degisen dosyalar + Save/*.cpp. Varsayilan KAPALI (dosya basina ~5-60 sn); CI/manuel: -FullCompile.
+if ($FullCompile) {
+    Step "PCH'siz tek-dosya /W4 derleme (-FullCompile)" {
+        $src = Join-Path $root "Source\MyProject\Private"
+        $files = @(
+            "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
+            "Components\MMOStatsComponent.cpp", "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
+            "Characters\MMOMob.cpp"
+        ) | ForEach-Object { Join-Path $src $_ }
+        $files += (Get-ChildItem (Join-Path $src "Save") -Filter *.cpp | ForEach-Object { $_.FullName })
+        $allOk = $true
+        $totalWarn = 0
+        foreach ($f in $files) {
+            $out = & $ue MyProjectEditor Win64 Development "-Project=$root\MyProject.uproject" -WaitMutex -NoPCH -NoLink "-SingleFile=$f" 2>&1
+            $ok = ($out | Select-String "Result: Succeeded") -ne $null
+            $warn = @($out | Select-String "warning C\d+").Count
+            $totalWarn += $warn
+            Write-Host ("   {0,-34} {1}  (warning C: {2})" -f (Split-Path -Leaf $f), $(if ($ok) { "OK" } else { "HATA" }), $warn)
+            if (-not $ok) {
+                $allOk = $false
+                $out | Select-String "error C" | Select-Object -First 5 | ForEach-Object { Write-Host ("      " + $_.Line) }
+            }
+        }
+        Write-Host "   toplam 'warning C': $totalWarn"
+        $allOk
     }
 }
 
