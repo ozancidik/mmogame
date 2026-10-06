@@ -508,7 +508,7 @@ def main():
                 continue
             first = inc.split("/")[0]
             # Motor klasorleriyle ad cakismasi olmasin diye yalniz MMO* dosyalari denetlenir.
-            if first in top_dirs and inc.split("/")[-1].startswith("MMO") and not (pub / inc).exists():
+            if first in top_dirs and inc.split("/")[-1].startswith("MMO") and not (pub / inc).exists() and not (SRC / "MyProject" / "Private" / inc).exists():
                 errors.append(f"{p.relative_to(ROOT)}: include bulunamadi -> {inc}")
         if p.suffix == ".h" and re.search(r"\b(UCLASS|USTRUCT|UENUM)\s*\(", code):
             if ".generated.h" not in raw:
