@@ -1796,6 +1796,24 @@ void AMMOCharacter::UseHotbar7() { if (SkillComponent) { SkillComponent->UseHotb
 void AMMOCharacter::UseHotbar8() { if (SkillComponent) { SkillComponent->UseHotbarSlot(8); } }
 void AMMOCharacter::UseHotbar9() { if (SkillComponent) { SkillComponent->UseHotbarSlot(9); } }
 
+bool AMMOCharacter::TryBeginConsumableUse()
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+
+	const float Now = World->GetTimeSeconds();
+	if (Now - LastConsumableUseTime < ConsumableUseCooldown)
+	{
+		return false;
+	}
+
+	LastConsumableUseTime = Now;
+	return true;
+}
+
 void AMMOCharacter::UseHealthPotion()
 {
 	static const FName PotionId(TEXT("HealthPotion"));
@@ -1816,6 +1834,14 @@ void AMMOCharacter::UseHealthPotion()
 	if (Inventory->GetItemCount(PotionId) <= 0)
 	{
 		MMONotify::ToOwner(this, TEXT("Iksir yok!"), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+
+	// Hem sahip istemcide RPC kuyrugunu hem de otoritede dogrudan RPC tekrarlarini
+	// sinirla. Basarisiz on kontroller damgayi ilerletmez; gecerli tuketilebilirlerin
+	// hepsi ayni 1 sn oyun dengesi kapisini paylasir.
+	if (!TryBeginConsumableUse())
+	{
 		return;
 	}
 
@@ -1867,6 +1893,11 @@ void AMMOCharacter::UseConsumable(FName ItemId)
 	if (Inventory->GetItemCount(ItemId) <= 0)
 	{
 		MMONotify::ToOwner(this, FString::Printf(TEXT("%s yok!"), *Def->Name), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+
+	if (!TryBeginConsumableUse())
+	{
 		return;
 	}
 

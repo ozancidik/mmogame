@@ -3606,3 +3606,18 @@ Gerçek aktör kanal sayısı Network Profiler/PIE ile ölçülmedi.
   oluşmalı; istemci mobları görmeli, hareketlerini ve ölümlerini almalıdır.
 - [ ] İstemci konsolunda `Net.ListActorChannels` çalıştır: `MMOMobSpawner` kanalı olmamalı;
   `AMMOMob` kanalları yakınlık/cull davranışına göre görünmelidir.
+
+## Tüketilebilir kullanım sınırı — 2026-10-06
+
+Can/mana iksirleri ve buff parşömenleri artık aynı sunucu-otoriter 1 saniyelik kullanım
+kapısını paylaşır. Sahip istemci de aynı kapıyı uygulayarak sunucuya Reliable RPC yığmaz;
+sunucu doğrudan gönderilen çağrıları yeniden sınırlar. Editör derlemesi ve
+`RunAllChecks.ps1 -SkipBuild` (ValidateData, statik/negatif kontroller, kayıt ve bölge
+geçişleri, Summer/Winter smoke, NetSmoke) geçti.
+
+- [ ] Canı azaltıp `F` tuşuna çok hızlı bas: ilk Can İksiri tüketilmeli, sonraki 1 saniye
+  içinde başka iksir eksilmemeli; süre dolunca yeniden kullanılabilmelidir.
+- [ ] Can iksirinden hemen sonra `G` ile Mana İksiri veya envanterden bir parşömen kullan:
+  ortak 1 saniye dolmadan ikinci eşya tüketilmemeli; dolduktan sonra normal çalışmalıdır.
+- [ ] Host ve uzak istemcide aynı davranışı doğrula; hızlı basışlar sohbeti/Reliable RPC
+  kuyruğunu doldurmamalı ve bağlantıyı düşürmemelidir.

@@ -382,6 +382,12 @@ protected:
 	static constexpr float SetNameCooldown = 30.f;
 	static constexpr float SetNameCooldownLocal = 5.f;
 
+	// Can/mana iksiri ve parsomenler ayni kisa kullanim kapisini paylasir. Bu damga
+	// istemcide Reliable RPC yigilmalarini, sunucuda ise dogrudan RPC spam'ini keser.
+	float LastConsumableUseTime = -100.f;
+	static constexpr float ConsumableUseCooldown = 1.f;
+	bool TryBeginConsumableUse();
+
 	// --- Server RPC'ler (istemci istegi -> sunucu uygular) ---
 	UFUNCTION(Server, Reliable)
 	void ServerAttackTarget(AMMOCharacter* Target);
