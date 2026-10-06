@@ -119,7 +119,13 @@ public:
 	void SaveCharacter();
 	// SENKRON kayit (otomatik kayit, MMOSave, klan/ticaret sonrasi, EndPlay): yukleme bitmediyse veya
 	// yazim basarisizsa false doner. Bolge gecisi bunu KULLANMAZ; asagidaki asenkron yolu kullanir.
-	bool SaveCharacterForTravel();
+	// Bu karakterin bolge gecisi kaydi UCUSTAYKEN (bulut magaza) yazim ERTELENIR (false doner, bSaveDeferredByTravel
+	// kalkar) ve gecis bitince FlushDeferredSave ile yapilir; boylece ayni yuvaya yeni numarali bir yazim
+	// gecis yazimini "eski" yapip gecisi iptal ettirmez. bForce (EndPlay: karakter yok oluyor) ertelemez.
+	bool SaveCharacterForTravel(bool bForce = false);
+	// Gecis penceresinde ertelenmis bir kayit varsa simdi tek yazimda yapar (AMMOGameMode cagirir).
+	void FlushDeferredSave();
+	bool IsSaveDeferredByTravel() const { return bSaveDeferredByTravel; }
 	// Bolge gecisinin kullandigi asenkron kayit: callback yalniz yazim tamamlandiginda cagrilir; basarisiz
 	// yazimda veya sonuc "eski" ise (ayni yuvaya daha yeni bir yazim basladi) false ile cagrilir ve
 	// AMMOGameMode gecisi iptal eder.
@@ -365,6 +371,8 @@ protected:
 	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
 	bool bTravelSaveCommitted = false;
+	// Bolge gecisi kaydi ucustayken bir kayit istegi geldi ve ertelendi (FlushDeferredSave'e kadar).
+	bool bSaveDeferredByTravel = false;
 	// Son yuklenen/olusturulan/yazilan kayit yuvasi (K-1: ad degisince baska yuvanin ezilmesini engellemek icin).
 	FString ActiveSaveSlot;
 

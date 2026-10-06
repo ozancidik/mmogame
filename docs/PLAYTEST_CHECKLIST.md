@@ -3635,3 +3635,19 @@ Editör derlemesi, StaticLint, Summer/Winter smoke ve NetSmoke geçti.
   PlayerStart çevresi güvenli bölge olmalıdır.
 - [ ] İki oyunculu PIE'de oyunculardan biri hub içinde, diğeri dışında olsun: iki yöndeki
   PvP saldırısı da reddedilmeli; iki oyuncu dışarı çıktığında mevcut PvP kuralları çalışmalıdır.
+
+## Bölge geçişi sırasında ertelenen kayıtlar — 2026-10-06
+
+Gecikmeli bulut mağazası hazırlığında, bölge geçişi kaydı uçuşta olan karakterin otomatik,
+elle, klan veya ticaret kaynaklı ek kaydı artık geçiş yazımını bayatlatmaz. Ek kayıt geçiş
+başarılı olduğunda veya iptal edildiğinde bir kez yazılır. UE 5.7 derlemesi ve bütün otomatik
+kontroller geçti; timeout testi erteleme ve iptal sonrası yazımı doğruladı. Gerçek iki oyunculu
+PIE ve gecikmeli mağaza ile oynanmadı.
+
+- [ ] Gecikmeli mağazada Summer -> Winter geçişini başlatıp callback beklerken `MMOSave` çalıştır:
+  oyuncu erteleme mesajı görmeli, geçiş sırf yeni yazım nedeniyle iptal olmamalı ve kayıt geçiş
+  tamamlanınca yazılmalıdır.
+- [ ] Callback zaman aşımında oyuncular Summer'da kalmalı; ertelenen kayıt iptalden sonra yazılmalı,
+  kilit temizlenmeli ve ikinci geçiş denemesi çalışmalıdır.
+- [ ] Geçiş kaydı sürerken uzak istemciyi kapat: sunucu geçişi güvenli biçimde iptal etmeli, kalan
+  oyuncuların ilerlemesi kaybolmamalı ve bir sonraki geçiş isteği kabul edilmelidir.

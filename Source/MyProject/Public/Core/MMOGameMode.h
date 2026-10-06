@@ -53,10 +53,18 @@ public:
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
 
+	// Bu karakterin bolge gecisi kaydi su an UCUSTA mi (istek verildi, onay callback'i gelmedi)? Ucustayken
+	// ayni yuvaya yapilan baska bir yazim (otomatik kayit, klan/ticaret) gecis yazimini "eski" yapip gecisi
+	// iptal ettirirdi: AMMOCharacter::SaveCharacterForTravel bu durumda yazimi ERTELER, gecis bitince
+	// (basari ya da iptal) tek bir yazimda birlestirilip yapilir. Yerel (senkron) magazada pencere yoktur.
+	bool IsZoneTravelSaveInFlight(const class AMMOCharacter* Character) const;
+
 	// PvP acik mi? Acikken oyuncular birbirine vurabilir (sunucuda dogrulanir). Varsayilan KAPALI:
 	// tikla-saldir oyuncu hedefini AttackTarget'a gecirmiyor, PvP bilincli acilana kadar kapali kalir.
 	// Host konsolundan "MMOPvP 1" ile acilir.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "MMO|GameMode")
+	// BlueprintReadOnly: yalniz C++ SetPvPAllowed yazar (BP dogrudan yazarsa replike ayna bayatlardi).
+	// Content taramasi (ham bayt): hicbir Blueprint/harita bu alani kullanmiyor.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MMO|GameMode")
 	bool bAllowPvP = false;
 
 	// PvP anahtarini degistirmenin TEK yolu: bAllowPvP'yi (tek kaynak) yazar ve replike aynayi
@@ -89,6 +97,8 @@ protected:
 	void HandleZoneTravelSaveTimeout(uint64 RequestSerial);
 	void FinishZoneTravel(uint64 RequestSerial);
 	void AbortZoneTravel(uint64 RequestSerial, const FString& Reason);
+	// Gecis penceresinde ertelenen kayitlari (bkz. IsZoneTravelSaveInFlight) birlestirip yazar.
+	void FlushDeferredCharacterSaves(const TArray<TWeakObjectPtr<class AMMOCharacter>>& Characters);
 	// Oyun basladiginda oyuncu dogus noktasinin yakinina bir mob spawner yerlestirir.
 	void SpawnMobArea();
 

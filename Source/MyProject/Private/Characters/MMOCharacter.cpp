@@ -411,7 +411,7 @@ void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		// bug-hunt bulgusu: possess sonrasi ~0.6sn icinde disconnect = ilerlemenin silinmesi).
 		if (bInitialLoadComplete && !bTravelSaveCommitted)
 		{
-			SaveCharacter();
+			SaveCharacterForTravel(true); // karakter yok oluyor: gecis penceresinde bile ertelenmez
 		}
 
 		// Partideyse hemen ayril: yoksa kalan uyelerin Members listesi, bu aktor GC ile
@@ -479,8 +479,32 @@ void AMMOCharacter::SetTravelSaveCommitted(bool bCommitted)
 	}
 }
 
-bool AMMOCharacter::SaveCharacterForTravel()
+void AMMOCharacter::FlushDeferredSave()
 {
+	if (bSaveDeferredByTravel)
+	{
+		bSaveDeferredByTravel = false;
+		const bool bSaved = SaveCharacterForTravel();
+		UE_LOG(LogTemp, Display, TEXT("[MMOSave] Gecis penceresinde ertelenen kayit yapildi (%s) saved=%d"),
+			*GetSaveSlotName(), bSaved ? 1 : 0);
+	}
+}
+
+bool AMMOCharacter::SaveCharacterForTravel(bool bForce)
+{
+	// Bolge gecisi kaydim ucustaysa (bulut magaza) yeni bir yazim numarasi onu "eski" yapip gecisi iptal ettirir:
+	// ertele, gecis bitince tek yazimda birlestirilir. Yerel magazada callback ayni karede doner, pencere yok.
+	if (!bForce)
+	{
+		const UWorld* World = GetWorld();
+		const AMMOGameMode* GameMode = World ? World->GetAuthGameMode<AMMOGameMode>() : nullptr;
+		if (GameMode && GameMode->IsZoneTravelSaveInFlight(this))
+		{
+			bSaveDeferredByTravel = true;
+			return false;
+		}
+	}
+
 	IMMOCharacterStore* Store = nullptr;
 	FString TargetSlot;
 	FMMOCharacterSaveData D;
@@ -756,6 +780,10 @@ void AMMOCharacter::MMOSave()
 		{
 			MMONotify::ToOwner(this, TEXT("Kaydedildi"), FColor(120, 220, 120), 2.f);
 		}
+		else if (bSaveDeferredByTravel)
+		{
+			MMONotify::ToOwner(this, TEXT("Bolge gecisi kaydi suruyor; kayit hemen ardindan yapilacak"), FColor::Orange, 3.f);
+		}
 	}
 	else
 	{
@@ -810,6 +838,10 @@ void AMMOCharacter::ServerSaveCharacter_Implementation()
 	if (SaveCharacterForTravel())
 	{
 		MMONotify::ToOwner(this, TEXT("Kaydedildi"), FColor(120, 220, 120), 2.f);
+	}
+	else if (bSaveDeferredByTravel)
+	{
+		MMONotify::ToOwner(this, TEXT("Bolge gecisi kaydi suruyor; kayit hemen ardindan yapilacak"), FColor::Orange, 3.f);
 	}
 }
 

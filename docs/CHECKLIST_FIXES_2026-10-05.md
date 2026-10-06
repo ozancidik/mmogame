@@ -305,3 +305,19 @@ Kod derlendi, RunAllChecks (-SkipBuild -FullCompile) sonucu commit mesajinda. PI
 - [ ] Uzak istemcide 200 ms gecikme + 100 ms titresim (`Net PktLag=200 PktLagVariance=100`) ile iksire ~1.0 sn aralikla bas: sunucu cooldown'u 0.85 sn oldugundan basislar sessizce yutulmamali (eskiden bazilari yutulabiliyordu); cok hizli (<0.5 sn) basista ipucu uzak istemcide gorunmeli.
 - [ ] Yogun savasta (cok mob + HoT/leash sifasi) ekrandaki ucan hasar/sifa sayisi 64'u gecmemeli; eski sayilar erken kaybolabilir, oyun/FPS etkilenmemeli.
 - [ ] Hub (PlayerStart) yakininda saldiri reddi ilk karede ve Summer->Winter->Summer sonrasi eskisi gibi calismali (onbellek: bos sonuc saklanmaz, dolu kalici).
+
+## 28. QA 2026-10-08 ORTA-2: gecis kaydi ucustayken diger yazimlari ertele
+
+Kod derlendi; `RunAllChecks.ps1 -SkipBuild -FullCompile` tum 12 adimda GECTI. Timeout testi gecis
+kayit callback'ini bilerek dusururken ikinci kaydin `saved=0 deferred=1 inflight=1` oldugunu, gecis
+iptalinden sonra ertelenen kaydin `saved=1` ile yazildigini dogruladi. Yerel magaza callback'i ayni
+karede dondugu icin gercek gecikmeli pencere yalniz test kancasi veya ilerideki bulut magazasinda
+olusur. PIE'de iki oyunculu OYNANMADI.
+
+- [ ] Gecikmeli magaza ile host + uzak istemci gecisi baslat; kayit callback'leri beklerken otomatik
+  kayit, `MMOSave`, klan ve ticaret kaydi tetikle. Gecis yazimi bayat sayilmamali; ek yazimlar
+  birlestirilip gecis tamamlaninca yazilmali.
+- [ ] Ayni senaryoda bir callback'i zaman asimina ugrat: herkes kaynak haritada kalmali, ertelenen
+  kayit iptalden sonra yazilmali ve hemen sonraki gecis istegi kabul edilmelidir.
+- [ ] Kayit ucustayken bir oyuncunun baglantisini kes: `EndPlay` zorunlu kaydi ertelememeli; gecis
+  ayrilan oyuncu nedeniyle iptal olmali ve kalan oyuncularin gecis kilidi temizlenmelidir.

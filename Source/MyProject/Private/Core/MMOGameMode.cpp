@@ -108,6 +108,18 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
 		UE_LOG(LogTemp, Display, TEXT("[%s] request=%s reason=%s"),
 			bExpectTimeout ? TEXT("MMO_ZONE_TRAVEL_TIMEOUT_TEST") : TEXT("MMO_ZONE_TRAVEL_TEST"),
 			bAccepted ? TEXT("ACCEPTED") : TEXT("REJECTED"), *FailureReason);
+		if (bExpectTimeout && bAccepted && Host)
+		{
+			// Gecis kaydi ucustayken (callback dusuruldu) baska bir kayit istegi ERTELENMELI (false doner); gecis
+			// zaman asimiyla iptal olunca ertelenen kayit yapilir (FlushDeferredSave log'u).
+			if (AMMOCharacter* HostCharacter = Cast<AMMOCharacter>(Host->GetPawn()))
+			{
+				const bool bSaved = HostCharacter->SaveCharacterForTravel();
+				UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_TIMEOUT_TEST] deferred-save-check saved=%d deferred=%d inflight=%d"),
+					bSaved ? 1 : 0, HostCharacter->IsSaveDeferredByTravel() ? 1 : 0,
+					GameMode->IsZoneTravelSaveInFlight(HostCharacter) ? 1 : 0);
+			}
+		}
 	}), 1.5f, false);
 #endif
 }
@@ -566,6 +578,8 @@ void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
 		return;
 	}
 	World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);
+	// Gecis kayitlari tamamlandi: pencerede ertelenen kayitlar (klan/ticaret/otomatik) tek yazimda indirilir.
+	FlushDeferredCharacterSaves(PendingZoneTravelCharacters);
 	for (const TWeakObjectPtr<AMMOCharacter>& WeakCharacter : PendingZoneTravelCharacters)
 	{
 		AMMOCharacter* Character = WeakCharacter.Get();
@@ -613,6 +627,7 @@ void AMMOGameMode::AbortZoneTravel(uint64 RequestSerial, const FString& Reason)
 			Character->SetTravelSaveCommitted(false);
 		}
 	}
+	const TArray<TWeakObjectPtr<AMMOCharacter>> AbortedCharacters = MoveTemp(PendingZoneTravelCharacters);
 	bZoneTravelInProgress = false;
 	PendingZoneTravelSaves = 0;
 	CompletedZoneTravelSaves.Reset();
@@ -625,6 +640,29 @@ void AMMOGameMode::AbortZoneTravel(uint64 RequestSerial, const FString& Reason)
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, Reason);
+	}
+	// Pencere kapandi: ertelenen kayitlar artik gecis yazimini bozamaz.
+	FlushDeferredCharacterSaves(AbortedCharacters);
+}
+
+bool AMMOGameMode::IsZoneTravelSaveInFlight(const AMMOCharacter* Character) const
+{
+	if (!bZoneTravelInProgress || !Character)
+	{
+		return false;
+	}
+	const TWeakObjectPtr<AMMOCharacter> Weak(const_cast<AMMOCharacter*>(Character));
+	return PendingZoneTravelCharacters.Contains(Weak) && !CompletedZoneTravelSaves.Contains(Weak);
+}
+
+void AMMOGameMode::FlushDeferredCharacterSaves(const TArray<TWeakObjectPtr<AMMOCharacter>>& Characters)
+{
+	for (const TWeakObjectPtr<AMMOCharacter>& Weak : Characters)
+	{
+		if (AMMOCharacter* Character = Weak.Get())
+		{
+			Character->FlushDeferredSave();
+		}
 	}
 }
 
