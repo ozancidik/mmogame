@@ -177,14 +177,18 @@ fiyatı ölçekte kabul edilemezse. O noktada yalnız Instance Launcher/Instance
   uygulama bugünkü senkron davranışı aynı kare callback ile koruyor. Summer/Winter geçişi artık
   bütün karakter kayıt callback'leri başarılı olmadan `ServerTravel` başlatmıyor; eski veya
   başarısız callback'ler ve kayıt sırasında ayrılan oyuncular geçişi iptal ediyor. Headless
-  `Scripts/TestZoneTravel.ps1` gerçek Summer -> Winter geçişini doğruluyor. PlayFab HTTP
-  uygulaması, gecikmeli kayıt kuyruğu/lazy migration ve gerçek hata/gecikme enjeksiyonu hâlâ yapılacak.
+  `Scripts/TestZoneTravel.ps1` gerçek Summer -> Winter geçişini doğruluyor. Gelmeyen callback
+  15 saniyede geçişi iptal edip kilidi açıyor; 0,75 saniyelik headless hata enjeksiyonu bu yolun
+  kaynak haritada iptalini ve sonraki isteğin başarıyla Winter'a geçtiğini doğruluyor. PlayFab HTTP uygulaması, gecikmeli kayıt kuyruğu/lazy migration
+  ve gerçek HTTP hata/gecikme ölçümleri hâlâ yapılacak.
 - `IMMOCharacterStore` arayüzü + `LocalFile` uygulaması (mevcut davranış) + `PlayFab` uygulaması (dedicated server, REST,
   `FHttpModule`; eklenti şart değil).
 - Sunucu `LoginWithServerCustomId` ile ad-tabanlı sunucu kimliğiyle (`legacyname:<ad>`) giriş yapar, blob'u karakter başına yazar/okur.
   `FMMOCharacterSaveData` <-> JSON dönüştürücü + `SchemaVersion`.
 - Önce yerel .sav'ı yaz, bulut yazımı arkada; okumada bulut varsa onu tercih et, yoksa .sav'dan yükle ve bulutta oluştur ("lazy migration").
-- Bölge geçişini asenkron onaya bağla: kaydın tamamlanma geri çağrısı gelmeden `ServerTravel` yapma (şu an senkron `bool` bekliyor).
+- Bölge geçişini asenkron onaya bağla: kaydın tamamlanma geri çağrısı gelmeden `ServerTravel`
+  yapma. **Tamamlandı (2026-10-06):** tüm callback'ler için bariyer, eski istek seri koruması,
+  oyuncu ayrılma/yazım hatası iptali ve 15 sn zaman aşımı var.
 - Dirty-flag + 60 sn otomatik kaydı oran sınırına uygun biçimde sıkıştır (aynı veriyi tekrar yazma).
 - Çıkış ölçütü: JSON gidiş-dönüş eşitlik testi (tüm alanlar, `TMap<FName,int64>` dahil); gerçek blob boyutu ölçümü; yazım gecikmesi ölçümü;
   istek başarısızlığında .sav'a düşme.

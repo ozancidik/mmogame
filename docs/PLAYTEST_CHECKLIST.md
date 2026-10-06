@@ -3541,12 +3541,17 @@ gelecekteki PlayFab mağazası aynı sözleşmeyi gecikmeli tamamlayabilir. İst
 callback'leri etkisiz kılıyor; kayıt sırasında kaybolan karakter ya da tek bir yazım hatası bütün
 geçişi kaynak haritada iptal ediyor. `Scripts/TestZoneTravel.ps1` headless Summer -> Winter
 geçişinde isteğin kabulünü, kayıt sonrasındaki travel başlangıcını ve Winter dünyasının açılışını
-doğruladı. Zorlanmış UE 5.7 derlemesi geçti.
+doğruladı. Gelmeyen callback için 15 sn güvenlik zaman aşımı eklendi;
+`Scripts/TestZoneTravelTimeout.ps1` tek callback'i bilinçli düşürüp kaynak haritada iptali,
+kilidin temizlenmesini ve aynı oturumdaki sonraki isteğin Winter'a geçmesini doğruladı.
+Zorlanmış UE 5.7 derlemesi geçti.
 
 - [ ] İki oyunculu PIE oturumunda geçişi başlat: ikinci oyuncunun kayıt callback'i bitmeden
   hiçbir istemci harita değiştirmemeli; ikisi de tamamlanınca birlikte Winter'a geçmeli.
 - [ ] Gecikmeli mağaza taklidiyle bir oyuncunun kaydını başarısız yap: herkes Summer'da kalmalı,
   geçiş kilidi temizlenmeli ve sonraki başarılı istek çalışmalı.
+- [ ] Gerçek HTTP mağazasında isteği yanıtsız bırak: 15 sn sonra iptal mesajı görünmeli; aynı
+  oturumdaki sonraki geçiş isteği kabul edilmeli ve geç gelen eski callback yeni isteği etkilememeli.
 - [ ] Kayıt callback'i beklerken bir istemciyi ayır: geçiş iptal edilmeli ve kalan oyuncuların
   `bTravelSaveCommitted` durumu sonraki normal kaydı engellememeli.
 - [ ] Başarılı seamless travel sonrasında seviye, altın, envanter, görevler, beceri cooldown'ları

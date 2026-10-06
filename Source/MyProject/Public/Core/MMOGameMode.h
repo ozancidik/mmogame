@@ -45,6 +45,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOTestZoneTravel();
 
+	// Headless otomasyon: bir kayit callback'ini dusurup gecisin timeout ile acilmasini dogrular.
+	UFUNCTION(Exec)
+	void MMOTestZoneTravelTimeout();
+
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
@@ -62,8 +66,15 @@ protected:
 	FString PendingZoneTravelTargetMap;
 	FString PendingZoneTravelSourceMap;
 	TArray<TWeakObjectPtr<class AMMOCharacter>> PendingZoneTravelCharacters;
+	FTimerHandle ZoneTravelSaveTimeoutHandle;
+	static constexpr float ZoneTravelSaveTimeoutSeconds = 15.f;
+	bool bTestDropNextZoneTravelSaveCallback = false;
+	bool bTestRetryAfterZoneTravelTimeout = false;
+	float TestZoneTravelTimeoutOverrideSeconds = 0.f;
 
+	void ScheduleZoneTravelTest(bool bExpectTimeout);
 	void HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSuccess);
+	void HandleZoneTravelSaveTimeout(uint64 RequestSerial);
 	void FinishZoneTravel(uint64 RequestSerial);
 	void AbortZoneTravel(uint64 RequestSerial, const FString& Reason);
 	// Oyun basladiginda oyuncu dogus noktasinin yakinina bir mob spawner yerlestirir.

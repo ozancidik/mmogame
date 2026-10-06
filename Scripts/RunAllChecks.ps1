@@ -58,6 +58,11 @@ Step "Asenkron kayit onayli bolge gecisi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Bolge gecisi kayit zaman asimi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelTimeout.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

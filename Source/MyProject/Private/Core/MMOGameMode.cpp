@@ -35,6 +35,20 @@ AMMOGameMode::AMMOGameMode()
 void AMMOGameMode::MMOTestZoneTravel()
 {
 #if !UE_BUILD_SHIPPING
+	ScheduleZoneTravelTest(false);
+#endif
+}
+
+void AMMOGameMode::MMOTestZoneTravelTimeout()
+{
+#if !UE_BUILD_SHIPPING
+	ScheduleZoneTravelTest(true);
+#endif
+}
+
+void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
+{
+#if !UE_BUILD_SHIPPING
 	UWorld* World = GetWorld();
 	if (!World || !HasAuthority())
 	{
@@ -42,7 +56,7 @@ void AMMOGameMode::MMOTestZoneTravel()
 	}
 	const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
 	FTimerHandle TestHandle;
-	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis]()
+	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis, bExpectTimeout]()
 	{
 		AMMOGameMode* GameMode = WeakThis.Get();
 		UWorld* TestWorld = GameMode ? GameMode->GetWorld() : nullptr;
@@ -60,9 +74,16 @@ void AMMOGameMode::MMOTestZoneTravel()
 				break;
 			}
 		}
+		if (bExpectTimeout)
+		{
+			GameMode->bTestDropNextZoneTravelSaveCallback = true;
+			GameMode->bTestRetryAfterZoneTravelTimeout = true;
+			GameMode->TestZoneTravelTimeoutOverrideSeconds = 0.75f;
+		}
 		FString FailureReason;
 		const bool bAccepted = GameMode->RequestZoneTravel(Host, FailureReason);
-		UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_TEST] request=%s reason=%s"),
+		UE_LOG(LogTemp, Display, TEXT("[%s] request=%s reason=%s"),
+			bExpectTimeout ? TEXT("MMO_ZONE_TRAVEL_TIMEOUT_TEST") : TEXT("MMO_ZONE_TRAVEL_TEST"),
 			bAccepted ? TEXT("ACCEPTED") : TEXT("REJECTED"), *FailureReason);
 	}), 1.5f, false);
 #endif
@@ -402,6 +423,12 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 	{
 		PendingZoneTravelCharacters.Add(Character);
 	}
+	const float SaveTimeoutSeconds = TestZoneTravelTimeoutOverrideSeconds > 0.f
+		? TestZoneTravelTimeoutOverrideSeconds : ZoneTravelSaveTimeoutSeconds;
+	TestZoneTravelTimeoutOverrideSeconds = 0.f;
+	World->GetTimerManager().SetTimer(ZoneTravelSaveTimeoutHandle,
+		FTimerDelegate::CreateUObject(this, &AMMOGameMode::HandleZoneTravelSaveTimeout, RequestSerial),
+		SaveTimeoutSeconds, false);
 	for (AMMOCharacter* Character : Characters)
 	{
 		const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
@@ -424,6 +451,14 @@ void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSucc
 	{
 		return;
 	}
+#if !UE_BUILD_SHIPPING
+	if (bTestDropNextZoneTravelSaveCallback)
+	{
+		bTestDropNextZoneTravelSaveCallback = false;
+		UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_TIMEOUT_TEST] callback intentionally dropped"));
+		return;
+	}
+#endif
 	if (!bSuccess)
 	{
 		AbortZoneTravel(RequestSerial, TEXT("Bir karakter kaydedilemedi; gecis iptal edildi"));
@@ -433,6 +468,25 @@ void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSucc
 	{
 		FinishZoneTravel(RequestSerial);
 	}
+}
+
+void AMMOGameMode::HandleZoneTravelSaveTimeout(uint64 RequestSerial)
+{
+	if (!bZoneTravelInProgress || RequestSerial != ZoneTravelRequestSerial)
+	{
+		return;
+	}
+	const int32 TimedOutSaveCount = PendingZoneTravelSaves;
+	const bool bRetryTestAfterTimeout = bTestRetryAfterZoneTravelTimeout;
+	AbortZoneTravel(RequestSerial, FString::Printf(
+		TEXT("Karakter kaydi zaman asimina ugradi (%d bekliyor); gecis iptal edildi"), TimedOutSaveCount));
+#if !UE_BUILD_SHIPPING
+	if (bRetryTestAfterTimeout)
+	{
+		// Ayni GameMode'da yeni istegin kabul edilmesi timeout'un kilidi gercekten temizledigini kanitlar.
+		ScheduleZoneTravelTest(false);
+	}
+#endif
 }
 
 void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
@@ -447,6 +501,7 @@ void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
 		AbortZoneTravel(RequestSerial, TEXT("Dunya gecis tamamlanmadan kapandi"));
 		return;
 	}
+	World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);
 	for (const TWeakObjectPtr<AMMOCharacter>& WeakCharacter : PendingZoneTravelCharacters)
 	{
 		AMMOCharacter* Character = WeakCharacter.Get();
@@ -482,11 +537,25 @@ void AMMOGameMode::AbortZoneTravel(uint64 RequestSerial, const FString& Reason)
 	{
 		return;
 	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);
+	}
+	for (const TWeakObjectPtr<AMMOCharacter>& WeakCharacter : PendingZoneTravelCharacters)
+	{
+		if (AMMOCharacter* Character = WeakCharacter.Get())
+		{
+			Character->SetTravelSaveCommitted(false);
+		}
+	}
 	bZoneTravelInProgress = false;
 	PendingZoneTravelSaves = 0;
 	PendingZoneTravelCharacters.Reset();
 	PendingZoneTravelTargetMap.Reset();
 	PendingZoneTravelSourceMap.Reset();
+	bTestDropNextZoneTravelSaveCallback = false;
+	bTestRetryAfterZoneTravelTimeout = false;
+	TestZoneTravelTimeoutOverrideSeconds = 0.f;
 	UE_LOG(LogTemp, Error, TEXT("Zone travel aborted: %s"), *Reason);
 	if (GEngine)
 	{
