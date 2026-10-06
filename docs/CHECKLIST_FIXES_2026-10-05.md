@@ -155,3 +155,22 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 istemc
 - [ ] Davet 30 sn sonra gecersiz: B 30 sn bekleyip `/parti kabul` yazinca "Davetin suresi doldu"/parti kurulmamasi; daveti 30 sn sonra baska oyuncu atabilmeli. `/yardim` metninde `/parti (davet; kabul, ret, ayril)` gorunmeli; `/parti xyz` kullanim satirini vermeli. Konsol: `MMOPartyDecline` ayni davranisi vermeli.
 - [ ] **ORTA-3** `G` gorev penceresi: Seviye 6+ ile `Q_Warlocks`/`Q_DireWolves`, Lv25+ ile `Q_ObsidianWarlord`, `Q_Gold1000` ve uzun esya adli odullu gorevlerde aciklama + odul satiri panelin (480 px) icinde kalmali; uzun aciklama "..." ile bitmeli ve "Odul: ..." kismi her zaman gorunmeli. Satirlara tiklayarak gorev alma/odul alma hala calismali; cok gorevli durumda satir hizasi bozulmamali. (Ekran goruntusu al.)
 - [ ] **DUSUK-3** `?Name=MehmetCelikoglu-2024` (tam 20 karakter) ile baglanan oyuncu `Gezgin######` OLMAMALI; `?Name=CIDIK-3F9A1B7C2D4E5F` ve cok uzun bilgisayar adindan kesilmis `...-1A2B` gibi adlar yine `Gezgin######` olmali.
+
+## 15. Ilk 10 dakika ipuclari (CONTENT_PLAN_LV11_45 bolum C)
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Tamami `AMMOHUD::UpdateTutorialHints` icinde yerel HUD durumu; sunucu/RPC/kayit degismedi. Balon: alt-orta NPC balonu (baslik "Ipucu", 9 sn). Yeni karakterle, konsol komutu kullanmadan dene; host + 1 istemci.
+
+- [ ] **H1** Yeni karakter (Lv1, 0 EXP): sinif panelini kapat, 8 sn kipirdama: "Zemine sol tikla: yuru..." cikmali. Ilk adimdan sonra (>80 birim) bu oturumda hic cikmamali; 8 sn dolmadan yurursen hic cikmamali.
+- [ ] **H2** Lv1-2, gorev yokken Yasli Doran'a <=900 birim yaklas: "Yasli Doran'in ustundeki ! isaretine tikla" cikmali. Gorev aldiktan/tamamladiktan sonra cikmamali.
+- [ ] **H3** Ilk gorevi kabul et ve 20 sn hic oldurme yapma: "Z: hedef sec  R: saldir..." cikmali (Doran kabul replighi 9 sn sonra, ipucu ondan SONRA/ustune binmeden). 20 sn icinde bir mob oldurursen cikmamali.
+- [ ] **H4** Lv<=5, ilk oldurmede esya/altin yere dusunce (<=1500 birim): "Esya dustu: uzerinden gec..." cikmali; bir daha cikmamali.
+- [ ] **H5** Lv1 -> Lv2 atla (puan var): "Seviye atladin! C: stat puani..." cikmali; Lv11+ seviye atlamada cikmamali.
+- [ ] **H6** Gorev hedefi dolunca (tracker "(tamam!)"): "Gorev tamam! Yasli Doran'a don..." cikmali; Lv>10 karakterde cikmamali.
+- [ ] **H7** Lv<=20 iken ilk kez ol: olum ekraninda (OLDUN) alt-ortada "Oldun: 5 sn sonra dogarsin..." cikmali; ikinci olumde cikmamali.
+- [ ] **H8** Cantayi 12/12 yap (bos -> dolu gecisi): "Canta dolu! Satici NPC'ye esya sat..." cikmali; Lv>20 karakterde cikmamali.
+- [ ] **Tek ipucu / spam yok**: iki tetikleyici ayni anda olursa (or. Lv2 + ilk ganimet) once biri, en az ~12 sn sonra digeri cikmali; hic ust uste binmemeli. Ipucu sirasinda NPC diyalogu acilirsa diyalog onceliklidir (ipucu kaybolur, 20 sn icinde yer bulursa sonra cikar).
+- [ ] **Pencere**: envanter/gorev/beceri/stat/depo/dukkan acikken ipucu cikmamali; pencere kapaninca (20 sn icinde) cikmali.
+- [ ] **Oturumluk**: ayni ipucu ayni oturumda ikinci kez cikmamali (bolge degisimi/olum-canlanma dahil). Oyundan cikip girince Lv<=sinir karakterde bir kez daha cikabilir (kabul edilen sinirlama).
+- [ ] **Istemci**: ikinci pencere (listen-server istemcisi) kendi ipuclarini gormeli; host penceresinde istemcinin ipucu cikmamali.
+- [ ] **Yuksek seviye**: Lv25+ kayitli karakterle girince (gorev/canta dolu/olum dahil) hicbir ipucu cikmamali; girisin ilk 3 sn icinde replikasyon yuklenmesi yanlis tetik uretmemeli.
+- [ ] Planin H5 "puan >=6 birikince Lv<=15 ikinci ipucu" kismi UYGULANMADI (yalniz ilk seviye atlama).
