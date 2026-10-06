@@ -317,7 +317,7 @@ int32 UMMOSkillComponent::GetMasteryRank(EMMOSkillTree Tree) const
 	return MasteryRankArray.IsValidIndex(Idx) ? MasteryRankArray[Idx] : 0;
 }
 
-void UMMOSkillComponent::SyncLearnedFromMastery()
+void UMMOSkillComponent::SyncLearnedFromMastery(int32 LevelOverride)
 {
 	if (!HasAuthorityInternal())
 	{
@@ -326,6 +326,8 @@ void UMMOSkillComponent::SyncLearnedFromMastery()
 
 	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	const UMMOStatsComponent* S = Owner ? Owner->GetStats() : nullptr;
+	const bool bHasLevel = LevelOverride > 0 || S != nullptr;
+	const int32 CurrentLevel = LevelOverride > 0 ? LevelOverride : (S ? S->Level : 0);
 
 	for (const FMMOSkillDef& D : FMMOSkillDatabase::GetAll())
 	{
@@ -340,7 +342,7 @@ void UMMOSkillComponent::SyncLearnedFromMastery()
 		// Rutbe <= seviye kurali tek basina Lv7 bir skili Lv3'te acabilirdi; skill
 		// tablosundaki RequiredLevel dengesi bozulmasin diye ayrica kontrol ediliyor
 		// (seviye gelince OnLevelUp senkronu bu skili otomatik acar).
-		if (S && S->Level < D.RequiredLevel)
+		if (bHasLevel && CurrentLevel < D.RequiredLevel)
 		{
 			continue;
 		}
@@ -389,11 +391,12 @@ bool UMMOSkillComponent::CanLearn(FName SkillId, FString& OutReason) const
 		OutReason = FString::Printf(TEXT("Rutbe %d gerekli"), Def->RequiredMasteryRank);
 		return false;
 	}
-	// Rutbe zaten yeterliyse skill acilmis olmaliydi (IsLearned yukarida elendi) — bu
-	// durumda blokaj RequiredLevel'dir, onu yukarida bildirdik; yine de guvenli davran.
+	// Rutbe ve seviye zaten yeterli (yukaridaki kontroller gecti) ama skill ogrenilmemis: puan
+	// harcanmaz, otomatik acilir (kayit yuklemede/seviye atlamada senkron). "Level N gerekli"
+	// demek yanlis olurdu — oyuncu zaten seviyeyi asmis durumda.
 	if (Def->RequiredMasteryRank <= Rank)
 	{
-		OutReason = FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel);
+		OutReason = TEXT("Otomatik acilir (puan gerekmez)");
 		return false;
 	}
 	// KO kurali: bir gruptaki rutbe karakter seviyesini asamaz.
@@ -771,6 +774,10 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 			Hotbar[1] = TEXT("Pri_Smite");
 		}
 	}
+	// Yeni surumde eklenen (ornegin Lv31/Lv39) beceriler: rutbe + kayitli seviye yeterliyse
+	// eksikleri tamamla (mevcut LearnedSkills silinmez, puan/hotbar'a dokunulmaz). Stats
+	// henuz yuklenmedigi icin seviye acikca verilir.
+	SyncLearnedFromMastery(SavedLevel);
 	CooldownEndTimes.Reset();
 	LastClassChangeTime = -1000.f;
 	if (const UWorld* World = GetWorld())

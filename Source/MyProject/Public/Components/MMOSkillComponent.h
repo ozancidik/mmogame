@@ -134,7 +134,9 @@ protected:
 	void GrantStarterSkill();
 
 	/** Mevcut rutbelere gore acilmis olmasi gereken tum skilleri LearnedSkills'e yazar (sadece otorite). */
-	void SyncLearnedFromMastery();
+	// LevelOverride > 0: seviye kapisi Stats yerine bu degerle denetlenir (kayit yuklemede Stats
+	// henuz yuklenmemis olabilir; MMOCharacter once skill sonra stat uygular).
+	void SyncLearnedFromMastery(int32 LevelOverride = 0);
 
 	// Seviye atlayinca tekrar senkronize et: rutbesi yeterli ama RequiredLevel'i o an
 	// karsilanmayan skiller (or. Kan Firtinasi Lv7) seviye gelince otomatik acilsin.
