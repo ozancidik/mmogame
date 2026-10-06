@@ -24,8 +24,13 @@ namespace
 	constexpr int32 MaxNameChars = 256;
 	constexpr int32 MaxStringChars = 1024;
 	constexpr int32 MaxDepth = 6;
+	// FJsonSerializer yapisal dogrulamadan once ayristirir ve derin girdide ozyineleme kullanir.
+	// Guvenilmeyen bulut blob'unda yigin tasmasini onlemek icin ayristirmadan ONCE ham tavan.
+	constexpr int32 MaxJsonNestingDepth = 16;
 	// JSON sayilari double'dir: bundan buyuk tam sayilar v1'de (sayi olarak) guvenle tasinamaz.
 	constexpr double MaxExactJsonInt = 9007199254740992.0;
+	constexpr double MinInt64AsDouble = -9223372036854775808.0;
+	constexpr double Int64UpperBoundAsDouble = 9223372036854775808.0;
 
 	void SetError(FString* OutError, const FString& Message)
 	{
@@ -44,6 +49,49 @@ namespace
 	bool IsIntegralFinite(double Value)
 	{
 		return FMath::IsFinite(Value) && Value == FMath::FloorToDouble(Value);
+	}
+
+	bool HasSafeJsonNesting(const FString& Json)
+	{
+		int32 Depth = 0;
+		bool bInString = false;
+		bool bEscaped = false;
+		for (const TCHAR Ch : Json)
+		{
+			if (bInString)
+			{
+				if (bEscaped)
+				{
+					bEscaped = false;
+				}
+				else if (Ch == TEXT('\\'))
+				{
+					bEscaped = true;
+				}
+				else if (Ch == TEXT('"'))
+				{
+					bInString = false;
+				}
+				continue;
+			}
+
+			if (Ch == TEXT('"'))
+			{
+				bInString = true;
+			}
+			else if (Ch == TEXT('{') || Ch == TEXT('['))
+			{
+				if (++Depth > MaxJsonNestingDepth)
+				{
+					return false;
+				}
+			}
+			else if (Ch == TEXT('}') || Ch == TEXT(']'))
+			{
+				Depth = FMath::Max(0, Depth - 1);
+			}
+		}
+		return true;
 	}
 
 	// Yalniz [-]rakamlar, bas sifir/+/bosluk yok, int64'e sigar (Atoi64 gidis-donusu ile dogrulanir).
@@ -81,11 +129,17 @@ namespace
 		{
 			// Eski/elle yazilmis blob'lar icin sayisal deger tolere edilir (gecerli bir degere denk gelmeli).
 			const double Number = Value->AsNumber();
-			if (!IsIntegralFinite(Number) || !Enum->IsValidEnumValue(static_cast<int64>(Number)))
+			// double -> int64 donusumu aralik disinda tanimsizdir; cast'ten once acikca sinirla.
+			if (!IsIntegralFinite(Number) || Number < MinInt64AsDouble || Number >= Int64UpperBoundAsDouble)
 			{
 				return Fail(OutError, Path, TEXT("gecersiz enum degeri"));
 			}
-			EnumValue = static_cast<int64>(Number);
+			const int64 NumericEnumValue = static_cast<int64>(Number);
+			if (!Enum->IsValidEnumValue(NumericEnumValue))
+			{
+				return Fail(OutError, Path, TEXT("gecersiz enum degeri"));
+			}
+			EnumValue = NumericEnumValue;
 		}
 		else
 		{
@@ -345,8 +399,9 @@ namespace
 bool FMMOCharacterSaveJson::ToJson(const FMMOCharacterSaveData& Data, FString& OutJson)
 {
 	OutJson.Reset();
-	// NaN/Inf konum JSON'da gecersiz sayi uretir; kaydi sessizce bozmak yerine reddet.
-	if (!HasFiniteTransform(Data))
+	// Yazar, okuyucunun reddedecegi bir blob uretmemeli: sonlu donusum + oyun araliklari ayni kapidan gecer.
+	FString ValidationError;
+	if (!HasFiniteTransform(Data) || !CheckRanges(Data, ValidationError))
 	{
 		return false;
 	}
@@ -366,6 +421,12 @@ bool FMMOCharacterSaveJson::ToJson(const FMMOCharacterSaveData& Data, FString& O
 	const TSharedRef<FJsonObject> DataObject = MakeShared<FJsonObject>();
 	if (!FJsonObjectConverter::UStructToJsonObject(
 		FMMOCharacterSaveData::StaticStruct(), &Data, DataObject, CPF_SaveGame, 0, &ExportInt64AsString))
+	{
+		return false;
+	}
+	// Dizi/harita/string tavanlari ve enum gorunurlugu de FromJson ile simetrik olsun.
+	if (!ValidateStruct(FMMOCharacterSaveData::StaticStruct(), DataObject, CurrentSchemaVersion,
+		FString(), 0, ValidationError))
 	{
 		return false;
 	}
@@ -395,6 +456,11 @@ bool FMMOCharacterSaveJson::FromJson(const FString& Json, FMMOCharacterSaveData&
 	if (Json.Len() > MaxJsonChars)
 	{
 		SetError(OutError, TEXT("Blob cok buyuk"));
+		return false;
+	}
+	if (!HasSafeJsonNesting(Json))
+	{
+		SetError(OutError, TEXT("JSON ic ice derinligi cok buyuk"));
 		return false;
 	}
 	TSharedPtr<FJsonObject> Root;
@@ -640,6 +706,13 @@ namespace
 			if (!ExpectRawRejected(Raw, Raw, OutError, OutCount)) return false;
 		}
 		if (!ExpectRawRejected(FString::ChrN(2 * 1024 * 1024 + 1, TEXT('x')), TEXT("asiri buyuk blob"), OutError, OutCount)) return false;
+		{
+			// Gecerli karakter blob'undaki bilinmeyen alan da on taramaya tabidir.
+			// Yalniz dizi kok kullanmak, nesne kok zorunlulugu nedeniyle zaten reddedilirdi.
+			const FString DeeplyNested = TEXT("{\"Deep\":") + FString::ChrN(MaxJsonNestingDepth, TEXT('[')) + TEXT("0")
+				+ FString::ChrN(MaxJsonNestingDepth, TEXT(']')) + TEXT(",") + BaseJson.RightChop(1);
+			if (!ExpectRawRejected(DeeplyNested, TEXT("asiri derin JSON"), OutError, OutCount)) return false;
+		}
 
 		// SchemaVersion
 		MMO_EXPECT_REJECT("SchemaVersion eksik", Root->RemoveField(SchemaVersionField);)
@@ -693,6 +766,7 @@ namespace
 		// Enum
 		MMO_EXPECT_REJECT("sinif bilinmeyen ad", Data->SetField(TEXT("CharacterClass"), Str(TEXT("Necromancer")));)
 		MMO_EXPECT_REJECT("sinif aralik disi sayi", Data->SetField(TEXT("CharacterClass"), Num(99));)
+		MMO_EXPECT_REJECT("sinif int64 disi sayi", Data->SetField(TEXT("CharacterClass"), Num(1.0e300));)
 		MMO_EXPECT_REJECT("sinif negatif sayi", Data->SetField(TEXT("CharacterClass"), Num(-1));)
 		MMO_EXPECT_REJECT("sinif bool", Data->SetField(TEXT("CharacterClass"), Bool(false));)
 		MMO_EXPECT_REJECT("nadirlik gizli MAX", FirstOfArray(Data, TEXT("EquipmentBag"))->SetField(TEXT("Rarity"), Str(TEXT("MAX")));)
@@ -770,12 +844,25 @@ namespace
 		// Bilinmeyen ek alan yok sayilir (ileri uyumluluk).
 		{
 			const TSharedPtr<FJsonObject> Root = ParseObject(BaseJson);
-			Sub(Root, DataField)->SetField(TEXT("FutureField"), Str(TEXT("x")));
+			// Tirnak, ters egik cizgi ve string icindeki parantezler derinlik sayacini etkilememeli.
+			const FString QuotedBrackets = TEXT("\\\"") + FString::ChrN(32, TEXT('[')) + FString::ChrN(32, TEXT('{'));
+			Sub(Root, DataField)->SetField(TEXT("FutureField"), MakeShared<FJsonValueString>(QuotedBrackets));
 			Root->SetField(TEXT("Extra"), Num(1));
 			if (!FMMOCharacterSaveJson::FromJson(WriteObject(Root), Out, nullptr, &Error)
 				|| !FMMOCharacterSaveData::StaticStruct()->CompareScriptStruct(&Before, &Out, 0))
 			{
 				OutError = TEXT("Bilinmeyen ek alan tolere edilmedi: ") + Error;
+				return false;
+			}
+		}
+		// Ham tavanin kendisi kabul edilir: kok nesne + 15 dizi = 16.
+		{
+			const FString AtDepthLimit = TEXT("{\"Deep\":") + FString::ChrN(MaxJsonNestingDepth - 1, TEXT('[')) + TEXT("0")
+				+ FString::ChrN(MaxJsonNestingDepth - 1, TEXT(']')) + TEXT(",") + BaseJson.RightChop(1);
+			if (!FMMOCharacterSaveJson::FromJson(AtDepthLimit, Out, nullptr, &Error)
+				|| !FMMOCharacterSaveData::StaticStruct()->CompareScriptStruct(&Before, &Out, 0))
+			{
+				OutError = TEXT("Derinlik tavani icindeki ek alan reddedildi: ") + Error;
 				return false;
 			}
 		}
@@ -858,6 +945,25 @@ namespace
 			if (FMMOCharacterSaveJson::ToJson(NanData, Ignored))
 			{
 				OutError = TEXT("NaN konum ToJson tarafindan reddedilmedi");
+				return false;
+			}
+		}
+		// ToJson, FromJson'in aralik ve boyut kurallariyla simetrik olmali.
+		{
+			FMMOCharacterSaveData InvalidRange = Before;
+			InvalidRange.Level = 0;
+			FString Ignored;
+			if (FMMOCharacterSaveJson::ToJson(InvalidRange, Ignored))
+			{
+				OutError = TEXT("Aralik disi Level ToJson tarafindan reddedilmedi");
+				return false;
+			}
+
+			FMMOCharacterSaveData Oversized = Before;
+			Oversized.Friends.SetNum(MaxArrayElements + 1);
+			if (FMMOCharacterSaveJson::ToJson(Oversized, Ignored))
+			{
+				OutError = TEXT("Asiri buyuk dizi ToJson tarafindan reddedilmedi");
 				return false;
 			}
 		}

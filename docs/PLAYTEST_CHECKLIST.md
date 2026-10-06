@@ -3651,3 +3651,18 @@ PIE ve gecikmeli mağaza ile oynanmadı.
   kilit temizlenmeli ve ikinci geçiş denemesi çalışmalıdır.
 - [ ] Geçiş kaydı sürerken uzak istemciyi kapat: sunucu geçişi güvenli biçimde iptal etmeli, kalan
   oyuncuların ilerlemesi kaybolmamalı ve bir sonraki geçiş isteği kabul edilmelidir.
+
+## JSON kayıt sınırları — 2026-10-07
+
+JSON dönüştürücüde ayrıştırmadan önce 16 düzey sınırı, yazma/okuma için ortak doğrulama
+ve sayısal enum dönüşüm sınırı eklendi. Derleme, 12 otomatik kontrol ve son fixture
+iyileştirmeleri sonrası JSON (111 negatif senaryo) / mağaza testleri geçti. 178 gerçek
+kayıt alan alan eşit döndü; en yüksek gerçek karakter seviyesi 6. JSON bugün oyun kayıt
+yolunda kullanılmıyor; gelecekteki bulut mağazası hazırlığıdır. PIE oynanmadı.
+
+- [ ] İki oyunculu PIE'de kaydet, çıkıp yeniden gir ve Summer/Winter arasında geç:
+  mevcut yerel karakter ilerlemesi korunmalı ve kayıt/yükleme çalışmalıdır.
+- [ ] Lv30+ ve depo/klan/görev dolu gerçek karakter kaydını oluştur; mağaza testinde
+  `json mismatch=0` ve `maxLevel>=30` kanıtını al.
+- [ ] Bulut mağazası eklendiğinde geçersiz JSON okuma/yazma reddinin mevcut kaydı
+  ezmediğini ve hatanın çağırana iletildiğini doğrula; bugün entegrasyon bulunmuyor.

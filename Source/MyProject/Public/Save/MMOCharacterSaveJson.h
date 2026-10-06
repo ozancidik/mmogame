@@ -16,7 +16,7 @@
  *    (yalniz 2^53 alti tam sayi kabul edilir), artik YAZILMAZ.
  *  - v2 (guncel): int64 alanlar ondalik-siz tam sayi METNI (string) olarak yazilir/okunur.
  *
- * FromJson SIKI okur: her SaveGame alani blob'da bulunmali, tip/aralik/boyut dogrulanir, bilinmeyen EK
+ * ToJson ve FromJson SIKI calisir: her SaveGame alani blob'da bulunmali, tip/aralik/boyut dogrulanir, bilinmeyen EK
  * alanlar yok sayilir. Basarisizlikta OutData'ya DOKUNULMAZ; cagiran false donunce mevcut kaydi
  * ezmemelidir (yazma). Enum'lar AD ile yazilir; eski/elle yazilmis sayisal degerler gecerli bir
  * enumeratore denk geliyorsa tolere edilir. Enum degeri yeniden adlandirilir/silinirse eski blob'lar

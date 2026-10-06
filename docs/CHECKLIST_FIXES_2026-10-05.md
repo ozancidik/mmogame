@@ -321,3 +321,30 @@ olusur. PIE'de iki oyunculu OYNANMADI.
   kayit iptalden sonra yazilmali ve hemen sonraki gecis istegi kabul edilmelidir.
 - [ ] Kayit ucustayken bir oyuncunun baglantisini kes: `EndPlay` zorunlu kaydi ertelememeli; gecis
   ayrilan oyuncu nedeniyle iptal olmali ve kalan oyuncularin gecis kilidi temizlenmelidir.
+
+## 29. QA 2026-10-08 ORTA-3: JSON derinlik, yazma-okuma simetrisi ve enum donusumu
+
+`FromJson`, ayristiriciyi cagirmadan once ham nesne/dizi derinligini 16 ile sinirlar;
+string icindeki parantezleri ve kacisli tirnak/ters egik cizgileri saymaz. Bilinmeyen ek
+alanlar da bu tavana tabidir. `ToJson` artik ayni `CheckRanges` ve yapisal boyut/tip/enum
+denetimlerini kullanir; okuyucunun reddedecegi Level=0 veya 4097 elemanli Friends yazilmaz.
+Sayisal enum, int64'e donusturulmeden once [-2^63, 2^63) araliginda dogrulanir.
+
+UE 5.7 editor derlemesi GECTI. `RunAllChecks.ps1 -SkipBuild -FullCompile` 12/12 GECTI
+(10 dosya PCH'siz /W4 temiz; Summer/Winter smoke; NetSmoke 1 sunucu/1 istemci baglantisi,
+0 hata). Ardindan yalniz regresyon fixture'lari guclendirildi: gecerli karakter blob'unda
+derinligi 17 olan bilinmeyen alan reddi, 16 sinirinin kabul edilmesi ve kacisli string
+parantezlerinin sayilmamasi. Son kod yeniden derlendi; JSON `schema=2 negative=111` ve
+magaza `slots=178 loaded=178 invalid=0 loadFailed=0 json ok=178 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1` GECTI. Fixture degisikliginden sonra tum smoke
+paketi tekrarlanmadi. PIE'de OYNANMADI; JSON halen yalniz test/gelecekte bulut yoludur.
+Yerel .sav formati degismedi. Sema alan ekleme/goc mekanizmasi ve Lv30+ gercek kayit
+kaniti aciktir. Agency-agents AppSec ve Test Results Analyzer rol belgeleri incelemede
+kullanildi; bagimsiz paralel ajan calistirilmadi.
+
+- [ ] Iki oyunculu PIE'de `MMOSave`, yeniden giris ve Summer/Winter gecisini oyna;
+  mevcut yerel karakter kayitlari ve ilerleme yuklenmeye devam etmelidir.
+- [ ] Depo/klan/gorev dolu Lv30+ karakter kaydedildikten sonra `TestCharacterStore.ps1`
+  ile `json mismatch=0` ve `maxLevel>=30` kanitini al (bu makinede en yuksek 6).
+- [ ] Bulut magaza entegre edildiginde JSON reddi mevcut kaydi ezmemeli; yazma reddi
+  cagirana gorunur olmali. Bu entegrasyon bugun yoktur ve dogrulanmadi.

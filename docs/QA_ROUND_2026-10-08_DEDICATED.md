@@ -65,6 +65,14 @@ Sorunlar:
 
 ### ORTA-3 — JSON ice aktarma v2 (`9665a09`, `5c1b535`)
 
+**2026-10-07 düzeltme notu:** Aşağıdaki 1–3 bulgularının kod düzeltmeleri ve regresyon
+testleri tamamlandı: ayrıştırma öncesi 16 düzey ham sınır (bilinmeyen ek alan dahil),
+`ToJson` için ortak aralık/yapısal doğrulama ve int64 dönüşümünden önce sayısal enum
+sınırı. UE derlemesi ve 12/12 otomatik kontrol geçti; fixture iyileştirmeleri sonrası
+yeniden derleme, JSON `negative=111` ve 178 gerçek kayıt için `mismatch=0` geçti.
+4 (şema göçü) ve 5 (Lv30+ gerçek kayıt kanıtı) açık. Ayrıntı:
+`CHECKLIST_FIXES_2026-10-05.md` §29. Aşağıdaki tespit metni ilk denetimin kaydıdır.
+
 **Üretimde kullanılıyor mu? HAYIR.** `FMMOCharacterSaveJson::` çağıranları yalnız: `MMOCharacter.cpp:787` (`MMOTestSaveJson` — `MMODebugCommandsEnabled` kapılı test komutu) ve `MMOCharacterStoreSubsystem.cpp:73-135` (store self-test). Gerçek kayıt/yükleme `FMMOLocalFileCharacterStore` → `.sav` (GVAS). Yani bu kod bugün oynanışa dokunmaz; bulut mağaza gelince devreye girecek. `FromJson` reddi için "mevcut kaydı korur" sözleşmesi (başarısızlıkta `OutData` dokunulmaz, çağıran false'ta yazmaz) kodla/test ile doğrulandı: `FromJson` adayı ayrı `Candidate`'ta kurar, yalnız tüm doğrulamalardan sonra `OutData = MoveTemp(Candidate)` yapar (`MMOCharacterSaveJson.cpp` ~423); negatif testler sentinel (`Level=777`) ile `OutData`'nın ezilmediğini kontrol ediyor. Henüz hiçbir çağıran bu sözleşmeye bağlanmadığı için "çağıranlarda gerçekten korunuyor mu" sorusunun cevabı: **çağıran yok → belgelenmeli** (`MMOCharacterSaveJson.h` başlığı zaten uyarıyor; ACCOUNT_BACKEND_COMPARISON'a da yazılsın).
 
 Doğru olanlar: v1 (sayı) hâlâ okunuyor (yalnız |x| ≤ 2^53 tam sayı), v2 int64 ondalıksız METİN (`ParseStrictInt64`: `-0`, `+5`, `05`, boşluk, taşma, boş reddediliyor); 2^53+1 ve `MAX_int64` gidiş-dönüş testli; her `SaveGame` alanı zorunlu; null/yanlış tip/ondalık/aralık dışı/bool-sayı karışımı reddi; `MAX` gizli enum reddi; blob 2 MiB, dizi/harita 4096, string 1024, ad 256 tavanları; `ToJson` NaN/Inf konumu reddediyor; `FVector`/`FRotator` alanları `SaveGame` bayraklı (motor `NoExportTypes.h:543-560`), yani yapısal doğrulama bunları da kapsıyor; 109 negatif senaryo + v1/eski enum/ek alan tolerans testleri GEÇTİ; gerçek 166 `.sav` → `ToJson` → `FromJson` → alan alan eşit.
@@ -144,7 +152,7 @@ Doğru: 64 aşılınca `RemoveAt(0, fazla)` en eskiyi atar (sıra eklenme sıras
 |---|---|---|
 | ORTA-1 (asenkron kayıt sözleşmesi) | **Kısmen kapandı** | Callback sırası/çift callback/dönüş sözleşmesi/kanca sızıntısı giderildi. AÇIK: depoda sıra garantisi (Revision/kuyruk), anlık görüntü-`Finish` penceresi, `Finish`'te yeniden doğrulama yok, otomatik kayıt etkileşimi (yeni ORTA-2) |
 | ORTA-2 (PCH'siz derleme kırığı) | **Kapandı** | Include eklendi; 10/10 taze tek-dosya derleme temiz |
-| ORTA-3 (JSON gevşek) | **Büyük ölçüde kapandı** | Sıkı doğrulama, v2, tavanlar, 109 negatif test; AÇIK: derin iç içe, `ToJson` asimetrisi, UB dönüşümü, sürüm göçü kodu; `FromJson` hâlâ çağrılmıyor |
+| ORTA-3 (JSON gevşek) | **Büyük ölçüde kapandı** | Sıkı doğrulama, v2, ham derinlik sınırı, simetrik yazma/okuma, güvenli enum dönüşümü, 111 negatif test; AÇIK: sürüm göçü kodu ve Lv30+ gerçek kayıt kanıtı; `FromJson` üretimde hâlâ çağrılmıyor |
 | ORTA-4 (denetim logu Shipping) | **Kapanmadı, belgelendi** | `bUseLoggingInShipping` eklenmedi (UBT unique build gerekir); NETWORK_AUDIT O12'ye sınır yazıldı. Dedicated Server target'ı olmadığı için doğrulanamaz |
 | DÜŞÜK-1 (bölge geçişi yardımcıları) | **Kapandı** | `false`+neden dönüşü, karakter başına küme, kanca sıfırlama, bayat yorum düzeltildi |
 | DÜŞÜK-2 (tüketilebilir geri bildirim) | **Kısmen** | İpucu + 0.85/1.0 yapıldı; HUD bekleme göstergesi yok; yerel ipucu yığılıyor (DÜŞÜK-4) |
