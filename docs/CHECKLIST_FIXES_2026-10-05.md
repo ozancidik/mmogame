@@ -202,3 +202,22 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 UZAK i
 Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI.
 
 - [ ] LLM kapaliyken Muhafiz Kael'e art arda tikla: yedek replik listesinde "Goblin tek basina korkutmaz. Suru bastirirsa geri cekil, dar bir gecit bul." gorunmeli; eski "sirtini tasa ver" satiri hic cikmamali. Balona sigmali (tek baloncuk).
+
+## 19. QA NIGHT2 ORTA-2 + DUSUK-1/5: kayitta beceri senkronu, ipucu tuketimi, beceri kitabi sirasi
+
+Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. (Sonuc satirlari commit sonrasi dogrulandi; gecmediyse bu not duzeltilecek.)
+
+**T4 - Eski kayitli yuksek seviyeli karakter (ORTA-2)**
+- [ ] Bu surumden ONCE kaydedilmis Lv>=31 karakterle gir (Savasci/Okcu/Buyucu Special0 rutbesi >=6, Rahip >=4): beceri kitabinda `War_Earthshaker` / `Arc_ThornVolley` / `Mag_Inferno` / `Pri_RadiantNova` (Lv31) ve Lv39 becerileri ilk girista [Ogrenildi] gorunmeli (seviye atlamayi beklemeden). Lv80 karakterde de.
+- [ ] Skill puani (`Skill Puani:` satiri) giristen onceki degerle AYNI kalmali (otomatik acilan beceriler puan harcatmamali). Hotbar'daki mevcut atamalar degismemeli; yeni acilanlar hotbar'a OTOMATIK konmaz, elle atanir.
+- [ ] Rutbesi yetersiz oldugu (ornegin Special0 rutbe 3) bir karakterde Lv31/Lv39 becerileri acilmamali (yalniz rutbe+seviye yeterliyse acilir). Kayittaki mevcut ogrenilmis beceriler silinmemeli.
+- [ ] Beceri kitabinda rutbesi yeterli ama (nadir) hala acilmamis bir satir varsa durum metni "[Otomatik acilir (puan gerekmez)]" olmali; eski yanlis "Level N gerekli" CIKMAMALI. Seviyesi gercekten dusuk satirda "Level N gerekli", rutbe uzaksa "Rutbe N gerekli" cikmaya devam eder.
+- [ ] Yeni karakterde ve normal seviye atlamada (rutbe yatirma) beceri acilisi eskisi gibi; kayit/yukle sonrasi ayni beceri listesi geri gelmeli (kayit bicimi degismedi).
+
+**T6 - Ipucu tuketimi (DUSUK-1)**
+- [ ] Ipucu balonu (Ipucu: ...) ilk saniyelerindeyken NPC'ye tikla (veya gorev kabul/teslim et): gercek replik gorunmeli; ipucu 20 sn icinde (pencere/replik kapaninca) TEKRAR cikmali, kalici kaybolmamali.
+- [ ] Ipucu 9 sn boyunca kesintisiz kalirsa ayni oturumda bir daha CIKMAMALI.
+- [ ] H2: Lv1'de "Yasli Doran'in ustundeki ! ..." kuyruktayken/gosterimdeyken gorevi kabul et: H2 bir daha cikmamali; kabulden sonra ~4 sn hicbir ipucu cikmamali, Doran kabul replighi ipucuyla cakismamali.
+
+**T7 - Beceri kitabi sirasi (DUSUK-5)**
+- [ ] Savasci/Rahip Ustalik 1 listesi artik seviyeye gore artan: Rampage(28) - Earthshaker(31) - Skullsplitter(39) - WarCyclone(45) - WarDeluge(58) (Rahip: Retribution 28, RadiantNova 31, ... AngelicBlade 45, AngelicStorm 58). Her satira tiklama hala o becerinin kendisine gitmeli (yanlis satir ogrenilmemeli, hotbar atamasi dogru beceriyi secmeli); iki sutun duzeni/tasma degismemeli.

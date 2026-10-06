@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 48 mob (13 elit), 73 gorev, 53 ekipman, 73 beceri.
+Toplam: 51 mob (13 elit), 79 gorev, 53 ekipman, 81 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -16,14 +16,15 @@ Toplam: 48 mob (13 elit), 73 gorev, 53 ekipman, 73 beceri.
 | 8 | FrostWraith |  | Q_FrostWraiths |  | Mag_ChainLightning |
 | 9 | CursedKnight |  | Q_CursedKnights |  |  |
 | 10 | VenomSpider |  | Q_VenomSpiders | MithrilBlade, MithrilPlate, MithrilHelm, MithrilBoots | War_ShatterBlow, Arc_EagleEye, Mag_FlameStorm, Pri_HolyFlame |
-| 11 | _yeni icerik yok_ | | | | |
+| 11 |  |  | Q_AyazdisPatrol |  |  |
 | 12 | OrcBerserker |  | Q_OrcBerserkers |  |  |
-| 13 |  | FrostLich | Q_FrostLich |  | War_CrushingBlow, Arc_Volley, Mag_IceLance, Pri_Judgement |
-| 14-15 | _yeni icerik yok_ | | | | |
+| 13 | ThawStalker | FrostLich | Q_FrostLich, Q_ThawStalkers |  | War_CrushingBlow, Arc_Volley, Mag_IceLance, Pri_Judgement |
+| 14 | CrustWarden |  | Q_CrustWardens |  |  |
+| 15 | ScorchedRaider |  | Q_ScorchedRaiders |  |  |
 | 16 | EmberHound |  | Q_EmberHounds, Q_Level20, Q_Gold5000 | AdamantineBlade, AdamantinePlate, AdamantineHelm, AdamantineBoots | War_LifeReap, Arc_ShadowStep, Mag_IceChain, Pri_HolyRain |
-| 17 | _yeni icerik yok_ | | | | |
+| 17 |  |  | Q_EmberPack |  |  |
 | 18 | MagmaGolem |  | Q_MagmaGolems |  |  |
-| 19 | _yeni icerik yok_ | | | | |
+| 19 |  |  | Q_GolemQuarry |  |  |
 | 20 | AshOrc |  | Q_AshOrcs |  | War_Execute, Arc_Snipe, Mag_ArcaneBlast, Pri_Mending |
 | 21 | _yeni icerik yok_ | | | | |
 | 22 | InfernalWraith |  | Q_InfernalWraiths |  |  |
@@ -35,13 +36,13 @@ Toplam: 48 mob (13 elit), 73 gorev, 53 ekipman, 73 beceri.
 | 28 |  |  | Q_Gold15000, Q_Gold30000 |  | War_Rampage, Arc_DeathMark, Mag_Disintegrate, Pri_Retribution |
 | 29 | ObsidianRaider |  | Q_ObsidianRaiders |  |  |
 | 30 |  | ObsidianWarlord | Q_ObsidianWarlord, Q_Level40 |  |  |
-| 31 | DuskProwler |  | Q_DuskProwlers |  |  |
+| 31 | DuskProwler |  | Q_DuskProwlers |  | War_Earthshaker, Arc_ThornVolley, Mag_Inferno, Pri_RadiantNova |
 | 32 | _yeni icerik yok_ | | | | |
 | 33 | DuskGuardian |  | Q_DuskGuardians | DuskBlade, DuskPlate, DuskHelm, DuskBoots | War_BloodLord, Arc_WindsBreath, Mag_FreezingTempest, Pri_LifeBond |
 | 34-35 | _yeni icerik yok_ | | | | |
 | 36 | DuskReaver |  | Q_DuskReavers |  |  |
 | 37-38 | _yeni icerik yok_ | | | | |
-| 39 | DuskWraith |  | Q_DuskWraiths |  |  |
+| 39 | DuskWraith |  | Q_DuskWraiths |  | War_Skullsplitter, Arc_Impaler, Mag_Starfall, Pri_SalvationLight |
 | 40 |  | DuskOverlord | Q_DuskOverlord, Q_Level50, Q_Gold50000 |  |  |
 | 41 | _yeni icerik yok_ | | | | |
 | 42 | WinterStalker |  | Q_WinterStalkers | WinterBlade, WinterPlate, WinterHelm, WinterBoots |  |
