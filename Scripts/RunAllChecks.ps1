@@ -48,6 +48,11 @@ if (-not $SkipBuild) {
     }
 }
 
+Step "Karakter JSON gidis-donus testi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestCharacterSaveJson.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

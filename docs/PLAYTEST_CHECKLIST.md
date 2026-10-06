@@ -3516,3 +3516,19 @@ Ana görev zincirini bloke etmeyen iki yan görev eklendi. `Kor Sürüsü`, mevc
 - [ ] Çözülme görevlerini almadan `Q_EmberHounds` ana zincirine ilerle; yan görevler ilerlemeyi engellememelidir.
 - [ ] PlayerStart ve hub NPC'lerinde 3 dakika bekle: Çözülme mobları hub'a gelmemeli. Çözülme cebinden en yakın eski cebe mob sürükleyip iki grubun istemsiz birlikte aggro olup olmadığını kontrol et.
 - [ ] Kısmi görev ilerlemesinde kaydet/yükle yap; sayaçlar korunmalı, her ödül yalnız bir kez alınabilmelidir.
+
+## Karakter kaydı JSON şeması — 2026-10-06
+
+Bulut kayıt hazırlığının üçüncü dilimi eklendi: `FMMOCharacterSaveData`, sürüm 1 JSON zarfına
+çevriliyor ve geri okunuyor. Otomatik fixture bütün üst alanları, tüketilebilirleri, üç ekipman
+konumunu, öğrenilmiş beceri/hotbar/mastery verisini, `TMap<FName,int64>` cooldown'larını,
+görev/klan/arkadaş ve harita dönüşümünü karşılaştırdı. Örnek blob 1158 UTF-8 bayt; bilinmeyen
+ileri şema sürümü reddedildi. Zorlanmış UE 5.7 derlemesi, JSON testi, veri/statik/negatif
+kontroller, Summer/Winter duman testleri ve çok oyunculu bağlantı testi geçti.
+
+- [ ] Gerçek bir karakteri yerel `.sav` dosyasından yükle, `MMOSave` ile yeniden yaz ve yeniden
+  bağlan: mevcut yerel kayıt davranışı JSON yardımcı sınıfı eklendikten sonra değişmemeli.
+- [ ] Geliştirme konsolunda `MMOTestSaveJson` çalıştır: Output Log'da tek
+  `[MMO_SAVE_JSON_TEST] PASS schema=1 bytes=...` satırı görünmeli.
+- [ ] İleride PlayFab uygulaması bağlanınca aynı karakterin yerel `.sav` ve bulut JSON sonuçlarını
+  karşılaştır; başarısız HTTP yazımında yerel kayıt okunabilir kalmalı.

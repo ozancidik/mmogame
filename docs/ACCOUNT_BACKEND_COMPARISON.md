@@ -167,6 +167,14 @@ fiyatı ölçekte kabul edilemezse. O noktada yalnız Instance Launcher/Instance
 ## 6. Üç aşamalı geçiş planı (en küçük çalışan dilim önce)
 
 ### Aşama 1: Sunucu tarafı bulut kaydı (kimlik hâlâ ad; istemci değişmez)  [en küçük dilim]
+- **Hazırlık durumu (2026-10-06):** `IMMOCharacterStore`, yerel dosya uygulaması ve
+  `UGameInstanceSubsystem` erişim noktası eklendi; kayıt okuma/yazma çağıranları bu arayüze
+  taşındı. `FMMOCharacterSaveJson` sürüm 1 zarfı (`SchemaVersion` + `Data`) tüm
+  `FMMOCharacterSaveData` alanlarını JSON'a çeviriyor ve bilinmeyen ileri sürümleri reddediyor.
+  Gerçek UE yansımasıyla çalışan `Scripts/TestCharacterSaveJson.ps1`, dolu fixture'ın tüm
+  alanlarını (özellikle `TMap<FName,int64>`) gidiş-dönüşte karşılaştırıyor; ölçülen örnek blob
+  1158 UTF-8 bayt. PlayFab HTTP uygulaması, asenkron kuyruk/lazy migration ve travel onayı
+  bu hazırlık diliminden sonra hâlâ yapılacak.
 - `IMMOCharacterStore` arayüzü + `LocalFile` uygulaması (mevcut davranış) + `PlayFab` uygulaması (dedicated server, REST,
   `FHttpModule`; eklenti şart değil).
 - Sunucu `LoginWithServerCustomId` ile ad-tabanlı sunucu kimliğiyle (`legacyname:<ad>`) giriş yapar, blob'u karakter başına yazar/okur.

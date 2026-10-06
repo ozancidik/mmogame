@@ -44,6 +44,7 @@
 #include "DrawDebugHelpers.h"
 #include "Save/MMOSaveGame.h"
 #include "Save/MMOCharacterStoreSubsystem.h"
+#include "Save/MMOCharacterSaveJson.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -708,6 +709,26 @@ void AMMOCharacter::MMOLoad()
 	else
 	{
 		ServerLoadCharacter();
+	}
+}
+
+void AMMOCharacter::MMOTestSaveJson()
+{
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
+	FString Error;
+	int32 Utf8Bytes = 0;
+	const bool bPassed = FMMOCharacterSaveJson::RunRoundTripSelfTest(Error, Utf8Bytes);
+	if (bPassed)
+	{
+		UE_LOG(LogTemp, Display, TEXT("[MMO_SAVE_JSON_TEST] PASS schema=%d bytes=%d"),
+			FMMOCharacterSaveJson::CurrentSchemaVersion, Utf8Bytes);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[MMO_SAVE_JSON_TEST] FAIL %s"), *Error);
 	}
 }
 

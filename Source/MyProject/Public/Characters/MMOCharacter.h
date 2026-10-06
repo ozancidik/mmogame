@@ -100,6 +100,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOLoad();
 
+	// Bulut kaydi hazirligi: tum kayit alanlariyla surumlu JSON gidis-donus testi.
+	UFUNCTION(Exec)
+	void MMOTestSaveJson();
+
 	// Kayit dosyasi adi PlayerState'in adina dayanir (GetSaveSlotName). Bu proje
 	// login/kimlik sistemi kullanmiyor: motor varsayilaninda oyuncu adi baglanti
 	// sirasina gore "Player0"/"Player1".. olur - AYNI ISIMDIR farkli gecelerde farkli
