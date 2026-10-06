@@ -43,6 +43,7 @@
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 #include "Save/MMOSaveGame.h"
+#include "Save/MMOCharacterStoreSubsystem.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -480,12 +481,19 @@ bool AMMOCharacter::SaveCharacterForTravel()
 		return false;
 	}
 
+	// Kalicilik tek noktadan (IMMOCharacterStore): bugun yerel .sav, ileride bulut. Magaza yoksa kayit yok.
+	IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(this);
+	if (!Store)
+	{
+		return false;
+	}
+
 	// SECURITY_AUDIT K-1 (kayit ezme): yuklenen/olusturulan yuva ile simdiki yuva (ad degisti) farkliysa
 	// ve hedef yuvada baska birine ait bir kayit zaten varsa YAZMA. Yeni (bos) bir yuvaya yazmak serbest;
 	// mevcut bir kaydi sahiplenmek icin once o adla MMOLoad yapilmalidir (ActiveSaveSlot guncellenir).
 	const FString TargetSlot = GetSaveSlotName();
 	if (!ActiveSaveSlot.IsEmpty() && !ActiveSaveSlot.Equals(TargetSlot, ESearchCase::IgnoreCase)
-		&& UGameplayStatics::DoesSaveGameExist(TargetSlot, 0))
+		&& Store->Exists(TargetSlot))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Save refused: %s -> %s already exists (name changed since load)"), *ActiveSaveSlot, *TargetSlot);
 		// Uzak oyuncuya da ulasir (B5): aksi halde cikista ilerlemesini kaybettigini hic ogrenmezdi.
@@ -495,13 +503,7 @@ bool AMMOCharacter::SaveCharacterForTravel()
 		return false;
 	}
 
-	UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::CreateSaveGameObject(UMMOSaveGame::StaticClass()));
-	if (!SG)
-	{
-		return false;
-	}
-
-	FMMOCharacterSaveData& D = SG->Data;
+	FMMOCharacterSaveData D;
 	D.bValid = true;
 	if (Stats)
 	{
@@ -531,7 +533,7 @@ bool AMMOCharacter::SaveCharacterForTravel()
 	D.Location = GetActorLocation();
 	D.Rotation = GetActorRotation();
 
-	const bool bOk = UGameplayStatics::SaveGameToSlot(SG, TargetSlot, 0);
+	const bool bOk = Store->Save(TargetSlot, D);
 	if (bOk)
 	{
 		ActiveSaveSlot = TargetSlot;
@@ -585,8 +587,17 @@ bool AMMOCharacter::LoadCharacter()
 	GetWorldTimerManager().ClearTimer(SavedLocationRetryTimerHandle);
 	SavedLocationRetryCount = 0;
 
+	// Magaza yoksa yeni karakter dali YOK sayilmaz (orada kayit uzerine yazma riski): yukleme basarisiz,
+	// bInitialLoadComplete false kalir, kayit kapali.
+	IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(this);
+	if (!Store)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Character store unavailable; load failed, saving disabled"));
+		return false;
+	}
+
 	const FString Slot = GetSaveSlotName();
-	if (!UGameplayStatics::DoesSaveGameExist(Slot, 0))
+	if (!Store->Exists(Slot))
 	{
 		// Yeni karakter: hicbir kayit olmadigi icin PossessedBy'daki SetupForClass
 		// varsayilan (Warrior) sinifi sessizce uygulamis durumda. Oyuncunun bunu
@@ -604,14 +615,12 @@ bool AMMOCharacter::LoadCharacter()
 	}
 	bClassChoicePending = false;
 
-	UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-	if (!SG || !SG->Data.bValid)
+	FMMOCharacterSaveData D;
+	if (!Store->Load(Slot, D) || !D.bValid)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Character save %s exists but could not be loaded; saving disabled"), *Slot);
 		return false;
 	}
-
-	const FMMOCharacterSaveData& D = SG->Data;
 
 	// Once sinif/skiller (stat reset yapmadan), sonra statlar, sonra envanter (ekipman bonusu).
 	if (SkillComponent)
@@ -799,11 +808,15 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	}
 	// Uzak istemci diskte kaydi olan (baska birine ait) bir adi alamaz: aksi halde SaveCharacterForTravel
 	// bu karakter icin surekli reddedilir ve host'un bolge gecisi kilitlenir (QA O-3). Kendi yuvasina donus serbest.
-	if (!IsLocallyControlled() && !ActiveSaveSlot.Equals(CandidateSlot, ESearchCase::IgnoreCase)
-		&& UGameplayStatics::DoesSaveGameExist(CandidateSlot, 0))
+	if (!IsLocallyControlled() && !ActiveSaveSlot.Equals(CandidateSlot, ESearchCase::IgnoreCase))
 	{
-		MMONotify::ToOwner(this, TEXT("Bu ad kayitli bir karaktere ait: degistirilemedi. Kendi karakterin icin ?Name= ile yeniden baglan."), FColor::Orange, 6.f);
-		return;
+		// Magaza yoksa varlik dogrulanamaz: ad degisikligi reddedilir (muhafazakar).
+		IMMOCharacterStore* NameStore = UMMOCharacterStoreSubsystem::Get(this);
+		if (!NameStore || NameStore->Exists(CandidateSlot))
+		{
+			MMONotify::ToOwner(this, TEXT("Bu ad kayitli bir karaktere ait: degistirilemedi. Kendi karakterin icin ?Name= ile yeniden baglan."), FColor::Orange, 6.f);
+			return;
+		}
 	}
 	if (CooldownWorld)
 	{

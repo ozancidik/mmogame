@@ -11,6 +11,7 @@
 #include "World/MMOWarehouseNPC.h"
 #include "UI/MMOHUD.h"
 #include "Characters/MMOCharacter.h"
+#include "Save/MMOCharacterStoreSubsystem.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
@@ -192,7 +193,9 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 			for (int32 Attempt = 0; Attempt < 16; ++Attempt)
 			{
 				const FString Candidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999));
-				bool bTaken = UGameplayStatics::DoesSaveGameExist(FString(TEXT("MMOSave_")) + Candidate, 0);
+				// Magaza yoksa yuva dogrulanamaz: aday "alinmis" sayilir (16 deneme sonrasi GUID yedegi devreye girer).
+				IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(this);
+				bool bTaken = !Store || Store->Exists(FString(TEXT("MMOSave_")) + Candidate);
 				if (!bTaken && World)
 				{
 					for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)

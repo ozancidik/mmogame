@@ -5,13 +5,12 @@
 #include "Components/MMOStatsComponent.h"
 #include "Player/MMOPlayerController.h"
 #include "Save/MMOSaveGame.h"
+#include "Save/MMOCharacterStoreSubsystem.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
-#include "HAL/FileManager.h"
-#include "Misc/Paths.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOClanAudit, Log, All);
 
@@ -54,21 +53,26 @@ namespace
 	constexpr double SavedClanCacheTtlSeconds = 30.0;
 
 	// Disk kayitlarinda (baska bir karakter yuvasinda) bu klan adi kullaniliyor mu?
-	bool SavedClanNameInUse(const FString& Name, const FString& ExcludeSlot)
+	bool SavedClanNameInUse(const UObject* WorldContext, const FString& Name, const FString& ExcludeSlot)
 	{
 		const double Now = FPlatformTime::Seconds();
 		if (Now - GSavedClanCacheTime > SavedClanCacheTtlSeconds)
 		{
-			GSavedClanBySlot.Reset();
-			TArray<FString> Files;
-			IFileManager::Get().FindFiles(Files, *(FPaths::ProjectSavedDir() / TEXT("SaveGames") / TEXT("MMOSave_*.sav")), true, false);
-			for (const FString& File : Files)
+			// Kayit magazasi (IMMOCharacterStore) yoksa cakisma dogrulanamaz: ad "kullanimda" sayilir.
+			IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(WorldContext);
+			if (!Store)
 			{
-				const FString Slot = FPaths::GetBaseFilename(File);
-				const UMMOSaveGame* SG = Cast<UMMOSaveGame>(UGameplayStatics::LoadGameFromSlot(Slot, 0));
-				if (SG && !SG->Data.ClanName.IsEmpty())
+				return true;
+			}
+			GSavedClanBySlot.Reset();
+			TArray<FString> Slots;
+			Store->ListSlotNames(Slots);
+			for (const FString& Slot : Slots)
+			{
+				FMMOCharacterSaveData SavedData;
+				if (Store->Load(Slot, SavedData) && !SavedData.ClanName.IsEmpty())
 				{
-					GSavedClanBySlot.Add(Slot, SG->Data.ClanName);
+					GSavedClanBySlot.Add(Slot, SavedData.ClanName);
 				}
 			}
 			GSavedClanCacheTime = Now;
@@ -269,7 +273,7 @@ void UMMOClanComponent::CmdCreate(const FString& Name)
 
 	// Kayitlarda (cevrimdisi uyeler) bu adi tasiyan baska bir karakter varsa da reddet:
 	// aksi halde ad kapan, geri donen eski uyeleri/lideri devralirdi (QA ORTA).
-	if (SavedClanNameInUse(N, Self->GetSaveSlotName()))
+	if (SavedClanNameInUse(this, N, Self->GetSaveSlotName()))
 	{
 		NotifyOwner(TEXT("Bu klan adi kullanimda (cevrimdisi uyeleri var)."));
 		return;
