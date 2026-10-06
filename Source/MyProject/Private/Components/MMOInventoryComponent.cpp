@@ -10,6 +10,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerState.h"
 #include "Core/MMONotify.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -17,6 +18,24 @@
 #include "Player/MMOPlayerController.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOWarehouseNPC.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogMMOInventoryAudit, Log, All);
+
+namespace
+{
+	FString InventoryActorName(const UMMOInventoryComponent* Inventory)
+	{
+		const AMMOCharacter* Character = Inventory ? Cast<AMMOCharacter>(Inventory->GetOwner()) : nullptr;
+		const APlayerState* PlayerState = Character ? Character->GetPlayerState() : nullptr;
+		return PlayerState ? PlayerState->GetPlayerName() : TEXT("?");
+	}
+
+	FString InventorySlotName(const UMMOInventoryComponent* Inventory)
+	{
+		const AMMOCharacter* Character = Inventory ? Cast<AMMOCharacter>(Inventory->GetOwner()) : nullptr;
+		return Character ? Character->GetSaveSlotName() : TEXT("?");
+	}
+}
 
 UMMOInventoryComponent::UMMOInventoryComponent()
 {
@@ -462,12 +481,19 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 	LastUpgradeServerTime = Now;
 	AddGoldFrom(-Cost, TEXT("yukseltme"));
 
+	const FName UpgradedItemId = Inst.ItemId;
+	const int32 OldPlus = Inst.Plus;
+	const int32 UpgradeRarity = static_cast<int32>(Inst.Rarity);
 	const int32 ChancePct = FMMOItemDatabase::GetUpgradeChancePct(Inst.Plus);
 	const bool bSuccess = FMath::RandRange(1, 100) <= ChancePct;
+	const TCHAR* Result = TEXT("failed");
+	int32 ResultPlus = OldPlus;
 
 	if (bSuccess)
 	{
 		Inst.Plus++;
+		Result = TEXT("success");
+		ResultPlus = Inst.Plus;
 		ClientUpgradeResult(true, false, Inst.ItemId, Inst.Plus);
 	}
 	else if (FMath::RandRange(1, 100) <= FMMOItemDatabase::GetBurnChancePct(Inst.Plus))
@@ -475,12 +501,19 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 		// YANDI! Item yok olur (klasik KO).
 		const FName BurnedId = Inst.ItemId;
 		EquipmentBag.RemoveAt(BagIndex);
+		Result = TEXT("burned");
+		ResultPlus = -1;
 		ClientUpgradeResult(false, true, BurnedId, 0);
 	}
 	else
 	{
 		ClientUpgradeResult(false, false, Inst.ItemId, Inst.Plus);
 	}
+
+	UE_LOG(LogMMOInventoryAudit, Display,
+		TEXT("event=item_upgrade actor=\"%s\" slot=\"%s\" item=\"%s\" instance=%d rarity=%d from_plus=%d to_plus=%d cost=%d chance=%d result=%s balance=%d"),
+		*InventoryActorName(this), *InventorySlotName(this), *UpgradedItemId.ToString(), InstanceId,
+		UpgradeRarity, OldPlus, ResultPlus, Cost, ChancePct, Result, Gold);
 
 	OnInventoryChanged.Broadcast();
 }
@@ -722,6 +755,10 @@ void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
 		* FMMOItemDatabase::GetRarityMultiplier(Inst.Rarity));
 	EquipmentBag.RemoveAt(BagIndex);
 	AddGoldFrom(Price, TEXT("satis"));
+	UE_LOG(LogMMOInventoryAudit, Display,
+		TEXT("event=item_sell actor=\"%s\" slot=\"%s\" item=\"%s\" instance=%d rarity=%d plus=%d price=%d balance=%d"),
+		*InventoryActorName(this), *InventorySlotName(this), *Inst.ItemId.ToString(), Inst.InstanceId,
+		static_cast<int32>(Inst.Rarity), Inst.Plus, Price, Gold);
 	OnInventoryChanged.Broadcast();
 
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satildi: %s +%d (+%d altin)"), *Def->Name, Inst.Plus, Price), FColor(255, 210, 0), 2.f);
@@ -792,8 +829,13 @@ void UMMOInventoryComponent::DepositEquipment(int32 InstanceId)
 		return;
 	}
 
-	Warehouse.Add(EquipmentBag[BagIndex]);
+	const FMMOEquipmentInstance Moved = EquipmentBag[BagIndex];
+	Warehouse.Add(Moved);
 	EquipmentBag.RemoveAt(BagIndex);
+	UE_LOG(LogMMOInventoryAudit, Display,
+		TEXT("event=warehouse_deposit actor=\"%s\" slot=\"%s\" item=\"%s\" instance=%d rarity=%d plus=%d bag_count=%d warehouse_count=%d"),
+		*InventoryActorName(this), *InventorySlotName(this), *Moved.ItemId.ToString(), Moved.InstanceId,
+		static_cast<int32>(Moved.Rarity), Moved.Plus, EquipmentBag.Num(), Warehouse.Num());
 	OnInventoryChanged.Broadcast();
 }
 
@@ -834,8 +876,13 @@ void UMMOInventoryComponent::WithdrawEquipment(int32 InstanceId)
 		return;
 	}
 
-	EquipmentBag.Add(Warehouse[StoreIndex]);
+	const FMMOEquipmentInstance Moved = Warehouse[StoreIndex];
+	EquipmentBag.Add(Moved);
 	Warehouse.RemoveAt(StoreIndex);
+	UE_LOG(LogMMOInventoryAudit, Display,
+		TEXT("event=warehouse_withdraw actor=\"%s\" slot=\"%s\" item=\"%s\" instance=%d rarity=%d plus=%d bag_count=%d warehouse_count=%d"),
+		*InventoryActorName(this), *InventorySlotName(this), *Moved.ItemId.ToString(), Moved.InstanceId,
+		static_cast<int32>(Moved.Rarity), Moved.Plus, EquipmentBag.Num(), Warehouse.Num());
 	OnInventoryChanged.Broadcast();
 }
 

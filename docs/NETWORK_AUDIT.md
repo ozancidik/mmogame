@@ -28,12 +28,12 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O4 | ORTA | Ticaret davetinde aynı davetçi sınırsız tekrar bildirim; Parti davetinde "davet kapma" koruması yok | MMOTradeComponent.cpp:251-260; MMOPartyComponent.cpp:194-196 |
 | O5 | ORTA | Arkadaş listesi rızasız: başkasının giriş/çıkış ve seviyesini izlemek mümkün | MMOFriendsComponent.cpp:107-164, 206-231, 233-276 |
 | O6 | ORTA | `bTravelSaveCommitted` penceresinde ilerleme kaybı (geri sarma); `bZoneTravelInProgress` sıfırlanmıyor; tek oyuncu toplu geçişi kilitleyebilir | MMOCharacter.cpp:383; MMOGameMode.cpp:118-168 |
-| O7 | ORTA | "Dünya duyurusu" NetMulticast yalnız ilgili (relevant) istemcilere gider | MMOMob.cpp:350-366, 702-710 |
+| O7 | ORTA | **Kapandı:** elit ölüm duyurusu sunucuda tüm PlayerController'lara sahip-istemci `ClientReceiveChat` ile gider | MMOMob.cpp:916-934 |
 | O8 | ORTA | Mob `Tick` her karede, oyuncu olmasa da, O(mob × oyuncu); spawner gereksiz replike | MMOMob.cpp:384-490; MMOMobSpawner.cpp:17 |
 | O9 | ORTA | Stats/Quest/Skill/Party alanları da herkese (gizlilik + bant) | MMOStatsComponent.cpp:77-92; MMOQuestComponent.cpp:26-27; MMOSkillComponent.cpp:42-45; MMOPartyComponent.cpp:19-20 |
 | O10 | ORTA | `UnequipSlot` çanta sınırını (12) aşar; invariant bozulunca takas/geri alma/ödül reddedilir | MMOInventoryComponent.cpp:285 |
 | O11 | ORTA | Dedicated için engeller: Server target yok, admin yolu `IsLocalController`'a bağlı, geri bildirim `IsLocallyControlled`'a bağlı, HUD'a bağlı sunucu kodu | bkz. bölüm 6 |
-| O12 | ORTA | Denetim (audit) logu yok: takas, altın, klan, ad değişimi | bölüm 1 |
+| O12 | ORTA | **Kapandı (yerel log):** takas/iptal, klan, yükseltme/yanma, satış, depo ve ad değişimi yapılandırılmış sunucu loguna yazılır | bölüm 1 |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -76,8 +76,12 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - **Party:** `ServerInviteNearest` (MMOPartyComponent.cpp:194-196) hedefin `PendingInviteFrom`'unu koşulsuz ezer (Trade/Klan'daki kapma koruması yok): saldırgan gerçek bir daveti, kurbanın `kabul`'üne kadar kendi davetiyle değiştirebilir. Bu bileşen kapsam dışıydı; yalnız not.
 - Trade `Accept/Cancel/RemoveItem` ve Clan komutlarında RPC başına hız sınırı yok (yalnız chat throttle'ı); `ServerAddItem/SetGold` 0.3 sn cooldown'lu (iyi).
 
-### O12 · ORTA · Denetim logu yok
-- Takas (altın/eşya), klan kuruluş/atma, ad değişimi, `TryUpgrade` yanması, depo hareketleri için kalıcı ve sorgulanabilir kayıt yok. Dedicated ortamda eşya çoğaltma/dolandırıcılık şikâyetlerini incelemek imkânsız. `TryExecuteTrade` (MMOTradeComponent.cpp:665-675) bir satır `UE_LOG(LogMMOAudit, ...)` + hesap kimliğiyle yazmalı.
+### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu)
+- `LogMMOTradeAudit`: tamamlanan ve iptal edilen takaslar; iki taraf, altın bakiyeleri ve eşya `InstanceId`/artı/nadirlikleri.
+- `LogMMOClanAudit`: klan kurma, katılma, ayrılma, atma ve lider devri.
+- `LogMMOInventoryAudit`: yükseltme başarı/başarısızlık/yanma, satma, depoya koyma ve depodan alma; karakter yuvası, eşya kimliği ve son bakiye/sayaçlar.
+- `LogMMOIdentityAudit`: eski/yeni görünen ad, eski/yeni kayıt yuvası ve etkin kayıt yuvası.
+- Satın alma, görev/ganimet ve diğer altın değişimleri mevcut `[MMOMETRIC] ev=gold` satırlarında kaynak etiketi ve bakiye ile izlenir. UE logları `Saved/Logs` altında kalıcıdır. Hesap backend'i gelince görünen ad/kayıt yuvası yerine doğrulanmış `AccountId` yazılmalı ve merkezi sorgulanabilir log toplayıcısına aktarılmalıdır.
 
 ### Olumlu bulgular (korunmalı)
 - Takas: sahip-yalnız replikasyon, atomik yürütme, yürütmede yeniden doğrulama, `OfferRevision` + 1 sn onay kilidi (MMOTradeComponent.cpp:406-448, 576-676); gönderen kimliği yerine yeni `InstanceId` (MMOInventoryComponent.cpp:729).
@@ -134,7 +138,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 ### Reliable / Unreliable değerlendirmesi
 - `ClientNotifyXPGain` (`Client, Unreliable`, MMOCharacter.h:283, çağrı MMOMob.cpp:690): **doğru seçim** (yalnız görsel; kaybolursa XP zaten replike `Experience`'tan görünür). Kaydı: parti üyelerine her öldürmede bir paket; küçük. `Amount/Percent` `int32` → `uint16/uint8` yapılabilir (kozmetik).
 - `ClientReceiveChat` (`Client, Reliable`, MMOPlayerController.h:47): sohbet satırı için doğru, **ama aynı kanal geçici ipuçları için de kullanılıyor**: saldırı ret nedeni (MMOCharacter.cpp:974, ~2/sn), ticaret teklif değişimi bildirimleri, `NotifyOwner` çağrılarının tamamı. Geçici ipuçları için ayrı `Client, Unreliable ClientShowHint(...)` tanımla; reliable'ı yalnız gerçek sohbet/sistem mesajlarına sakla.
-- `MulticastMeleeFX` / `MulticastSkillFX` / `MulticastPlayCreatureAttack`: Unreliable (doğru). `MulticastEliteDeathAnnounce` Reliable (doğru ama bkz. O7).
+- `MulticastMeleeFX` / `MulticastSkillFX` / `MulticastPlayCreatureAttack`: Unreliable (doğru). Elit ölüm dünya duyurusu multicast kullanmıyor; sunucu tüm PlayerController'lara sahip-istemci reliable sohbet satırı yollar (O7 kapandı).
 - Server RPC'lerin hepsi Reliable: düşük frekanslı olanlar için uygun. `ServerAttackTarget` (≈1.6/sn/oyuncu) ve `ServerUseSkill` cooldown'la sınırlı; kabul edilebilir.
 
 ### O2 · ORTA · Sohbet fan-out ve reliable-buffer taşması
@@ -198,7 +202,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 3. **Geri bildirim `IsLocallyControlled()`'e bağlı (uzak istemcilere hiç gitmiyor — listen-server'da da!):** Inventory (MMOInventoryComponent.cpp:172, 392, 402, 415, 424, 453, 463, 472, 498, 514, 523, 550, 570, 620, 665), Party (MMOPartyComponent.cpp:181, 198, 224, 232, 258, 274, 373), Quest (MMOQuestComponent.cpp:178-371), Skill (MMOSkillComponent.cpp:129, 457, 475, 566, 791), Character (MMOCharacter.cpp:498, 596, 705, 835, 928, 1026, 1482-1662), LootPickup (MMOLootPickup.cpp:168 ve **koşulsuz** 183-207). Sunucuda uzak oyuncunun pawn'ı `IsLocallyControlled()==false` olduğundan "Canta dolu!", "Altin yetersiz", "Satin alindi", "Satildi", görev alındı, loot mesajı, "Kaydedildi/Karakter yuklendi", "Oldun! -N EXP", vurma geri bildirimi **yalnız host'a** görünür. Bu bugün listen-server'da uzak oyuncuların deneyimini bozuyor (kod okumasıyla kesin; PIE'de iki oyunculu gözle doğrulanmalı) ve dedicated'da tamamen yok olur. `LootPickup`'ın koşulsuz mesajları ise host ekranında başkalarının toplama olaylarını gösteriyor.
    - **Düzeltme:** Tek bir `AMMOPlayerController::ClientNotify(FText/uint8 Kod, int32 Arg...)` (Unreliable, oran sınırlı) ya da mevcut kanal-2 sohbet satırı; sunucu kodu `GEngine->AddOnScreenDebugMessage` yerine bunu çağırsın.
 4. **HUD'a bağlı sunucu kodu — kapandı (2026-10-06):** `TakeDamage` ve `Heal` artık sunucuda HUD aramıyor; ilgili karakter üzerinden `Unreliable NetMulticast` ile miktar/konum/iyileştirme bayrağı gönderiliyor. Her istemci kendi yerel controller/HUD'ında çiziyor, dedicated örneği `NM_DedicatedServer` dalında çizimi atlıyor. Eski `OnRep_Health` sayı üretimi kaldırıldı; aynı vuruş iki kez görünmüyor. Aktör ilgililiği dışındaki oyunculara kozmetik sayı gönderilmemesi kasıtlı. İki istemcili görsel PIE doğrulaması bekliyor.
-   - `MulticastEliteDeathAnnounce` (MMOMob.cpp:350-366) `GEngine->GetFirstLocalPlayerController` kullanıyor — multicast istemcide çalıştığından sorun değil; sunucuda null döner (zararsız).
+   - Elit ölüm duyurusu da kapandı: mob relevancy multicast'i yerine sunucu `PlayerController` döngüsü ve `ClientReceiveChat` kullanıyor; uzaktaki oyuncu da satırı alır.
 5. **Disk G/Ç oyun iş parçacığında:** `SaveGameToSlot`/`LoadGameFromSlot` (MMOCharacter.cpp:496, 534), `SavedClanNameInUse` (bkz. O3). 100 oyuncu × 60 sn otomatik kayıt dağınık olsa da takas/klan/arkadaş anlık `SaveCharacter()` çağırıyor. Asenkron kayıt (`AsyncSaveGameToSlot`) ya da DB.
 6. **`bAllowPvP = true` varsayılan** (MMOGameMode.h:40, "Test icin varsayilan acik"); halka açık sunucuda `false` olmalı. `bAllowPvP` replike değil: istemci `IsPvPAllowed()` her zaman `false` döner (`GetAuthGameMode` istemcide null) — istemci tarafı kapılar buna güvenmemeli (`AttackTarget` istemci yolu güvenli: yalnız sunucu karar veriyor).
 7. **LLM NPC diyaloğu:** `ServerRequestNpcDialogue` yalnız oyuncu başına 2 sn (MMOPlayerController.cpp:1183-1187); sunucu geneli eşzamanlı/dakikalık üst sınır yok → 100 oyuncu × 0.5 istek/sn = ücretli istek patlaması. Küresel token-bucket ekle. Sunucu ortamında API anahtarı yönetimi gerekir.
@@ -234,7 +238,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 5. **O1/O2/O3** — chat `_Validate` + uzunluk + tek throttle, alıcı başına bütçe, klan kayıt kaydı.
 6. **O11 (bölüm 6)** — `ClientNotify` kanalı, Server target, admin yolu, HUD'dan bağımsız sayılar.
 7. **Y1** — hesap kimliği (dedicated/herkese açık yayın öncesi **zorunlu**); o zamana dek `ServerSetName` kısıtlaması ve `?Name=` yok sayma.
-8. **O6, O7, O12** — travel kilidi, dünya duyurusu için GameState/PC döngüsü, denetim logu.
+8. **O6** — travel sonrası motor yükleme hatası ve kayıt-pawn yok oluş penceresi.
 
 Önerilen PIE doğrulamaları (2+ oyunculu listen-server, ardından `-server` hedefi):
 - Uzak istemcide "Canta dolu / Altin yetersiz / Satin alindi / loot" mesajı görünüyor mu (bölüm 6.3).
@@ -242,7 +246,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - `stat net` + Network Profiler: 1 oyuncu yenilenirken ve buff'lıyken izleyici başına B/sn (Y3).
 - Hızlı çift tık ile `TryUpgrade`/`Sell` + 200 ms gecikme (`p.NetPktLag=200` / `Net PktLag=200`) (Y4).
 - `open ip?Name=<mevcut kayıt adı>` ile bağlan (Y1-B).
-- Elit boss'u uzak bir oyuncu varken öldür: duyuru uzak oyuncuya ulaşıyor mu (O7).
+- Elit boss'u uzak bir oyuncu varken öldür: duyuru uzak oyuncuya ulaşmalı (O7 kodda kapandı; PIE doğrulaması bekliyor).
 - İki oyuncuyla `MMOTravel` sırasında pawn `EndPlay` logları ve parti durumu (bölüm 5).
 
 ---
@@ -254,7 +258,7 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişikl
 - **Bu turda (derlenmedi):** D1 (debug RPC'leri Shipping'de erken döner), D3 (ölü karakter satıcıdan işlem ve yükseltme yapamaz; yükseltmede NPC yakınlık koşulu tasarım kararı olarak eklenmedi), D5/D9 (sohbet kontrol ve bidi karakter temizliği), D6 (`GAnnounced` tablosu 512 kayıtla sınırlı), D9/Y1 ad değiştirme soğuması (30 sn, yalnız uzak istemci).
 - **Y3 madde 1** (can/mana her karede kirlenir): yenilenme ≥1 puanlık adımlara bağlandı (derlenmedi). Madde 2 (`ActiveEffects.RemainingTime`): `NotReplicated` yapıldı, replike `EndServerTime` eklendi, HUD kalan süreyi ondan hesaplıyor (derlenmedi).
 - **O11 madde 3** (geri bildirim `IsLocallyControlled()`'e bağlı): `MMONotify::ToOwner` eklendi, envanter ve görev bileşeni mesajları uzak istemciye de gider (derlenmedi). Beceri/karakter/ganimet/parti mesajları açık.
-- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de),  O4 (parti ve ticaret davet kapma — `MMOPartyComponent.cpp`/`MMOTradeComponent.cpp` yerelde Codex'te olduğu için bulutta dokunulmadı), O5 (arkadaş rızası), O6, O7, O8, O11, O12 (denetim logu; Trade dosyası), D2, D4, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10.
+- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), O4 (parti ve ticaret davet kapma), O5 (arkadaş rızası), O6, O8, O11, D2, D4, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10. O7 ve O12 kodda kapandı; PIE/log doğrulaması aşağıdaki checklist'te bekliyor.
 
 ### Y3 çözüm notu (2026-10-06)
 
@@ -268,4 +272,4 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişikl
 
 - **`MMONotify::ToOwner`'a taşındı:** Parti (`ServerInviteNearest` "Yakinda davet edilecek oyuncu yok", `ServerAccept` "Davetin suresi doldu"/"Davet eden cok uzakta", `ServerKick` "Sadece parti lideri…"/"Uye partiden cikarildi", `FormOrJoin` "Parti dolu"), ganimet sarf malzemesi satırı ("+N Item", `MMOLootPickup`), beceri `ExecuteSkill` "Menzilde hedef yok" (iki yer), karakter `UseHealthPotion`/`UseConsumable` "Canin zaten dolu"/"Iksir yok!"/"X yok!". Bunlar sunucuda uzak pawn için çalışan yollardı (`IsLocallyControlled` ile kayboluyordu); `ToOwner` yerelde ekran, uzakta Hint/Result'tır. Ağ trafiği: Hint Unreliable, aynı metin 0.5 sn içinde tekrar gitmez.
 - **Dokunulmadı (bilinçli):** (a) yalnız istemcide çalışan ön kontrol/geri bildirimler: `UseSkill` "Guvenli bolgeden saldiramazsin"/cooldown/">> Skill" (istemci aynı kontrolü kendi makinesinde yapıp RPC'den önce gösterir), `AttackTarget` "Guvenli bolgede saldiri yok" (4101), `AMMOCharacter::MMOPartyKick` ön kontrolleri, `LearnSkill` "Ogrenilemedi", `AMMOPlayerController` tıkla-yürü ipuçları ("Saticiya yaklas" vb.), HUD "Hotbar dolu"; (b) `OnLevelUpFeedback`/`OnRep_SpawnProtected` (OnRep ile her makinede yerel çalışır); (c) `Client` RPC gövdeleri (`ClientNotifyInvited/Kicked`, `ClientUpgradeResult`); (d) `QuestComponent::NotifyMobKilled` ilerleme satırı (kasıtlı yerel: HUD takipçisi uzakta zaten gösterir, sohbeti doldurmasın); (e) yalnız konsol/debug: `MMOPvP`, `MMOClass`, `MMONpcTalk`, `MMOTravel` hata satırı.
-- **Dedicated server için kalan engeller:** (1) `MyProjectServer.Target.cs` yok ve kurulu Epic binary motor Server target'ını desteklemiyor; kaynak UE 5.7 motoru gerekiyor; (2) admin/debug yolu `IsLocalController()`'a kilitli (`MMOTravel`, `RequestZoneTravel`, `ServerSetPvP/ApplyBuff/SpawnMob/GiveItem/LoadCharacter`); (3) `AMMOMob::MulticastEliteDeathAnnounce` `GetFirstLocalPlayerController` kullanıyor (istemcide çalıştığı için zararsız, sunucuda null); (4) `SaveGameToSlot`/`LoadGameFromSlot` oyun iş parçacığında (asenkron kayıt/DB); (5) `bAllowPvP` replike değil; (6) LLM NPC için küresel hız sınırı yok; (7) Slate/HUD modül bağımlılıkları kaynak motor Server target'ında doğrulanmadı; (8) `Exec` komutları/debug RPC'leri Shipping'de (D1 RPC tarafı kapatıldı); (9) listen-server'a özgü `GetFirstPlayerController` kullanan başka istemci-yerel yollar dedicated'da çalışmayabilir. Hasar/iyileştirme sayılarına ait doğrudan sunucu-HUD bağı kapandı.
+- **Dedicated server için kalan engeller:** (1) `MyProjectServer.Target.cs` yok ve kurulu Epic binary motor Server target'ını desteklemiyor; kaynak UE 5.7 motoru gerekiyor; (2) admin/debug yolu `IsLocalController()`'a kilitli (`MMOTravel`, `RequestZoneTravel`, `ServerSetPvP/ApplyBuff/SpawnMob/GiveItem/LoadCharacter`); (3) `SaveGameToSlot`/`LoadGameFromSlot` oyun iş parçacığında (asenkron kayıt/DB); (4) `bAllowPvP` replike değil; (5) Slate/HUD modül bağımlılıkları kaynak motor Server target'ında doğrulanmadı; (6) `Exec` komutları/debug RPC'leri Shipping'de (D1 RPC tarafı kapatıldı); (7) listen-server'a özgü `GetFirstPlayerController` kullanan başka istemci-yerel yollar dedicated'da çalışmayabilir. Hasar/iyileştirme sayılarına ait doğrudan sunucu-HUD bağı ve elit dünya duyurusu kapandı. LLM NPC için küresel hız/eşzamanlılık sınırı eklendi; günlük bütçe tavanı ayrı açık kalemdir.

@@ -47,6 +47,8 @@
 #include "Save/MMOCharacterSaveJson.h"
 #include "Net/UnrealNetwork.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogMMOIdentityAudit, Log, All);
+
 namespace
 {
 	// Hile/debug komutlari (MMOGiveItem, MMOGainXP, MMOSpawnMob vb.) Shipping derlemede
@@ -892,7 +894,14 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	if (APlayerState* PS = GetPlayerState())
 	{
 		const FString OldName = PS->GetPlayerName();
+		const FString OldSlot = GetSaveSlotName();
 		PS->SetPlayerName(Trimmed);
+		if (!OldName.Equals(Trimmed, ESearchCase::CaseSensitive))
+		{
+			UE_LOG(LogMMOIdentityAudit, Display,
+				TEXT("event=name_change old_name=\"%s\" new_name=\"%s\" old_slot=\"%s\" new_slot=\"%s\" active_slot=\"%s\""),
+				*OldName, *Trimmed, *OldSlot, *GetSaveSlotName(), *ActiveSaveSlot);
+		}
 		// Ad degisince arkadaslar eski adi cevrimdisi, yeni adi cevrimici gorsun (QA ORTA-2).
 		if (FriendsComponent && IsPlayerControlled() && !OldName.Equals(Trimmed, ESearchCase::IgnoreCase))
 		{

@@ -3573,3 +3573,23 @@ UE 5.7 motoruna kaldı.
   ilgili pencerede bir kez görünmeli; pasif can yenilenmesi uçan sayı üretmemeli.
 - [ ] `Net PktLoss=20` ile birkaç vuruş/şifa dene: kozmetik sayı kaçabilir fakat can ve ölüm
   replike durumuyla doğru kalmalı; oyun mantığı multicast sonucuna bağlı olmamalı.
+
+## Ekonomi ve kimlik denetim logları — 2026-10-06
+
+Takas ve klan loglarına envanterdeki geri döndürülemez hareketler ile ad değişimi eklendi.
+Yükseltme; sonuç, maliyet, `InstanceId`, artı ve bakiye; satış ve depo hareketleri eşya kimliği
+ile kayıt yuvasını; ad değişimi eski/yeni ad ve kayıt yuvalarını yapılandırılmış tek satırlar
+halinde `Saved/Logs` altındaki sunucu loguna yazar. Zorlanmış UE 5.7 Editor derlemesi,
+ValidateData/StaticLint ve negatif testler, JSON/travel/timeout testleri, Summer/Winter duman
+testleri ve NetSmoke geçti. Gerçek işlem satırlarının üretilmesi PIE bekliyor.
+
+- [ ] Bir eşyayı yükselt: Output Log'da `LogMMOInventoryAudit` / `event=item_upgrade` satırı,
+  doğru sonuç (`success`, `failed`, `burned`), maliyet, eski/yeni artı ve son bakiye görünmeli.
+- [ ] Bir ekipman satıp başka bir ekipmanı depoya koy/geri al: `item_sell`,
+  `warehouse_deposit`, `warehouse_withdraw` satırlarında aynı `InstanceId`, eşya ve yuva olmalı.
+- [ ] İki oyunculu ticareti tamamla ve bir ticareti iptal et: `LogMMOTradeAudit` satırlarında iki
+  oyuncu, iki yönlü eşya/altın ve iptal sebebi bulunmalı; tamamlanan işlemden sonra iki kayıt yazılmalı.
+- [ ] Klan kur/katıl/ayrıl/at/lider devri akışlarını dene: `LogMMOClanAudit` her kalıcı değişimi
+  yapan oyuncu ve hedefle yazmalı.
+- [ ] `MMOSetName` ile adı değiştir: `LogMMOIdentityAudit` eski/yeni ad, eski/yeni yuva ve
+  `active_slot` değerlerini yazmalı. Aynı ad, geçersiz ad ve cooldown reddi başarı satırı üretmemeli.
