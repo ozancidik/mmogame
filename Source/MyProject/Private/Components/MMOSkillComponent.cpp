@@ -962,9 +962,9 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 
 			MulticastSkillFX(Def.Effect, CasterLoc + FVector(0, 0, 40), Target->GetActorLocation() + FVector(0, 0, 40), 0.f, AnimIndex);
 		}
-		else if (GEngine)
+		else
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Menzilde hedef yok"));
+			MMONotify::ToOwner(Caster, TEXT("Menzilde hedef yok"), FColor::Silver, 1.f, MMONotify::EMMONotifyKind::Hint);
 		}
 		break;
 	}
@@ -978,10 +978,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 			AMMOCharacter* Target = FindNearestEnemy(Def.Range);
 			if (!Target)
 			{
-				if (GEngine)
-				{
-					GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Silver, TEXT("Menzilde hedef yok"));
-				}
+				MMONotify::ToOwner(Caster, TEXT("Menzilde hedef yok"), FColor::Silver, 1.f, MMONotify::EMMONotifyKind::Hint);
 				return;
 			}
 			Center = Target->GetActorLocation();

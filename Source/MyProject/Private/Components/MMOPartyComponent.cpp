@@ -207,14 +207,7 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 	AMMOCharacter* Target = FindNearestOtherPlayer(1600.f);
 	if (!Target)
 	{
-		if (GEngine && Inviter->IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Yakinda davet edilecek oyuncu yok"));
-		}
-		else if (!Inviter->IsLocallyControlled())
-		{
-			MMONotify::ToOwner(Inviter, TEXT("Yakinda davet edilecek oyuncu yok"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
-		}
+		MMONotify::ToOwner(Inviter, TEXT("Yakinda davet edilecek oyuncu yok"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -293,18 +286,12 @@ void UMMOPartyComponent::ServerAccept_Implementation()
 	const float Now = World ? World->GetTimeSeconds() : 0.f;
 	if (InviteTime < 0.f || Now - InviteTime > InviteExpirySeconds)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Davetin suresi doldu"));
-		}
+		MMONotify::ToOwner(Invitee, TEXT("Davetin suresi doldu"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 	if (FVector::Dist(Invitee->GetActorLocation(), Inviter->GetActorLocation()) > InviteAcceptMaxDistance)
 	{
-		if (GEngine && IsLocallyControlledOwner())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Davet eden cok uzakta"));
-		}
+		MMONotify::ToOwner(Invitee, TEXT("Davet eden cok uzakta"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -327,10 +314,7 @@ void UMMOPartyComponent::ServerKick_Implementation(AMMOCharacter* Target)
 	// Sunucu-otoriter dogrulama: sadece lider, kendi partisindeki bir uyeyi cikarabilir.
 	if (!IsPartyLeader() || !Members.Contains(Target))
 	{
-		if (GEngine && Self->IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Sadece parti lideri uye cikarabilir"));
-		}
+		MMONotify::ToOwner(Self, TEXT("Sadece parti lideri uye cikarabilir"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -343,10 +327,7 @@ void UMMOPartyComponent::ServerKick_Implementation(AMMOCharacter* Target)
 	{
 		TP->ClientNotifyKicked();
 	}
-	if (GEngine && Self->IsLocallyControlled())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(220, 180, 120), TEXT("Uye partiden cikarildi"));
-	}
+	MMONotify::ToOwner(Self, TEXT("Uye partiden cikarildi"), FColor(220, 180, 120), 2.f);
 }
 
 void UMMOPartyComponent::ClientNotifyInvited_Implementation(AMMOCharacter* From)
@@ -442,10 +423,7 @@ void UMMOPartyComponent::FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invit
 	const int32 MaxParty = 8;
 	if (Set.Num() > MaxParty)
 	{
-		if (GEngine && Inviter->IsLocallyControlled())
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Silver, TEXT("Parti dolu (maksimum 8)"));
-		}
+		MMONotify::ToOwner(Inviter, TEXT("Parti dolu (maksimum 8)"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 

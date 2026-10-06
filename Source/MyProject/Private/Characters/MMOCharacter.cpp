@@ -1712,24 +1712,17 @@ void AMMOCharacter::UseHealthPotion()
 		return;
 	}
 
-	const bool bLocalFeedback = IsLocallyControlled();
-
-	// On kontroller replike verilerle her iki tarafta da yapilabilir.
+	// On kontroller replike verilerle her iki tarafta da yapilabilir. ToOwner: yerelde ekran, sunucuda
+	// (RPC ile gelen uzak istemci) sahibe hint; eskiden IsLocallyControlled yuzunden uzakta kayboluyordu.
 	if (Stats->Health >= Stats->MaxHealth)
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("Canin zaten dolu"));
-		}
+		MMONotify::ToOwner(this, TEXT("Canin zaten dolu"), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
 	if (Inventory->GetItemCount(PotionId) <= 0)
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver, TEXT("Iksir yok!"));
-		}
+		MMONotify::ToOwner(this, TEXT("Iksir yok!"), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -1778,15 +1771,9 @@ void AMMOCharacter::UseConsumable(FName ItemId)
 		return;
 	}
 
-	const bool bLocalFeedback = IsLocallyControlled();
-
 	if (Inventory->GetItemCount(ItemId) <= 0)
 	{
-		if (GEngine && bLocalFeedback)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Silver,
-				FString::Printf(TEXT("%s yok!"), *Def->Name));
-		}
+		MMONotify::ToOwner(this, FString::Printf(TEXT("%s yok!"), *Def->Name), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 

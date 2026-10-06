@@ -184,3 +184,15 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 istemc
 - [ ] Dolu cana ulasinca yenilenme durmali; bir sonraki hasardan sonra beklenmedik +1 HP sicramasi olmamali (can/mana doluyken birikim sifirlanir).
 - [ ] Efekt: bir buff/zehir uygula; HUD efekt sayaci (EndServerTime) geri sayimi akici ve dogru, sure bitince efekt kalkmali (uzak istemcide de).
 - [ ] (Istege bagli) 2 istemci + `stat net`: yenilenen oyuncu basina trafigin eskisine gore dustugunu olc (kazanc su an DOGRULANMADI).
+
+## 17. Uzak istemci geri bildirimleri MMONotify'a tasindi (NETWORK_AUDIT O11 madde 3 devam notu)
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 UZAK istemci gerekir; her satirda mesaj UZAK istemcide gorunmeli (host pencerede degil). Hint = karakter ustunde kisa balon, Result = sohbet sistem satiri.
+
+- [ ] **Parti**: yakinda baska oyuncu yokken `/parti` (veya MMOInvite): istemcide "Yakinda davet edilecek oyuncu yok" balonu. Daveti 30 sn+ beklettikten sonra `/parti kabul`: "Davetin suresi doldu"; davet edenden cok uzaklasip kabul: "Davet eden cok uzakta" (InviteAcceptMaxDistance asildiginda).
+- [ ] Uye olmayan istemcide parti uyesi secip kick denemesi (yetkisiz): "Sadece parti lideri uye cikarabilir" balonu. Lider istemcide basarili kick: sohbette "Uye partiden cikarildi" satiri; atilan oyuncuda "Parti lideri seni partiden cikardi" (degismedi).
+- [ ] 8 kisilik iki partiyi birlestirmeye calis (veya 8+ kisi): "Parti dolu (maksimum 8)" balonu davet edende.
+- [ ] **Ganimet**: istemcide sarf malzemesi (iksir vb.) toplayinca "+N <esya>" sohbet satiri gorunmeli (host ekraninda istemcinin satiri CIKMAMALI). Cok hizli ardisik toplamada spam olmamali (0.5 sn ayni metin tekrar etmez).
+- [ ] **Iksir**: istemcide cani doluyken `F`: "Canin zaten dolu"; iksiri yokken `F`/`G`: "Iksir yok!" / "<Esya> yok!" (yerelde ekran mesaji; ayni davranis host icin de).
+- [ ] **Beceri**: hedefsiz/menzil disi iken hedef gerektiren skill (sunucu ExecuteSkill yolu nadiren; ana yol UseSkill "Menzilde hedef yok" zaten vardi): istemcide balon gorunmeli, mana harcanmamali.
+- [ ] Regresyon: host kendi pawn'inda tum bu mesajlari eskisi gibi ekranda gormeli (cift mesaj olmamali).

@@ -287,10 +287,9 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 	if (!bIsGold && !bIsEquipment)
 	{
 		const int32 Added = Inv->AddItem(ItemId, ItemCount);
-		if (Added > 0 && GEngine && Char->IsLocallyControlled())
+		if (Added > 0)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor(60, 140, 255),
-				FString::Printf(TEXT("+%d %s"), Added, *ItemId.ToString()));
+			MMONotify::ToOwner(Char, FString::Printf(TEXT("+%d %s"), Added, *ItemId.ToString()), FColor(60, 140, 255), 2.f);
 		}
 		if (Added < ItemCount)
 		{
