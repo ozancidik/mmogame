@@ -215,6 +215,10 @@ protected:
 	uint16 HintPendingMask = 0;
 	float HintQueuedAt[8] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 	float HintNextAllowedTime = 0.f;
+	// Ekranda gosterilmekte olan ipucu (-1 = yok) ve balonun basladigi an. "Gosterildi" biti ancak
+	// balon tam suresi boyunca ezilmeden kaldiysa atilir; ezilirse ipucu yeniden siraya girer.
+	int32 HintActiveIndex = -1;
+	float HintActiveStart = -1000.f;
 	TWeakObjectPtr<class AMMOCharacter> HintPawn;
 	float HintPawnFirstSeen = -1.f;
 	float HintMoveWatchStart = -1.f;

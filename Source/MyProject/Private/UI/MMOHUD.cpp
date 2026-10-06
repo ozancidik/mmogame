@@ -2652,6 +2652,7 @@ namespace
 	constexpr float HintPendingExpire = 20.f;  // siradaki ipucu bu kadar sn icinde gosterilemezse dusurulur
 	constexpr float HintGapSeconds = 3.f;      // iki ipucu arasi bosluk (balon suresinin ustune)
 	constexpr float HintWarmupSeconds = 3.f;   // pawn ilk goruldugunde replikasyonun oturmasini bekle
+	constexpr float HintQuestAcceptQuietSeconds = 4.f; // gorev kabulunden sonra NPC kabul satiri icin susma
 
 	uint16& GetSessionHintMask(const ULocalPlayer* LP)
 	{
@@ -2683,7 +2684,9 @@ void AMMOHUD::QueueHint(int32 HintIndex, int32 PlayerLevel)
 	}
 	const APlayerController* PC = GetOwningPlayerController();
 	const uint16 Bit = (uint16)(1u << HintIndex);
-	if ((GetSessionHintMask(PC ? PC->GetLocalPlayer() : nullptr) & Bit) != 0 || (HintPendingMask & Bit) != 0)
+	// Ekranda gosterilmekte olan ipucu (henuz "gosterildi" biti atilmadi) tekrar siraya girmesin.
+	if ((GetSessionHintMask(PC ? PC->GetLocalPlayer() : nullptr) & Bit) != 0 || (HintPendingMask & Bit) != 0
+		|| HintActiveIndex == HintIndex)
 	{
 		return;
 	}
@@ -2721,8 +2724,35 @@ void AMMOHUD::UpdateTutorialHints(AMMOCharacter* PlayerChar)
 	}
 	const bool bWarm = Now - HintPawnFirstSeen >= HintWarmupSeconds;
 
+	// Gosterilmekte olan ipucunun akibeti: balon tam sure kaldiysa "gosterildi" say; arada baska bir
+	// replik (NPC/LLM/gorev satiri) balonu ezdiyse maskeyi atma, ipucunu yeniden siraya koy.
+	if (HintActiveIndex >= 0)
+	{
+		const uint16 ActiveBit = (uint16)(1u << HintActiveIndex);
+		if (Now - HintActiveStart >= NpcDialogueDuration)
+		{
+			ShownMask |= ActiveBit;
+			HintActiveIndex = -1;
+		}
+		else if (NpcDialogueStartTime != HintActiveStart || NpcDialogueText != GTutorialHints[HintActiveIndex].Text)
+		{
+			HintPendingMask |= ActiveBit;
+			HintQueuedAt[HintActiveIndex] = Now;
+			HintActiveIndex = -1;
+		}
+	}
+
 	if (bWarm)
 	{
+		// Gorev kabul edildi (0 -> >0): H2 ("! isaretine tikla") artik bayat; ayrica NPC'nin kabul satiri
+		// <=2 sn gecikmeyle gelip balonu ezecegi icin kisa sure ipucu gosterme.
+		if (HintPrevQuestCount == 0 && QuestCount > 0)
+		{
+			ShownMask |= (uint16)(1u << HintNpc);
+			HintPendingMask &= ~(uint16)(1u << HintNpc);
+			HintNextAllowedTime = FMath::Max(HintNextAllowedTime, Now + HintQuestAcceptQuietSeconds);
+		}
+
 		// H5: seviye atlama (OnLevelUp'in istemci karsiligi: replike Level tam +1 artti), harcanmamis puan var.
 		if (HintPrevLevel > 0 && Lv == HintPrevLevel + 1 && (S->UnspentStatPoints + S->UnspentSkillPoints) > 0)
 		{
@@ -2859,8 +2889,16 @@ void AMMOHUD::UpdateTutorialHints(AMMOCharacter* PlayerChar)
 		{
 			continue;
 		}
+		// Gosterim aninda kosulu yeniden dogrula: H2 kuyrukta beklerken gorev alindiysa bayat kalir.
+		if (i == HintNpc && (QuestCount > 0 || (Q && Q->CompletedQuests.Num() > 0)))
+		{
+			HintPendingMask &= ~Bit;
+			continue;
+		}
 		ShowNpcDialogue(TEXT("Ipucu"), GTutorialHints[i].Text);
-		ShownMask |= Bit;
+		// "Gosterildi" biti hemen atilmaz: balon tam sure ezilmeden kalirsa yukarida atilir.
+		HintActiveIndex = i;
+		HintActiveStart = NpcDialogueStartTime;
 		HintPendingMask &= ~Bit;
 		HintNextAllowedTime = Now + NpcDialogueDuration + HintGapSeconds;
 		break;
