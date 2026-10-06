@@ -206,6 +206,29 @@ protected:
 	float NpcDialogueStartTime = -1000.f;         // -1000 = gosterilecek diyalog yok
 	static constexpr float NpcDialogueDuration = 9.f;
 
+	// --- Ilk 10 dakika ipuclari (yalniz yerel HUD; sunucu mantigi/RPC/kayit yok) ---
+	// Yerel replike durumu (Stats/Quest/Inventory) izleyip olay anlarinda ipucu siraya koyar; ayni anda tek ipucu.
+	void UpdateTutorialHints(class AMMOCharacter* PlayerChar);
+	void QueueHint(int32 HintIndex, int32 PlayerLevel);
+	bool IsNpcDialogueShowing(float Now) const { return NpcDialogueStartTime > -900.f && Now - NpcDialogueStartTime <= NpcDialogueDuration; }
+
+	uint16 HintPendingMask = 0;
+	float HintQueuedAt[8] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	float HintNextAllowedTime = 0.f;
+	TWeakObjectPtr<class AMMOCharacter> HintPawn;
+	float HintPawnFirstSeen = -1.f;
+	float HintMoveWatchStart = -1.f;
+	FVector HintMoveOrigin = FVector::ZeroVector;
+	float HintNextNpcScan = 0.f;
+	float HintNextLootScan = 0.f;
+	int32 HintPrevLevel = 0;
+	int32 HintPrevQuestCount = -1;
+	bool bHintPrevDead = false;
+	bool bHintPrevBagFull = false;
+	float HintQuestAcceptedAt = -1.f;
+	int32 HintQuestAcceptLevel = 0;
+	int32 HintQuestAcceptExp = 0;
+
 	bool bSkillBookOpen = false;
 	bool bInventoryOpen = false;
 	bool bShopOpen = false;

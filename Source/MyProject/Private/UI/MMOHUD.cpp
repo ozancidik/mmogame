@@ -22,6 +22,8 @@
 #include "World/MMOTalkerNPC.h"
 #include "World/MMOHealerNPC.h"
 #include "World/MMOWarehouseNPC.h"
+#include "World/MMOLootPickup.h"
+#include "Engine/LocalPlayer.h"
 #include "Player/MMOPlayerController.h"
 #include "Engine/Canvas.h"
 #include "Engine/World.h"
@@ -85,6 +87,9 @@ void AMMOHUD::DrawHUD()
 		DrawPlayerCursor();
 		return;
 	}
+
+	// Yeni oyuncu ipuclari (yerel durum izleme; pencereler/diyalog bos ise tek balon).
+	UpdateTutorialHints(MMOChar);
 
 	const float X = BarOriginX;
 	const float Y = BarOriginY;
@@ -2600,6 +2605,265 @@ void AMMOHUD::UpdatePendingQuestLines(const UMMOQuestComponent* Q)
 		{
 			PendingQuestLines.RemoveAt(i);
 		}
+	}
+}
+
+// --- Ilk 10 dakika ipuclari (docs/CONTENT_PLAN_LV11_45.md bolum C) ---------------------------------
+// Gosterim kanali: ShowNpcDialogue (alt-orta balon, 9 sn). Neden: AddFloatingLabel/ClientShowHint karakter
+// ustunde 2 sn'de yukari kayip siliniyor, ~50 karakterlik cumle okunamaz; NPC balonu pencere degil
+// (hareketi engellemez), okunacak kadar kalir ve tek slot oldugu icin "ayni anda tek ipucu" kendiliginden saglanir.
+// Tetikleyiciler yerel replike durumun izlenmesiyle bulunur (HUD yalniz yerel oyuncuda vardir): sunucu kodu,
+// RPC, replikasyon ve MMOSaveGame degismez. Gosterilenler maskesi oturumluktur (ULocalPlayer basina bellekte).
+namespace
+{
+	enum EMMOTutorialHint : int32
+	{
+		HintMove = 0,   // H1
+		HintNpc,        // H2
+		HintCombat,     // H3
+		HintLoot,       // H4
+		HintLevelUp,    // H5
+		HintQuestDone,  // H6
+		HintDeath,      // H7
+		HintBagFull,    // H8
+		HintCount
+	};
+
+	struct FTutorialHintDef
+	{
+		const TCHAR* Text;
+		int32 MaxLevel; // bu seviyenin ustundeki oyuncuya gosterilmez
+	};
+
+	// Metinler ASCII Turkce, <=50 karakter. Seviye kosullari plandan; H3/H8 icin plan vermedigi icin
+	// koruyucu ust sinir konuldu (yuksek seviyeli oyuncuya "ilk gorev" ipucu cikmasin).
+	const FTutorialHintDef GTutorialHints[HintCount] =
+	{
+		{ TEXT("Zemine sol tikla: yuru. Sag tik surukle: kamera"), 1 },
+		{ TEXT("Yasli Doran'in ustundeki ! isaretine tikla"), 2 },
+		{ TEXT("Z: hedef sec  R: saldir  1-0: beceri  F: iksir"), 10 },
+		{ TEXT("Esya dustu: uzerinden gec. I: canta, tikla = kusan"), 5 },
+		{ TEXT("Seviye atladin! C: stat puani, K: beceri puani"), 10 },
+		{ TEXT("Gorev tamam! Yasli Doran'a don, tikla, odulu al"), 10 },
+		{ TEXT("Oldun: 5 sn sonra dogarsin, biraz EXP kaybettin"), 20 },
+		{ TEXT("Canta dolu! Satici NPC'ye esya sat veya depoya koy"), 20 },
+	};
+
+	constexpr float HintPendingExpire = 20.f;  // siradaki ipucu bu kadar sn icinde gosterilemezse dusurulur
+	constexpr float HintGapSeconds = 3.f;      // iki ipucu arasi bosluk (balon suresinin ustune)
+	constexpr float HintWarmupSeconds = 3.f;   // pawn ilk goruldugunde replikasyonun oturmasini bekle
+
+	uint16& GetSessionHintMask(const ULocalPlayer* LP)
+	{
+		static TMap<TWeakObjectPtr<const ULocalPlayer>, uint16> Masks;
+		static uint16 Fallback = 0;
+		if (!LP)
+		{
+			return Fallback;
+		}
+		if (Masks.Num() > 8)
+		{
+			for (auto It = Masks.CreateIterator(); It; ++It)
+			{
+				if (!It.Key().IsValid())
+				{
+					It.RemoveCurrent();
+				}
+			}
+		}
+		return Masks.FindOrAdd(TWeakObjectPtr<const ULocalPlayer>(LP));
+	}
+}
+
+void AMMOHUD::QueueHint(int32 HintIndex, int32 PlayerLevel)
+{
+	if (HintIndex < 0 || HintIndex >= HintCount || PlayerLevel > GTutorialHints[HintIndex].MaxLevel || !GetWorld())
+	{
+		return;
+	}
+	const APlayerController* PC = GetOwningPlayerController();
+	const uint16 Bit = (uint16)(1u << HintIndex);
+	if ((GetSessionHintMask(PC ? PC->GetLocalPlayer() : nullptr) & Bit) != 0 || (HintPendingMask & Bit) != 0)
+	{
+		return;
+	}
+	HintPendingMask |= Bit;
+	HintQueuedAt[HintIndex] = GetWorld()->GetTimeSeconds();
+}
+
+void AMMOHUD::UpdateTutorialHints(AMMOCharacter* PlayerChar)
+{
+	UWorld* World = GetWorld();
+	UMMOStatsComponent* S = PlayerChar ? PlayerChar->GetStats() : nullptr;
+	if (!World || !S || !PlayerChar->IsLocallyControlled())
+	{
+		return;
+	}
+	const APlayerController* PC = GetOwningPlayerController();
+	uint16& ShownMask = GetSessionHintMask(PC ? PC->GetLocalPlayer() : nullptr);
+	const float Now = World->GetTimeSeconds();
+	const int32 Lv = S->Level;
+	const UMMOQuestComponent* Q = PlayerChar->GetQuestComponent();
+	const UMMOInventoryComponent* Inv = PlayerChar->GetInventory();
+	const int32 QuestCount = Q ? Q->ActiveQuests.Num() : 0;
+	const bool bBagFull = Inv && Inv->EquipmentBag.Num() >= UMMOInventoryComponent::MaxBagSize;
+	const bool bDead = S->bIsDead;
+
+	// Yeni pawn (ilk kare / yeniden olusma): izleme taban cizgisini sifirla, replikasyon oturana kadar sessiz kal.
+	if (HintPawn.Get() != PlayerChar)
+	{
+		HintPawn = PlayerChar;
+		HintPawnFirstSeen = Now;
+		HintMoveWatchStart = -1.f;
+		HintQuestAcceptedAt = -1.f;
+		HintPrevLevel = 0;
+		HintPrevQuestCount = -1;
+	}
+	const bool bWarm = Now - HintPawnFirstSeen >= HintWarmupSeconds;
+
+	if (bWarm)
+	{
+		// H5: seviye atlama (OnLevelUp'in istemci karsiligi: replike Level tam +1 artti), harcanmamis puan var.
+		if (HintPrevLevel > 0 && Lv == HintPrevLevel + 1 && (S->UnspentStatPoints + S->UnspentSkillPoints) > 0)
+		{
+			QueueHint(HintLevelUp, Lv);
+		}
+		// H7: ilk olum.
+		if (!bHintPrevDead && bDead)
+		{
+			QueueHint(HintDeath, Lv);
+		}
+		// H8: canta doldu (bos -> dolu gecisi).
+		if (!bHintPrevBagFull && bBagFull)
+		{
+			QueueHint(HintBagFull, Lv);
+		}
+		// H3: gorev kabul edildi (0 -> >0); 20 sn icinde seviye/EXP degismediyse (olduruldugu yok) kombo ipucu.
+		if (HintPrevQuestCount == 0 && QuestCount > 0 && Lv <= GTutorialHints[HintCombat].MaxLevel)
+		{
+			HintQuestAcceptedAt = Now;
+			HintQuestAcceptLevel = Lv;
+			HintQuestAcceptExp = S->Experience;
+		}
+		if (HintQuestAcceptedAt >= 0.f)
+		{
+			if (Lv != HintQuestAcceptLevel || S->Experience != HintQuestAcceptExp)
+			{
+				HintQuestAcceptedAt = -1.f; // oyuncu zaten dovusuyor
+			}
+			else if (Now - HintQuestAcceptedAt >= 20.f)
+			{
+				HintQuestAcceptedAt = -1.f;
+				QueueHint(HintCombat, Lv);
+			}
+		}
+		// H6: hedefe ulasmis ama teslim edilmemis gorev.
+		if (Q && QuestCount > 0 && Lv <= GTutorialHints[HintQuestDone].MaxLevel)
+		{
+			for (const FMMOQuestProgress& P : Q->ActiveQuests)
+			{
+				const FMMOQuestDef* Def = FMMOQuestDatabase::Find(P.QuestId);
+				if (Def && Q->IsQuestComplete(*Def, P))
+				{
+					QueueHint(HintQuestDone, Lv);
+					break;
+				}
+			}
+		}
+
+		// H1: yeni karakter (Lv1, 0 EXP, gorev yok), sinif paneli kapali; 8 sn hareket etmediyse. Hareket = kalici iptal.
+		const uint16 MoveBit = (uint16)(1u << HintMove);
+		if ((ShownMask & MoveBit) == 0)
+		{
+			if (Lv == 1 && S->Experience == 0 && QuestCount == 0 && !bDead && !PlayerChar->ShouldShowClassHint())
+			{
+				if (HintMoveWatchStart < 0.f)
+				{
+					HintMoveWatchStart = Now;
+					HintMoveOrigin = PlayerChar->GetActorLocation();
+				}
+				else if (FVector::DistSquared(PlayerChar->GetActorLocation(), HintMoveOrigin) > 80.f * 80.f)
+				{
+					ShownMask |= MoveBit;
+					HintPendingMask &= ~MoveBit;
+				}
+				else if (Now - HintMoveWatchStart >= 8.f)
+				{
+					QueueHint(HintMove, Lv);
+				}
+			}
+			else
+			{
+				HintMoveWatchStart = -1.f;
+				HintPendingMask &= ~MoveBit;
+			}
+		}
+
+		// H2: Lv1-2, gorev yok (aktif/tamamlanmis), gorevli NPC'ye <=900 u. 1 sn'de bir tara.
+		if (Now >= HintNextNpcScan && Lv <= GTutorialHints[HintNpc].MaxLevel && QuestCount == 0
+			&& (!Q || Q->CompletedQuests.Num() == 0) && (ShownMask & (1u << HintNpc)) == 0)
+		{
+			HintNextNpcScan = Now + 1.f;
+			const FVector PawnLoc = PlayerChar->GetActorLocation();
+			for (TActorIterator<AMMOQuestGiverNPC> It(World); It; ++It)
+			{
+				if (FVector::DistSquared(It->GetActorLocation(), PawnLoc) <= 900.f * 900.f)
+				{
+					QueueHint(HintNpc, Lv);
+					break;
+				}
+			}
+		}
+
+		// H4: yakinda yerde ganimet var (ilk oldurmenin dusurdugu). 0.5 sn'de bir tara.
+		if (Now >= HintNextLootScan && Lv <= GTutorialHints[HintLoot].MaxLevel && (ShownMask & (1u << HintLoot)) == 0)
+		{
+			HintNextLootScan = Now + 0.5f;
+			const FVector PawnLoc = PlayerChar->GetActorLocation();
+			for (TActorIterator<AMMOLootPickup> It(World); It; ++It)
+			{
+				if (FVector::DistSquared(It->GetActorLocation(), PawnLoc) <= 1500.f * 1500.f)
+				{
+					QueueHint(HintLoot, Lv);
+					break;
+				}
+			}
+		}
+	}
+
+	HintPrevLevel = Lv;
+	HintPrevQuestCount = QuestCount;
+	bHintPrevDead = bDead;
+	bHintPrevBagFull = bBagFull;
+
+	// Gosterim: tek slot. Pencere acik / NPC balonu ekranda / onceki ipucundan sonra bosluk bitmedi ise bekle.
+	if (HintPendingMask == 0 || Now < HintNextAllowedTime || IsNpcDialogueShowing(Now) || IsAnyWindowOpen())
+	{
+		return;
+	}
+	for (int32 i = 0; i < HintCount; ++i)
+	{
+		const uint16 Bit = (uint16)(1u << i);
+		if ((HintPendingMask & Bit) == 0)
+		{
+			continue;
+		}
+		// Eskimis ya da seviyesi gecmis istekleri dusur.
+		if (Now - HintQueuedAt[i] > HintPendingExpire || Lv > GTutorialHints[i].MaxLevel)
+		{
+			HintPendingMask &= ~Bit;
+			continue;
+		}
+		// Olu iken yalniz olum ipucu (olum ekraninin altinda, hemen anlami var); digerleri canlanmayi bekler.
+		if (bDead && i != HintDeath)
+		{
+			continue;
+		}
+		ShowNpcDialogue(TEXT("Ipucu"), GTutorialHints[i].Text);
+		ShownMask |= Bit;
+		HintPendingMask &= ~Bit;
+		HintNextAllowedTime = Now + NpcDialogueDuration + HintGapSeconds;
+		break;
 	}
 }
 
