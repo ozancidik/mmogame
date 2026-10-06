@@ -53,6 +53,11 @@ Step "Karakter JSON gidis-donus testi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Karakter magazasi (yerel .sav) okuma + gidis-donus testi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestCharacterStore.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Asenkron kayit onayli bolge gecisi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravel.ps1") | Out-Host
     $LASTEXITCODE -eq 0
