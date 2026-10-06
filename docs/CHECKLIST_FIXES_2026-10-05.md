@@ -266,3 +266,12 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI (headless bolge gecisi + timeout t
 - [ ] Uzak istemci: dugme GORUNMEZ; konsoldan `MMOTravel`, `MMOPvP 1`, `MMOBuff Rage`, `MMOSpawnMob OrcWarlord`, `MMOGiveItem ...`, manuel karakter yukleme (`MMOLoad`): hicbir etki olmamali (sunucu sessizce reddeder), host'un PvP/envanteri/dunyasi degismemeli.
 - [ ] Host: `MMOPvP 1/0`, `MMOBuff`, `MMOSpawnMob`, `MMOGiveItem` eskisi gibi calisir (Development derlemede).
 - [ ] Shipping paketinde bu konsol komutlari ve debug RPC'leri zaten kapali (D1); degismedi.
+
+## 24. LLM NPC diyalogu: gunluk (oturum-otesi) cagri tavani
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI. Bu kontroller LLM'e hic istek atmaz (API anahtari yok), yani tavan mantigi OTOMATIK DOGRULANMADI, PIE'de de denenmedi. `MMODialogueSubsystem::MaxDailyRequests` varsayilani 1500 bir baslangic tahminidir (maliyet karari sizin).
+
+- [ ] `NVIDIA_API_KEY` tanimliyken NPC ile konus: `Saved/MMO/LLMDailyBudget.txt` olusur, icerigi "<UTC gun numarasi> <sayac>" ve her LLM istegiyle sayac 1 artar (baglanti hatasi/anahtarsiz istek sayilmaz; ProcessRequest baslamazsa iade edilir).
+- [ ] Host'u kapatip ayni gun yeniden ac: sayac dosyadan devam etmeli (0'dan baslamamali). Dosyadaki gun numarasini elle eskiye cek: ilk istekte sayac 0'lanmali.
+- [ ] Tavani gecici dusur (ornegin dosyadaki sayaci 1499 yap ya da `MaxDailyRequests`'i 1 yap): tavan dolunca log'da `[MMODialogue] Gunluk LLM butcesi doldu` gorulmeli, NPC "(NPC su an konusamiyor.)"/mevcut yedek replikle konusmali, oyun akisi bozulmamali. `MaxDailyRequests = 0` sinirsiz yapar.
+- [ ] Mevcut dakikalik sinir (30/dk), eszamanli sinir (4) ve `MaxSessionRequests` (400) eskisi gibi calismali.

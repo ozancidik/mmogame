@@ -9,6 +9,9 @@
 #include "Serialization/JsonWriter.h"
 #include "Dom/JsonObject.h"
 #include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+#include "Misc/DateTime.h"
 
 namespace
 {
@@ -28,6 +31,53 @@ namespace
 bool UMMODialogueSubsystem::HasApiKey() const
 {
 	return !GetApiKeyFor(Provider).IsEmpty();
+}
+
+namespace
+{
+	// UTC gun numarasi (1 Ocak 0001'den beri gecen gun).
+	int64 UtcDayNumber()
+	{
+		return FDateTime::UtcNow().GetTicks() / ETimespan::TicksPerDay;
+	}
+
+	FString DailyBudgetFilePath()
+	{
+		return FPaths::ProjectSavedDir() / TEXT("MMO/LLMDailyBudget.txt");
+	}
+}
+
+void UMMODialogueSubsystem::RollDailyBudget()
+{
+	if (!bDailyBudgetLoaded)
+	{
+		bDailyBudgetLoaded = true;
+		// Dosya bicimi: "<utc gun numarasi> <sayac>". Yoksa/bozuksa bugun icin 0'dan baslar.
+		FString Text;
+		FString DayPart, CountPart;
+		if (FFileHelper::LoadFileToString(Text, *DailyBudgetFilePath())
+			&& Text.TrimStartAndEnd().Split(TEXT(" "), &DayPart, &CountPart))
+		{
+			DailyBudgetDay = FCString::Atoi64(*DayPart);
+			DailyRequestCount = FMath::Max(0, FCString::Atoi(*CountPart));
+		}
+	}
+	const int64 Today = UtcDayNumber();
+	if (DailyBudgetDay != Today)
+	{
+		DailyBudgetDay = Today;
+		DailyRequestCount = 0;
+		SaveDailyBudget();
+	}
+}
+
+void UMMODialogueSubsystem::SaveDailyBudget() const
+{
+	// Kucuk dosya (istek basina bir kez, dakikada en fazla MaxRequestsPerMinute). Yazilamazsa sayac
+	// bellekte calismaya devam eder; yalniz yeniden baslatmada kaybolur.
+	const FString Path = DailyBudgetFilePath();
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
+	FFileHelper::SaveStringToFile(FString::Printf(TEXT("%lld %d"), DailyBudgetDay, DailyRequestCount), *Path);
 }
 
 void UMMODialogueSubsystem::RequestNpcLine(const FString& NpcName, const FString& NpcRole,
@@ -87,9 +137,19 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		return;
 	}
+	// Gunluk (oturum-otesi) tavan: UTC gun degisince sayac sifirlanir; dolunca yedek replik.
+	RollDailyBudget();
+	if (MaxDailyRequests > 0 && DailyRequestCount >= MaxDailyRequests)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Gunluk LLM butcesi doldu (%d); istek atlandi."), MaxDailyRequests);
+		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
+		return;
+	}
 	RecentRequestTimes.Add(NowSec);
 	++InFlightRequests;
 	++SessionRequestCount;
+	++DailyRequestCount;
+	SaveDailyBudget();
 
 	const bool bNvidia = (Provider == EMMOLLMProvider::NVIDIA);
 
@@ -230,6 +290,8 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			InFlightRequests = FMath::Max(0, InFlightRequests - 1);
 			RecentRequestTimes.RemoveSingle(NowSec); // atilmayan istek dakika sinirini tuketmesin
 			SessionRequestCount = FMath::Max(0, SessionRequestCount - 1); // ... ne de oturum butcesini
+			DailyRequestCount = FMath::Max(0, DailyRequestCount - 1);     // ... ne de gunluk butceyi
+			SaveDailyBudget();
 			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		}
 	}

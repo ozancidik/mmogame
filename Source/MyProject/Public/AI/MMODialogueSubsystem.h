@@ -113,7 +113,25 @@ public:
 	// Bu oturumda atilan toplam LLM istegi sayisi (yalniz sunucuda artar).
 	int32 SessionRequestCount = 0;
 
+	// Sunucu basina GUNLUK toplam LLM cagrisi tavani (oturum-otesi). Sayac UTC gun degisince sifirlanir ve
+	// Saved/MMO/LLMDailyBudget.txt'te saklanir: host gun icinde yeniden baslasa da toplam korunur
+	// (MaxSessionRequests yalniz tek sureci sinirlar). Tavan dolunca istek atilmaz, NPC yedek replige duser.
+	// Varsayilan 1500 baslangic tahminidir (maliyet/denge karari sizin); 0 = sinirsiz.
+	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "0"))
+	int32 MaxDailyRequests = 1500;
+
+	// Bugun (UTC) atilan toplam LLM istegi sayisi (yalniz sunucuda artar).
+	int32 DailyRequestCount = 0;
+
 protected:
+	// Gunluk butce durumu: ilk kullanimda dosyadan yuklenir, gun degisince sifirlanir.
+	int64 DailyBudgetDay = -1;
+	bool bDailyBudgetLoaded = false;
+
+	// Gunluk sayaci yukler/sifirlar (gun degistiyse). SendRequest'in basinda cagrilir.
+	void RollDailyBudget();
+	void SaveDailyBudget() const;
+
 	// Hiz siniri durumu (yalniz bu subsystem'de, replike degil).
 	TArray<double> RecentRequestTimes;
 	int32 InFlightRequests = 0;
