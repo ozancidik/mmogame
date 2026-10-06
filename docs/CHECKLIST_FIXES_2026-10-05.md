@@ -293,3 +293,12 @@ Kod derlendi, RunAllChecks (-SkipBuild -FullCompile) GECTI (bolge gecisi + zaman
 - [ ] `MMOTravel`'i basarili bir geciste ard arda iki kez bas (gecis sirasinda): ikinci istek reddedilmeli (`Gecis su anda kullanilamiyor`), ilk gecis bozulmamali.
 - [ ] Gecis reddedilince (ornegin biri savasta: `Tum oyuncular canli ve savas disinda olmali`) host konsol/HUD mesajinin reddi gostermesi ve hemen ardindan savastan cikip tekrar denenince gecisin kabul edilmesi (kilit/test kancasi kalintisi yok).
 - [ ] Elle `MMOSave` ile gecis ayni karede ust uste: gecis istegi sirasinda `Save superseded` logu cikarsa gecis iptal olmali ve tekrar denenince calismali (yerel magazada normalde cikmaz).
+
+## 27. QA 2026-10-07 ORTA-4 + DUSUK-2/4/5: denetim logu Shipping siniri (belge), tuketilebilir geri bildirimi, HUD sinir, hub onbellegi
+
+Kod derlendi, RunAllChecks (-SkipBuild -FullCompile) sonucu commit mesajinda. PIE'de OYNANMADI. `bUseLoggingInShipping` EKLENMEDI (UBT: unique build environment gerektirir, kaynak motor/Shipping derlemesi bu makinede dogrulanamaz); NETWORK_AUDIT O12 sinirlari yazdi.
+
+- [ ] Can iksirini ~0.5 sn arayla iki kez bas (host/yerel): ikinci basista "Esya kullanimi bekleniyor" ipucu cikmali, esya harcanmamali; 1 sn+ arayla basinca her seferinde calismali.
+- [ ] Uzak istemcide 200 ms gecikme + 100 ms titresim (`Net PktLag=200 PktLagVariance=100`) ile iksire ~1.0 sn aralikla bas: sunucu cooldown'u 0.85 sn oldugundan basislar sessizce yutulmamali (eskiden bazilari yutulabiliyordu); cok hizli (<0.5 sn) basista ipucu uzak istemcide gorunmeli.
+- [ ] Yogun savasta (cok mob + HoT/leash sifasi) ekrandaki ucan hasar/sifa sayisi 64'u gecmemeli; eski sayilar erken kaybolabilir, oyun/FPS etkilenmemeli.
+- [ ] Hub (PlayerStart) yakininda saldiri reddi ilk karede ve Summer->Winter->Summer sonrasi eskisi gibi calismali (onbellek: bos sonuc saklanmaz, dolu kalici).

@@ -1843,8 +1843,14 @@ bool AMMOCharacter::TryBeginConsumableUse()
 	}
 
 	const float Now = World->GetTimeSeconds();
-	if (Now - LastConsumableUseTime < ConsumableUseCooldown)
+	// Uzak istemcinin RPC'lerini sunucuda yargilarken kapi biraz KISA tutulur: istemci ve sunucu damgalari
+	// bagimsizdir, ag titresimi (RPC1 gec, RPC2 erken) ~1 sn araliktaki mesru ikinci kullanimi sessizce
+	// yutmasin (istemci kendi kilidini zaten harcamis olur). Host/yerel ve istemci tarafi tam sure kullanir.
+	const float Cooldown = (HasAuthority() && !IsLocallyControlled()) ? ConsumableUseCooldownServerRemote : ConsumableUseCooldown;
+	if (Now - LastConsumableUseTime < Cooldown)
 	{
+		// Sessiz ret yerine ipucu (ayni metin 0.5 sn icinde tekrar gonderilmez; uzakta sahibine gider).
+		MMONotify::ToOwner(this, TEXT("Esya kullanimi bekleniyor"), FColor::Silver, 1.f, MMONotify::EMMONotifyKind::Hint);
 		return false;
 	}
 

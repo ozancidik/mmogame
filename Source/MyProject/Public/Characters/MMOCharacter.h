@@ -388,6 +388,8 @@ protected:
 	// istemcide Reliable RPC yigilmalarini, sunucuda ise dogrudan RPC spam'ini keser.
 	float LastConsumableUseTime = -100.f;
 	static constexpr float ConsumableUseCooldown = 1.f;
+	// Sunucuda uzak istemci RPC'leri icin biraz kisa (ag titresim toleransi, bkz. TryBeginConsumableUse).
+	static constexpr float ConsumableUseCooldownServerRemote = 0.85f;
 	bool TryBeginConsumableUse();
 
 	// --- Server RPC'ler (istemci istegi -> sunucu uygular) ---

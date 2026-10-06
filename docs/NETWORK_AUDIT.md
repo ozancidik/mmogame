@@ -33,7 +33,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O9 | ORTA | Stats/Quest/Skill/Party alanları da herkese (gizlilik + bant) | MMOStatsComponent.cpp:77-92; MMOQuestComponent.cpp:26-27; MMOSkillComponent.cpp:42-45; MMOPartyComponent.cpp:19-20 |
 | O10 | ORTA | `UnequipSlot` çanta sınırını (12) aşar; invariant bozulunca takas/geri alma/ödül reddedilir | MMOInventoryComponent.cpp:285 |
 | O11 | ORTA | Dedicated için engeller: Server target yok, admin yolu `IsLocalController`'a bağlı, geri bildirim `IsLocallyControlled`'a bağlı, HUD'a bağlı sunucu kodu | bkz. bölüm 6 |
-| O12 | ORTA | **Kapandı (yerel log):** takas/iptal, klan, yükseltme/yanma, satış, depo ve ad değişimi yapılandırılmış sunucu loguna yazılır | bölüm 1 |
+| O12 | ORTA | **Kapandı (yerel log; Shipping'de derlenmez, bkz. O12 bölümü):** takas/iptal, klan, yükseltme/yanma, satış, depo ve ad değişimi yapılandırılmış sunucu loguna yazılır | bölüm 1 |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -76,7 +76,8 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - **Party:** `ServerInviteNearest` (MMOPartyComponent.cpp:194-196) hedefin `PendingInviteFrom`'unu koşulsuz ezer (Trade/Klan'daki kapma koruması yok): saldırgan gerçek bir daveti, kurbanın `kabul`'üne kadar kendi davetiyle değiştirebilir. Bu bileşen kapsam dışıydı; yalnız not.
 - Trade `Accept/Cancel/RemoveItem` ve Clan komutlarında RPC başına hız sınırı yok (yalnız chat throttle'ı); `ServerAddItem/SetGold` 0.3 sn cooldown'lu (iyi).
 
-### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu)
+### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
+- **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.
 - `LogMMOTradeAudit`: tamamlanan ve iptal edilen takaslar; iki taraf, altın bakiyeleri ve eşya `InstanceId`/artı/nadirlikleri.
 - `LogMMOClanAudit`: klan kurma, katılma, ayrılma, atma ve lider devri.
 - `LogMMOInventoryAudit`: yükseltme başarı/başarısızlık/yanma, satma, depoya koyma ve depodan alma; karakter yuvası, eşya kimliği ve son bakiye/sayaçlar.
@@ -223,7 +224,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - **D7** Loot: ilk-gelen alır, sahiplik/kilitlenme yok; çanta doluyken loot yerde kalır (iyi) ama `AddEquipmentInstance` doluysa ödül/loot sessizce kaybolur (MMOInventoryComponent.cpp:170-177).
 - **D8** Klan: çevrimdışı üye atılamaz (`CmdKick` yalnız çevrimiçi, MMOClanComponent.cpp:468-484); travel sırasında lider `EndPlay`'i "X artık klan lideri" duyurusunu gereksiz yollar (207) **[doğrulanmalı]**.
 - **D9** `ServerSetName` cooldown'u yok (bkz. Y1).
-- **D10 — kapandı (2026-10-06):** `IsInsideHubSafeZone`, sabit harita `PlayerStart` merkezlerini zayıf `UWorld` anahtarlı cache'e ilk çağrıda bir kez toplar; sonraki saldırı/beceri kontrolleri aktör taraması yerine kare mesafe karşılaştırır. Travel sonrası yeni dünya ayrı cache alır, ölü dünya kayıtları temizlenir.
+- **D10 — kapandı (2026-10-06):** `IsInsideHubSafeZone`, sabit harita `PlayerStart` merkezlerini zayıf `UWorld` anahtarlı cache'e ilk çağrıda bir kez toplar; sonraki saldırı/beceri kontrolleri aktör taraması yerine kare mesafe karşılaştırır. Travel sonrası yeni dünya ayrı cache alır, ölü dünya kayıtları sonraki çağrıda (tembel) temizlenir. **2026-10-07:** boş sonuç artık önbelleğe ALINMAZ (PlayerStart henüz yüklenmemişse güvenli bölge dünya ömrü boyunca kaybolmasın); boş kaldıkça en fazla saniyede bir yeniden taranır, dolu liste kalıcıdır.
 
 ### O10 · ORTA · `UnequipSlot` çanta sınırını aşar
 - MMOInventoryComponent.cpp:285 `EquipmentBag.Add(...)` `MaxBagSize` (12) kontrolü yok. Çanta doluyken 4 ekipmanı çıkaran oyuncu çantayı 16'ya çıkarır; bundan sonra `ReceiveTradedEquipment` (723) ve `Withdraw` (684) reddeder, `TryExecuteTrade` kapasite kontrolü (612-618) her takası iptal eder, HUD yalnız ≤12 göstermek üzere boyutlanmış (MMOInventoryComponent.h:78-85) → fazla item'lar erişilemez kalabilir. Düzeltme: `Unequip` çanta doluysa reddet ve ipucu gönder.

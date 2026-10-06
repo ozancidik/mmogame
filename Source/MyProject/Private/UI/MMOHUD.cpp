@@ -443,6 +443,10 @@ void AMMOHUD::DrawMouseCursor(float X, float Y, bool bAttackMode)
 	}
 }
 
+// Havadaki hasar/etiket kaydi ust siniri (Canvas yokken - ornegin sekmede/yukleme - ya da yogun savasta
+// sinirsiz buyumesin): sinir asilinca en eskiler atilir.
+static constexpr int32 MaxFloatingTexts = 64;
+
 void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount, bool bIsHeal)
 {
 	FMMOFloatingText FT;
@@ -451,6 +455,10 @@ void AMMOHUD::AddDamageNumber(const FVector& WorldLocation, float Amount, bool b
 	FT.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	FT.bIsHeal = bIsHeal;
 	FloatingTexts.Add(FT);
+	if (FloatingTexts.Num() > MaxFloatingTexts)
+	{
+		FloatingTexts.RemoveAt(0, FloatingTexts.Num() - MaxFloatingTexts, EAllowShrinking::No);
+	}
 }
 
 void AMMOHUD::AddChatLine(const FString& Line, const FLinearColor& Color)
@@ -518,6 +526,10 @@ void AMMOHUD::AddFloatingLabel(const FVector& WorldLocation, const FString& Labe
 	FT.SpawnTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	FT.Label = Label;
 	FloatingTexts.Add(FT);
+	if (FloatingTexts.Num() > MaxFloatingTexts)
+	{
+		FloatingTexts.RemoveAt(0, FloatingTexts.Num() - MaxFloatingTexts, EAllowShrinking::No);
+	}
 }
 
 void AMMOHUD::ShowNpcDialogue(const FString& SpeakerName, const FString& Text)

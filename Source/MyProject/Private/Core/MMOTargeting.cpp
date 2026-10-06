@@ -14,6 +14,9 @@ namespace
 	{
 		TWeakObjectPtr<UWorld> World;
 		TArray<FVector> Centers;
+		// Bos sonuc onbellege ALINMAZ (PlayerStart henuz yuklenmemis olabilir): bos kaldikca en erken bu
+		// zamandan (FPlatformTime saniye) sonra yeniden taranir; bos tarama her cagrida aktor taramasina donmesin.
+		double NextEmptyRefreshTime = 0.0;
 	};
 
 	// PlayerStart'lar bu projede harita yuklenirken olusan sabit aktorlerdir. Her vurus ve
@@ -24,27 +27,42 @@ namespace
 
 	const TArray<FVector>& GetHubSafeZoneCenters(UWorld* World)
 	{
+		FHubSafeZoneWorldCache* Found = nullptr;
 		for (int32 Index = GHubSafeZoneCaches.Num() - 1; Index >= 0; --Index)
 		{
-			FHubSafeZoneWorldCache& Cache = GHubSafeZoneCaches[Index];
-			if (!Cache.World.IsValid())
+			if (!GHubSafeZoneCaches[Index].World.IsValid())
 			{
 				GHubSafeZoneCaches.RemoveAtSwap(Index);
-				continue;
 			}
+		}
+		for (FHubSafeZoneWorldCache& Cache : GHubSafeZoneCaches)
+		{
 			if (Cache.World.Get() == World)
 			{
-				return Cache.Centers;
+				Found = &Cache;
+				break;
 			}
 		}
-
-		FHubSafeZoneWorldCache& NewCache = GHubSafeZoneCaches.AddDefaulted_GetRef();
-		NewCache.World = World;
-		for (TActorIterator<APlayerStart> It(World); It; ++It)
+		if (!Found)
 		{
-			NewCache.Centers.Add(It->GetActorLocation());
+			Found = &GHubSafeZoneCaches.AddDefaulted_GetRef();
+			Found->World = World;
 		}
-		return NewCache.Centers;
+
+		// Dolu liste dunya omru boyunca kalir; bos liste saklanmaz, kisa araliklarla yeniden denenir.
+		const double Now = FPlatformTime::Seconds();
+		if (Found->Centers.IsEmpty() && Now >= Found->NextEmptyRefreshTime)
+		{
+			for (TActorIterator<APlayerStart> It(World); It; ++It)
+			{
+				Found->Centers.Add(It->GetActorLocation());
+			}
+			if (Found->Centers.IsEmpty())
+			{
+				Found->NextEmptyRefreshTime = Now + 1.0;
+			}
+		}
+		return Found->Centers;
 	}
 }
 
