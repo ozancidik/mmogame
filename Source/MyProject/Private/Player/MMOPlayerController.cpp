@@ -1320,7 +1320,9 @@ void AMMOPlayerController::ServerRequestNpcDialogue_Implementation(AMMOTalkerNPC
 		WeakThis->ClientReceiveNpcDialogue(SpeakerName, bSuccess ? Safe : FallbackLine);
 	});
 
-	Dialogue->RequestNpcLine(Npc->NpcName, Npc->NpcRole, PlayerInfo, OnReady);
+	// Oyuncu adi yalniz gunluk kota sayaci anahtaridir (LLM'e gitmez).
+	Dialogue->RequestNpcLine(Npc->NpcName, Npc->NpcRole, PlayerInfo, OnReady,
+		PlayerState ? PlayerState->GetPlayerName() : FString());
 }
 
 void AMMOPlayerController::ClientReceiveNpcDialogue_Implementation(const FString& SpeakerName, const FString& Text)

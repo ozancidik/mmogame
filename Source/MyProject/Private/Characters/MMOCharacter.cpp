@@ -1732,7 +1732,8 @@ void AMMOCharacter::MMONpcTalk()
 		TEXT("Satici Merek"),
 		TEXT("kasabanin aksi ama durust silah saticisi"),
 		PlayerInfo,
-		OnReady);
+		OnReady,
+		GetPlayerState() ? GetPlayerState()->GetPlayerName() : FString());
 }
 
 void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)

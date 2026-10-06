@@ -12,6 +12,9 @@
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
 #include "Misc/DateTime.h"
+#include "Misc/ConfigCacheIni.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 namespace
 {
@@ -45,6 +48,70 @@ namespace
 	{
 		return FPaths::ProjectSavedDir() / TEXT("MMO/LLMDailyBudget.txt");
 	}
+
+	// Yalniz rakamlardan olusan, en fazla MaxDigits haneli negatif olmayan sayi. Bozuk metin -> false.
+	bool ParseDigits(const FString& Text, int32 MaxDigits, int64& Out)
+	{
+		const FString T = Text.TrimStartAndEnd();
+		if (T.IsEmpty() || T.Len() > MaxDigits)
+		{
+			return false;
+		}
+		for (const TCHAR C : T)
+		{
+			if (C < TEXT('0') || C > TEXT('9'))
+			{
+				return false;
+			}
+		}
+		Out = FCString::Atoi64(*T);
+		return true;
+	}
+}
+
+void UMMODialogueSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	LoadDailyLimitConfig();
+}
+
+void UMMODialogueSubsystem::Deinitialize()
+{
+	// Kapanista bekleyen sayac degisikligini zorla yaz (yazim seyreltildigi icin).
+	if (bBudgetDirty)
+	{
+		WriteDailyBudgetFile();
+	}
+	Super::Deinitialize();
+}
+
+void UMMODialogueSubsystem::LoadDailyLimitConfig()
+{
+	// Oncelik: komut satiri > DefaultGame.ini [MMO] LlmDailyRequests > sinif varsayilani (1500).
+	int32 Value = 0;
+	if (GConfig && GConfig->GetInt(TEXT("MMO"), TEXT("LlmDailyRequests"), Value, GGameIni))
+	{
+		MaxDailyRequests = FMath::Max(0, Value);
+	}
+	if (FParse::Value(FCommandLine::Get(), TEXT("MMOLlmDaily="), Value))
+	{
+		MaxDailyRequests = FMath::Max(0, Value);
+	}
+	UE_LOG(LogTemp, Display, TEXT("[MMODialogue] Gunluk LLM tavani=%d (oyuncu basi kota=%d; 0=sinirsiz)."),
+		MaxDailyRequests, GetPerPlayerDailyQuota());
+}
+
+FString UMMODialogueSubsystem::NormalizePlayerKey(const FString& PlayerKey)
+{
+	FString Key = PlayerKey.TrimStartAndEnd().ToLower().Left(64);
+	for (TCHAR& C : Key)
+	{
+		if (C < 32) // sekme/satir sonu dosya bicimini bozmasin
+		{
+			C = TEXT(' ');
+		}
+	}
+	return Key.IsEmpty() ? FString(TEXT("?")) : Key;
 }
 
 void UMMODialogueSubsystem::RollDailyBudget()
@@ -52,14 +119,40 @@ void UMMODialogueSubsystem::RollDailyBudget()
 	if (!bDailyBudgetLoaded)
 	{
 		bDailyBudgetLoaded = true;
-		// Dosya bicimi: "<utc gun numarasi> <sayac>". Yoksa/bozuksa bugun icin 0'dan baslar.
-		FString Text;
-		FString DayPart, CountPart;
-		if (FFileHelper::LoadFileToString(Text, *DailyBudgetFilePath())
-			&& Text.TrimStartAndEnd().Split(TEXT(" "), &DayPart, &CountPart))
+		// Dosya bicimi: 1. satir "<utc gun numarasi> <sayac>", sonraki satirlar "<anahtar>\t<sayac>" (oyuncu basi).
+		// Yok/bozuk/eksik ise bugun icin 0'dan baslanir. Once ana dosya, o yoksa/gecersizse gecici dosya
+		// (silme ile tasima arasinda kesilen yazimdan kurtarma) denenir.
+		const FString Path = DailyBudgetFilePath();
+		for (const FString& Candidate : { Path, Path + TEXT(".tmp") })
 		{
-			DailyBudgetDay = FCString::Atoi64(*DayPart);
-			DailyRequestCount = FMath::Max(0, FCString::Atoi(*CountPart));
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *Candidate))
+			{
+				continue;
+			}
+			TArray<FString> Lines;
+			Text.ParseIntoArrayLines(Lines);
+			FString DayPart, CountPart;
+			int64 Day = 0, Count = 0;
+			if (Lines.Num() == 0 || !Lines[0].TrimStartAndEnd().Split(TEXT(" "), &DayPart, &CountPart)
+				|| !ParseDigits(DayPart, 10, Day) || !ParseDigits(CountPart, 9, Count))
+			{
+				continue; // bu aday bozuk
+			}
+			DailyBudgetDay = Day;
+			DailyRequestCount = static_cast<int32>(Count);
+			PlayerDailyCounts.Reset();
+			for (int32 i = 1; i < Lines.Num() && PlayerDailyCounts.Num() < MaxTrackedPlayers; ++i)
+			{
+				FString KeyPart, PlayerCountPart;
+				int64 PlayerCount = 0;
+				if (Lines[i].Split(TEXT("\t"), &KeyPart, &PlayerCountPart) && !KeyPart.IsEmpty()
+					&& ParseDigits(PlayerCountPart, 9, PlayerCount))
+				{
+					PlayerDailyCounts.Add(NormalizePlayerKey(KeyPart), static_cast<int32>(PlayerCount));
+				}
+			}
+			break;
 		}
 	}
 	const int64 Today = UtcDayNumber();
@@ -67,21 +160,64 @@ void UMMODialogueSubsystem::RollDailyBudget()
 	{
 		DailyBudgetDay = Today;
 		DailyRequestCount = 0;
-		SaveDailyBudget();
+		PlayerDailyCounts.Reset();
+		NoteBudgetChanged(true);
 	}
 }
 
-void UMMODialogueSubsystem::SaveDailyBudget() const
+void UMMODialogueSubsystem::NoteBudgetChanged(bool bForce)
 {
-	// Kucuk dosya (istek basina bir kez, dakikada en fazla MaxRequestsPerMinute). Yazilamazsa sayac
-	// bellekte calismaya devam eder; yalniz yeniden baslatmada kaybolur.
+	bBudgetDirty = true;
+	++UnsavedBudgetChanges;
+	// Her cagrida degil: 10 degisiklikte ya da son yazimdan 30 sn sonra (ya da zorla) diske iner.
+	if (bForce || UnsavedBudgetChanges >= 10 || FPlatformTime::Seconds() - LastBudgetSaveTime >= 30.0)
+	{
+		WriteDailyBudgetFile();
+	}
+}
+
+void UMMODialogueSubsystem::WriteDailyBudgetFile()
+{
+	// Atomik yazim: once gecici dosyaya, sonra ana dosyanin yerine tasi (yarim yazim ana dosyayi bozmaz).
+	// Yazilamazsa sayac bellekte calismaya devam eder; yalniz yeniden baslatmada kaybolur.
+	bBudgetDirty = false;
+	UnsavedBudgetChanges = 0;
+	LastBudgetSaveTime = FPlatformTime::Seconds();
+
+	FString Text = FString::Printf(TEXT("%lld %d\n"), DailyBudgetDay, DailyRequestCount);
+	for (const TPair<FString, int32>& Pair : PlayerDailyCounts)
+	{
+		Text += FString::Printf(TEXT("%s\t%d\n"), *Pair.Key, Pair.Value);
+	}
+
 	const FString Path = DailyBudgetFilePath();
+	const FString TmpPath = Path + TEXT(".tmp");
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
-	FFileHelper::SaveStringToFile(FString::Printf(TEXT("%lld %d"), DailyBudgetDay, DailyRequestCount), *Path);
+	if (!FFileHelper::SaveStringToFile(Text, *TmpPath)
+		|| !IFileManager::Get().Move(*Path, *TmpPath, true, true, false, true))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Gunluk sayac dosyasi yazilamadi; bellekte devam."));
+		IFileManager::Get().Delete(*TmpPath, false, true, true);
+		bBudgetDirty = true; // sonraki sinirda yeniden denenir
+	}
+}
+
+void UMMODialogueSubsystem::RefundRequest(const FString& PlayerKey, int64 RequestDay)
+{
+	SessionRequestCount = FMath::Max(0, SessionRequestCount - 1);
+	if (RequestDay == DailyBudgetDay)
+	{
+		DailyRequestCount = FMath::Max(0, DailyRequestCount - 1);
+		if (int32* PlayerCount = PlayerDailyCounts.Find(PlayerKey))
+		{
+			*PlayerCount = FMath::Max(0, *PlayerCount - 1);
+		}
+		NoteBudgetChanged();
+	}
 }
 
 void UMMODialogueSubsystem::RequestNpcLine(const FString& NpcName, const FString& NpcRole,
-	const FString& PlayerInfo, FMMOOnDialogueReady OnReady)
+	const FString& PlayerInfo, FMMOOnDialogueReady OnReady, const FString& PlayerKey)
 {
 	// GUVENLIK (SECURITY_AUDIT Y-4, prompt enjeksiyonu): LLM'e oyuncunun yazdigi HICBIR metin gecmez.
 	// NpcName/NpcRole tasarimci verisidir (NPC aktorunun alanlari), PlayerInfo cagiranlarda sunucunun
@@ -100,17 +236,17 @@ void UMMODialogueSubsystem::RequestNpcLine(const FString& NpcName, const FString
 		? TEXT("Oyuncu seninle konusmaya basladi. Onu selamla.")
 		: FString::Printf(TEXT("Oyuncu seninle konusuyor. Oyuncu hakkinda bilinenler: %s"), *PlayerInfo);
 
-	SendRequest(SystemPrompt, UserPrompt, OnReady);
+	SendRequest(SystemPrompt, UserPrompt, OnReady, PlayerKey);
 }
 
 void UMMODialogueSubsystem::RequestRaw(const FString& SystemPrompt, const FString& UserPrompt,
-	FMMOOnDialogueReady OnReady)
+	FMMOOnDialogueReady OnReady, const FString& PlayerKey)
 {
-	SendRequest(SystemPrompt, UserPrompt, OnReady);
+	SendRequest(SystemPrompt, UserPrompt, OnReady, PlayerKey);
 }
 
 void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FString& UserPrompt,
-	FMMOOnDialogueReady OnReady)
+	FMMOOnDialogueReady OnReady, const FString& PlayerKeyRaw)
 {
 	const FString ApiKey = GetApiKeyFor(Provider);
 	if (ApiKey.IsEmpty())
@@ -145,11 +281,30 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		return;
 	}
+	// Oyuncu basi gunluk kota: tek oyuncu genel tavani bitirip digerlerini yedek replige dusurmesin.
+	const FString PlayerKey = NormalizePlayerKey(PlayerKeyRaw);
+	const int32 PlayerQuota = GetPerPlayerDailyQuota();
+	if (PlayerQuota > 0)
+	{
+		const int32* Used = PlayerDailyCounts.Find(PlayerKey);
+		if (Used && *Used >= PlayerQuota)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oyuncu gunluk LLM kotasi doldu (%s, %d); istek atlandi."),
+				*PlayerKey, PlayerQuota);
+			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
+			return;
+		}
+	}
 	RecentRequestTimes.Add(NowSec);
 	++InFlightRequests;
 	++SessionRequestCount;
 	++DailyRequestCount;
-	SaveDailyBudget();
+	if (PlayerDailyCounts.Contains(PlayerKey) || PlayerDailyCounts.Num() < MaxTrackedPlayers)
+	{
+		++PlayerDailyCounts.FindOrAdd(PlayerKey);
+	}
+	const int64 RequestDay = DailyBudgetDay;
+	NoteBudgetChanged();
 
 	const bool bNvidia = (Provider == EMMOLLMProvider::NVIDIA);
 
@@ -235,7 +390,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 	// baslatilamazsa asagida (callback hic gelmeyebilir; sayac sizip tum NPC konusmalarini kilitlemesin).
 	const TSharedRef<bool> bSlotReleased = MakeShared<bool>(false);
 	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, OnReady, bNvidia, bSlotReleased](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
+		[WeakThis, OnReady, bNvidia, bSlotReleased, PlayerKey, RequestDay](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bConnectedOk)
 		{
 			// Subsystem yok olduysa (dunya kapandi vs.) hicbir sey yapma — niyet edilen omur korumasi.
 			if (!WeakThis.IsValid())
@@ -251,7 +406,14 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 
 			if (!bConnectedOk || !Resp.IsValid())
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Baglanti/istek hatasi."));
+				// Zaman asimi SAYILIR (istek saglayiciya ulasmis/faturalanmis olabilir); baglanti hatasi/iptal iade.
+				const bool bTimedOut = Req.IsValid() && Req->GetFailureReason() == EHttpFailureReason::TimedOut;
+				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Baglanti/istek hatasi%s."),
+					bTimedOut ? TEXT(" (zaman asimi; sayac iade edilmedi)") : TEXT(" (sayac iade edildi)"));
+				if (!bTimedOut)
+				{
+					WeakThis->RefundRequest(PlayerKey, RequestDay);
+				}
 				OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 				return;
 			}
@@ -261,6 +423,8 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 
 			if (Code != 200)
 			{
+				// 401/403/429/5xx...: saglayici yanit uretmedi -> sayac iade (genel/oyuncu/oturum).
+				WeakThis->RefundRequest(PlayerKey, RequestDay);
 				// Hata govdesi kisaltilir: bazi saglayicilar iletide anahtar parcasi yankilar (SECURITY_AUDIT D-10).
 				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] HTTP %d: %s"), Code, *RespBody.Left(200));
 				OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
@@ -289,9 +453,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			*bSlotReleased = true;
 			InFlightRequests = FMath::Max(0, InFlightRequests - 1);
 			RecentRequestTimes.RemoveSingle(NowSec); // atilmayan istek dakika sinirini tuketmesin
-			SessionRequestCount = FMath::Max(0, SessionRequestCount - 1); // ... ne de oturum butcesini
-			DailyRequestCount = FMath::Max(0, DailyRequestCount - 1);     // ... ne de gunluk butceyi
-			SaveDailyBudget();
+			RefundRequest(PlayerKey, RequestDay); // ... ne de oturum/gunluk/oyuncu butcesini
 			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		}
 	}

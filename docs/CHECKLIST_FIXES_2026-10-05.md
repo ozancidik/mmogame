@@ -271,9 +271,12 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI (headless bolge gecisi + timeout t
 
 Kod derlendi, RunAllChecks (-SkipBuild) GECTI. Bu kontroller LLM'e hic istek atmaz (API anahtari yok), yani tavan mantigi OTOMATIK DOGRULANMADI, PIE'de de denenmedi. `MMODialogueSubsystem::MaxDailyRequests` varsayilani 1500 bir baslangic tahminidir (maliyet karari sizin).
 
-- [ ] `NVIDIA_API_KEY` tanimliyken NPC ile konus: `Saved/MMO/LLMDailyBudget.txt` olusur, icerigi "<UTC gun numarasi> <sayac>" ve her LLM istegiyle sayac 1 artar (baglanti hatasi/anahtarsiz istek sayilmaz; ProcessRequest baslamazsa iade edilir).
+DUZELTME (2026-10-08 turu): bu bolumun ilk surumundeki "baglanti hatasi sayilmaz" cumlesi kodla celisiyordu. Gecerli kural (kod + `MMODialogueSubsystem.h` yorumu): anahtarsiz istek hic kurulmaz ve sayilmaz; baslatilamayan istek, baglanti hatasi/iptal ve HTTP != 200 (401/403/429/5xx...) IADE edilir; HTTP 200 (ayristirma hatasi dahil) ve ZAMAN ASIMI SAYILIR (istek saglayiciya ulasmis/faturalanmis olabilir). Sayac artik her cagrida degil, 10 degisiklikte / 30 sn'de bir ve kapanista yazilir (bkz. bolum 28); tavan `MaxDailyRequests` editorde degil, `-MMOLlmDaily=N` komut satiri veya DefaultGame.ini `[MMO] LlmDailyRequests=N` ile ayarlanir.
+
+- [ ] `NVIDIA_API_KEY` tanimliyken NPC ile konus: `Saved/MMO/LLMDailyBudget.txt` olusur; 1. satir "<UTC gun numarasi> <sayac>", sonraki satirlar "<oyuncu>\t<sayac>"; BASARILI (HTTP 200) her LLM istegiyle sayac 1 artar (dosyaya yazim gecikmeli: 10 istek ya da 30 sn sonra/kapanista).
+- [ ] Gecersiz bir `NVIDIA_API_KEY` ile (HTTP 401) 3 kez konus: sayac ARTMAMALI (iade), log'da `HTTP 401` gorulmeli. Interneti kesip dene: baglanti hatasi iade, zaman asimi (12 sn) ise sayilir.
 - [ ] Host'u kapatip ayni gun yeniden ac: sayac dosyadan devam etmeli (0'dan baslamamali). Dosyadaki gun numarasini elle eskiye cek: ilk istekte sayac 0'lanmali.
-- [ ] Tavani gecici dusur (ornegin dosyadaki sayaci 1499 yap ya da `MaxDailyRequests`'i 1 yap): tavan dolunca log'da `[MMODialogue] Gunluk LLM butcesi doldu` gorulmeli, NPC "(NPC su an konusamiyor.)"/mevcut yedek replikle konusmali, oyun akisi bozulmamali. `MaxDailyRequests = 0` sinirsiz yapar.
+- [ ] Tavani gecici dusur (`-MMOLlmDaily=1` ile host'u ac ya da dosyadaki sayaci tavana esitle): tavan dolunca log'da `[MMODialogue] Gunluk LLM butcesi doldu` gorulmeli, NPC "(NPC su an konusamiyor.)"/mevcut yedek replikle konusmali, oyun akisi bozulmamali. `-MMOLlmDaily=0` sinirsiz yapar.
 - [ ] Mevcut dakikalik sinir (30/dk), eszamanli sinir (4) ve `MaxSessionRequests` (400) eskisi gibi calismali.
 
 ## 25. QA 2026-10-07 ORTA-2/ORTA-3: PCH'siz derleme kirigi + JSON ice aktarma sikilastirildi (sema v2)

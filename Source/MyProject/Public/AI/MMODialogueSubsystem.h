@@ -36,18 +36,24 @@ class MYPROJECT_API UMMODialogueSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
 	/**
 	 * NPC icin tek seferlik bir replik uretir.
 	 * @param NpcName    NPC'nin adi (or. "Satici Merek")
 	 * @param NpcRole    NPC'nin rolu/kisiligi (or. "kasabanin silah saticisi, aksi ama durust")
 	 * @param PlayerInfo Oyuncu baglami (seviye, sinif, aktif gorev) — replige renk katar
 	 * @param OnReady    Cevap hazir olunca cagrilir (oyun is parcaciginda)
+	 * @param PlayerKey  Istegi yapan oyuncunun anahtari (oyuncu adi). Oyuncu basi gunluk kota icin; bos ise
+	 *                   ortak "?" kovasi sayilir. LLM'e GITMEZ (yalniz sayac anahtari).
 	 */
 	void RequestNpcLine(const FString& NpcName, const FString& NpcRole,
-		const FString& PlayerInfo, FMMOOnDialogueReady OnReady);
+		const FString& PlayerInfo, FMMOOnDialogueReady OnReady, const FString& PlayerKey = FString());
 
 	/** Serbest bir soru sorar (test/konsol icin). */
-	void RequestRaw(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady);
+	void RequestRaw(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady,
+		const FString& PlayerKey = FString());
 
 	/** Secili saglayicinin API anahtari tanimli mi? (tanimli degilse istek atmayiz) */
 	bool HasApiKey() const;
@@ -116,28 +122,63 @@ public:
 	// Sunucu basina GUNLUK toplam LLM cagrisi tavani (oturum-otesi). Sayac UTC gun degisince sifirlanir ve
 	// Saved/MMO/LLMDailyBudget.txt'te saklanir: host gun icinde yeniden baslasa da toplam korunur
 	// (MaxSessionRequests yalniz tek sureci sinirlar). Tavan dolunca istek atilmaz, NPC yedek replige duser.
-	// Varsayilan 1500 baslangic tahminidir (maliyet/denge karari sizin); 0 = sinirsiz.
+	// SAYAC KURALI (maliyet): yalnizca saglayicinin yanit URETMIS olabilecegi istekler sayilir. HTTP 200
+	// (ayristirma hatasi dahil) ve ZAMAN ASIMI sayilir (istek saglayiciya ulasmis olabilir, faturalanmis
+	// olabilir); baglanti hatasi, iptal, HTTP != 200 (401/403/429/5xx...) ve baslatilamayan istek IADE edilir.
+	// Dakikalik sinir iade edilmedigi icin hatali istek donguleri yine de sinirlidir.
+	// Ayar onceligi: komut satiri -MMOLlmDaily=N > DefaultGame.ini [MMO] LlmDailyRequests=N > varsayilan 1500
+	// (maliyet/denge karari sizin); 0 = sinirsiz. Dosya sayaci tek surece aittir: ayni Saved/ dizinini
+	// paylasan iki host sureci birbirini ezer (son yazan kazanir).
 	UPROPERTY(EditAnywhere, Category = "MMO|AI", meta = (ClampMin = "0"))
 	int32 MaxDailyRequests = 1500;
 
 	// Bugun (UTC) atilan toplam LLM istegi sayisi (yalniz sunucuda artar).
 	int32 DailyRequestCount = 0;
 
+	// Oyuncu basi gunluk kota: tek oyuncu herkesin NPC'sini yedek replige dusurmesin. Tavanin 1/4'u, en az 50
+	// (MaxDailyRequests = 0 ise kota da yok). Oyuncu = PlayerState adi (kimlik zaafi bilinen bosluk).
+	int32 GetPerPlayerDailyQuota() const
+	{
+		return MaxDailyRequests > 0 ? FMath::Max(50, MaxDailyRequests / 4) : 0;
+	}
+
 protected:
 	// Gunluk butce durumu: ilk kullanimda dosyadan yuklenir, gun degisince sifirlanir.
 	int64 DailyBudgetDay = -1;
 	bool bDailyBudgetLoaded = false;
 
+	// Oyuncu anahtari (kucuk harf) -> bugunku istek sayisi. Boyut tavani asilirsa yeni anahtar izlenmez
+	// (kota uygulanmaz, genel tavan korur) — sahte adlarla bellek sisirilemesin.
+	TMap<FString, int32> PlayerDailyCounts;
+	static constexpr int32 MaxTrackedPlayers = 4096;
+
+	// Sayac dosyasi yazim sikligi: degisiklik biriktikce en fazla her 10 cagrida / 30 sn'de bir diske iner,
+	// ayrica Deinitialize'da (kapanista) zorla yazilir. Yazim gecici dosya + tasima ile yapilir.
+	bool bBudgetDirty = false;
+	int32 UnsavedBudgetChanges = 0;
+	double LastBudgetSaveTime = 0.0;
+
+	// Ini / komut satirindan MaxDailyRequests'i okur (Initialize'da).
+	void LoadDailyLimitConfig();
+
 	// Gunluk sayaci yukler/sifirlar (gun degistiyse). SendRequest'in basinda cagrilir.
 	void RollDailyBudget();
-	void SaveDailyBudget() const;
+	// Degisikligi isaretler; sik yazimi sinirlar (bForce = hemen yaz).
+	void NoteBudgetChanged(bool bForce = false);
+	void WriteDailyBudgetFile();
+	// Sayac anahtarini normallestirir (kucuk harf, sekme/satir sonu yok, <= 64 karakter, bos -> "?").
+	static FString NormalizePlayerKey(const FString& PlayerKey);
+	// Atilmis ama saglayicinin yanit uretmedigi bir istegi sayaclardan dusurur (Session + Daily + oyuncu).
+	// RequestDay != bugunse gun sayaclari dokunulmaz (gun donmus, yeni gunun sayaci yanlis dusmesin).
+	void RefundRequest(const FString& PlayerKey, int64 RequestDay);
 
 	// Hiz siniri durumu (yalniz bu subsystem'de, replike degil).
 	TArray<double> RecentRequestTimes;
 	int32 InFlightRequests = 0;
 
 	/** Istegi kurar ve gonderir. */
-	void SendRequest(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady);
+	void SendRequest(const FString& SystemPrompt, const FString& UserPrompt, FMMOOnDialogueReady OnReady,
+		const FString& PlayerKey);
 
 	/** Anthropic Messages yanitindan gorunur metni cikarir. Basarisizsa OutError doldurulur. */
 	static bool ParseAnthropicResponse(const FString& Body, FString& OutText, FString& OutError);
