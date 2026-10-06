@@ -232,3 +232,18 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI (yeni adim "Karakter magazasi" dah
 - [ ] Klan: `/klan kur <ad>` ile baska bir (cevrimdisi, kayitli) karakterin klan adini almaya calis: "Bu klan adi kullanimda (cevrimdisi uyeleri var)". Yeni ad kurulabilmeli; ilk taramada hafif takilma (tum yuvalar taranir, 30 sn onbellek) olmamali/kisa surmeli.
 - [ ] Bolge gecisi (Summer <-> Winter, `MMOTravel`) ve 60 sn otomatik kayit eskisi gibi calismali; kayit basarisizsa gecis iptal mesaji (degismedi).
 - [ ] Not (otomasyonla DOGRULANAMAYAN): bir pawn'a belirli ad vermek headless'ta mumkun olmadi (yerel/uzak oyuncu adi motor tarafindan "Player"/OS adina cevrilip `Gezgin######` oluyor); bu yuzden "eski .sav'i belirli karakter olarak yukleme" yalniz PIE'de gozle dogrulanir. Magaza katmaninda eski dosyalarin hepsinin okundugu TestCharacterStore ile kanitlandi.
+
+## 21. QA NIGHT2 ORTA-1: Cozulme Yolu cebi rota acikligi icin tasindi (-5000,-3000) -> (-1875,5125,-114)
+
+Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Yalniz cep konumu degisti (kayit bicimi ayni). Olcum: `Scripts/ProbeThawRoute.py` (editor navmesh, 250u grid, 1877 tam-yollu hucre) + `SmokeTest.ps1` ile oyun ici `MMOProbeSurface/MMOProbeSpawn`; tablo `MMOGameMode.cpp` Cozulme yorumunda. Hub->cep nav yolu: (-816,-47) (-2413,3363) (-2375,4427) (-2223,4712) (-2128,4845) (-1875,5125). Rota acikligi >=20 cepler: Hukumdar 1375, Magma Tirani 1945, Obsidyen 2647, Reis 2863 (eski rota 288 / 676). 1500u hedefi haritada saglanamadi (en iyi 1375); karar adayi `DECISIONS_NEEDED.md`. Bu madde `PLAYTEST_CHECKLIST.md` ~3510'daki eski `(-5000,-3000)` maddesinin yerine gecer.
+
+**T1 - Rota (Lv13-15 karakter, hub'dan cebe)**
+- [ ] Lv14 karakterle PlayerStart'tan `(-1875,5125)` cebine yuru (tikla-yurude nav yolu yukaridaki noktalardan gecer). Yolda Obsidyen (Lv25-29), Magma Tirani, Alacakaranlik moblari/elitleri sana saldirdi mi? (Beklenen: HAYIR; Alacakaranlik Hukumdari ~1375u uzakta, fark etme zarfi ~1200u.) Saldirdiysa hangi mob ve cep merkezine kac u kala oldu not et.
+- [ ] Yol Ikinci bolge (Lv6-7, kuzeybati yolun uzerinde) ve Buz Lordu'nun (Lv13 elit, aggro 1300, yola ~943u) yakininden geciyor: Buz Lordu seni cekiyor mu? Cekiyorsa kabul edilebilir mi, notu DECISIONS_NEEDED'a geri bildir.
+- [ ] Dar duz serit: cep kuzeybatida yamacla cevrili (Z~-164 duz, yamac +250u). Yuruyus sirasinda takilma / navmesh kopmasi / bosluga dusme var mi?
+
+**T2 - Cep (spawner)**
+- [ ] Konsol: `MMOProbeSpawn -1875 5125 -114 225` ~10 kez; `[MMOPROBE] ... ok=N/64`: beklenen 59-64/64 (egim reddi yamac tarafi, trace_miss 0, nav 0).
+- [ ] Cepte 5 mob yalniz `ThawStalker/CrustWarden/ScorchedRaider`; yerde duruyor (havada/yer altinda degil, Z~-74); ucuruma/yamaca yapisip kalmiyor; `[MMODBG] Spawner ... no nearby ground/nav location` uyarisi logda yok.
+- [ ] Cepte dovusurken Yarik Bekcisi (-4800,4800, Lv62) ve Alacakaranlik cepleri (1000,3200) cekilmiyor (en yakin 2943u).
+- [ ] Minimap/gorev yonlendirmesi: Q_ThawStalkers/CrustWardens/ScorchedRaiders hedeflerine gidilebiliyor mu; gorev metni yer tarif etmiyor (degistirilmedi).

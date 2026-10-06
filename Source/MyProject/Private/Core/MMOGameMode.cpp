@@ -873,11 +873,29 @@ void AMMOGameMode::SpawnMobArea()
 			UGameplayStatics::FinishSpawningActor(ObsidianSpawner, ObsidianTM);
 		}
 
-		// Cozulme Yolu (Lv13-15): 2026-10-06 Summer_scene headless grid probunda
-		// (-5000,-3000) merkezinin 225u halkasi 10x64/64 zemin+nav sonucu verdi.
-		// Zemin Z~0, spawner tabani Z=50. Merkez; en yakin eski normal cep olan
-		// Obsidyen bolgesinden ~2506u ve PlayerStart'tan ~5121u uzakta.
-		const FVector ThawLoc(-5000.f, -3000.f, 50.f);
+		// Cozulme Yolu (Lv13-15): ROTA ACIKLIGI olcutuyle yerlestirildi (QA NIGHT2 ORTA-1).
+		// Eski konum (-5000,-3000): cep-cep mesafe tutuyordu ama hub'dan duz hat Obsidyen (Lv25-29)
+		// merkezinden 288u, Obsidyen Reisi'ne (aggro 1200) 676u geciyordu; Lv11-15 oyuncu yuksek
+		// seviyeli cebin icinden geciyordu. Yeni konum (-1875,5125,-114), kuzey (zemin Z~-164).
+		// Olcum 2026-10-06 (Scripts/ProbeThawRoute.py = editor Recast navmesh, 250u grid, 1877 tam-yollu
+		// hucre; oyun ici dogrulama SmokeTest.ps1 + MMOProbeSurface/MMOProbeSpawn):
+		//  - Cep merkezlerine en yakin: Yarik Bekcisi (-4800,4800) 2943u; hepsi >=2200u (erken cepler
+		//    PlayerStart (-816,-47) yaw 0'a gore). Hub'a 5280u. Navmesh siniri (+-8500) icinde.
+		//  - Hub -> cep NAV yolu tam (kismi degil): (-816,-47) (-2413,3363) (-2375,4427) (-2223,4712)
+		//    (-2128,4845) (-1875,5125), uzunluk 5694u; halkanin 32/32 noktasi da tam yolla bagli.
+		//  - Rota acikligi (yol cokluchizgisine en kisa mesafe), seviyesi >=20 cepler:
+		//      Alacakaranlik Hukumdari (-3200,1800) 1375 | Magma Tirani (elit Lv24, aggro 1350) 1945 |
+		//      Obsidyen (-2800,-1800) 2647 | Obsidyen Reisi (-4000,0) 2863 | Alacakaranlik (1000,3200) 3022 |
+		//      Yarik Bekcisi 2454 | Yarik Arayicisi 5020 | Yarik Habercisi 6769  (eski rota: 288 / 676).
+		//    Hedef 1500u KARSILANMADI: hub cikislari iki koridora sabit (dogu: (0,0)->(988,-437), Magma
+		//    Tirani'na 1042u; kuzeybati: duz hat (-816,-47)->(-2413,3363), Alacakaranlik Hukumdari'na
+		//    1375u); 1877 hucrenin hicbiri >1375 vermedi (guney/bati rotalari Obsidyen'e 1064u, Reis'e 807u).
+		//    Kuzey en az kotu: tek >=20 cep Hukumdari (aggro 600 -> fark etme zarfi ~1200u < 1375u, pay 175u);
+		//    dogu/bati rotalari ise Magma Tirani/Obsidyen zarfinin icinde kaliyor.
+		//  - Kalan risk: yol Ikinci bolgeden (Lv6-7, 37u) ve Buz Lordu'ndan (Lv13 elit, aggro 1300, 943u) geciyor.
+		//  - Oyun ici: MMOProbeSpawn -1875 5125 -114 225 x10 = 59..64/64 (ort 62,4; egim reddi nz=0.64 yamaci,
+		//    trace_miss 0, nav 0). Yakin komsular dar duz seritte: (-2000,5125) 43/64, (-1875,5000) 45/64.
+		const FVector ThawLoc(-1875.f, 5125.f, -114.f);
 		const FTransform ThawTM(FRotator::ZeroRotator, ThawLoc);
 		if (AMMOMobSpawner* ThawSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThawTM))
 		{

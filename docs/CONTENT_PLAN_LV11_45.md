@@ -91,13 +91,15 @@ Notlar:
 
 **Probe ölçütleri (koordinat uydurmayın; mevcut Obsidyen/Rift probunun aynısı):** halka (225/250 u) 16/16 ya da 64/64 nokta zeminde (±60 u) ve bağlı navmesh'te, eğim sınırı içinde, PlayerStart'a **tam yol**; en yakın eski cep ve doğuş noktası/NPC'lerden **≥ ~1300 u** (mob doğma yarıçapı 225 + gezinme 450 + aggro 600 = ~1275 u'dan oyuncu fark edilir; `MMOGameMode.cpp` Rift yorumu); Üçüncü ve Dördüncü bölgeye komşu, ikisine de aggro menzilinde değil. `ExtendSummerNavigation.py` ile navmesh ±8500'e genişletildi, zemin var `[KOD]`.
 
-**Ölçülen sonuç (2026-10-06):** Summer_scene `(-5000,-3000,50)`, yarıçap 225; on ardışık probun tamamı `64/64`, iz/egim/nav reddi `0`. Merkez PlayerStart'tan yaklaşık 5121 u, Obsidyen normal cebinden 2506 u uzakta. Daha yakın `(-1700,-2700)` adayı tek probda 64/64 verse de tekrarlı örneklerde 57–63/64'e düştüğü için kullanılmadı.
+**Ölçülen sonuç (2026-10-06, İLK KONUM; GEÇERSİZ, aşağıdaki "Güncelleme" bak):** Summer_scene `(-5000,-3000,50)`, yarıçap 225; on ardışık probun tamamı `64/64`. Yalnız cep-cep mesafesine bakıyordu; hub → cep düz hattı Obsidyen (Lv25-29) merkezinden 288 u geçtiği için QA NIGHT2 ORTA-1 ile reddedildi.
+
+**Güncelleme (2026-10-06, ORTA-1 çözümü): ROTA AÇIKLIĞI ölçütü ve yeni konum `(-1875,5125,-114)`.** Ölçüt artık cep-cep mesafesine ek olarak hub'dan cebe **NAV yolunun** seviyesi ≥ 20 her cep merkezine uzaklığıdır (`Scripts/ProbeThawRoute.py`, editör Recast navmesh; oyun içi prob ayrı). Ölçütler: (1) tüm cep merkezlerine ≥ 2200 u, (2) nav yolu tam (kısmi değil) ve ≥ 20 cep merkezlerine ≥ 1500 u, (3) oyun içi `MMOProbeSurface/MMOProbeSpawn` ≥ 60/64, (4) navmesh ±8500 içinde ve hub'a ≥ 1500 u. 250 u gridde 1877 tam-yollu hücre tarandı; **hiçbiri (2)'nin 1500 u eşiğini sağlamadı** (en iyi 1375 u): hub çıkışları iki koridora sabit (doğu → Magma Tirani'na 1042 u; kuzeybatı düz hat → Alacakaranlık Hükümdarı'na 1375 u; güney/batı → Obsidyen 1064 u / Reis 807 u). Kuzey koridoru en az kötü seçildi (tek ≥ 20 cep Hükümdar, aggro 600 → fark etme zarfı ~1200 u < 1375 u). Seçilen konum: merkezlere en yakın 2943 u (Yarık Bekçisi), hub'a 5280 u, nav yolu 5694 u, halka 32/32 tam yol, oyun içi `MMOProbeSpawn` ×10 = 59–64/64 (ort 62,4). Ayrıntı ve tablo `MMOGameMode.cpp` Çözülme yorumunda; karar adayı `DECISIONS_NEEDED.md` ("Çözülme Yolu konumu / Lore").
 
 **C++ uygulaması** (ölçülen koordinat):
 
 ```cpp
-		// Cozulme Yolu (Lv13-15): 10x64/64 headless Summer_scene probu, zemin Z~0.
-		const FVector ThawLoc(-5000.f, -3000.f, 50.f);
+		// Cozulme Yolu (Lv13-15): rota acikligi olcutu (bkz. Guncelleme); ilk konum (-5000,-3000,50) gecersiz.
+		const FVector ThawLoc(-1875.f, 5125.f, -114.f);
 		const FTransform ThawTM(FRotator::ZeroRotator, ThawLoc);
 		if (AMMOMobSpawner* ThawSpawner = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), ThawTM))
 		{
@@ -366,7 +368,7 @@ PIE doğrulaması (hepsi `[VARSAYIM]`, oynanmadı): yeni karakter, konsol komutu
 
 | Konu | Not | Etiket |
 |---|---|---|
-| Çözülme spawner koordinatı | `(-5000,-3000,50)`, 10×64/64 headless prob; yedek `ThirdZone` genişletmesi kullanılmadı | çözüldü |
+| Çözülme spawner koordinatı | ~~`(-5000,-3000,50)`~~ → `(-1875,5125,-114)` (ORTA-1: rota açıklığı; nav yolu ≥ 20 cebe en az 1375 u, 1500 u hedefi haritada sağlanamadı); yedek `ThirdZone` genişletmesi kullanılmadı | çözüldü (1500 u istisnası: karar adayı) |
 | Lv16–20 hız kayması | Çekirdek görevler bandı 9,6 → 5,9 yapıyor (A.4) | model; ölçüm şart |
 | Altın | Yeni görev altını +%37 (Lv10–15 kademesi); sink kararı açık | `DECISIONS_NEEDED.md` 3 |
 | Lv13 Adamantin düşme | Lv13 mob Lv16 ekipmanı düşürebilir | bilgi |
