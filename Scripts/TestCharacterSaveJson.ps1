@@ -17,7 +17,7 @@ if (-not $process.WaitForExit(280000)) {
     exit 2
 }
 
-$pass = Select-String -Path $log -Pattern "\[MMO_SAVE_JSON_TEST\] PASS schema=1 bytes=([1-9][0-9]*)"
+$pass = Select-String -Path $log -Pattern "\[MMO_SAVE_JSON_TEST\] PASS schema=2 bytes=([1-9][0-9]*) negative=([5-9][0-9]|[1-9][0-9]{2,})"
 $fail = Select-String -Path $log -Pattern "\[MMO_SAVE_JSON_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation"
 if ($pass -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $pass.Line

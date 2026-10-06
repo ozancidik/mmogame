@@ -275,3 +275,12 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI. Bu kontroller LLM'e hic istek atm
 - [ ] Host'u kapatip ayni gun yeniden ac: sayac dosyadan devam etmeli (0'dan baslamamali). Dosyadaki gun numarasini elle eskiye cek: ilk istekte sayac 0'lanmali.
 - [ ] Tavani gecici dusur (ornegin dosyadaki sayaci 1499 yap ya da `MaxDailyRequests`'i 1 yap): tavan dolunca log'da `[MMODialogue] Gunluk LLM butcesi doldu` gorulmeli, NPC "(NPC su an konusamiyor.)"/mevcut yedek replikle konusmali, oyun akisi bozulmamali. `MaxDailyRequests = 0` sinirsiz yapar.
 - [ ] Mevcut dakikalik sinir (30/dk), eszamanli sinir (4) ve `MaxSessionRequests` (400) eskisi gibi calismali.
+
+## 25. QA 2026-10-07 ORTA-2/ORTA-3: PCH'siz derleme kirigi + JSON ice aktarma sikilastirildi (sema v2)
+
+Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild -FullCompile) GECTI: PCH'siz tek-dosya /W4 (10 dosya) 0 uyari, JSON testi `PASS schema=2 negative=109`, magaza testi gercek 154 .sav -> JSON -> alan alan esit (json ok=154 mismatch=0; makinedeki en yuksek seviye 6). PIE'de OYNANMADI; FromJson su an oyun kodu tarafindan KULLANILMIYOR (yalniz test/ileride bulut magazasi), yani oynanista degisiklik beklenmez; yerel .sav formati ve okumasi degismedi.
+
+- [ ] Karakteri yukle/kaydet (MMOSave, MMOLoad, bolge gecisi): eskisi gibi calismali (yerel .sav yolu degismedi).
+- [ ] `Scripts\TestCharacterSaveJson.ps1` calistir: `PASS schema=2 ... negative=109` (negatif sayi artarsa/azalirsa test kapsami degisti). Editor kapali olmali.
+- [ ] `Scripts\RunAllChecks.ps1 -SkipBuild -FullCompile`: "PCH'siz tek-dosya" adimi her dosya OK. Bir `#include` silip tekrar dene: o dosya HATA vermeli (CI/manuel kullanim; varsayilan RunAllChecks bu adimi atlar).
+- [ ] Eski kayitli (Lv30+, depo/klan/gorev dolu) bir karakterin .sav dosyasi bu makinede varsa `TestCharacterStore.ps1` ciktisindaki `json ok=N mismatch=0 maxLevel=` satirinda maxLevel o seviyeyi gostermeli (su an en yuksek 6; yuksek seviyeli gercek kayit oynanip kaydedildikten sonra tekrar kos).

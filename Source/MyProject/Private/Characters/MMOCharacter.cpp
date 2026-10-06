@@ -770,11 +770,12 @@ void AMMOCharacter::MMOTestSaveJson()
 	}
 	FString Error;
 	int32 Utf8Bytes = 0;
-	const bool bPassed = FMMOCharacterSaveJson::RunRoundTripSelfTest(Error, Utf8Bytes);
+	int32 NegativeCases = 0;
+	const bool bPassed = FMMOCharacterSaveJson::RunRoundTripSelfTest(Error, Utf8Bytes, &NegativeCases);
 	if (bPassed)
 	{
-		UE_LOG(LogTemp, Display, TEXT("[MMO_SAVE_JSON_TEST] PASS schema=%d bytes=%d"),
-			FMMOCharacterSaveJson::CurrentSchemaVersion, Utf8Bytes);
+		UE_LOG(LogTemp, Display, TEXT("[MMO_SAVE_JSON_TEST] PASS schema=%d bytes=%d negative=%d"),
+			FMMOCharacterSaveJson::CurrentSchemaVersion, Utf8Bytes, NegativeCases);
 	}
 	else
 	{

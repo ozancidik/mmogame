@@ -72,8 +72,11 @@ Doğrulanamayan varsayımlar "[?]" ile işaretlidir ve bölüm 9'da toplanmışt
   küçük JSON nesneleri (`SetObjects`/`GetObjects`); ücretsiz katmanda bir varlığa en çok **3 nesne** (üst katmanlarda daha çok).
   Nesne başına boyut sınırını doğrulayamadım [?]. Eski yol Player Data/UserData (`Internal`/`ReadOnly`/`Client` üç erişim kipi).
   Planım: `character` varlığı başına tek `CharacterSave` JSON nesnesi (gerekirse Items/Warehouse/Quests olarak 3'e bölünür).
-  `FMMOCharacterSaveData`'yı `FJsonObjectConverter` ile JSON'a çevirmek gerekir; `TMap<FName,int64>` ve `int64` (JSON'da
-  string'e dönüşür) için gidiş-dönüş testi şart [?].
+  `FMMOCharacterSaveData`'yı `FJsonObjectConverter` ile JSON'a çevirmek gerekir; `TMap<FName,int64>` ve `int64` için gidiş-dönüş
+  testi şart. **Düzeltme (2026-10-07, motor kaynağı `JsonObjectConverter.cpp` okunarak):** motor `int64`'ü yazarken JSON **sayı
+  (double)** olarak yazar (yalnız okurken string'i de `Atoi64` ile çözer); yani önceki "string'e dönüşür" notu yanlıştı ve 2^53
+  üstü değerler sessizce bozulurdu. Şema sürüm 2'de `FMMOCharacterSaveJson` int64'leri açıkça ondalıksız tam sayı METNİ olarak
+  yazar/okur (v1 blob'ları hâlâ okunur); gidiş-dönüş testi 2^53+1 ve `INT64_MAX` değerlerini kayıpsız doğrular.
 - Sürümleme: yapıda "eski kayıtlarda boş gelir" desenini zaten kullanıyoruz; JSON'a `SchemaVersion` alanı ekleyip aynı deseni sürdürürüz (iki seçenekte de).
 - **Avantaj: PlayFab** (blob/JSON doğal). OWS'ta da yapılır ama ilişkisel şemayla savaşırız.
 
@@ -169,8 +172,11 @@ fiyatı ölçekte kabul edilemezse. O noktada yalnız Instance Launcher/Instance
 ### Aşama 1: Sunucu tarafı bulut kaydı (kimlik hâlâ ad; istemci değişmez)  [en küçük dilim]
 - **Hazırlık durumu (2026-10-06):** `IMMOCharacterStore`, yerel dosya uygulaması ve
   `UGameInstanceSubsystem` erişim noktası eklendi; kayıt okuma/yazma çağıranları bu arayüze
-  taşındı. `FMMOCharacterSaveJson` sürüm 1 zarfı (`SchemaVersion` + `Data`) tüm
+  taşındı. `FMMOCharacterSaveJson` zarfı (`SchemaVersion` + `Data`; güncel sürüm 2, v1 hâlâ okunur) tüm
   `FMMOCharacterSaveData` alanlarını JSON'a çeviriyor ve bilinmeyen ileri sürümleri reddediyor.
+  `FromJson` artık SIKI: her SaveGame alanı zorunlu, tip/aralık/boyut (blob 2 MiB, dizi 4096, string 1024) doğrulanır,
+  başarısızlıkta çıkış yapısı ezilmez (çağıran false'ta mevcut kaydı yazmaz); 100+ negatif test (bozuk/eksik/aşırı büyük)
+  ve gerçek `.sav` -> JSON -> alan alan eşitlik testi `RunAllChecks`'te.
   Gerçek UE yansımasıyla çalışan `Scripts/TestCharacterSaveJson.ps1`, dolu fixture'ın tüm
   alanlarını (özellikle `TMap<FName,int64>`) gidiş-dönüşte karşılaştırıyor; ölçülen örnek blob
   1158 UTF-8 bayt. `IMMOCharacterStore` asenkron callback giriş noktaları eklendi; yerel
@@ -236,7 +242,7 @@ başına dakikada bir otomatik kayıt. Dirty-flag ile gereksiz yazımlar kesilir
 6. PlayFab başlık ayarlarında istemci veri yazımını kapatma seçeneklerinin tam adları; entity nesne erişim ilkesinin istemci yazımını nasıl kısıtladığı.
 7. `ExpectedProfileVersion` ile iyimser eşzamanlılık davranışı (SetObjects).
 8. Karakter adı benzersizliği için PlayFab'ta yerleşik çözüm olmadığı (bu belgede "yok" varsayıldı; bir Azure Function veya ek tablo gerekebilir).
-9. `FJsonObjectConverter` ile `FMMOCharacterSaveData` (özellikle `TMap<FName,int64>`, `int64`, `FVector/FRotator`, `EMMOClass` enum) gidiş-dönüşü: denenmedi.
+9. `FJsonObjectConverter` ile `FMMOCharacterSaveData` (özellikle `TMap<FName,int64>`, `int64`, `FVector/FRotator`, `EMMOClass` enum) gidiş-dönüşü: **yapıldı** (2026-10-07; `Scripts/TestCharacterSaveJson.ps1` + `TestCharacterStore.ps1`; enum politikası: ad yazılır, eski sayısal değer tolere edilir, yeniden adlandırma için sürüm artırıp geçiş eklenmeli).
 10. PlayFab bölgesi/veri yerleşimi ve KVKK uygunluğu; Türkiye'den gecikme (denenmedi).
 11. Dedicated server hedef işletim sistemi (Windows/Linux) belirtilmedi; PlayFab paketi platform listesi Windows/Xbox/Steam Deck. REST yolu bunu aşıyor ama denenmedi.
 12. Üçüncü taraf bloglardaki "free tier %99 küçüldü" haberi Microsoft'un kendi fiyat sayfasındaki "1.000 ömür boyu oyuncu" ifadesiyle uyumlu; geçmiş değer (100.000) yalnız üçüncü taraftan.
