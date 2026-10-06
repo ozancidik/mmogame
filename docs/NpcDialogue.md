@@ -66,6 +66,7 @@ ekran baloncuğuna sığacak uzunluktadır. Her NPC'nin sesi belirgin biçimde f
 - Haydutlar yolları kesti. Kervanla git, tek atlıyı avlarlar.
 - Geç bakalım. Ama sınırda gördüğün her şeyi bana bildir, unutma.
 - Kapıdan geçen çok, geri dönen az. Sen dönenlerden ol.
+- Goblin tek başına korkutmaz. Sürü bastırırsa geri çekil, dar bir geçit bul.
 
 *Yeni bölgeler (Ayazdiş Buzulu / Alev Vadisi):*
 
@@ -225,6 +226,8 @@ baloncuğuna sığacak kısalıktadır.*
 ---
 
 ## Kael düzeltme önerileri
+
+*Durum: Öneri 1 koda (`MMOGameMode.cpp` Kael `FallbackLines`) ve yukarıdaki Kael listesine uygulandı.*
 
 *Kodda (`Source/MyProject/Private/Core/MMOGameMode.cpp`, Muhafız Kael `FallbackLines`) şu satır var:*
 

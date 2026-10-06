@@ -196,3 +196,9 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 UZAK i
 - [ ] **Iksir**: istemcide cani doluyken `F`: "Canin zaten dolu"; iksiri yokken `F`/`G`: "Iksir yok!" / "<Esya> yok!" (yerelde ekran mesaji; ayni davranis host icin de).
 - [ ] **Beceri**: hedefsiz/menzil disi iken hedef gerektiren skill (sunucu ExecuteSkill yolu nadiren; ana yol UseSkill "Menzilde hedef yok" zaten vardi): istemcide balon gorunmeli, mana harcanmamali.
 - [ ] Regresyon: host kendi pawn'inda tum bu mesajlari eskisi gibi ekranda gormeli (cift mesaj olmamali).
+
+## 18. Muhafiz Kael replik duzeltmesi (yalniz metin)
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI.
+
+- [ ] LLM kapaliyken Muhafiz Kael'e art arda tikla: yedek replik listesinde "Goblin tek basina korkutmaz. Suru bastirirsa geri cekil, dar bir gecit bul." gorunmeli; eski "sirtini tasa ver" satiri hic cikmamali. Balona sigmali (tek baloncuk).
