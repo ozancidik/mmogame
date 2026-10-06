@@ -8,6 +8,11 @@
 #include "Net/UnrealNetwork.h"
 #include "Core/MMONotify.h"
 #include "GameFramework/PlayerState.h"
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+#endif
 
 namespace
 {
@@ -216,6 +221,11 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 	{
 		return;
 	}
+	if (Members.Contains(Target) || !CanCombineParties(Inviter, Target))
+	{
+		MMONotify::ToOwner(Inviter, TEXT("Mevcut partileri birlestirmek icin parti liderlerini davet edin."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
 
 	// Hedefteki gecerli daveti ezme. Daveti kosulsuz degistirmek, kotu niyetli bir
 	// oyuncunun gercek daveti kurban kabul etmeden hemen once kapmasina izin veriyordu.
@@ -388,9 +398,37 @@ void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AM
 	}
 }
 
+bool UMMOPartyComponent::CanCombineParties(AMMOCharacter* Inviter, AMMOCharacter* Invitee)
+{
+	const UMMOPartyComponent* IP = Inviter ? Inviter->GetPartyComponent() : nullptr;
+	const UMMOPartyComponent* VP = Invitee ? Invitee->GetPartyComponent() : nullptr;
+	if (!IP || !VP)
+	{
+		return false;
+	}
+	// Ayni partiye tekrar kabul, baska bir grubun sahipligini degistirmez.
+	if (IP->Members.Contains(Invitee))
+	{
+		return true;
+	}
+	// Partisiz oyuncu kendi adina karar verir. Uye -> partisiz oyuncu daveti korunur.
+	// Davet edilenin zaten partisi varsa, iki taraf da tum grubu temsil ediyor.
+	return !VP->IsInParty() || (VP->IsPartyLeader() && (!IP->IsInParty() || IP->IsPartyLeader()));
+}
+
 void UMMOPartyComponent::FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invitee)
 {
-	if (!Inviter || !Invitee || Inviter == Invitee)
+	if (!HasAuthorityInternal() || !Inviter || !Invitee || Inviter == Invitee)
+	{
+		return;
+	}
+	// Davet ile kabul arasinda liderlik/uyelik degisebilir; yetkiyi mutasyon oncesi yenile.
+	if (!CanCombineParties(Inviter, Invitee))
+	{
+		MMONotify::ToOwner(Invitee, TEXT("Parti birlestirme icin iki partinin lider onayi gerekir."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+	if (Inviter->GetPartyComponent()->Members.Contains(Invitee))
 	{
 		return;
 	}
@@ -488,3 +526,124 @@ void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
 		}
 	}
 }
+
+#if !UE_BUILD_SHIPPING
+bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	TArray<AMMOCharacter*> Actors;
+	const bool bSuccess = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		for (int32 I = 0; I < 9; ++I)
+		{
+			AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
+			if (!Character)
+			{
+				OutError = TEXT("fixture spawn failed");
+				return false;
+			}
+			Actors.Add(Character);
+		}
+		auto Accept = [&](int32 From, int32 To)
+		{
+			UMMOPartyComponent* Target = Actors[To]->GetPartyComponent();
+			Target->PendingInviteFrom = Actors[From];
+			Target->PendingInviteTime = World->GetTimeSeconds();
+			Target->RequestAccept();
+		};
+		auto Matches = [&](const TArray<AMMOCharacter*>& Set, AMMOCharacter* ExpectedLeader)
+		{
+			for (AMMOCharacter* Character : Set)
+			{
+				const UMMOPartyComponent* Party = Character->GetPartyComponent();
+				if (Party->Leader != ExpectedLeader || Party->Members.Num() != Set.Num() - 1)
+				{
+					return false;
+				}
+				for (AMMOCharacter* Other : Set)
+				{
+					if (Other != Character && !Party->Members.Contains(Other)) { return false; }
+				}
+			}
+			return true;
+		};
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		const TArray<AMMOCharacter*> A { Actors[0], Actors[1] };
+		const TArray<AMMOCharacter*> B { Actors[2], Actors[3] };
+		Accept(0, 1);
+		Accept(2, 3);
+		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[2]), TEXT("solo formation"))) { return false; }
+		Accept(0, 3);
+		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[2]), TEXT("invitee member moved group"))) { return false; }
+		Accept(1, 2);
+		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[2]), TEXT("inviter member merged group"))) { return false; }
+		// Davet yetkiliyken gonderilir; lider kabul gelmeden ayrilir/liderlik degisir.
+		UMMOPartyComponent* Target = Actors[2]->GetPartyComponent();
+		Target->PendingInviteFrom = Actors[0];
+		Target->PendingInviteTime = World->GetTimeSeconds();
+		ApplyPartySet(A, Actors[1]);
+		Target->RequestAccept();
+		if (!Check(Matches(A, Actors[1]) && Matches(B, Actors[2]) && !Target->PendingInviteFrom.IsValid(), TEXT("stale inviter leadership"))) { return false; }
+		ApplyPartySet(A, Actors[0]);
+		Target->PendingInviteFrom = Actors[0];
+		Target->PendingInviteTime = World->GetTimeSeconds();
+		ApplyPartySet(B, Actors[3]);
+		Target->RequestAccept();
+		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[3]), TEXT("stale invitee leadership"))) { return false; }
+		ApplyPartySet(B, Actors[2]);
+		Accept(1, 0);
+		if (!Check(Matches(A, Actors[0]), TEXT("same group changed leader"))) { return false; }
+		Accept(0, 2);
+		TArray<AMMOCharacter*> Merged { Actors[0], Actors[1], Actors[2], Actors[3] };
+		if (!Check(Matches(Merged, Actors[0]), TEXT("leader consent merge"))) { return false; }
+		Accept(1, 4); // Siradan uyenin partisiz oyuncu davet etmesi halen desteklenir.
+		Merged.Add(Actors[4]);
+		if (!Check(Matches(Merged, Actors[0]), TEXT("member solo invitation"))) { return false; }
+		for (int32 I = 5; I < 8; ++I) { Accept(0, I); Merged.Add(Actors[I]); }
+		if (!Check(Matches(Merged, Actors[0]), TEXT("eight members"))) { return false; }
+		Accept(0, 8);
+		if (!Check(Matches(Merged, Actors[0]) && !Actors[8]->GetPartyComponent()->IsInParty() && Actors[8]->GetPartyComponent()->Leader == nullptr, TEXT("capacity overflow mutated groups"))) { return false; }
+		return true;
+	}();
+	// Controllersiz fixture'lar EndPlay'de oyuncu kaydi yazmaz; grup referanslarini da temizle.
+	for (AMMOCharacter* Character : Actors) { Character->GetPartyComponent()->RequestLeave(); }
+	for (AMMOCharacter* Character : Actors) { Character->Destroy(); }
+	return bSuccess;
+}
+
+namespace
+{
+	struct FMMOPartyConsentTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestPartyConsent"))) { return false; }
+			FString Error;
+			int32 Checks = 0;
+			if (UMMOPartyComponent::RunMergeConsentSelfTest(InWorld, Error, Checks))
+			{
+				Ar.Logf(TEXT("[MMO_PARTY_CONSENT_TEST] PASS checks=%d"), Checks);
+			}
+			else
+			{
+				Ar.Logf(TEXT("[MMO_PARTY_CONSENT_TEST] FAIL checks=%d reason=%s"), Checks, *Error);
+			}
+			return true;
+		}
+	};
+	FMMOPartyConsentTestExec GMMOPartyConsentTestExec;
+}
+#endif

@@ -694,7 +694,7 @@ regresyondur.
 > QA notu: Bug-hunt turu, dogrudan kod incelemesiyle (parti birlesme yolu, daha once hic incelenmemis alan) bulundu. Derleme temiz. Test icin en az 9 oyuncu (veya iki kalabalik parti) gerekiyor — normal 2-3 kisilik oyunda tetiklenmez, ama coklu grup senaryosunda gercek bir riskti.
 
 - [ ] **Ana senaryo:** Iki ayri parti olustur (ideal: biri 5, digeri 5 kisi, toplam 10 > 8 sinir). Bir partinin lideri digerinden birini davet edip kabul ettirmeye calissin → **hicbir tarafin partisi degismemeli**, davet eden ekraninda "Parti dolu (maksimum 8)" mesaji gormeli.
-- [ ] **Regresyon - normal birlesme:** Toplam <=8 olacak sekilde iki kucuk parti (or. 3+3=6) birlesmeyi dene → eskisi gibi calismali, tum uyeler tek partide gorunmeli.
+- [ ] **Regresyon - normal birlesme:** Toplam <=8 olacak sekilde iki kucuk partinin LIDERLERI arasinda (or. 3+3=6) birlesmeyi dene → tum uyeler tek partide gorunmeli (2026-10-07: grup birlestirmede lider onayi zorunlu).
 - [ ] **Regresyon - tekli davet:** Partisiz iki oyuncu birbirini davet etsin → normal calismali (degisiklik bu yolu etkilemedi).
 
 ---
@@ -3698,3 +3698,21 @@ ve iki oyunculu PIE oynanmadı; anlık görüntü sonrası XP/altın penceresi h
 - [ ] Yazım hatası giderildikten sonra yeni Summer/Winter geçişi normal çalışmalıdır.
 - [ ] İptal sonrası disk/bulut yazımı hâlâ başarısızken `MMOSave` dene: "Karakter
   kaydedilemedi" mesajı görülmeli, "bölge geçişi sürüyor" mesajı gösterilmemelidir.
+
+## Parti birleştirmede lider yetkisi — 2026-10-07
+
+Davet edilen mevcut grubun lideri olmalıdır; davetçinin de grubu varsa o grubun lideri
+olmalıdır. Yetki kabul anında tekrar denetlenir. Sıradan üye partisiz oyuncu davet
+edebilir. Headless sunucu yolunda 10 senaryo geçti; gerçek istemci RPC/HUD/replikasyon
+oynanmadı. Dört oyunculu test gereklidir; iki oyuncu ile iki mevcut grup kurulamaz.
+
+- [ ] Dört oyuncuyu A+B ve C+D gruplarına ayır. A/C liderken A'nın D'ye, B'nin C'ye
+  daveti reddedilmeli; üyelik/liderlik iki tarafta değişmemelidir.
+- [ ] A, C'ye davet gönderdikten sonra A ayrılsın; C kabul edince eski A grubundaki B
+  taşınmamalıdır (A partisizse kendi adına C grubuna katılması geçerlidir).
+- [ ] A, C'ye davet gönderdikten sonra C ayrılsın; C'nin eski grubundaki D taşınmamalıdır
+  (C partisizse kendi adına A grubuna katılması geçerlidir).
+- [ ] İki lider hâlâ yerindeyken birleşmeyi kabul et: dört oyuncu bütün istemcilerde
+  aynı üyeleri ve davetçi liderini görmelidir; HUD güncellenmelidir.
+- [ ] Bir üyenin solo oyuncu daveti normal çalışmalı; eski lider korunmalıdır. Toplam
+  dokuz kişiye taşma reddedilmeli; sekiz kişinin listesi simetrik kalmalıdır.

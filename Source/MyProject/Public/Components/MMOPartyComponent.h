@@ -64,6 +64,11 @@ public:
 	// dogrulamasi icin (davet edenin cok uzaklasmis veya cok eski bir davet olmasi).
 	float PendingInviteTime = -1.f;
 
+#if !UE_BUILD_SHIPPING
+	// Izole, controllersiz karakterlerle sunucu tarafindaki birlesme yetkisini denetler.
+	static bool RunMergeConsentSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 protected:
 	UFUNCTION()
 	void OnRep_Members();
@@ -91,6 +96,8 @@ protected:
 
 	// Sunucu tarafi parti islemleri.
 	void FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invitee);
+	// Mevcut iki grubu birlestirme, her grubun liderinin onayini gerektirir.
+	static bool CanCombineParties(AMMOCharacter* Inviter, AMMOCharacter* Invitee);
 	// Bir karakteri partiden cikarir. Normal ayrilma da, lider tarafindan cikarilma (kick)
 	// da bunu kullanir — davranis ikisinde de ayni (kalanlar yeniden duzenlenir, tek kisi
 	// kalirsa o da partisiz olur).

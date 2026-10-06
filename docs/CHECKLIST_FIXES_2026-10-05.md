@@ -392,3 +392,32 @@ sonrasinda butun smoke paketi tekrarlanmadi; mesajlarin PIE gorunumu aciktir.
 PIE'de iki oyunculu OYNANMADI. Disk/bulut hatasini kullaniciya bildirme ve ariza giderilip
 yeniden gecis denemesi `PLAYTEST_CHECKLIST.md`'de acik. Depodaki yazim sirasi/iptal ve
 anlik goruntu-sonrasi ilerleme penceresi acik; bu degisiklik bunlari kapatmaz.
+
+## 32. O13: mevcut partileri birlestirmede lider yetkisi (2026-10-07)
+
+`FormOrJoin`, her iki tarafin tum uyelerini topladigi halde lider yetkisi istemiyordu.
+Bir uye kabul ederek kendi grubunun tamamini tasiyabiliyor, uye davetci baska grubu
+kendi grubuna ekleyebiliyordu. `CanCombineParties` davet edilen mevcut grubun liderini,
+davetci de gruptaysa onun liderligini davet ve kabul aninda denetler. Parti uyelerinin
+partisiz oyuncuyu davet etmesi korunur. Ayni grup kabulunde liste/lider degismez.
+Mutasyon kapisinda authority kontrolu de vardir; uyelik/lider replikasyon yolu korunur.
+
+UE 5.7 editor derlemesi GECTI. `RunAllChecks.ps1 -SkipBuild -FullCompile` **15/15 GECTI**:
+11 dosya PCH'siz /W4, 0 derleyici uyarisi (parti dosyasi listeye eklendi); JSON 111
+negatif; 191 gercek kayit `loaded=191 invalid=0 json ok=191 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`; normal/timeout/durum/ertelenen hata gecis
+testleri; yeni parti yetki testi; Summer 51 / Winter 29 mob dogumu, 0 hata; NetSmoke
+1 server join / 1 client welcome, iki tarafta 0 hata. Veri beceri boslugu Lv33+ ve
+StaticLint `InitGameState` beyaz liste uyarilari onceki gibi acik, hata degildir.
+
+`TestPartyConsent.ps1`: `PASS checks=10`. Iki solo grup kurulumu; iki tarafta uye ile
+birlesme reddi; beklerken iki tarafta liderlik degisimi; ayni grup; lider onayli
+birlesme; uye -> solo davet; sekiz kisi; dokuzuncunun reddi denetlendi. Fixture'lar
+controllersiz karakterlerdir; pending daveti test sunucuda kurar. Shipping'de test
+komutu derlenmez. Gercek sahip-istemci RPC, HUD/replication ve dedicated testi DEGILDIR.
+PIE'de en az dort oyunculu kontrol `PLAYTEST_CHECKLIST.md`'de bekliyor; oynanmadi.
+
+Agency-agents Unreal Multiplayer Architect ve Test Results Analyzer rol belgeleri
+kullanildi; bagimsiz paralel ajan calistirilmadi. Siradaki yuksek etkili isler: O6
+snapshot-sonrasi ilerleme/yazim sirasi, iki-surecli admin/PvP dogrulamasi, mevcut
+Lv1-30 dikey dilim eksikleri. Bu tur yalniz parti birlesme yetkisini kapatti.

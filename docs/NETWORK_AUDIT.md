@@ -34,6 +34,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O10 | ORTA | `UnequipSlot` çanta sınırını (12) aşar; invariant bozulunca takas/geri alma/ödül reddedilir | MMOInventoryComponent.cpp:285 |
 | O11 | ORTA | Dedicated için engeller: Server target yok, admin yolu `IsLocalController`'a bağlı, geri bildirim `IsLocallyControlled`'a bağlı, HUD'a bağlı sunucu kodu | bkz. bölüm 6 |
 | O12 | ORTA | **Kapandı (yerel log; Shipping'de derlenmez, bkz. O12 bölümü):** takas/iptal, klan, yükseltme/yanma, satış, depo ve ad değişimi yapılandırılmış sunucu loguna yazılır | bölüm 1 |
+| O13 | ORTA | **Kod düzeltildi, PIE bekliyor (2026-10-07):** üye kabulü mevcut grubun tamamını lider izni olmadan birleştiriyordu; mevcut gruplar için lider yetkisi davet ve kabul anında denetleniyor | `UMMOPartyComponent::CanCombineParties/FormOrJoin` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -75,6 +76,25 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - **Trade:** `ServerInviteNearest` (MMOTradeComponent.cpp:251-260): "başka davetçi varsa ezme" koruması var, ama aynı davetçi için engel yok → aynı kişi her 3 sn'de hedefe yeni sohbet satırı yollar (sınırsız taciz; engelleme/yoksayma listesi yok). Klan'daki "Bu oyuncuya davet zaten gönderildi" kontrolü (MMOClanComponent.cpp:329-334) Trade'e taşınmalı.
 - **Party:** `ServerInviteNearest` (MMOPartyComponent.cpp:194-196) hedefin `PendingInviteFrom`'unu koşulsuz ezer (Trade/Klan'daki kapma koruması yok): saldırgan gerçek bir daveti, kurbanın `kabul`'üne kadar kendi davetiyle değiştirebilir. Bu bileşen kapsam dışıydı; yalnız not.
 - Trade `Accept/Cancel/RemoveItem` ve Clan komutlarında RPC başına hız sınırı yok (yalnız chat throttle'ı); `ServerAddItem/SetGold` 0.3 sn cooldown'lu (iyi).
+
+### O13 · ORTA · Parti birleştirmede lider rızası — kod düzeltildi (2026-10-07)
+
+`FormOrJoin` iki tarafın bütün `Members` kümelerini birleştiriyordu. Davet edilen sıradan
+üye kabul edince kendi grubunun tamamını taşıyabiliyor; davetçi sıradan üye de başka grubu
+kendi grubuna ekleyebiliyordu. Sekiz kişi sınırı, grubun lider yetkisini korumuyordu.
+`CanCombineParties` artık davet edilen mevcut grubun liderini ve davetçinin mevcut
+grubunun liderini denetler. Davet-kabul arasında liderlik değişirse kabul reddedilir.
+Partisiz davetçi kendi adına karar verir; üyelerin partisiz oyuncu davet etmesi korunur.
+Aynı grubun bayat davetini kabul etmek idempotenttir, liderliği değiştirmez.
+
+Normal UE editor ve PCH'siz `MMOPartyComponent.cpp` derlemeleri geçti. Headless gerçek
+UE dünyasında `TestPartyConsent.ps1` **10 senaryo geçti**: iki solo grup kurulumu,
+davet edilen üye/davetçi üye reddi, iki tarafta bekleme sırasında lider değişimi, aynı
+grup kabulü, liderlerin onaylı birleşmesi, üyenin solo daveti, sekiz kişi ve taşma reddi.
+Kontrolsüz test karakterleri kullanılır; pending daveti test kodu sunucuda kurar.
+Gerçek sahip-istemci RPC, çoğaltma/HUD ve dedicated server doğrulaması değildir.
+Bu bulgu, O4'teki eski davet kapma bulgusundan ayrıdır; mevcut parti kodunda pending
+davet ezmeme/aynı daveti yenilememe koruması zaten vardır.
 
 ### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
 - **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.

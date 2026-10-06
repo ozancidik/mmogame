@@ -57,7 +57,7 @@ if ($FullCompile) {
         $src = Join-Path $root "Source\MyProject\Private"
         $files = @(
             "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
-            "Components\MMOStatsComponent.cpp", "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
+            "Components\MMOStatsComponent.cpp", "Components\MMOPartyComponent.cpp", "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
             "Characters\MMOMob.cpp"
         ) | ForEach-Object { Join-Path $src $_ }
         $files += (Get-ChildItem (Join-Path $src "Save") -Filter *.cpp | ForEach-Object { $_.FullName })
@@ -106,6 +106,11 @@ Step "Bolge gecisi beklerken oyuncu durumu degisimi" {
 
 Step "Bolge gecisi ertelenen kayit hatasi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelDeferredSave.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Parti birlesme lider onayi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestPartyConsent.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 
