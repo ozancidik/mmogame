@@ -27,8 +27,8 @@ avcıları ve maceracıları en çok şu tehditlerle karşılaşır:
   savaşçılar; harabelerde kamp kurup yol keserler.
 - **Haydutlar** — Kanunun ulaşmadığı patikalarda kervan avlayan insan çeteleri;
   çoğu, Uzun Kış'ta her şeyini yitirmiş savaşçıların soyundandır.
-- **Troller** — Bataklık kıyısında yaşayan devasa yaratıklar; nadir görülür ama
-  bir tanesi bile bütün bir müfrezeyi dağıtabilir.
+- **Troller** — Başlangıç yöresindeki kıyılarda dolaşan devasa yaratıklar; nadir
+  görülür ama bir tanesi bile bütün bir müfrezeyi dağıtabilir.
 
 ## Ana Gerilim: Solgun Fısıltı
 
@@ -156,6 +156,28 @@ kimse bilmez. Bilinen şu: o nefes aldıkça Ayazdiş erimez. Dokunuşu bedeni
 dondurup yavaşlatır, canı azaldıkça öfkesi buz gibi keskinleşir. Solgun
 Fısıltı'nın soğuk yüzü odur.
 
+### Geçiş Kuşağı: Çözülme Yolu (Lv13-15)
+
+Buz Lordu düşünce Ayazdiş'in donmuş yamaçları yüzyıllar sonra ilk kez çözülmeye
+başladı. Buzulun doğu ucundan Alev Vadisi'nin kapısına inen dar şeride maceracılar
+**Çözülme Yolu** diyor: bir yanda eriyen buz, öbür yanda ilk kor; zemin ne tam kış
+ne tam yaz. Kasabalılar yola bu kuşakta sessizce geçmeyi, kimseyi uyandırmamayı
+öğütler — çünkü iki tahtın arasında kalan her şey, hangi yana ait olduğunu henüz
+seçmedi.
+
+- **Çözülme Avcısı** *(ThawStalker, Lv13)* — Eriyen buzun sızdığı yamaçlarda avlanan
+  sinsi, hızlı yaratıklar; sürüklenen suyun zehrini dişlerinde taşırlar. Isırık
+  kanda sessizce yayılır, avını fark edemeden zayıflatırlar. Vadiye inen
+  yolcuların ilk korkusudur.
+- **Kabuk Bekçisi** *(CrustWarden, Lv14)* — Yarı buz yarı cüruf kabuklu, ağır adımlı
+  bekçiler; kış ile ateşin tam kesiştiği yerde iki malzemeden kendini dövmüş gibi
+  dururlar. Yavaş ama sarsılmazdırlar; kabukları çatladıkça içlerindeki öfke
+  taşar, darbeleri sertleşir.
+- **Kavrulmuş Akıncı** *(ScorchedRaider, Lv15)* — Alev Vadisi'nin kapısına doğru
+  yürüyen, derisi kavrulmuş ork akıncıları; Kül Ovası'ndaki yeni kabilenin
+  öncüleri sayılır. Vuruşları adımı ağırlaştırır, yaralandıkça gözleri kızarır ve
+  Çözülme Yolu'nun en tehlikeli yaratığı olurlar.
+
 ## Dördüncü Bölge: Alev Vadisi (Lv16-22)
 
 Buz Lordu devrildiği gün Ayazdiş'in rüzgârı ilk kez dindi — ve aynı gün doğu
@@ -281,6 +303,43 @@ açılır.*
   Onu devir; ama bil ki yanığı derine işler, öfkesi dağları sarsar."
   - *Dönüşte:* "Dağ sustu, evlat. Al şu Adamantin Kılıç'ı. Fısıltı hâlâ bir yerlerde
     konuşuyor; ama artık seni tanıyor — ve senden korkuyor."
+
+## Görevler (Anlatı): Lv11-20 Yan Görevler
+
+*Ana zincirin kenarında Yaşlı Doran'ın verdiği ek işler. Zinciri kilitlemezler.
+Ayazdiş Devriyesi Zehir Örümcekleri'ni bitirenlere, Çözülme Yolu görevleri Buz
+Lordu'nu devirenlere, Alev Vadisi yan görevleri ise bağlı oldukları ana görevi
+(Kor Tazıları, Magma Golemleri) bitirenlere açılır.*
+
+- **Ayazdiş Devriyesi** *(Q_AyazdisPatrol)* — "Buzulun kenarını tutan muhafızların
+  nefesi kesildi, evlat. Önüne çıkan on dört canavarı devir de devriye biraz
+  soluklansın."
+  - *Dönüşte:* "Muhafızlar soluklandı. Şu Büyük Can İksirleri senin; buzulda yorulan
+    değil, kendini kollamayan düşer."
+- **Çözülme Avcıları** *(Q_ThawStalkers)* — "Buz Lordu düşünce yamaçlar çözülmeye
+  başladı, evlat; eriyen buzun altından sinsi avcılar çıkıyor. Sekiz Çözülme
+  Avcısı'nı durdur; hızlıdırlar, vuruşları zehirler."
+  - *Dönüşte:* "Yamaçlar nefes alıyor. Şu Büyük Mana İksirleri'ni sakla; zehirle
+    savaşan, zihnini berrak tutmalı."
+- **Kabuk Bekçileri** *(Q_CrustWardens)* — "Çözülme Yolu'nda yarı buz yarı cüruf
+  kabuklu bekçiler dikiliyor, evlat. Ağır ve inatçıdırlar; sekizini kır, canları
+  azaldıkça öfkelendiklerini unutma."
+  - *Dönüşte:* "Kabuk çatladı, yol açıldı. Al şu Büyük Can İksirleri'ni; öfkeli
+    düşmana karşı sabır en iyi zırhtır."
+- **Kavrulmuş Akıncılar** *(Q_ScorchedRaiders)* — "Alev Vadisi'ne yürüyen kavrulmuş
+  ork akıncıları görüldü. Onunu dağıt, evlat; vuruşları adımını ağırlaştırır,
+  yaralanınca gözleri döner."
+  - *Dönüşte:* "Akıncılar dağıldı, vadinin kapısı bir süre sessiz kalır. Şu Büyük
+    Mana İksirleri'ni al; ateşin önünde aklını serin tut."
+- **Kor Sürüsü** *(Q_EmberPack)* — "Geçidi açtın ama sürünün artığı ardında dolanıyor,
+  evlat. Altı Kor Tazısı daha avla; yaralı sürü, sağlamından daha çok ısırır."
+  - *Dönüşte:* "Sürü dağıldı, koku silindi. Al şu Büyük Can İksirleri'ni; yanık
+    iyileşir, dikkatsizlik iyileşmez."
+- **Golem Ocağı** *(Q_GolemQuarry)* — "Golemler gölün ardındaki ocakta yeniden
+  dövülüyor, evlat; biri düşünce yerine yenisi çıkıyor. Altı Magma Golemi daha kır,
+  ocağın közü sönsün."
+  - *Dönüşte:* "Ocak söndü, kor soğudu. Şu Büyük Mana İksirleri'ni al; taşı yıkan
+    elin gücü de tükenir, doldurmayı unutma."
 
 ## Kuzey Yolu: Yaz ile Kış Arasında
 
@@ -719,7 +778,7 @@ birbirini izler. Yan görevler zinciri kilitlemez.*
 - **Temizlik** *(Q_Cleanup)* — "Bölgede çıban gibi çoğaldılar, evlat. Kim olduğu
   fark etmez, önüne çıkan ilk on canavarı temizle; muhafızlar da biraz soluklansın."
   - *Dönüşte:* "Bir süre rahat uyuruz. Ama fısıltı dinmedikçe yenileri çıkar."
-- **Trol Avı** *(Q_Trolls)* — "Ormanın kıyısında trol dolaşıyor. Bir tanesi bile
+- **Trol Avı** *(Q_Trolls)* — "Başlangıç yöresindeki kıyılarda trol dolaşıyor. Bir tanesi bile
   bir müfrezeyi dağıtır, evlat. Üçünü seç, ama tek başına dalma."
   - *Dönüşte:* "Sağ döndün, bu da bir hüner. Trole karşı cesaret değil, hesap
     kazanır."

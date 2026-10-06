@@ -221,3 +221,39 @@ baloncuğuna sığacak kısalıktadır.*
 **Veda**
 
 - Yol uzun, sırt kısa. Fazlasını bana bırak, hafif yürü.
+
+---
+
+## Kael düzeltme önerileri
+
+*Kodda (`Source/MyProject/Private/Core/MMOGameMode.cpp`, Muhafız Kael `FallbackLines`) şu satır var:*
+
+> `Goblin tek basina korkutmaz. Besi birden cikarsa sirtini tasa ver.`
+
+*Sorun: "sırtını taşa vermek" Türkçe'de yaygın bir deyim değil; oyuncu "sırtını duvara
+dayamak" ya da "sırtını kollamak" gibi bir şey beklerken tuhaf bir ifadeyle karşılaşıyor.
+Ayrıca ASCII hâlinde "Besi" ("Beşi") "besi hayvanı" gibi okunabiliyor. Aşağıdakilerden biri
+Kael'in kısa, disiplinli sesine uyar. Kodu geliştirici uygular; kod satırları HUD fontu için
+ASCII'dir. Üçü de tek baloncuğa sığar.*
+
+**Öneri 1 (önerilen) — deyimsiz, net talimat**
+
+- Doğal: Goblin tek başına korkutmaz. Sürü bastırırsa geri çekil, dar bir geçit bul.
+- Kod (ASCII): `TEXT("Goblin tek basina korkutmaz. Suru bastirirsa geri cekil, dar bir gecit bul.")`
+
+**Öneri 2 — yaygın deyimle ("sırtını duvara dayamak")**
+
+- Doğal: Goblin tek başına korkutmaz. Sürü bastırırsa sırtını duvara dayayıp savaş.
+- Kod (ASCII): `TEXT("Goblin tek basina korkutmaz. Suru bastirirsa sirtini duvara dayayip savas.")`
+
+**Öneri 3 — arkadan gelen tehlikeye uyarı**
+
+- Doğal: Goblin tek başına korkutmaz. Ama sürüyle gelirler; sırtını kolla, arkana dolanırlar.
+- Kod (ASCII): `TEXT("Goblin tek basina korkutmaz. Ama suruyle gelirler; sirtini kolla, arkana dolanirlar.")`
+
+*Notlar:*
+
+- Yukarıdaki satır `NpcDialogue.md`'nin "Muhafız Kael" bölümünde yok; kod yorumu "bu
+  dosyadan" dese de belge ile kod ayrışmış. Hangi öneri seçilirse, aynı satır belgenin
+  Kael listesine de eklenmeli ki ikisi tekrar eşleşsin.
+- Kael'in koddaki diğer altı satırında deyim sorunu yok; olduğu gibi kalabilir.
