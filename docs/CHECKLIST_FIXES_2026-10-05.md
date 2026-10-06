@@ -257,3 +257,12 @@ Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild) GECTI (NetSmokeTest 
 - [ ] PvP ACIKken: ayni parti/klan uyesine tiklayinca kovalama baslamamali ("Parti uyesine vuramazsin"/"Klan uyesine vuramazsin"); hub guvenli bolgesinde (PlayerStart 700u) oyuncuya tiklayinca kovalama yok.
 - [ ] Bolge gecisinden (`MMOTravel`) sonra yeni dunyada PvP yine KAPALI baslar (GameMode yeniden olusur; onceki davranisla ayni) ve istemci de kapali gorur.
 - [ ] Regresyon: uzak istemcinin mob'a vurusu, beceri kullanimi ve hasar sayilari eskisi gibi.
+
+## 23. Dedicated hazirligi: admin/debug yetkisi `MMOAdmin::IsServerAdmin`'de merkezilestirildi
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI (headless bolge gecisi + timeout testleri host secimini artik IsServerAdmin ile yapiyor ve geciyor). PIE'de OYNANMADI. Davranis degismemeli: yetkili = yalniz listen-server host'unun yerel denetleyicisi; dedicated'da hic kimse (kasitli, ileride token/hesap).
+
+- [ ] Host: "Tum oyunculari Kis'a/Yaz'a tasi" dugmesi gorunur ve calisir; `MMOTravel` konsol komutu calisir.
+- [ ] Uzak istemci: dugme GORUNMEZ; konsoldan `MMOTravel`, `MMOPvP 1`, `MMOBuff Rage`, `MMOSpawnMob OrcWarlord`, `MMOGiveItem ...`, manuel karakter yukleme (`MMOLoad`): hicbir etki olmamali (sunucu sessizce reddeder), host'un PvP/envanteri/dunyasi degismemeli.
+- [ ] Host: `MMOPvP 1/0`, `MMOBuff`, `MMOSpawnMob`, `MMOGiveItem` eskisi gibi calisir (Development derlemede).
+- [ ] Shipping paketinde bu konsol komutlari ve debug RPC'leri zaten kapali (D1); degismedi.

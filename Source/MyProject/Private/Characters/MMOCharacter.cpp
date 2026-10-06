@@ -16,6 +16,7 @@
 #include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
 #include "Core/MMOGameState.h"
+#include "Core/MMOAdmin.h"
 #include "Items/MMOConsumableTypes.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -802,8 +803,7 @@ void AMMOCharacter::ServerLoadCharacter_Implementation()
 {
 	// Manuel yukleme debug islemidir. Uzak oyuncu eski disk durumuna donerek
 	// tuketim, olum cezasi veya gorev sonuclarini geri alamaz.
-	const AController* C = GetController();
-	if (!C || !C->IsLocalController())
+	if (!MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController())))
 	{
 		return;
 	}
@@ -1401,8 +1401,8 @@ void AMMOCharacter::ServerSetPvP_Implementation(bool bOn)
 	// eden ciddi bir acik). Sadece HOST'un (listen server'i baslatan oyuncunun)
 	// karakteri bu RPC'yi kendi yerel controller'i uzerinden cagirabilir; uzak bir
 	// istemcinin karakterinin sunucudaki controller'i asla "local" degildir.
-	const AController* C = GetController();
-	if (!C || !C->IsLocalController())
+	// Karar MMOAdmin::IsServerAdmin'de (dedicated'da simdilik yonetici yok).
+	if (!MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController())))
 	{
 		return;
 	}
@@ -1440,8 +1440,7 @@ void AMMOCharacter::ServerApplyBuff_Implementation(FName EffectId)
 		return;
 	}
 	// Hata ayiklama komutu: uzak istemci kendi RPC'sini dogrudan cagirip buff alamaz.
-	const AController* C = GetController();
-	if (!C || !C->IsLocalController())
+	if (!MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController())))
 	{
 		return;
 	}
@@ -1728,9 +1727,8 @@ void AMMOCharacter::ServerSpawnMob_Implementation(FName ArchetypeId)
 	{
 		return;
 	}
-	// Sunucunun yerel oyuncusu disindakiler mob olusturup XP/ganimet uretemez.
-	const AController* C = GetController();
-	if (!C || !C->IsLocalController())
+	// Sunucu yoneticisi disindakiler mob olusturup XP/ganimet uretemez.
+	if (!MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController())))
 	{
 		return;
 	}
@@ -1987,9 +1985,8 @@ void AMMOCharacter::ServerGiveItem_Implementation(FName ItemId, int32 Count)
 	{
 		return;
 	}
-	// Debug item komutunu yalnizca host kullanabilir; sayi siniri tek basina yeterli degil.
-	const AController* C = GetController();
-	if (!C || !C->IsLocalController())
+	// Debug item komutunu yalnizca sunucu yoneticisi (host) kullanabilir; sayi siniri tek basina yeterli degil.
+	if (!MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController())))
 	{
 		return;
 	}

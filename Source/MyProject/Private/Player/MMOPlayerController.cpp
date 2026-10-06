@@ -14,6 +14,7 @@
 #include "Engine/GameInstance.h"
 #include "Core/MMOTargeting.h"
 #include "Core/MMOGameMode.h"
+#include "Core/MMOAdmin.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -43,8 +44,8 @@ AMMOPlayerController::AMMOPlayerController()
 
 void AMMOPlayerController::MMOTravel()
 {
-	// Uzak istemci bu komutla tum oturumu tasiyamaz. Host kontrolu GameMode'da da var.
-	if (!HasAuthority() || !IsLocalController())
+	// Uzak istemci bu komutla tum oturumu tasiyamaz. Yonetici kontrolu GameMode'da da var.
+	if (!MMOAdmin::IsServerAdmin(this))
 	{
 		return;
 	}

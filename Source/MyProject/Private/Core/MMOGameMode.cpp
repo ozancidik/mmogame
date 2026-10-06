@@ -3,6 +3,7 @@
 #include "Core/MMOGameMode.h"
 #include "Core/MMOMobSpawner.h"
 #include "Core/MMOGameState.h"
+#include "Core/MMOAdmin.h"
 #include "Characters/MMOMob.h"
 #include "Components/CapsuleComponent.h"
 #include "World/MMOVendorNPC.h"
@@ -90,7 +91,7 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
 		for (FConstPlayerControllerIterator It = TestWorld->GetPlayerControllerIterator(); It; ++It)
 		{
 			APlayerController* Candidate = It->Get();
-			if (Candidate && Candidate->IsLocalController())
+			if (Candidate && MMOAdmin::IsServerAdmin(Candidate))
 			{
 				Host = Candidate;
 				break;
@@ -382,7 +383,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 	OutFailureReason.Reset();
 	UWorld* World = GetWorld();
 	if (!World || !HasAuthority() || bZoneTravelInProgress || !Requester
-		|| Requester->GetWorld() != World || !Requester->IsLocalController())
+		|| Requester->GetWorld() != World || !MMOAdmin::IsServerAdmin(Requester))
 	{
 		OutFailureReason = TEXT("Gecis su anda kullanilamiyor");
 		return false;

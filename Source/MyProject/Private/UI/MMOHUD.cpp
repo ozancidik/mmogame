@@ -4,6 +4,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
 #include "Characters/MMOMobArchetype.h"
+#include "Core/MMOAdmin.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOPartyComponent.h"
 #include "Components/MMOTradeComponent.h"
@@ -183,8 +184,7 @@ void AMMOHUD::DrawHUD()
 	const AMMOPlayerController* LocalPC = Cast<AMMOPlayerController>(GetOwningPlayerController());
 	const FString MapName = GetWorld() ? GetWorld()->GetMapName() : FString();
 	const bool bSupportedMap = MapName.EndsWith(TEXT("Summer_scene")) || MapName.EndsWith(TEXT("Winter_scene"));
-	if (!bAnyWindowOpen && !S->bIsDead && LocalPC && LocalPC->HasAuthority()
-		&& LocalPC->IsLocalController() && bSupportedMap)
+	if (!bAnyWindowOpen && !S->bIsDead && MMOAdmin::IsServerAdmin(LocalPC) && bSupportedMap)
 	{
 		const float BW = FMath::Min(262.f, FMath::Max(180.f, (float)Canvas->SizeX - 32.f));
 		const float BH = 34.f;
@@ -3057,7 +3057,7 @@ bool AMMOHUD::HandleZoneTravelClick(const FVector2D& Pos)
 		return false;
 	}
 	AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetOwningPlayerController());
-	if (PC && PC->HasAuthority() && PC->IsLocalController())
+	if (MMOAdmin::IsServerAdmin(PC))
 	{
 		PC->MMOTravel();
 	}
