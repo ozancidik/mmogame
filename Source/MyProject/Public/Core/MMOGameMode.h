@@ -70,6 +70,10 @@ protected:
 	bool bZoneTravelInProgress = false;
 	uint64 ZoneTravelRequestSerial = 0;
 	int32 PendingZoneTravelSaves = 0;
+	// Kaydi TAMAMLANAN karakterler: ayni karakterin cift callback'i (bulut tekrar-deneme) bariyeri erken acmasin.
+	TSet<TWeakObjectPtr<class AMMOCharacter>> CompletedZoneTravelSaves;
+	// Son iptalin nedeni: RequestZoneTravel ayni karede iptal olursa cagirana false + bu neden doner.
+	FString LastZoneTravelAbortReason;
 	FString PendingZoneTravelTargetMap;
 	FString PendingZoneTravelSourceMap;
 	TArray<TWeakObjectPtr<class AMMOCharacter>> PendingZoneTravelCharacters;
@@ -80,7 +84,8 @@ protected:
 	float TestZoneTravelTimeoutOverrideSeconds = 0.f;
 
 	void ScheduleZoneTravelTest(bool bExpectTimeout);
-	void HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSuccess);
+	void HandleZoneTravelSaveComplete(uint64 RequestSerial, const TWeakObjectPtr<class AMMOCharacter>& Character, bool bSuccess);
+	void ClearZoneTravelTestHooks();
 	void HandleZoneTravelSaveTimeout(uint64 RequestSerial);
 	void FinishZoneTravel(uint64 RequestSerial);
 	void AbortZoneTravel(uint64 RequestSerial, const FString& Reason);

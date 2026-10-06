@@ -284,3 +284,12 @@ Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild -FullCompile) GECTI: 
 - [ ] `Scripts\TestCharacterSaveJson.ps1` calistir: `PASS schema=2 ... negative=109` (negatif sayi artarsa/azalirsa test kapsami degisti). Editor kapali olmali.
 - [ ] `Scripts\RunAllChecks.ps1 -SkipBuild -FullCompile`: "PCH'siz tek-dosya" adimi her dosya OK. Bir `#include` silip tekrar dene: o dosya HATA vermeli (CI/manuel kullanim; varsayilan RunAllChecks bu adimi atlar).
 - [ ] Eski kayitli (Lv30+, depo/klan/gorev dolu) bir karakterin .sav dosyasi bu makinede varsa `TestCharacterStore.ps1` ciktisindaki `json ok=N mismatch=0 maxLevel=` satirinda maxLevel o seviyeyi gostermeli (su an en yuksek 6; yuksek seviyeli gercek kayit oynanip kaydedildikten sonra tekrar kos).
+
+## 26. QA 2026-10-07 ORTA-1 (guvenli kisim): yuva basina yazim sirasi + bolge gecisi bariyer/dondurme duzeltmeleri
+
+Kod derlendi, RunAllChecks (-SkipBuild -FullCompile) GECTI (bolge gecisi + zaman asimi headless testleri dahil; magaza testine `writeorder ok=1` eklendi). PIE'de iki oyunculu OYNANMADI. Yerel magaza SENKRON oldugu icin "eski yazim sonradan indi" durumu bugun TETIKLENEMEZ: yeni yollar yalniz bulut magazasi icin hazirliktir. Mimari kisimlar (yuva kuyrugu/Revision, ucustaki yazimin iptali, anlik goruntu-Finish penceresi) KODLANMADI, docs/NETWORK_AUDIT.md O6.
+
+- [ ] Host + uzak istemci, ikisi canli ve savas disi: `MMOTravel` -> ikisi de Winter'a gecmeli (eskisi gibi); host loguna `Zone travel started` (2 oyuncu) yazilmali, `Save superseded` uyarisi OLMAMALI.
+- [ ] `MMOTravel`'i basarili bir geciste ard arda iki kez bas (gecis sirasinda): ikinci istek reddedilmeli (`Gecis su anda kullanilamiyor`), ilk gecis bozulmamali.
+- [ ] Gecis reddedilince (ornegin biri savasta: `Tum oyuncular canli ve savas disinda olmali`) host konsol/HUD mesajinin reddi gostermesi ve hemen ardindan savastan cikip tekrar denenince gecisin kabul edilmesi (kilit/test kancasi kalintisi yok).
+- [ ] Elle `MMOSave` ile gecis ayni karede ust uste: gecis istegi sirasinda `Save superseded` logu cikarsa gecis iptal olmali ve tekrar denenince calismali (yerel magazada normalde cikmaz).

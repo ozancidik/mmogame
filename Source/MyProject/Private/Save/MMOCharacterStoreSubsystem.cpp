@@ -106,6 +106,21 @@ namespace
 			UE_LOG(LogTemp, Display, TEXT("[MMO_STORE_TEST] json ok=%d mismatch=%d maxLevel=%d maxJsonChars=%d"),
 				JsonOk, JsonMismatch, MaxLevel, MaxJsonBytes);
 
+			// Yuva basina yazim sirasi: yeni yazim ayni yuvadaki (buyuk/kucuk harf duyarsiz) eski numarayi
+			// "eski" yapar, baska yuva etkilenmez, sonradan baslayan yazim en yeni olur.
+			{
+				const TSharedRef<FMMOSlotWriteTracker>& Tracker = Store->GetWriteTracker();
+				const uint64 First1 = Tracker->BeginWrite(TEXT("MMOSave_WriteOrderA"));
+				const uint64 Other = Tracker->BeginWrite(TEXT("MMOSave_WriteOrderB"));
+				const bool bFreshOk = Tracker->IsNewest(TEXT("MMOSave_WriteOrderA"), First1);
+				const uint64 Second = Tracker->BeginWrite(TEXT("mmosave_writeordera"));
+				const bool bOrderOk = bFreshOk && !Tracker->IsNewest(TEXT("MMOSave_WriteOrderA"), First1)
+					&& Tracker->IsNewest(TEXT("MMOSave_WriteOrderA"), Second) && Second > First1
+					&& Tracker->IsNewest(TEXT("MMOSave_WriteOrderB"), Other)
+					&& !Tracker->IsNewest(TEXT("MMOSave_WriteOrderNeverWritten"), Second);
+				UE_LOG(LogTemp, Display, TEXT("[MMO_STORE_TEST] writeorder ok=%d"), bOrderOk ? 1 : 0);
+			}
+
 			if (!FirstSlot.IsEmpty())
 			{
 				const FString TempSlot = TEXT("MMOSave_ZStoreTestTemp");

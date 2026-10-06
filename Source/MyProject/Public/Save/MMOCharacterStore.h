@@ -6,6 +6,35 @@
 #include "Save/MMOSaveGame.h"
 
 /**
+ * Yuva basina yazim sirasi (numara) takibi. Cagiranlar her yazimdan once BeginWrite ile artan bir
+ * numara alir; asenkron callback geldiginde ayni yuvaya daha YENI bir yazim baslamissa IsNewest
+ * false doner ve eski yazimin sonucu yok sayilir. IMMOCharacterStore::GetWriteTracker() bir
+ * TSharedRef verir: callback'ler onu yakalayabilir, magaza yok olsa bile gecerli kalir.
+ */
+class MYPROJECT_API FMMOSlotWriteTracker
+{
+public:
+	/** Yuva icin yeni (daha onceki hepsinden buyuk) yazim numarasi verir. Yuva adi buyuk/kucuk harf duyarsiz. */
+	uint64 BeginWrite(const FString& SlotName)
+	{
+		const uint64 Ticket = ++LastTicket;
+		Newest.Add(SlotName.ToLower(), Ticket);
+		return Ticket;
+	}
+
+	/** Ticket hala bu yuvadaki en yeni yazim mi. */
+	bool IsNewest(const FString& SlotName, uint64 Ticket) const
+	{
+		const uint64* Found = Newest.Find(SlotName.ToLower());
+		return Found && *Found == Ticket;
+	}
+
+private:
+	uint64 LastTicket = 0;
+	TMap<FString, uint64> Newest;
+};
+
+/**
  * Karakter kalicilik arayuzu (saf C++, UObject DEGIL). Sunucu tarafi; senkron API ve
  * bulut uygulamalarina uygun asenkron callback adaptoru.
  *
@@ -24,6 +53,14 @@
  * ASENKRON SOZLESME: Gelecekteki bulut magazasi SaveAsync/LoadAsync'i gecikmeli tamamlar. Yerel
  * magaza varsayilan adaptoru senkron islemi yapip callback'i ayni karede cagirir. Bolge gecisi
  * SaveCharacterForTravelAsync callback'leri tamamlanmadan ServerTravel baslatmaz.
+ *
+ * YAZIM SIRASI (yuva basina): cagiranlar (AMMOCharacter) her yazimdan once GetWriteTracker()->BeginWrite(Yuva)
+ * ile numara alir; ayni yuvaya daha YENI bir yazim baslamissa eski asenkron yazimin sonucu YOK SAYILIR
+ * (basari sayilmaz, ActiveSaveSlot guncellenmez, bolge gecisi iptal olur) ve eski anlik goruntu yeni
+ * veriyi geri sarmis gibi islem gormez. Bu YALNIZ callback tarafinin korumasidir: verinin depoda hangi
+ * sirayla INDIGINI belirlemez. Bulut magazasi ek olarak yuva basina seri yazim kuyrugu ya da
+ * karsilastir-ve-yaz (Revision/ExpectedRevision) uygulamalidir (yerel senkron magaza icin gerekmez).
+ * Bilinen sinir: zaman asimi sonrasi ucusta kalan bir yazim iptal EDILEMEZ (docs/NETWORK_AUDIT.md O6).
  */
 class MYPROJECT_API IMMOCharacterStore
 {
@@ -61,4 +98,10 @@ public:
 			Completion(bSuccess);
 		}
 	}
+
+	/** Yuva basina yazim sirasi takipcisi (bkz. sinif yorumu: YAZIM SIRASI). */
+	const TSharedRef<FMMOSlotWriteTracker>& GetWriteTracker() const { return WriteTracker; }
+
+private:
+	TSharedRef<FMMOSlotWriteTracker> WriteTracker = MakeShared<FMMOSlotWriteTracker>();
 };

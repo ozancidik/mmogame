@@ -22,11 +22,12 @@ $summary = Select-String -Path $log -Pattern "\[MMO_STORE_TEST\] slots=(\d+) loa
 $round = Select-String -Path $log -Pattern "\[MMO_STORE_TEST\] roundtrip .* saved=1 loaded=1 equal=1 existsAfterSave=1"
 $fail = Select-String -Path $log -Pattern "\[MMO_STORE_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation"
 $jsonLine = Select-String -Path $log -Pattern "\[MMO_STORE_TEST\] json ok=(\d+) mismatch=(\d+) maxLevel=(\d+)"
+$orderLine = Select-String -Path $log -Pattern "\[MMO_STORE_TEST\] writeorder ok=1"
 $ok = $false
 if ($summary) {
     $m = $summary.Matches[0].Groups
     $slots = [int]$m[1].Value; $loaded = [int]$m[2].Value; $failed = [int]$m[4].Value; $mismatch = [int]$m[5].Value
-    $ok = ($failed -eq 0) -and ($mismatch -eq 0) -and (($slots -eq 0) -or [bool]$round)
+    $ok = ($failed -eq 0) -and ($mismatch -eq 0) -and (($slots -eq 0) -or [bool]$round) -and [bool]$orderLine
     # Gercek .sav -> JSON -> yapi esitligi: her gecerli yuva alan alan esit olmali.
     if ($loaded -gt 0) {
         $jm = if ($jsonLine) { $jsonLine.Matches[0].Groups } else { $null }
@@ -36,6 +37,7 @@ if ($summary) {
 if ($ok -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $summary.Line
     if ($jsonLine) { Write-Output $jsonLine.Line }
+    if ($orderLine) { Write-Output $orderLine.Line }
     if ($round) { Write-Output $round.Line }
     if ($slots -eq 0) { Write-Output "UYARI: hic karakter yuvasi yok -> okuma/JSON/gidis-donus ATLANDI (bos gecti, kanit degildir)" }
     exit 0

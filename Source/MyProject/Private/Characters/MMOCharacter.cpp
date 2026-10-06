@@ -489,6 +489,8 @@ bool AMMOCharacter::SaveCharacterForTravel()
 		return false;
 	}
 
+	// Yazim sirasi: bu yazim, ayni yuvada ucustaki daha eski asenkron yazimlari "eski" yapar (bkz. IMMOCharacterStore).
+	Store->GetWriteTracker()->BeginWrite(TargetSlot);
 	const bool bOk = Store->Save(TargetSlot, D);
 	if (bOk)
 	{
@@ -577,11 +579,22 @@ void AMMOCharacter::SaveCharacterForTravelAsync(TFunction<void(bool bSuccess)>&&
 	}
 
 	const TWeakObjectPtr<AMMOCharacter> WeakThis(this);
+	// Yazim sirasi korumasi: callback geldiginde ayni yuvaya daha YENI bir yazim (otomatik kayit, ticaret,
+	// yeni gecis istegi) baslamissa bu eski anlik goruntunun sonucu yok sayilir (basari degil) — eski
+	// yazim yeni veriyi geri sarmis gibi islem gormesin. Tracker paylasimli: magaza yok olsa da guvenli.
+	const TSharedRef<FMMOSlotWriteTracker> Tracker = Store->GetWriteTracker();
+	const uint64 WriteTicket = Tracker->BeginWrite(TargetSlot);
 	Store->SaveAsync(TargetSlot, Data,
-		[WeakThis, TargetSlot, Completion = MoveTemp(Completion)](bool bSuccess) mutable
+		[WeakThis, TargetSlot, Tracker, WriteTicket, Completion = MoveTemp(Completion)](bool bSuccess) mutable
 		{
 			AMMOCharacter* Character = WeakThis.Get();
-			if (!Character)
+			if (bSuccess && !Tracker->IsNewest(TargetSlot, WriteTicket))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Save superseded: %s write #%llu finished after a newer write started; result ignored"),
+					*TargetSlot, WriteTicket);
+				bSuccess = false;
+			}
+			else if (!Character)
 			{
 				bSuccess = false;
 			}

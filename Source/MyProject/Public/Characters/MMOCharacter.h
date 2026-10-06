@@ -117,10 +117,12 @@ public:
 
 	// Karakteri diske yazar / diskten yukler (sadece otorite; istemciden Exec cagrilirsa sunucuya yonlenir).
 	void SaveCharacter();
-	// Harita degisimi oncesi zorunlu kayit: yukleme bitmediyse veya disk yazimi
-	// basarisizsa false doner; GameMode bu durumda seyahati iptal eder.
+	// SENKRON kayit (otomatik kayit, MMOSave, klan/ticaret sonrasi, EndPlay): yukleme bitmediyse veya
+	// yazim basarisizsa false doner. Bolge gecisi bunu KULLANMAZ; asagidaki asenkron yolu kullanir.
 	bool SaveCharacterForTravel();
-	// Bulut magazasi icin asenkron karsilik: callback yalniz yazim tamamlandiginda cagrilir.
+	// Bolge gecisinin kullandigi asenkron kayit: callback yalniz yazim tamamlandiginda cagrilir; basarisiz
+	// yazimda veya sonuc "eski" ise (ayni yuvaya daha yeni bir yazim basladi) false ile cagrilir ve
+	// AMMOGameMode gecisi iptal eder.
 	void SaveCharacterForTravelAsync(TFunction<void(bool bSuccess)>&& Completion);
 	void SetTravelSaveCommitted(bool bCommitted);
 	bool LoadCharacter();

@@ -386,8 +386,14 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 		|| Requester->GetWorld() != World || !MMOAdmin::IsServerAdmin(Requester))
 	{
 		OutFailureReason = TEXT("Gecis su anda kullanilamiyor");
+		// Devam eden bir gecisin test kancalarina dokunma; yalniz bu reddedilen istegin kancalarini birak.
+		if (!bZoneTravelInProgress)
+		{
+			ClearZoneTravelTestHooks();
+		}
 		return false;
 	}
+	LastZoneTravelAbortReason.Reset();
 
 	const FString CurrentMap = UGameplayStatics::GetCurrentLevelName(World, true);
 	FString TargetMap;
@@ -402,6 +408,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 	else
 	{
 		OutFailureReason = TEXT("Bu haritadan bolge gecisi yok");
+		ClearZoneTravelTestHooks();
 		return false;
 	}
 
@@ -416,6 +423,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Zone travel rejected: a player is missing, dead or in combat"));
 			OutFailureReason = TEXT("Tum oyuncular canli ve savas disinda olmali");
+			ClearZoneTravelTestHooks();
 			return false;
 		}
 		const FString Slot = Character->GetSaveSlotName();
@@ -425,6 +433,7 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 		{
 			UE_LOG(LogTemp, Error, TEXT("Zone travel rejected: duplicate save slot %s"), *Slot);
 			OutFailureReason = TEXT("Iki oyuncunun kayit adi ayni");
+			ClearZoneTravelTestHooks();
 			return false;
 		}
 		SaveSlots.Add(NormalizedSlot);
@@ -433,12 +442,14 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 	if (Characters.IsEmpty())
 	{
 		OutFailureReason = TEXT("Tasinacak oyuncu bulunamadi");
+		ClearZoneTravelTestHooks();
 		return false;
 	}
 
 	bZoneTravelInProgress = true;
 	const uint64 RequestSerial = ++ZoneTravelRequestSerial;
 	PendingZoneTravelSaves = Characters.Num();
+	CompletedZoneTravelSaves.Reset();
 	PendingZoneTravelTargetMap = TargetMap;
 	PendingZoneTravelSourceMap = CurrentMap;
 	PendingZoneTravelCharacters.Reset(Characters.Num());
@@ -454,21 +465,41 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 		SaveTimeoutSeconds, false);
 	for (AMMOCharacter* Character : Characters)
 	{
+		// Yerel (senkron) magazada ilk karakter kaydi basarisiz olursa gecis burada iptal olmus olabilir:
+		// kalan karakterleri gereksiz yere yazma.
+		if (!bZoneTravelInProgress || ZoneTravelRequestSerial != RequestSerial)
+		{
+			break;
+		}
 		const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
-		Character->SaveCharacterForTravelAsync([WeakThis, RequestSerial](bool bSuccess)
+		const TWeakObjectPtr<AMMOCharacter> WeakCharacter(Character);
+		Character->SaveCharacterForTravelAsync([WeakThis, WeakCharacter, RequestSerial](bool bSuccess)
 		{
 			if (AMMOGameMode* GameMode = WeakThis.Get())
 			{
-				GameMode->HandleZoneTravelSaveComplete(RequestSerial, bSuccess);
+				GameMode->HandleZoneTravelSaveComplete(RequestSerial, WeakCharacter, bSuccess);
 			}
 		});
 	}
-	// Yerel dosya callback'leri ayni karede biter. Bulut magazasinda true yalniz istegin
-	// kabul edildigini belirtir; travel tum kayit callback'leri basarili olduktan sonra baslar.
+	// Yerel dosya callback'leri ayni karede biter: gecis zaten iptal olduysa (kayit hatasi) cagirana
+	// false + neden doner. Bulut magazasinda true yalniz istegin kabul edildigini belirtir; travel tum
+	// kayit callback'leri basarili olduktan sonra baslar (iptal ederse log + ekran mesaji).
+	if (!bZoneTravelInProgress || ZoneTravelRequestSerial != RequestSerial)
+	{
+		OutFailureReason = LastZoneTravelAbortReason.IsEmpty() ? FString(TEXT("Gecis iptal edildi")) : LastZoneTravelAbortReason;
+		return false;
+	}
 	return true;
 }
 
-void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSuccess)
+void AMMOGameMode::ClearZoneTravelTestHooks()
+{
+	bTestDropNextZoneTravelSaveCallback = false;
+	bTestRetryAfterZoneTravelTimeout = false;
+	TestZoneTravelTimeoutOverrideSeconds = 0.f;
+}
+
+void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, const TWeakObjectPtr<AMMOCharacter>& Character, bool bSuccess)
 {
 	if (!bZoneTravelInProgress || RequestSerial != ZoneTravelRequestSerial)
 	{
@@ -487,7 +518,17 @@ void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSucc
 		AbortZoneTravel(RequestSerial, TEXT("Bir karakter kaydedilemedi; gecis iptal edildi"));
 		return;
 	}
-	if (--PendingZoneTravelSaves <= 0)
+	// Ayni karakter icin ikinci basari callback'i (bulut tekrar-deneme) sayilmaz: bariyer yalniz GERCEKTEN
+	// kaydi biten benzersiz karakterlerle acilir.
+	bool bAlreadyCompleted = false;
+	CompletedZoneTravelSaves.Add(Character, &bAlreadyCompleted);
+	if (bAlreadyCompleted)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Zone travel: duplicate save callback ignored"));
+		return;
+	}
+	PendingZoneTravelSaves = FMath::Max(0, PendingZoneTravelCharacters.Num() - CompletedZoneTravelSaves.Num());
+	if (PendingZoneTravelSaves <= 0)
 	{
 		FinishZoneTravel(RequestSerial);
 	}
@@ -551,6 +592,7 @@ void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
 	UE_LOG(LogTemp, Log, TEXT("Zone travel started: %s -> %s (%d players)"),
 		*PendingZoneTravelSourceMap, *PendingZoneTravelTargetMap, PendingZoneTravelCharacters.Num());
 	PendingZoneTravelCharacters.Reset();
+	CompletedZoneTravelSaves.Reset();
 	PendingZoneTravelSaves = 0;
 }
 
@@ -573,12 +615,12 @@ void AMMOGameMode::AbortZoneTravel(uint64 RequestSerial, const FString& Reason)
 	}
 	bZoneTravelInProgress = false;
 	PendingZoneTravelSaves = 0;
+	CompletedZoneTravelSaves.Reset();
 	PendingZoneTravelCharacters.Reset();
 	PendingZoneTravelTargetMap.Reset();
 	PendingZoneTravelSourceMap.Reset();
-	bTestDropNextZoneTravelSaveCallback = false;
-	bTestRetryAfterZoneTravelTimeout = false;
-	TestZoneTravelTimeoutOverrideSeconds = 0.f;
+	ClearZoneTravelTestHooks();
+	LastZoneTravelAbortReason = Reason;
 	UE_LOG(LogTemp, Error, TEXT("Zone travel aborted: %s"), *Reason);
 	if (GEngine)
 	{
