@@ -221,3 +221,14 @@ Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANM
 
 **T7 - Beceri kitabi sirasi (DUSUK-5)**
 - [ ] Savasci/Rahip Ustalik 1 listesi artik seviyeye gore artan: Rampage(28) - Earthshaker(31) - Skullsplitter(39) - WarCyclone(45) - WarDeluge(58) (Rahip: Retribution 28, RadiantNova 31, ... AngelicBlade 45, AngelicStorm 58). Her satira tiklama hala o becerinin kendisine gitmeli (yanlis satir ogrenilmemeli, hotbar atamasi dogru beceriyi secmeli); iki sutun duzeni/tasma degismemeli.
+
+## 20. Hesap hazirligi Asama 1: kayit okuma/yazma IMMOCharacterStore arkasina alindi (saf refactor)
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI (yeni adim "Karakter magazasi" dahil; TestCharacterStore.ps1 106 yuvanin tamami yuklendi, gecici yuvaya Save->Load gidis-donusu esit). PIE'de OYNANMADI; davranis degismemeli, asagisi regresyon kontroludur. Editor kapaliyken once `Scripts\TestCharacterStore.ps1` calistirilabilir.
+
+- [ ] Eski kayitli karakterle (ornegin Lv6+ bir `MMOSave_<ad>.sav`) gir: seviye/envanter/gorev/klan/konum eskisi gibi gelmeli, "Karakter yuklendi" balonu cikmali, baslangic paketi TEKRAR verilmemeli.
+- [ ] Yeni (kayitsiz) bir adla gir: sinif secimi ipucu paneli + baslangic paketi (Kisa Kilic, Deri Zirh, 3 Can Iksiri) bir kez gelmeli. `MMOSave` -> "Kaydedildi"; `Saved/SaveGames/MMOSave_<ad>.sav` olusmali; cikip tekrar girince ayni durum yuklenmeli.
+- [ ] K-1 hala gecerli: kayitli bir karakterle girip (uzak istemci) `MMOSetName` ile BASKA bir kayitli karakterin adini almaya calis: "Bu ad kayitli bir karaktere ait" mesaji, ad degismemeli. Host'ta (yerel) kayitli bir adi alip `MMOSave`: "Bu ad baska bir kayda ait: kaydedilmedi" uyarisi, o dosya EZILMEMELI.
+- [ ] Klan: `/klan kur <ad>` ile baska bir (cevrimdisi, kayitli) karakterin klan adini almaya calis: "Bu klan adi kullanimda (cevrimdisi uyeleri var)". Yeni ad kurulabilmeli; ilk taramada hafif takilma (tum yuvalar taranir, 30 sn onbellek) olmamali/kisa surmeli.
+- [ ] Bolge gecisi (Summer <-> Winter, `MMOTravel`) ve 60 sn otomatik kayit eskisi gibi calismali; kayit basarisizsa gecis iptal mesaji (degismedi).
+- [ ] Not (otomasyonla DOGRULANAMAYAN): bir pawn'a belirli ad vermek headless'ta mumkun olmadi (yerel/uzak oyuncu adi motor tarafindan "Player"/OS adina cevrilip `Gezgin######` oluyor); bu yuzden "eski .sav'i belirli karakter olarak yukleme" yalniz PIE'de gozle dogrulanir. Magaza katmaninda eski dosyalarin hepsinin okundugu TestCharacterStore ile kanitlandi.

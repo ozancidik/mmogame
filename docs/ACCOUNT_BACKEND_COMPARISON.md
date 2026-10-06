@@ -254,3 +254,35 @@ başına dakikada bir otomatik kayıt. Dirty-flag ile gereksiz yazımlar kesilir
 - PlayFab Server API kimlik doğrulama (AuthenticateSessionTicket, LoginWithServerCustomId): https://learn.microsoft.com/en-us/rest/api/playfab/server/authentication
 - PlayFab Unreal Marketplace eklentisi (Apache-2.0): https://github.com/PlayFab/UnrealMarketplacePlugin
 - Ücretsiz katman değişikliği (üçüncü taraf, ikincil): https://accelbyte.io/blog/playfab-just-cut-its-free-tier-by-99.-heres-what-that-means-for-your-game
+
+## 11. Aşama 1 durumu (2026-10-06)
+
+Bu bölüm Aşama 1'in "arayüzün arkasına alma" dilimini kayda geçirir (saf refactor: davranış ve disk formatı aynı).
+
+**Yapılan**
+- `IMMOCharacterStore` (`Public/Save/MMOCharacterStore.h`, saf C++): `Load/Save/Exists/ListSlotNames`, sunucu tarafı senkron API;
+  arayüz yorumunda bulut mağazasının asenkron olacağı ve bölge geçişinin kayıt onayını beklemesi gerektiği belgelendi.
+- `FMMOLocalFileCharacterStore` (`Private/Save`): bugünkü `SaveGameToSlot/LoadGameFromSlot/DoesSaveGameExist` + `UMMOSaveGame`
+  davranışının birebir karşılığı. Slot adları (`MMOSave_<ad>`) ve `Saved/SaveGames/*.sav` (GVAS, `/Script/MyProject.MMOSaveGame`) formatı
+  aynı; `UMMOSaveGame` ve `FMMOCharacterSaveData` değişmedi.
+- Tek erişim noktası `UMMOCharacterStoreSubsystem::Get(WorldContext)` (`UGameInstanceSubsystem`; varsayılan yerel dosya mağazası).
+- Taşınan çağıranlar: `AMMOCharacter::SaveCharacterForTravel` (K-1 yuva kontrolü dahil), `AMMOCharacter::LoadCharacter`,
+  `AMMOCharacter::ServerSetName` (uzak istemcinin kayıtlı ad alması reddi), `AMMOGameMode::ChangeName` (rastgele ad yuva çakışması),
+  `MMOClanComponent` `SavedClanNameInUse` (klan adı çakışma taraması, `ListSlotNames`). Kaynakta artık `SaveGameToSlot/LoadGameFromSlot/
+  DoesSaveGameExist` ve `MMOSave_*.sav` dosya taraması yalnız `FMMOLocalFileCharacterStore` içinde.
+- Doğrulama: `Scripts/TestCharacterStore.ps1` (`MMOTestStore` konsol komutu, RunAllChecks'e bağlı): diskteki tüm yuvalar mağaza
+  üzerinden listelenip yüklendi (2026-10-06 ölçümü: 106 yuva, 106 yüklendi, 0 geçersiz, `Exists` tutarlı; Temmuz 2026'da yazılmış eski
+  `.sav` dosyaları dahil), en yüksek seviyeli kayıtla geçici yuvaya `Save -> Load` gidiş-dönüşü alan alan eşit çıktı. Eski dosyalar
+  değiştirilmedi (önce/sonra SHA-256 aynı). Tam RunAllChecks (derleme hariç) geçti.
+- Mağaza bulunamazsa (pratikte olmaz) muhafazakâr dallar: kayıt/yükleme `false`, kayıtlı-ad ve klan-adı kontrolleri "kullanımda" sayar.
+
+**Bu dilimin dışında yapılan (aynı gün, ayrı commit'ler)**: sürümlü JSON şeması + gidiş-dönüş testi (`07ba76e`), `LoadAsync/SaveAsync`
+callback giriş noktaları ve bölge geçişinin kayıt onayına bağlanması (`5102110`), 15 sn zaman aşımı/kilit kurtarma (`85d19fd`).
+
+**Kalan**
+- Asenkron/bulut mağaza (PlayFab HTTP uygulaması, yazım kuyruğu, lazy migration, dirty-flag, gecikme/boyut ölçümü).
+  `AMMOCharacter::SaveCharacter()/MMOSave/otomatik kayıt` yolları hâlâ senkron `Save`'i çağırıyor; yalnız bölge geçişi asenkron onaya bağlı.
+- Hesap kimliği: slot adı hâlâ oyuncu adı (`GetSaveSlotName`); K-1 kimlik açığı kapanmadı (Aşama 2: hesap + `CharacterId`).
+- Yerel mağazada `Delete` yok (ileride karakter silme/hesap taşıma için gerekecek); `ListSlotNames` yalnız `MMOSave_*` önekini görür.
+- Belirli bir ada sahip pawn'ı headless yükleme testi mümkün olmadı (motor yerel/uzak oyuncu adını `Player`/OS adına çevirip `Gezgin######`
+  üretiyor); eski bir kaydın belirli karakter olarak oyunda açılması PIE'de gözle doğrulanacak (CHECKLIST_FIXES bölüm 20).
