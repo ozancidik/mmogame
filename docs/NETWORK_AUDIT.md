@@ -222,7 +222,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - **D7** Loot: ilk-gelen alır, sahiplik/kilitlenme yok; çanta doluyken loot yerde kalır (iyi) ama `AddEquipmentInstance` doluysa ödül/loot sessizce kaybolur (MMOInventoryComponent.cpp:170-177).
 - **D8** Klan: çevrimdışı üye atılamaz (`CmdKick` yalnız çevrimiçi, MMOClanComponent.cpp:468-484); travel sırasında lider `EndPlay`'i "X artık klan lideri" duyurusunu gereksiz yollar (207) **[doğrulanmalı]**.
 - **D9** `ServerSetName` cooldown'u yok (bkz. Y1).
-- **D10** `IsInsideHubSafeZone` her çağrıda `TActorIterator<APlayerStart>` (MMOTargeting.cpp:18); `AttackTarget`, `TakeDamage`, `CanHarmPlayer` her vuruşta birkaç kez çağırıyor — PlayerStart'ı `BeginPlay`'de önbelleğe al.
+- **D10 — kapandı (2026-10-06):** `IsInsideHubSafeZone`, sabit harita `PlayerStart` merkezlerini zayıf `UWorld` anahtarlı cache'e ilk çağrıda bir kez toplar; sonraki saldırı/beceri kontrolleri aktör taraması yerine kare mesafe karşılaştırır. Travel sonrası yeni dünya ayrı cache alır, ölü dünya kayıtları temizlenir.
 
 ### O10 · ORTA · `UnequipSlot` çanta sınırını aşar
 - MMOInventoryComponent.cpp:285 `EquipmentBag.Add(...)` `MaxBagSize` (12) kontrolü yok. Çanta doluyken 4 ekipmanı çıkaran oyuncu çantayı 16'ya çıkarır; bundan sonra `ReceiveTradedEquipment` (723) ve `Withdraw` (684) reddeder, `TryExecuteTrade` kapasite kontrolü (612-618) her takası iptal eder, HUD yalnız ≤12 göstermek üzere boyutlanmış (MMOInventoryComponent.h:78-85) → fazla item'lar erişilemez kalabilir. Düzeltme: `Unequip` çanta doluysa reddet ve ipucu gönder.
@@ -258,7 +258,7 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişikl
 - **Bu turda (derlenmedi):** D1 (debug RPC'leri Shipping'de erken döner), D3 (ölü karakter satıcıdan işlem ve yükseltme yapamaz; yükseltmede NPC yakınlık koşulu tasarım kararı olarak eklenmedi), D5/D9 (sohbet kontrol ve bidi karakter temizliği), D6 (`GAnnounced` tablosu 512 kayıtla sınırlı), D9/Y1 ad değiştirme soğuması (30 sn, yalnız uzak istemci).
 - **Y3 madde 1** (can/mana her karede kirlenir): yenilenme ≥1 puanlık adımlara bağlandı (derlenmedi). Madde 2 (`ActiveEffects.RemainingTime`): `NotReplicated` yapıldı, replike `EndServerTime` eklendi, HUD kalan süreyi ondan hesaplıyor (derlenmedi).
 - **O11 madde 3** (geri bildirim `IsLocallyControlled()`'e bağlı): `MMONotify::ToOwner` eklendi, envanter ve görev bileşeni mesajları uzak istemciye de gider (derlenmedi). Beceri/karakter/ganimet/parti mesajları açık.
-- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), O4 (parti ve ticaret davet kapma), O5 (arkadaş rızası), O6, O11, D2, D4'ün Trade `Accept/Cancel` ve Klan komutları, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10. O8'in hedef taraması ve spawner kanalı kapandı; yalnız mob tick/ölçüm ayarı açık. O7 ve O12 kodda kapandı; PIE/log doğrulaması aşağıdaki checklist'te bekliyor.
+- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), O4 (parti ve ticaret davet kapma), O5 (arkadaş rızası), O6, O11, D2, D4'ün Trade `Accept/Cancel` ve Klan komutları, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8. O8'in hedef taraması ve spawner kanalı kapandı; yalnız mob tick/ölçüm ayarı açık. O7, O12 ve D10 kodda kapandı; PIE/log doğrulaması aşağıdaki checklist'te bekliyor.
 
 ### Y3 çözüm notu (2026-10-06)
 

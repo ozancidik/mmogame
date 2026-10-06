@@ -3621,3 +3621,17 @@ geçişleri, Summer/Winter smoke, NetSmoke) geçti.
   ortak 1 saniye dolmadan ikinci eşya tüketilmemeli; dolduktan sonra normal çalışmalıdır.
 - [ ] Host ve uzak istemcide aynı davranışı doğrula; hızlı basışlar sohbeti/Reliable RPC
   kuyruğunu doldurmamalı ve bağlantıyı düşürmemelidir.
+
+## Hub güvenli bölge merkezi önbelleği — 2026-10-06
+
+`IsInsideHubSafeZone`, her saldırı ve beceri kontrolünde bütün `PlayerStart` aktörlerini
+taramak yerine merkezleri dünya başına ilk çağrıda önbelleğe alır. Travel yeni `UWorld`
+oluşturduğu için eski harita merkezi kullanılmaz; geçersiz dünya kayıtları temizlenir.
+Editör derlemesi, StaticLint, Summer/Winter smoke ve NetSmoke geçti.
+
+- [ ] Summer haritasında PlayerStart çevresinde 700 birim içindeyken normal saldırı ve
+  saldırı becerileri engellenmeli; sınırın dışına çıkınca tekrar çalışmalıdır.
+- [ ] Winter haritasına geçip aynı kontrolü tekrarla: Summer merkezi taşınmamalı, Winter
+  PlayerStart çevresi güvenli bölge olmalıdır.
+- [ ] İki oyunculu PIE'de oyunculardan biri hub içinde, diğeri dışında olsun: iki yöndeki
+  PvP saldırısı da reddedilmeli; iki oyuncu dışarı çıktığında mevcut PvP kuralları çalışmalıdır.

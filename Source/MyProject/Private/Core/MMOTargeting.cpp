@@ -8,16 +8,57 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerStart.h"
 
+namespace
+{
+	struct FHubSafeZoneWorldCache
+	{
+		TWeakObjectPtr<UWorld> World;
+		TArray<FVector> Centers;
+	};
+
+	// PlayerStart'lar bu projede harita yuklenirken olusan sabit aktorlerdir. Her vurus ve
+	// beceri kontrolunde TActorIterator calistirmak yerine merkezleri dunya basina bir kez
+	// topla. Zayif dunya isaretcisi seamless/non-seamless travel sonrasi eski kaydi guvenle
+	// ayirir; gecersiz kayitlar sonraki cache miss'inde temizlenir.
+	TArray<FHubSafeZoneWorldCache> GHubSafeZoneCaches;
+
+	const TArray<FVector>& GetHubSafeZoneCenters(UWorld* World)
+	{
+		for (int32 Index = GHubSafeZoneCaches.Num() - 1; Index >= 0; --Index)
+		{
+			FHubSafeZoneWorldCache& Cache = GHubSafeZoneCaches[Index];
+			if (!Cache.World.IsValid())
+			{
+				GHubSafeZoneCaches.RemoveAtSwap(Index);
+				continue;
+			}
+			if (Cache.World.Get() == World)
+			{
+				return Cache.Centers;
+			}
+		}
+
+		FHubSafeZoneWorldCache& NewCache = GHubSafeZoneCaches.AddDefaulted_GetRef();
+		NewCache.World = World;
+		for (TActorIterator<APlayerStart> It(World); It; ++It)
+		{
+			NewCache.Centers.Add(It->GetActorLocation());
+		}
+		return NewCache.Centers;
+	}
+}
+
 bool MMOTargeting::IsInsideHubSafeZone(const UObject* WorldContextObject, const FVector& Location, float Radius)
 {
-	const UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
+	UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull) : nullptr;
 	if (!World || Radius <= 0.f)
 	{
 		return false;
 	}
-	for (TActorIterator<APlayerStart> It(World); It; ++It)
+	const float RadiusSquared = Radius * Radius;
+	for (const FVector& Center : GetHubSafeZoneCenters(World))
 	{
-		if (FVector::Dist2D(Location, It->GetActorLocation()) < Radius)
+		if (FVector::DistSquared2D(Location, Center) < RadiusSquared)
 		{
 			return true;
 		}
