@@ -174,3 +174,13 @@ Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Tamami `AMMOHUD
 - [ ] **Istemci**: ikinci pencere (listen-server istemcisi) kendi ipuclarini gormeli; host penceresinde istemcinin ipucu cikmamali.
 - [ ] **Yuksek seviye**: Lv25+ kayitli karakterle girince (gorev/canta dolu/olum dahil) hicbir ipucu cikmamali; girisin ilk 3 sn icinde replikasyon yuklenmesi yanlis tetik uretmemeli.
 - [ ] Planin H5 "puan >=6 birikince Lv<=15 ikinci ipucu" kismi UYGULANMADI (yalniz ilk seviye atlama).
+
+## 16. Y3: can/mana yenilenmesi 0.5 sn adimlarla (NETWORK_AUDIT "Y3 cozum notu")
+
+Kod derlendi, RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANMADI. Host + 1 istemci gerekir.
+
+- [ ] Savasta olmayan, cani eksik oyuncu: can cubugu ~0.5 sn adimlarla (yaklasik +3 HP/adim; savasta 1/4 hizla) dolmali; toplam sure eskisiyle ayni (6 HP/sn). Mana ayni sekilde (7 + 0.25*Lv /sn).
+- [ ] Istemcide (uzak pencere) HOSTUN canini izle: 0.5 sn adimlarla artmali, takilmamali. Hasar alan oyuncuda dusus yine ANINDA gorunmeli (hasar/iyilestirme yolu adimlanmadi); iksir/Heal ani artis vermeli.
+- [ ] Dolu cana ulasinca yenilenme durmali; bir sonraki hasardan sonra beklenmedik +1 HP sicramasi olmamali (can/mana doluyken birikim sifirlanir).
+- [ ] Efekt: bir buff/zehir uygula; HUD efekt sayaci (EndServerTime) geri sayimi akici ve dogru, sure bitince efekt kalkmali (uzak istemcide de).
+- [ ] (Istege bagli) 2 istemci + `stat net`: yenilenen oyuncu basina trafigin eskisine gore dustugunu olc (kazanc su an DOGRULANMADI).

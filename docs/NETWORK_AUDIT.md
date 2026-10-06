@@ -250,3 +250,11 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişikl
 - **Y3 madde 1** (can/mana her karede kirlenir): yenilenme ≥1 puanlık adımlara bağlandı (derlenmedi). Madde 2 (`ActiveEffects.RemainingTime`): `NotReplicated` yapıldı, replike `EndServerTime` eklendi, HUD kalan süreyi ondan hesaplıyor (derlenmedi).
 - **O11 madde 3** (geri bildirim `IsLocallyControlled()`'e bağlı): `MMONotify::ToOwner` eklendi, envanter ve görev bileşeni mesajları uzak istemciye de gider (derlenmedi). Beceri/karakter/ganimet/parti mesajları açık.
 - **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de),  O4 (parti ve ticaret davet kapma — `MMOPartyComponent.cpp`/`MMOTradeComponent.cpp` yerelde Codex'te olduğu için bulutta dokunulmadı), O5 (arkadaş rızası), O6, O7, O8, O11, O12 (denetim logu; Trade dosyası), D2, D4, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10.
+
+### Y3 çözüm notu (2026-10-06)
+
+- **Doğrulama:** Bulut turu madde 2'yi zaten yapmıştı (`git log -S EndServerTime`: 496cdc9): `RemainingTime` `NotReplicated`, replike `EndServerTime`, HUD kalan süreyi ondan hesaplar. Madde 1 yalnız ≥1 puanlık adımdı; HP 6/sn ve mana 7+0.25·Lv/sn olduğundan Health hâlâ saniyede ~6 kez, Mana ~7-27 kez kirleniyordu.
+- **Çözüm:** `UMMOStatsComponent::TickComponent` yenilenmeyi her karede biriktirir ama Health/Mana'ya yalnız 0.5 sn adımlarla (`RegenApplyInterval`) ve tam puan olarak yazar → en fazla 2 Hz replikasyon (Mana zaten `COND_OwnerOnly`). Kesir birikimde kalır; toplam yenilenme, formüller (MaxHealth/AttackPower/Defense), SaveGame ve `ApplyDamage`/`Heal`/ölüm yolu (anlık, tam hassasiyet) değişmedi; `OnHealthChanged`/`OnManaChanged` ve OnRep delegeleri aynı çalışır. Yenilenirken HUD çubuğu 0.5 sn adımlarla atlar (kozmetik; istemci yumuşatması eklenmedi).
+- **Efekt süresi:** Değişiklik gerekmedi; dizi yalnız uygulama/tazeleme/bitişte kirlenir (sunucu `RemainingTime`'ı her karede düşürür ama alan replike değil).
+- **Kazanç: doğrulanmadı** (Network Profiler / `stat net` ile ölçülmedi). Kuramsal: yenilenen oyuncu başına can güncellemesi tick hızından (~30 Hz) 2 Hz'e, mana 2 Hz'e (yalnız sahibe).
+- **Kalan:** `MobName`'in replikasyondan çıkarılması (küçük kazanç) yapılmadı.

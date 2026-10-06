@@ -58,17 +58,13 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 	const bool bInCombat = (World->GetTimeSeconds() - LastCombatActivityTime) < CombatDuration;
 	const float Mult = FMath::Max(0.f, bInCombat ? CombatRegenMult : 1.f);
 
+	// Y3: yenilenme her karede birikir ama Health/Mana'ya yalniz RegenApplyInterval (0.5 sn) adimlarinda
+	// ve tam puan olarak yazilir; boylece degerler saniyede en fazla 2 kez kirlenir/replike olur
+	// (eskiden her karede). Toplam yenilenme miktari degismez (kesir birikimde kalir).
+	// Hasar/iyilestirme/olum hesaplari bu yoldan bagimsiz, tam hassasiyetle ApplyDamage/Heal'de.
 	if (Health < MaxHealth)
 	{
-		// Biriktir, >=1 puan olunca uygula (Y3: her karede replikasyon kirliligi yok).
 		HealthRegenAccum += FMath::Max(0.f, HealthRegenPerSec) * Mult * DeltaTime;
-		if (HealthRegenAccum >= 1.f)
-		{
-			const float Step = FMath::FloorToFloat(HealthRegenAccum);
-			HealthRegenAccum -= Step;
-			Health = FMath::Clamp(Health + Step, 0.f, MaxHealth);
-			OnHealthChanged.Broadcast(Health, MaxHealth);
-		}
 	}
 	else
 	{
@@ -80,17 +76,32 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		// 26sn CD) savasta ~174sn'de bir atilabiliyordu.
 		const float RegenPerSec = ManaRegenPerSec + Level * ManaRegenPerLevel;
 		ManaRegenAccum += FMath::Max(0.f, RegenPerSec) * Mult * DeltaTime;
-		if (ManaRegenAccum >= 1.f)
-		{
-			const float Step = FMath::FloorToFloat(ManaRegenAccum);
-			ManaRegenAccum -= Step;
-			Mana = FMath::Clamp(Mana + Step, 0.f, MaxMana);
-			OnManaChanged.Broadcast(Mana, MaxMana);
-		}
 	}
 	else
 	{
 		ManaRegenAccum = 0.f;
+	}
+
+	RegenApplyTimer += DeltaTime;
+	if (RegenApplyTimer < RegenApplyInterval)
+	{
+		return;
+	}
+	RegenApplyTimer = 0.f;
+
+	if (HealthRegenAccum >= 1.f && Health < MaxHealth)
+	{
+		const float Step = FMath::FloorToFloat(HealthRegenAccum);
+		HealthRegenAccum -= Step;
+		Health = FMath::Clamp(Health + Step, 0.f, MaxHealth);
+		OnHealthChanged.Broadcast(Health, MaxHealth);
+	}
+	if (ManaRegenAccum >= 1.f && Mana < MaxMana)
+	{
+		const float Step = FMath::FloorToFloat(ManaRegenAccum);
+		ManaRegenAccum -= Step;
+		Mana = FMath::Clamp(Mana + Step, 0.f, MaxMana);
+		OnManaChanged.Broadcast(Mana, MaxMana);
 	}
 }
 

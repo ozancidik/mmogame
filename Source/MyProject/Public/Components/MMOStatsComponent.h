@@ -341,6 +341,9 @@ protected:
 	// kirlenip replike edilmesin (NETWORK_AUDIT Y3). Toplam yenilenme miktari degismez.
 	float HealthRegenAccum = 0.f;
 	float ManaRegenAccum = 0.f;
+	// Birikimin Health/Mana'ya yazilma adimi (sn): replikasyon en fazla 1/Aralik Hz.
+	float RegenApplyTimer = 0.f;
+	static constexpr float RegenApplyInterval = 0.5f;
 
 	// --- OnRep fonksiyonları: istemcide değer değişince UI delegate'lerini tetikler ---
 	UFUNCTION()
