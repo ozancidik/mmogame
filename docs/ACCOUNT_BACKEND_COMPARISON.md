@@ -15,10 +15,9 @@ Doğrulanamayan varsayımlar "[?]" ile işaretlidir ve bölüm 9'da toplanmışt
 - **Yazım zaten sunucu-otoriter.** `SaveCharacterForTravel()` `HasAuthority()` ve `bInitialLoadComplete` olmadan `false` döner;
   `LoadCharacter()` da yalnız otoritede çalışır. Yani "yalnız sunucu yazar" kuralı mantıken var, eksik olan sunucunun *nereye* yazdığı.
 - **Harita geçişi tek süreçte.** `AMMOGameMode` bölge geçişi (Summer_scene <-> Winter_scene) tüm bağlı oyuncuları kaydedip
-  `World->ServerTravel(...)` ile aynı sunucu sürecinde haritayı değiştirir (`MMOGameMode.cpp` ~100-160). Ayrı "dünya sunucusu"
+  `World->ServerTravel(...)` ile aynı sunucu sürecinde haritayı değiştirir (`AMMOGameMode::RequestZoneTravel/FinishZoneTravel`). Ayrı "dünya sunucusu"
   süreci yok; bütün oyuncular birlikte taşınır.
-- **Kaydetme senkron.** `SaveCharacterForTravel()` `bool` döner ve geçiş buna bağlı. Bulut yazımı HTTP, yani asenkron olacağı için
-  bu akış "yazıldı onayı gelmeden travel yok" biçiminde yeniden kurulmalı (bölüm 8).
+- **Kaydetme: bölge geçişi artık asenkron onaya bağlı (güncel, 2026-10-07).** `AMMOGameMode::RequestZoneTravel` her karakter için `SaveCharacterForTravelAsync` (`IMMOCharacterStore::SaveAsync`) çağırır; hepsi başarıyla bitmeden `ServerTravel` yok (karakter başına tamamlanma kümesi, 15 sn zaman aşımı, yuva başına yazım sırası koruması). `SaveCharacterForTravel()` (senkron `bool`) YALNIZ otomatik kayıt (60 sn), `MMOSave`, klan/ticaret sonrası ve `EndPlay` yollarında kalır; bunlar da asenkron/kuyruklu hâle getirilmeli (bölüm 11 "Kalan"). Eski not ("geçiş senkron `bool`'a bağlı") bayattı.
 - İlgili çağıranlar: otomatik kayıt 60 sn (`MMOCharacter.cpp` ~246), klan/arkadaş/ticaret sonrası `SaveCharacter()`,
   `ServerSaveCharacter`/`ServerLoadCharacter` RPC'leri (`MMOCharacter.h` ~317-320; istemci tetikli, hesap sistemi gelirse gözden geçirilmeli).
 
@@ -124,7 +123,7 @@ Doğrulanamayan varsayımlar "[?]" ile işaretlidir ve bölüm 9'da toplanmışt
 - Klan ve arkadaş listeleri **ad (string)** tutuyor. Karakter adı benzersiz kalacağı sürece değişmeden çalışır; bu yüzden ad benzersizliği
   arka uçta zorlanmalı (PlayFab'ta karakter adı için yerleşik benzersizlik garantisi yok, hesap görünen adı başlık genelinde benzersiz
   olabilir; karakter adı için ek bir mekanizma lazım [?]; OWS'ta DB kısıtı ile yapılır [?]).
-- Asenkron kaydın eklenmesi (`SaveCharacterForTravel` senkron `bool`) iki seçenekte de aynı refactor.
+- Asenkron kayıt: bölge geçişi tarafı yapıldı (`SaveCharacterForTravelAsync`); otomatik kayıt/`EndPlay`/klan/ticaret yolları hâlâ senkron `Save` (bu kalan iş iki seçenekte de aynı refactor). Bulut mağaza ayrıca yuva başına seri yazım kuyruğu/`Revision` uygulamalı (NETWORK_AUDIT O6).
 
 ### 3.10 Güvenlik (token, hile)
 - **PlayFab:** Kısa ömürlü SessionTicket/EntityToken, gizli anahtar yalnız sunucuda; çifte giriş denetimi için "karakter kilidi" (hangi
@@ -266,7 +265,7 @@ başına dakikada bir otomatik kayıt. Dirty-flag ile gereksiz yazımlar kesilir
 Bu bölüm Aşama 1'in "arayüzün arkasına alma" dilimini kayda geçirir (saf refactor: davranış ve disk formatı aynı).
 
 **Yapılan**
-- `IMMOCharacterStore` (`Public/Save/MMOCharacterStore.h`, saf C++): `Load/Save/Exists/ListSlotNames`, sunucu tarafı senkron API;
+- `IMMOCharacterStore` (`Public/Save/MMOCharacterStore.h`, saf C++): `Load/Save/Exists/ListSlotNames` senkron API'si + `LoadAsync/SaveAsync` callback giriş noktaları (varsayılan: senkron işi aynı karede tamamlar) + yuva başına yazım sırası takipçisi (`GetWriteTracker`);
   arayüz yorumunda bulut mağazasının asenkron olacağı ve bölge geçişinin kayıt onayını beklemesi gerektiği belgelendi.
 - `FMMOLocalFileCharacterStore` (`Private/Save`): bugünkü `SaveGameToSlot/LoadGameFromSlot/DoesSaveGameExist` + `UMMOSaveGame`
   davranışının birebir karşılığı. Slot adları (`MMOSave_<ad>`) ve `Saved/SaveGames/*.sav` (GVAS, `/Script/MyProject.MMOSaveGame`) formatı
