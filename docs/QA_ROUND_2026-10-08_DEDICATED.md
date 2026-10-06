@@ -52,6 +52,13 @@ Sorunlar:
 
 ### ORTA-2 — Yazım sırası takipçisi (`f3228a5`)
 
+**2026-10-07 güncellemesi:** `e77ff4e` uçuşta geçiş kaydını bozan ek kayıtları erteledi
+ve takipçide oyun iş parçacığı sözleşmesini `check` ile zorladı. Sonraki düzeltmede
+`FinishZoneTravel` canlı/savaş dışı durumunu ve güncel oyuncu/pawn kümesini yeniden
+doğrular; beklerken savaşa giriş headless regresyonu iptal ve kilit temizliğini geçti.
+Anlık görüntü sonrası kazanımlar, depodaki gerçek yazım sırası/iptal ve ertelenen kayıt
+yazım hatasının geçişe iletilmesi açık. Aşağıdaki metin ilk denetimin tarihsel kaydıdır.
+
 Yer: `Public/Save/MMOCharacterStore.h:8-35` (`FMMOSlotWriteTracker`), `Private/Characters/MMOCharacter.cpp:493` (senkron `BeginWrite`), `:567-615` (`SaveCharacterForTravelAsync`), `Private/Core/MMOGameMode.cpp:381-520`.
 
 Doğru olanlar: sürüm numarası artan, yuva adı büyük/küçük harf duyarsız (`ToLower`); bayat callback `bSuccess=false` ve `ActiveSaveSlot` GÜNCELLENMİYOR (doğru); `WeakThis` ile karakter ömrü korunuyor; `TSharedRef` izleyici mağaza ölse de callback'te geçerli; `HandleZoneTravelSaveComplete` seri numarası + karakter başına tamamlanma kümesi ile eski/çift callback'i eliyor; `RequestZoneTravel` döngüsü iptalde kırılıyor ve `false` + neden dönüyor; test kancaları sıfırlanıyor; `PendingZoneTravelSaves` her seferinde `Pending.Num() - Completed.Num()` ile yeniden hesaplanıyor (sapma yok). Çağıranlar yeni sözleşmeyi doğru ele alıyor: `MMOTravel` (`MMOPlayerController.cpp:54`) `false` + neden basıyor; HUD düğmesi `MMOTravel`'i çağırıyor; headless test `REJECTED` loglıyor.

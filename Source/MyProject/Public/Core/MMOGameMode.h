@@ -49,6 +49,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOTestZoneTravelTimeout();
 
+	// Kayit onayi beklenirken savasa giren oyuncunun gecisinin iptalini headless dogrular.
+	UFUNCTION(Exec)
+	void MMOTestZoneTravelStateChange();
+
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
@@ -91,7 +95,7 @@ protected:
 	bool bTestRetryAfterZoneTravelTimeout = false;
 	float TestZoneTravelTimeoutOverrideSeconds = 0.f;
 
-	void ScheduleZoneTravelTest(bool bExpectTimeout);
+	void ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange = false);
 	void HandleZoneTravelSaveComplete(uint64 RequestSerial, const TWeakObjectPtr<class AMMOCharacter>& Character, bool bSuccess);
 	void ClearZoneTravelTestHooks();
 	void HandleZoneTravelSaveTimeout(uint64 RequestSerial);

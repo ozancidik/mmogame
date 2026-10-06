@@ -3666,3 +3666,19 @@ yolunda kullanılmıyor; gelecekteki bulut mağazası hazırlığıdır. PIE oyn
   `json mismatch=0` ve `maxLevel>=30` kanıtını al.
 - [ ] Bulut mağazası eklendiğinde geçersiz JSON okuma/yazma reddinin mevcut kaydı
   ezmediğini ve hatanın çağırana iletildiğini doğrula; bugün entegrasyon bulunmuyor.
+
+## Bölge geçişi öncesi oyuncuları yeniden doğrulama — 2026-10-07
+
+Geçiş kayıtları tamamlandığında, sunucu oyuncu/pawn kümesini ve canlı/savaş dışı
+koşullarını yeniden denetler. Bekleme sırasında koşullar değişirse geçiş iptal edilir.
+UE derlemesi ve tek oyunculu headless savaş enjeksiyonu geçti: onay beklerken savaş,
+iptal, boş bariyer, temiz kilit/zamanlayıcı. Gerçek gecikmeli mağaza ve iki oyunculu
+PIE oynanmadı. Anlık görüntü sonrası XP/altın kaybı konusu bu değişiklikle çözülmedi.
+`RunAllChecks.ps1 -SkipBuild -FullCompile` yeni regresyon dahil 13/13 geçti;
+Summer/Winter ve iki süreçli NetSmoke bağlantısı hatasızdı. NetSmoke oynanış kanıtı değildir.
+
+- [ ] Gecikmeli mağaza ile iki oyunculu PIE'de kayıt onayı beklerken bir oyuncuyu savaşa
+  sok: herkes Summer'da kalmalı ve savaş bittikten sonra yeni geçiş çalışmalıdır.
+- [ ] Aynı bekleme penceresinde ölüm, respawn/pawn değişimi, bağlantı kopması ve yeni
+  oyuncu katılımını ayrı ayrı dene: kayıt kümesi değişmişse toplu geçiş iptal edilmelidir.
+- [ ] İki oyuncu da canlı ve savaş dışı kalırsa normal Summer/Winter geçişi çalışmalıdır.

@@ -348,3 +348,23 @@ kullanildi; bagimsiz paralel ajan calistirilmadi.
   ile `json mismatch=0` ve `maxLevel>=30` kanitini al (bu makinede en yuksek 6).
 - [ ] Bulut magaza entegre edildiginde JSON reddi mevcut kaydi ezmemeli; yazma reddi
   cagirana gorunur olmali. Bu entegrasyon bugun yoktur ve dogrulanmadi.
+
+## 30. O6 / QA ORTA-2: gecis oncesi oyuncu kumesi ve savas durumunu yeniden dogrula
+
+`FinishZoneTravel`, kayit callback'leri tamamlandiktan sonra PlayerController/pawn kumesini
+ilk kaydi alinan karakterlerle karsilastirir. Yeni oyuncu, pawn degisimi, ayrilma, olum veya
+savas durumunda `ServerTravel` baslatilmaz; normal iptal yolu kilidi/bariyeri ve zamanlayiciyi
+temizler. Boylece gecikmeli onay, ilk istegin canli/savas disi kosullarini bayatlatamaz.
+
+UE 5.7 editor derlemesi ve `RunAllChecks.ps1 -SkipBuild -FullCompile` **13/13 GECTI**:
+10 dosya PCH'siz /W4, 0 derleyici uyarisi; JSON 111 negatif; 179 gercek kayit icin
+`loaded=179 json ok=179 mismatch=0 maxLevel=6`; normal gecis, timeout ve yeni durum
+regresyonu; Summer/Winter smoke 0 hata; NetSmoke 1 sunucu/1 istemci katilimi, 0 hata.
+Yeni `TestZoneTravelStateChange.ps1`, yerel kayit onayini dusurup savasa girisi ve sonra
+onayi taklit eder: `PASS combat=1 lock=0 pending=0`, zamanlayici temiz. Gercek asenkron
+bulut/dedicated server testi degildir. Olum/pawn/yeni oyuncu dallari iki oyunculu PIE'de
+oynanmadi; `PLAYTEST_CHECKLIST.md`'de bekliyor. XP/altin anlik goruntu penceresi ve
+ertelenen yazim hatasinin gecise iletilmesi acik (NETWORK_AUDIT O6).
+
+Agency-agents Unreal Multiplayer Architect rol belgesi authority/oyuncu kumesi
+incelemesinde kullanildi; bagimsiz paralel ajan calistirilmadi.

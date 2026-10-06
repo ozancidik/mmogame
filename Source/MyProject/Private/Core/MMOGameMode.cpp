@@ -69,7 +69,14 @@ void AMMOGameMode::MMOTestZoneTravelTimeout()
 #endif
 }
 
-void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
+void AMMOGameMode::MMOTestZoneTravelStateChange()
+{
+#if !UE_BUILD_SHIPPING
+	ScheduleZoneTravelTest(false, true);
+#endif
+}
+
+void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange)
 {
 #if !UE_BUILD_SHIPPING
 	UWorld* World = GetWorld();
@@ -79,7 +86,7 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
 	}
 	const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
 	FTimerHandle TestHandle;
-	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis, bExpectTimeout]()
+	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis, bExpectTimeout, bExpectStateChange]()
 	{
 		AMMOGameMode* GameMode = WeakThis.Get();
 		UWorld* TestWorld = GameMode ? GameMode->GetWorld() : nullptr;
@@ -97,10 +104,10 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
 				break;
 			}
 		}
-		if (bExpectTimeout)
+		if (bExpectTimeout || bExpectStateChange)
 		{
 			GameMode->bTestDropNextZoneTravelSaveCallback = true;
-			GameMode->bTestRetryAfterZoneTravelTimeout = true;
+			GameMode->bTestRetryAfterZoneTravelTimeout = bExpectTimeout;
 			GameMode->TestZoneTravelTimeoutOverrideSeconds = 0.75f;
 		}
 		FString FailureReason;
@@ -118,6 +125,27 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout)
 				UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_TIMEOUT_TEST] deferred-save-check saved=%d deferred=%d inflight=%d"),
 					bSaved ? 1 : 0, HostCharacter->IsSaveDeferredByTravel() ? 1 : 0,
 					GameMode->IsZoneTravelSaveInFlight(HostCharacter) ? 1 : 0);
+			}
+		}
+		if (bExpectStateChange && bAccepted && Host)
+		{
+			AMMOCharacter* Character = Cast<AMMOCharacter>(Host->GetPawn());
+			if (Character && Character->GetStats() && GameMode->IsZoneTravelSaveInFlight(Character))
+			{
+				// Yerel kayit tamamlandi ama test kancasi onayi dusurdu; bekleme penceresini taklit et.
+				Character->GetStats()->MarkCombatActivity();
+				GameMode->HandleZoneTravelSaveComplete(GameMode->ZoneTravelRequestSerial, Character, true);
+				const bool bAborted = !GameMode->bZoneTravelInProgress
+					&& GameMode->LastZoneTravelAbortReason == TEXT("Kayit beklerken bir oyuncu oldu veya savasa girdi; gecis iptal edildi")
+					&& GameMode->PendingZoneTravelCharacters.IsEmpty() && GameMode->CompletedZoneTravelSaves.IsEmpty()
+					&& !TestWorld->GetTimerManager().IsTimerActive(GameMode->ZoneTravelSaveTimeoutHandle);
+				UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_STATE_TEST] %s combat=%d lock=%d pending=%d"),
+					bAborted ? TEXT("PASS") : TEXT("FAIL"), Character->GetStats()->IsInCombat() ? 1 : 0,
+					GameMode->bZoneTravelInProgress ? 1 : 0, GameMode->PendingZoneTravelCharacters.Num());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("[MMO_ZONE_TRAVEL_STATE_TEST] FAIL no pending character"));
 			}
 		}
 	}), 1.5f, false);
@@ -575,6 +603,31 @@ void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
 	if (!World)
 	{
 		AbortZoneTravel(RequestSerial, TEXT("Dunya gecis tamamlanmadan kapandi"));
+		return;
+	}
+	// Bulut callback'i gecikebilir: ilk istekteki oyuncu/savas kosullari artik gecerli olmayabilir.
+	// Yeni katilan veya pawn'i degisen oyuncu kaydedilmeden tasinmamali; canli/savas disi kurali
+	// ServerTravel'dan hemen once sunucuda tekrar dogrulanir.
+	TSet<TWeakObjectPtr<AMMOCharacter>> CurrentCharacters;
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		AMMOCharacter* Character = PC ? Cast<AMMOCharacter>(PC->GetPawn()) : nullptr;
+		if (!Character || !PendingZoneTravelCharacters.Contains(Character))
+		{
+			AbortZoneTravel(RequestSerial, TEXT("Kayit beklerken oyuncu grubu degisti; gecis iptal edildi"));
+			return;
+		}
+		if (!Character->GetStats() || Character->GetStats()->bIsDead || Character->GetStats()->IsInCombat())
+		{
+			AbortZoneTravel(RequestSerial, TEXT("Kayit beklerken bir oyuncu oldu veya savasa girdi; gecis iptal edildi"));
+			return;
+		}
+		CurrentCharacters.Add(Character);
+	}
+	if (CurrentCharacters.Num() != PendingZoneTravelCharacters.Num())
+	{
+		AbortZoneTravel(RequestSerial, TEXT("Kayit beklerken oyuncu grubu degisti; gecis iptal edildi"));
 		return;
 	}
 	World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);

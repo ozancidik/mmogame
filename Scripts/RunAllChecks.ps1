@@ -99,6 +99,11 @@ Step "Bolge gecisi kayit zaman asimi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Bolge gecisi beklerken oyuncu durumu degisimi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelStateChange.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host
