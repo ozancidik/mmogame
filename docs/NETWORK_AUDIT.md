@@ -29,7 +29,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O5 | ORTA | Arkadaş listesi rızasız: başkasının giriş/çıkış ve seviyesini izlemek mümkün | MMOFriendsComponent.cpp:107-164, 206-231, 233-276 |
 | O6 | ORTA | `bTravelSaveCommitted` penceresinde ilerleme kaybı (geri sarma); `bZoneTravelInProgress` sıfırlanmıyor; tek oyuncu toplu geçişi kilitleyebilir | MMOCharacter.cpp:383; MMOGameMode.cpp:118-168 |
 | O7 | ORTA | **Kapandı:** elit ölüm duyurusu sunucuda tüm PlayerController'lara sahip-istemci `ClientReceiveChat` ile gider | MMOMob.cpp:916-934 |
-| O8 | ORTA | Mob `Tick` her karede, oyuncu olmasa da, O(mob × oyuncu); spawner gereksiz replike | MMOMob.cpp:384-490; MMOMobSpawner.cpp:17 |
+| O8 | ORTA | **Büyük kısmı kapandı:** hedef taraması 5 Hz önbellekli; spawner sunucuya özel ve replike değil. Mob animasyon/hareket tick'i karelik kalıyor | MMOMob.cpp; MMOMobSpawner.cpp |
 | O9 | ORTA | Stats/Quest/Skill/Party alanları da herkese (gizlilik + bant) | MMOStatsComponent.cpp:77-92; MMOQuestComponent.cpp:26-27; MMOSkillComponent.cpp:42-45; MMOPartyComponent.cpp:19-20 |
 | O10 | ORTA | `UnequipSlot` çanta sınırını (12) aşar; invariant bozulunca takas/geri alma/ödül reddedilir | MMOInventoryComponent.cpp:285 |
 | O11 | ORTA | Dedicated için engeller: Server target yok, admin yolu `IsLocalController`'a bağlı, geri bildirim `IsLocallyControlled`'a bağlı, HUD'a bağlı sunucu kodu | bkz. bölüm 6 |
@@ -160,7 +160,7 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
 - **Mob bileşenleri:** `AMMOMob` kurucusu yalnız Trade/Clan/Friends bileşenlerinin replikasyonunu kapatıyor (MMOMob.cpp:43-45); `Inventory`, `SkillComponent`, `QuestComponent`, `PartyComponent` mob'larda da replike. Şu an ≈45-55 mob × 5-7 alt nesne × izleyici sayısı; kayıp dizileri (EquippedItems 4 boş eleman, vb.) her mob spawn demetine girer.
 - **Spawn/despawn churn:** `TopUp` her 4 sn (MMOMobSpawner.cpp:117-130); ölen mob 2 sn sonra yok edilip yenisi açılıyor (MMOMob.cpp:869) → her yeni mob = aktör kanalı + ~8 alt nesnenin ilk durumu × tüm istemciler.
 - **Mob başına iş:** `Tick` her karede (MMOMob.cpp:384) tüm `PlayerController`'ları dolaşır (458-490) → O(mob × oyuncu); yakında oyuncu olmasa da çalışır (uyku/aktivasyon yarıçapı yok).
-- **Spawner:** `bReplicates = true` (MMOMobSpawner.cpp:17) ama replike mülkü yok; her istemci için gereksiz aktör kanalı (17 Summer + 11 Winter spawner). `bReplicates=false` yapılırsa seviye içinde yerleştirilmiş/spawn edilmiş aktör istemcide `ROLE_Authority` olur ve `BeginPlay`/`TopUp` istemcide de mob üretir; doğru çözüm: `bReplicates=false; bNetLoadOnClient=false;` (istemcide hiç var olmasın). Spawner'lar GameMode `StartPlay`'de sunucuda `SpawnActorDeferred` ile üretildiğinden istemciye zaten yüklenmiyor; yine de bayrağı kapatmak yeterli **[doğrulanmalı]**.
+- **Spawner — kapandı (2026-10-06):** `bReplicates=false; bNetLoadOnClient=false`; replike alanı/görseli olmayan spawner istemcide yüklenmez ve aktör kanalı açmaz. GameMode runtime spawner'ları yalnız sunucuda üretir; doğan moblar kendi replike aktörleridir.
 - **Loot/NPC:** `AMMOLootPickup` (MMOLootPickup.cpp:19) ve `AMMONpcBase` (MMONpcBase.cpp:13) statik aktörler; varsayılan sıklıkta, dormancy yok. `AMMOLootPickup::Tick` (123-135) sunucuda da dekoratif dönüş/salınım yapıyor (dedicated'da gereksiz).
 
 **Öneriler (sırayla):**
@@ -258,7 +258,7 @@ PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişikl
 - **Bu turda (derlenmedi):** D1 (debug RPC'leri Shipping'de erken döner), D3 (ölü karakter satıcıdan işlem ve yükseltme yapamaz; yükseltmede NPC yakınlık koşulu tasarım kararı olarak eklenmedi), D5/D9 (sohbet kontrol ve bidi karakter temizliği), D6 (`GAnnounced` tablosu 512 kayıtla sınırlı), D9/Y1 ad değiştirme soğuması (30 sn, yalnız uzak istemci).
 - **Y3 madde 1** (can/mana her karede kirlenir): yenilenme ≥1 puanlık adımlara bağlandı (derlenmedi). Madde 2 (`ActiveEffects.RemainingTime`): `NotReplicated` yapıldı, replike `EndServerTime` eklendi, HUD kalan süreyi ondan hesaplıyor (derlenmedi).
 - **O11 madde 3** (geri bildirim `IsLocallyControlled()`'e bağlı): `MMONotify::ToOwner` eklendi, envanter ve görev bileşeni mesajları uzak istemciye de gider (derlenmedi). Beceri/karakter/ganimet/parti mesajları açık.
-- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), O4 (parti ve ticaret davet kapma), O5 (arkadaş rızası), O6, O8, O11, D2, D4, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10. O7 ve O12 kodda kapandı; PIE/log doğrulaması aşağıdaki checklist'te bekliyor.
+- **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), O4 (parti ve ticaret davet kapma), O5 (arkadaş rızası), O6, O11, D2, D4, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8, D10. O8'in hedef taraması ve spawner kanalı kapandı; yalnız mob tick/ölçüm ayarı açık. O7 ve O12 kodda kapandı; PIE/log doğrulaması aşağıdaki checklist'te bekliyor.
 
 ### Y3 çözüm notu (2026-10-06)
 

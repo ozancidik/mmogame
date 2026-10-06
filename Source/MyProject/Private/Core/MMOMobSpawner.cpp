@@ -14,7 +14,14 @@
 AMMOMobSpawner::AMMOMobSpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
-	bReplicates = true;
+
+	// NETWORK_AUDIT O8: spawner yalniz sunucu zamanlayicisi ve sunucuya ait LiveMobs
+	// listesini tasir; istemcinin okuyacagi replike alan ya da gorsel yoktur. GameMode runtime
+	// spawner'lari zaten yalniz sunucuda uretir. Haritaya elle yerlestirilen bir spawner da
+	// istemcide yuklenmesin; aksi halde bosuna actor kanali acar (ve otorite gibi BeginPlay
+	// calistirma riski yaratir). Spawn edilen moblar kendi replike aktorleridir.
+	bReplicates = false;
+	bNetLoadOnClient = false;
 
 	// Kok bileseni olmadan actor konumlandirilamaz (SpawnActor konumu uygulanmaz).
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));

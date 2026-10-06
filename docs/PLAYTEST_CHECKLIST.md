@@ -3593,3 +3593,16 @@ testleri ve NetSmoke geçti. Gerçek işlem satırlarının üretilmesi PIE bekl
   yapan oyuncu ve hedefle yazmalı.
 - [ ] `MMOSetName` ile adı değiştir: `LogMMOIdentityAudit` eski/yeni ad, eski/yeni yuva ve
   `active_slot` değerlerini yazmalı. Aynı ad, geçersiz ad ve cooldown reddi başarı satırı üretmemeli.
+
+## Sunucuya özel mob spawner'ları — 2026-10-06
+
+`AMMOMobSpawner` artık replike edilmez ve haritadan istemciye yüklenmez. Runtime spawner'ları
+GameMode yalnız sunucuda oluşturur; mobların kendisi replike kalır. Bu, her oyuncu için 29 boş
+spawner aktör kanalını kaldırır. Editör derlemesi ve `RunAllChecks.ps1 -SkipBuild` (ValidateData,
+statik/negatif kontroller, kayıt ve bölge geçişleri, Summer/Winter smoke, NetSmoke) geçti.
+Gerçek aktör kanal sayısı Network Profiler/PIE ile ölçülmedi.
+
+- [ ] İki oyunculu PIE'de Summer ve Winter haritalarında normal/elit mob sayıları eskisi gibi
+  oluşmalı; istemci mobları görmeli, hareketlerini ve ölümlerini almalıdır.
+- [ ] İstemci konsolunda `Net.ListActorChannels` çalıştır: `MMOMobSpawner` kanalı olmamalı;
+  `AMMOMob` kanalları yakınlık/cull davranışına göre görünmelidir.
