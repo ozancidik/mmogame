@@ -59,6 +59,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "MMO|GameMode")
 	bool bAllowPvP = false;
 
+	// PvP anahtarini degistirmenin TEK yolu: bAllowPvP'yi (tek kaynak) yazar ve replike aynayi
+	// (AMMOGameState::bPvPEnabled) gunceller. Dogrudan bAllowPvP yazmayin; istemci durumu bilemez.
+	void SetPvPAllowed(bool bOn);
+
+	// GameState olustugunda bAllowPvP'nin baslangic degerini aynaya yansitir (CDO/BP varsayilani dahil).
+	virtual void InitGameState() override;
+
 protected:
 	bool bZoneTravelInProgress = false;
 	uint64 ZoneTravelRequestSerial = 0;

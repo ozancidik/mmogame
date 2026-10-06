@@ -2,6 +2,7 @@
 
 #include "Core/MMOGameMode.h"
 #include "Core/MMOMobSpawner.h"
+#include "Core/MMOGameState.h"
 #include "Characters/MMOMob.h"
 #include "Components/CapsuleComponent.h"
 #include "World/MMOVendorNPC.h"
@@ -29,7 +30,28 @@ AMMOGameMode::AMMOGameMode()
 {
 	// Varsayilan HUD'u MMO HUD'imizi yap.
 	HUDClass = AMMOHUD::StaticClass();
+	// Replike oyun durumu (PvP anahtari aynasi). BP_ThirdPersonGameMode GameStateClass'i ezmez
+	// (Content taramasi 2026-10-06), bu varsayilan gecerlidir.
+	GameStateClass = AMMOGameState::StaticClass();
 	bUseSeamlessTravel = true;
+}
+
+void AMMOGameMode::InitGameState()
+{
+	Super::InitGameState();
+	if (AMMOGameState* MMOState = GetGameState<AMMOGameState>())
+	{
+		MMOState->SetPvPEnabled(bAllowPvP);
+	}
+}
+
+void AMMOGameMode::SetPvPAllowed(bool bOn)
+{
+	bAllowPvP = bOn;
+	if (AMMOGameState* MMOState = GetGameState<AMMOGameState>())
+	{
+		MMOState->SetPvPEnabled(bOn);
+	}
 }
 
 void AMMOGameMode::MMOTestZoneTravel()

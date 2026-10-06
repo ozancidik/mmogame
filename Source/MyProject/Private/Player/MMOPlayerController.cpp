@@ -910,9 +910,24 @@ void AMMOPlayerController::DoLeftClickAction()
 		const float ClickNow = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 		const bool bRecentlyRejected = RejectedTarget.Get() == HitChar
 			&& ClickNow - RejectedTargetTime < RejectedTargetSeconds;
-		if (!bRecentlyRejected)
+		// Oyuncu hedefi PvP kapaliyken (GameState aynasi) ya da parti/klan/hub kurali yuzunden vurulamazsa
+		// kovalama baslatma: yalniz sec. Sunucu karari degismez; bu yalniz bosa giden yuruyus/RPC'yi keser.
+		bool bCanChase = true;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			const TCHAR* BlockReason = nullptr;
+			if (!Cast<AMMOMob>(HitChar) && (!Me->IsPvPAllowed() || !Me->CanHarmPlayer(HitChar, BlockReason)))
+			{
+				bCanChase = false;
+			}
+		}
+		if (!bRecentlyRejected && bCanChase)
 		{
 			TargetEnemy = HitChar;
+		}
+		else if (!bCanChase)
+		{
+			TargetEnemy.Reset();
 		}
 	}
 	else

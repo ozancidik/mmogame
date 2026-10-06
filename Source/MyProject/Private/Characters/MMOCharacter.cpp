@@ -15,6 +15,7 @@
 #include "Core/MMOMetrics.h"
 #include "Player/MMOPlayerController.h"
 #include "Core/MMOGameMode.h"
+#include "Core/MMOGameState.h"
 #include "Items/MMOConsumableTypes.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -1166,6 +1167,25 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	// Istemci: istegi hedefle sunucuya gonder (hasar sadece otoritede islenir).
 	if (!HasAuthority())
 	{
+		// Istemci on kontrolu (yalniz gereksiz RPC'yi azaltir, karar yine sunucuda): PvP kapaliyken ya da
+		// parti/klan/hub kurali yuzunden zaten reddedilecek oyuncu hedefi icin sunucuya hic gitme.
+		// PvP durumu GameState'ten (replike ayna), parti/klan replike bilesenlerden okunur; yeni acilan PvP
+		// birkac yuz ms gec gorunebilir. Reddedilen hedef zaten ReleaseAttackTarget ile birakilir.
+		if (Target && IsPlayerPawn(Target))
+		{
+			const TCHAR* BlockReason = nullptr;
+			const bool bPvPOff = !IsPvPAllowed();
+			if (bPvPOff || !CanHarmPlayer(Target, BlockReason))
+			{
+				if (GEngine && IsLocallyControlled())
+				{
+					GEngine->AddOnScreenDebugMessage(4102, 1.f, FColor::Silver,
+						bPvPOff ? TEXT("PvP kapali") : (BlockReason ? BlockReason : TEXT("Bu hedefe saldiramazsin")));
+				}
+				ReleaseAttackTargetOnOwner(Target);
+				return;
+			}
+		}
 		ServerAttackTarget(Target);
 		return;
 	}
@@ -1341,7 +1361,13 @@ bool AMMOCharacter::IsPvPAllowed() const
 	{
 		if (const AMMOGameMode* GM = World->GetAuthGameMode<AMMOGameMode>())
 		{
-			return GM->bAllowPvP;
+			return GM->bAllowPvP; // sunucu/host: tek kaynak
+		}
+		// Istemcide GameMode yoktur: sunucunun replike ettigi aynayi oku (yalniz on kontrol/ipucu icin;
+		// karari yine sunucu verir).
+		if (const AMMOGameState* GS = World->GetGameState<AMMOGameState>())
+		{
+			return GS->IsPvPEnabled();
 		}
 	}
 	return false;
@@ -1357,7 +1383,7 @@ void AMMOCharacter::MMOPvP(int32 bOn)
 
 	if (AMMOGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMMOGameMode>() : nullptr)
 	{
-		GM->bAllowPvP = (bOn != 0);
+		GM->SetPvPAllowed(bOn != 0);
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow,
@@ -1383,7 +1409,7 @@ void AMMOCharacter::ServerSetPvP_Implementation(bool bOn)
 
 	if (AMMOGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AMMOGameMode>() : nullptr)
 	{
-		GM->bAllowPvP = bOn;
+		GM->SetPvPAllowed(bOn);
 	}
 }
 

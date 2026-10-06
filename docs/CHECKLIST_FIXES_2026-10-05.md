@@ -247,3 +247,13 @@ Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild) GECTI; PIE'de OYNANM
 - [ ] Cepte 5 mob yalniz `ThawStalker/CrustWarden/ScorchedRaider`; yerde duruyor (havada/yer altinda degil, Z~-74); ucuruma/yamaca yapisip kalmiyor; `[MMODBG] Spawner ... no nearby ground/nav location` uyarisi logda yok.
 - [ ] Cepte dovusurken Yarik Bekcisi (-4800,4800, Lv62) ve Alacakaranlik cepleri (1000,3200) cekilmiyor (en yakin 2943u).
 - [ ] Minimap/gorev yonlendirmesi: Q_ThawStalkers/CrustWardens/ScorchedRaiders hedeflerine gidilebiliyor mu; gorev metni yer tarif etmiyor (degistirilmedi).
+
+## 22. Dedicated hazirligi (davranis degistirmeden): replike PvP durumu (AMMOGameState)
+
+Kod derlendi (Result: Succeeded), RunAllChecks (-SkipBuild) GECTI (NetSmokeTest dahil: 1 istemci baglandi, hata 0). PIE'de iki oyunculu OYNANMADI. Tek kaynak `AMMOGameMode::bAllowPvP`; `AMMOGameState::bPvPEnabled` onun replike aynasi. `BP_ThirdPersonGameMode` ve haritalar GameStateClass'i ezmiyor (uasset/umap isim tablosu tarandi), C++ varsayilani gecerli.
+
+- [ ] Host + 1 uzak istemci, PvP KAPALI (varsayilan): istemci diger oyuncuya tikladiginda karakter ona KOSMAMALI (yalniz secim halkasi/hedef cercevesi); `PvP kapali` ipucu cikabilir; host loguna/ag trafigine bos ServerAttackTarget akmamali. Mob'a tiklayinca hicbir sey degismemeli (kovalar ve vurur).
+- [ ] Host konsolundan `MMOPvP 1`: birkac saniye icinde uzak istemci de oyuncuya tiklayip kovalayabilmeli ve vurabilmeli (istemci GameState aynasi guncellendi). `MMOPvP 0` ile tekrar kapaninca istemci yine kovalamamali.
+- [ ] PvP ACIKken: ayni parti/klan uyesine tiklayinca kovalama baslamamali ("Parti uyesine vuramazsin"/"Klan uyesine vuramazsin"); hub guvenli bolgesinde (PlayerStart 700u) oyuncuya tiklayinca kovalama yok.
+- [ ] Bolge gecisinden (`MMOTravel`) sonra yeni dunyada PvP yine KAPALI baslar (GameMode yeniden olusur; onceki davranisla ayni) ve istemci de kapali gorur.
+- [ ] Regresyon: uzak istemcinin mob'a vurusu, beceri kullanimi ve hasar sayilari eskisi gibi.
