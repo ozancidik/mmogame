@@ -989,22 +989,26 @@ float AMMOCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEv
 	LastDamageInstigator = DamageCauser;
 	const float ActualDamage = Stats->ApplyDamage(DamageAmount, DamageCauser);
 
-	// Yerel HUD'a havada ucan hasar sayisi ekle (standalone/listen icin yeterli).
 	if (ActualDamage > 0.f)
 	{
-		if (UWorld* W = GetWorld())
-		{
-			if (APlayerController* PC = W->GetFirstPlayerController())
-			{
-				if (AMMOHUD* HUD = Cast<AMMOHUD>(PC->GetHUD()))
-				{
-					HUD->AddDamageNumber(GetActorLocation() + FVector(0.f, 0.f, 90.f), ActualDamage);
-				}
-			}
-		}
+		MulticastCombatText(GetActorLocation() + FVector(0.f, 0.f, 90.f), ActualDamage, false);
 	}
 
 	return ActualDamage;
+}
+
+void AMMOCharacter::MulticastCombatText_Implementation(FVector_NetQuantize WorldLocation, float Amount, bool bIsHeal)
+{
+	if (Amount <= 0.f || GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	APlayerController* LocalPC = GEngine && World ? GEngine->GetFirstLocalPlayerController(World) : nullptr;
+	if (AMMOHUD* HUD = LocalPC ? Cast<AMMOHUD>(LocalPC->GetHUD()) : nullptr)
+	{
+		HUD->AddDamageNumber(WorldLocation, Amount, bIsHeal);
+	}
 }
 
 void AMMOCharacter::HandleDeath()

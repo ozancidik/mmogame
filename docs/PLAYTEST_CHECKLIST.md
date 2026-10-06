@@ -3556,3 +3556,20 @@ Zorlanmış UE 5.7 derlemesi geçti.
   `bTravelSaveCommitted` durumu sonraki normal kaydı engellememeli.
 - [ ] Başarılı seamless travel sonrasında seviye, altın, envanter, görevler, beceri cooldown'ları
   ve konumun tek kez korunup korunmadığını iki istemcide kontrol et.
+
+## Dedicated uyumlu hasar/iyileştirme sayıları — 2026-10-06
+
+Sunucu tarafındaki `TakeDamage` ve `Heal` yollarından doğrudan ilk PlayerController HUD'ına
+çizim kaldırıldı. Kozmetik sayı artık hasar alan/iyileşen karakterin `Unreliable NetMulticast`
+RPC'siyle ilgili istemcilere gider; her süreç yalnız kendi yerel HUD'ına çizer ve dedicated
+sunucu çizim yapmaz. `OnRep_Health` içindeki eski hasar sayısı kaldırıldığı için aynı vuruşun
+iki kez görünme yolu kapandı. Zorlanmış UE 5.7 Editor derlemesi geçti. Kurulu Epic binary motor
+Server target derlemesini desteklemediği için gerçek dedicated executable doğrulaması kaynak
+UE 5.7 motoruna kaldı.
+
+- [ ] İki oyunculu PIE'de A, B'ye tek vuruş yapsın: iki pencerede de B'nin üstünde aynı miktar
+  yalnız bir kez görünmeli; A'nın HUD'ında uzaktaki ilgisiz vuruşlar görünmemeli.
+- [ ] B can iksiri, şifa becerisi ve Şifacı Lyra kullansın: yeşil `+N` aktif iyileştirmesi iki
+  ilgili pencerede bir kez görünmeli; pasif can yenilenmesi uçan sayı üretmemeli.
+- [ ] `Net PktLoss=20` ile birkaç vuruş/şifa dene: kozmetik sayı kaçabilir fakat can ve ölüm
+  replike durumuyla doğru kalmalı; oyun mantığı multicast sonucuna bağlı olmamalı.

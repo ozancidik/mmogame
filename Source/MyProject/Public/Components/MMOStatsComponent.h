@@ -327,9 +327,6 @@ protected:
 	// Sahibin varsayilan yurume hizi (ilk okundugunda cache'lenir; hiz buff'i buradan olceklenir).
 	float BaseWalkSpeed = -1.f;
 
-	// Istemcide OnRep_Health'te hasar farkini hesaplamak icin son bilinen can (replike degil).
-	float LastKnownHealth = -1.f;
-
 	// Ekipmandan gelen bonuslar (sunucuda hesaplanir; AttackPower/Defense'e islenir ve onlar replike olur).
 	float EquipmentAttackBonus = 0.f;
 	float EquipmentDefenseBonus = 0.f;

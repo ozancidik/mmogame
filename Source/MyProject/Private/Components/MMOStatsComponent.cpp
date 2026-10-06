@@ -8,13 +8,12 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
-#include "UI/MMOHUD.h"
 #include "Save/MMOSaveGame.h"
 #include "Components/MMOSkillComponent.h"
+#include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
 
 UMMOStatsComponent::UMMOStatsComponent()
@@ -136,8 +135,6 @@ void UMMOStatsComponent::BeginPlay()
 
 	// Eşik Level'dan deterministik türetilir; hem sunucu hem istemci hesaplayabilir.
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
-	LastKnownHealth = Health;
-
 	// Sahibin varsayilan yurume hizini cache'le (hiz buff'lari bunun ustune oranlanir).
 	if (const ACharacter* Ch = Cast<ACharacter>(GetOwner()))
 	{
@@ -310,25 +307,16 @@ void UMMOStatsComponent::Heal(float Amount)
 	Health = FMath::Clamp(Health + Amount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 
-	// Ucan "+N" iyilesme sayisi (hasar sayisinin ayni yontemi - TakeDamage'deki host-yerel
-	// bildirimle simetrik). BILEREK sadece burada (Heal() cagrilarinda - potion/skill/NPC
+	// Ucan "+N" iyilesme sayisi. BILEREK sadece burada (Heal() cagrilarinda - potion/skill/NPC
 	// sifaci): TickComponent'teki pasif yenilenme dogrudan Health'i mutasyona ugratir, BU
 	// yolu KULLANMAZ - yoksa her saniye "+2" gibi surekli spam olurdu.
 	const float ActualHeal = Health - OldHealth;
 	if (ActualHeal > 0.f)
 	{
-		if (const UWorld* World = GetWorld())
+		if (AMMOCharacter* OwnerCharacter = Cast<AMMOCharacter>(GetOwner()))
 		{
-			if (const APlayerController* PC = World->GetFirstPlayerController())
-			{
-				if (AMMOHUD* HUD = Cast<AMMOHUD>(PC->GetHUD()))
-				{
-					if (const AActor* Owner = GetOwner())
-					{
-						HUD->AddDamageNumber(Owner->GetActorLocation() + FVector(0.f, 0.f, 90.f), ActualHeal, /*bIsHeal=*/true);
-					}
-				}
-			}
+			OwnerCharacter->MulticastCombatText(
+				OwnerCharacter->GetActorLocation() + FVector(0.f, 0.f, 90.f), ActualHeal, true);
 		}
 	}
 }
@@ -916,27 +904,8 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 
 void UMMOStatsComponent::OnRep_Health()
 {
-	// Istemci: can dususunu yerel HUD'a ucan hasar sayisi olarak bildir.
-	// (OnRep sunucuda calismaz; sunucu/host sayilari TakeDamage'de ekler — cift sayim olmaz.)
-	const float Delta = Health - LastKnownHealth;
-	if (LastKnownHealth >= 0.f && Delta < 0.f)
-	{
-		if (UWorld* World = GetWorld())
-		{
-			if (APlayerController* PC = World->GetFirstPlayerController())
-			{
-				if (AMMOHUD* HUD = Cast<AMMOHUD>(PC->GetHUD()))
-				{
-					if (const AActor* Owner = GetOwner())
-					{
-						HUD->AddDamageNumber(Owner->GetActorLocation() + FVector(0.f, 0.f, 90.f), -Delta);
-					}
-				}
-			}
-		}
-	}
-	LastKnownHealth = Health;
-
+	// Kozmetik hasar/iyilestirme sayilari ayri Unreliable multicast ile gelir. OnRep yalniz
+	// gercek durum/UI delegate'ini yeniler; ayni vurus icin iki sayi uretilmez.
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 }
 

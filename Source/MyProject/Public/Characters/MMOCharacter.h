@@ -298,6 +298,11 @@ public:
 	UFUNCTION(Client, Unreliable)
 	void ClientShowHint(const FString& Text);
 
+	// Kozmetik savas sayisi: sunucu ilgili karakter kanalindaki istemcilere yollar;
+	// dedicated sunucu HUD'a dokunmaz. Hasar ve aktif iyilestirme (pasif regen haric).
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastCombatText(FVector_NetQuantize WorldLocation, float Amount, bool bIsHeal);
+
 	// Sunucu saldiriyi reddettiginde (PvP kapali / parti-klan / hub / dogum korumasi) sahibe:
 	// otomatik saldiri/kovalamayi birak. Yalniz oyuncu hedefleri icin (mob reddi yok).
 	UFUNCTION(Client, Unreliable)
