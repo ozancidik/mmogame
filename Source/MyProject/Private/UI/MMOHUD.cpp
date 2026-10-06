@@ -951,6 +951,13 @@ void AMMOHUD::DrawSkillBook(AMMOCharacter* PlayerChar)
 				TreeSkills[t].Add(&D);
 			}
 		}
+		// Listeleme duzeni: agac icinde seviyeye gore (esitlikte tablo sirasi korunur); tablo sirasi
+		// yeni eklenen ust-kademe becerileri (Lv45/58) Lv28-39'un onune dusuruyordu. Yalniz cizim
+		// sirasi degisir; tiklanabilir bolgeler cizim konumundan uretildigi icin birlikte tasinir.
+		TreeSkills[t].StableSort([](const FMMOSkillDef& A, const FMMOSkillDef& B)
+		{
+			return A.RequiredLevel < B.RequiredLevel;
+		});
 		if (TreeSkills[t].Num() > 0)
 		{
 			++ActiveTreeCount;
