@@ -368,3 +368,27 @@ ertelenen yazim hatasinin gecise iletilmesi acik (NETWORK_AUDIT O6).
 
 Agency-agents Unreal Multiplayer Architect rol belgesi authority/oyuncu kumesi
 incelemesinde kullanildi; bagimsiz paralel ajan calistirilmadi.
+
+## 31. O6: ertelenen kayit hatasinda gecisi durdur ve yeniden deneme isaretini koru
+
+`FlushDeferredSave` sonucunu `FinishZoneTravel` artik denetler: ertelenen ek kayit
+yazilamazsa `bTravelSaveCommitted` yapilmaz ve `ServerTravel` baslamaz. Bekleyen kayit
+isareti ancak basarili `SaveCharacterForTravel` ile temizlenir. Iptalden sonra tekrar
+yazim da basarisizsa isaret korunur; elle/otomatik/zorunlu kayit basarinca temizlenir.
+Elle kayit geri bildirimi de bekleyen isarete degil gercek ucustaki gecis kaydina bakar:
+iptal sonrasi disk hatasini "gecis suruyor" diye gostermemelidir.
+
+UE 5.7 editor derlemesi ve `RunAllChecks.ps1 -SkipBuild -FullCompile` **14/14 GECTI**:
+10 dosya PCH'siz /W4, 0 derleyici uyarisi; JSON 111 negatif; 184 gercek kayit
+`loaded=184 json ok=184 mismatch=0 maxLevel=6`; normal/timeout/durum/ertelenen hata
+gecis testleri; Summer/Winter smoke 0 hata; NetSmoke 1 sunucu/1 istemci katilimi,
+0 hata. Yeni `TestZoneTravelDeferredSave.ps1`: iki flush hatasi, iptal ve tekrar kayit
+`PASS lock=0 kept=1 retry=1 cleared=1`. Hata enjeksiyonu yazim oncesinde false doner;
+gercek disk arizasi/bulut testi DEGILDIR. Son geri bildirim duzeltmesi sonrasi
+`MMOCharacter.cpp` PCH'siz derlemesi ve normal UE editor derlemesi yeniden GECTI;
+ertelenen hata ve timeout regresyonlari tekrar GECTI. Bu yalniz geri bildirim degisikligi
+sonrasinda butun smoke paketi tekrarlanmadi; mesajlarin PIE gorunumu aciktir.
+
+PIE'de iki oyunculu OYNANMADI. Disk/bulut hatasini kullaniciya bildirme ve ariza giderilip
+yeniden gecis denemesi `PLAYTEST_CHECKLIST.md`'de acik. Depodaki yazim sirasi/iptal ve
+anlik goruntu-sonrasi ilerleme penceresi acik; bu degisiklik bunlari kapatmaz.

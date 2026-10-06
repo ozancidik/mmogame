@@ -198,7 +198,14 @@ Hız sınırı deseni zaten var: `UMMOQuestComponent::PassesRpcRateLimit` (MMOQu
   ve zamanlayıcı temizliğini doğruladı. Gerçek gecikmeli bulut mağazası ve iki oyunculu
   PIE denenmedi. Önceki notta açık olan canlı/savaş dışı yeniden doğrulama kodlandı;
   ilerleme anlık görüntüsü ile pawn yok oluşu arasındaki pencere, depoya yazım sırası,
-  ertelenen kayıt yazım hatasının geçişe iletilmesi ve motor yükleme hatası hâlâ açıktır.
+  motor yükleme hatası hâlâ açıktır. Ertelenen kayıt hatası için aşağıdaki ek düzeltmeye bak.
+- **2026-10-07 ertelenen yazım hatası:** `FlushDeferredSave` başarısızsa artık `false`
+  döner ve bekleyen kayıt işaretini korur. `FinishZoneTravel` bu sonucu toplar; tek bir
+  ertelenen yazım hatasında geçişi iptal eder, eski geçiş kaydını güncelmiş gibi işaretlemez.
+  İptal sonrası tekrar yazım da başarısızsa işaret kalır; sonraki başarılı elle/otomatik/
+  zorunlu kayıt temizler. `TestZoneTravelDeferredSave.ps1` iki ardışık flush hatasını
+  enjekte edip iptali, işaretin korunmasını ve başarılı yeniden kayıtta temizliğini doğrular.
+  Gerçek disk arızası, gecikmeli bulut mağazası ve iki oyunculu PIE doğrulanmadı.
 - Seamless sonrası yeni pawn 0.6 sn boyunca varsayılan durumda (kayıt yüklenmedi; `bInitialLoadComplete=false` olduğu için kayıt yazılmıyor — iyi). Bu pencerede girilen `/klan`, `/arkadas`, ticaret komutları `ApplySaveData` ile ezilir (MMOClanComponent.cpp:567-640, MMOFriendsComponent.cpp:287-308) — zararsız ama komutlar "başarılı" görünür. İstersen `bInitialLoadComplete` olmadan RPC'leri reddet.
 - Bağlantı kopması: Trade ve Klan EndPlay'ı doğru; Friends `AnnouncePresence(false)` yalnız `Destroyed` + `!bTravelSaveCommitted` (MMOCharacter.cpp:399) — doğru. `static GAnnounced` (MMOFriendsComponent.cpp:250) süreç ömrü boyunca büyür, PIE'de sunucu/istemci aynı süreçte paylaşılır (D6).
 - Parti, bölge geçişinde dağılır (EndPlay `RequestLeave`, MMOCharacter.cpp:393-396); kalıcı değil — tasarım notu.

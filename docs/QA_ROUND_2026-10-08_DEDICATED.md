@@ -56,8 +56,9 @@ Sorunlar:
 ve takipçide oyun iş parçacığı sözleşmesini `check` ile zorladı. Sonraki düzeltmede
 `FinishZoneTravel` canlı/savaş dışı durumunu ve güncel oyuncu/pawn kümesini yeniden
 doğrular; beklerken savaşa giriş headless regresyonu iptal ve kilit temizliğini geçti.
-Anlık görüntü sonrası kazanımlar, depodaki gerçek yazım sırası/iptal ve ertelenen kayıt
-yazım hatasının geçişe iletilmesi açık. Aşağıdaki metin ilk denetimin tarihsel kaydıdır.
+Ertelenen kayıt yazım hatası da sonraki düzeltmede geçişi iptal eder ve bekleyen işareti
+korur; iki başarısız deneme sonrası başarılı kayıt regresyonu geçti. Anlık görüntü sonrası
+kazanımlar ve depodaki gerçek yazım sırası/iptal açık. Aşağıdaki metin ilk denetimin tarihsel kaydıdır.
 
 Yer: `Public/Save/MMOCharacterStore.h:8-35` (`FMMOSlotWriteTracker`), `Private/Characters/MMOCharacter.cpp:493` (senkron `BeginWrite`), `:567-615` (`SaveCharacterForTravelAsync`), `Private/Core/MMOGameMode.cpp:381-520`.
 

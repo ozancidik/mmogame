@@ -76,7 +76,14 @@ void AMMOGameMode::MMOTestZoneTravelStateChange()
 #endif
 }
 
-void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange)
+void AMMOGameMode::MMOTestZoneTravelDeferredSaveFailure()
+{
+#if !UE_BUILD_SHIPPING
+	ScheduleZoneTravelTest(false, false, true);
+#endif
+}
+
+void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange, bool bExpectFlushFailure)
 {
 #if !UE_BUILD_SHIPPING
 	UWorld* World = GetWorld();
@@ -86,7 +93,7 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectState
 	}
 	const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
 	FTimerHandle TestHandle;
-	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis, bExpectTimeout, bExpectStateChange]()
+	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis, bExpectTimeout, bExpectStateChange, bExpectFlushFailure]()
 	{
 		AMMOGameMode* GameMode = WeakThis.Get();
 		UWorld* TestWorld = GameMode ? GameMode->GetWorld() : nullptr;
@@ -104,7 +111,7 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectState
 				break;
 			}
 		}
-		if (bExpectTimeout || bExpectStateChange)
+		if (bExpectTimeout || bExpectStateChange || bExpectFlushFailure)
 		{
 			GameMode->bTestDropNextZoneTravelSaveCallback = true;
 			GameMode->bTestRetryAfterZoneTravelTimeout = bExpectTimeout;
@@ -146,6 +153,29 @@ void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectState
 			else
 			{
 				UE_LOG(LogTemp, Error, TEXT("[MMO_ZONE_TRAVEL_STATE_TEST] FAIL no pending character"));
+			}
+		}
+		if (bExpectFlushFailure && bAccepted && Host)
+		{
+			AMMOCharacter* Character = Cast<AMMOCharacter>(Host->GetPawn());
+			if (Character && GameMode->IsZoneTravelSaveInFlight(Character))
+			{
+				const bool bDeferred = !Character->SaveCharacterForTravel() && Character->IsSaveDeferredByTravel();
+				Character->FailDeferredSavesForTest(2); // Finish ve Abort sonrasi tekrar deneme de basarisiz.
+				GameMode->HandleZoneTravelSaveComplete(GameMode->ZoneTravelRequestSerial, Character, true);
+				const bool bAborted = !GameMode->bZoneTravelInProgress && GameMode->PendingZoneTravelCharacters.IsEmpty()
+					&& !TestWorld->GetTimerManager().IsTimerActive(GameMode->ZoneTravelSaveTimeoutHandle)
+					&& GameMode->LastZoneTravelAbortReason == TEXT("Ertelenen karakter kaydi yazilamadi; gecis iptal edildi");
+				const bool bKept = Character->IsSaveDeferredByTravel();
+				const bool bRetrySaved = Character->SaveCharacterForTravel(); // Elle kayit da isareti temizler.
+				const bool bCleared = !Character->IsSaveDeferredByTravel();
+				UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_DEFERRED_TEST] %s lock=%d kept=%d retry=%d cleared=%d"),
+					bDeferred && bAborted && bKept && bRetrySaved && bCleared ? TEXT("PASS") : TEXT("FAIL"),
+					GameMode->bZoneTravelInProgress ? 1 : 0, bKept ? 1 : 0, bRetrySaved ? 1 : 0, bCleared ? 1 : 0);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("[MMO_ZONE_TRAVEL_DEFERRED_TEST] FAIL no pending character"));
 			}
 		}
 	}), 1.5f, false);
@@ -632,7 +662,11 @@ void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
 	}
 	World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);
 	// Gecis kayitlari tamamlandi: pencerede ertelenen kayitlar (klan/ticaret/otomatik) tek yazimda indirilir.
-	FlushDeferredCharacterSaves(PendingZoneTravelCharacters);
+	if (!FlushDeferredCharacterSaves(PendingZoneTravelCharacters))
+	{
+		AbortZoneTravel(RequestSerial, TEXT("Ertelenen karakter kaydi yazilamadi; gecis iptal edildi"));
+		return;
+	}
 	for (const TWeakObjectPtr<AMMOCharacter>& WeakCharacter : PendingZoneTravelCharacters)
 	{
 		AMMOCharacter* Character = WeakCharacter.Get();
@@ -708,15 +742,17 @@ bool AMMOGameMode::IsZoneTravelSaveInFlight(const AMMOCharacter* Character) cons
 	return PendingZoneTravelCharacters.Contains(Weak) && !CompletedZoneTravelSaves.Contains(Weak);
 }
 
-void AMMOGameMode::FlushDeferredCharacterSaves(const TArray<TWeakObjectPtr<AMMOCharacter>>& Characters)
+bool AMMOGameMode::FlushDeferredCharacterSaves(const TArray<TWeakObjectPtr<AMMOCharacter>>& Characters)
 {
+	bool bAllSaved = true;
 	for (const TWeakObjectPtr<AMMOCharacter>& Weak : Characters)
 	{
 		if (AMMOCharacter* Character = Weak.Get())
 		{
-			Character->FlushDeferredSave();
+			if (!Character->FlushDeferredSave()) bAllSaved = false;
 		}
 	}
+	return bAllSaved;
 }
 
 void AMMOGameMode::SpawnMobArea()

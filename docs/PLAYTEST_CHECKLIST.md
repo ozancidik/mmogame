@@ -3682,3 +3682,19 @@ Summer/Winter ve iki süreçli NetSmoke bağlantısı hatasızdı. NetSmoke oyna
 - [ ] Aynı bekleme penceresinde ölüm, respawn/pawn değişimi, bağlantı kopması ve yeni
   oyuncu katılımını ayrı ayrı dene: kayıt kümesi değişmişse toplu geçiş iptal edilmelidir.
 - [ ] İki oyuncu da canlı ve savaş dışı kalırsa normal Summer/Winter geçişi çalışmalıdır.
+
+## Ertelenen geçiş kaydının yazım hatası — 2026-10-07
+
+Geçiş bekleme penceresinde ertelenen ek kayıt yazılamazsa artık harita geçişi iptal
+edilir. Başarısız yazım bekleyen işareti silmez; sonraki başarılı kayıt temizler.
+Headless test iki flush hatası enjekte etti: iptal, temiz geçiş kilidi, korunan kayıt
+işareti ve başarılı yeniden kayıtta temizleme geçti. Gerçek disk arızası/bulut mağazası
+ve iki oyunculu PIE oynanmadı; anlık görüntü sonrası XP/altın penceresi hâlâ açıktır.
+
+- [ ] Gecikmeli mağazada iki oyuncu ile geçiş sırasında ek kaydı ertele, bu yazımı
+  başarısız yap: herkes kaynak haritada kalmalı ve geçiş kilidi temizlenmelidir.
+- [ ] İptal sonrası tekrar yazım da başarısız olsun: bekleyen işaret korunmalı; mağaza
+  düzelince `MMOSave` veya otomatik kayıt başarılı olup işareti temizlemelidir.
+- [ ] Yazım hatası giderildikten sonra yeni Summer/Winter geçişi normal çalışmalıdır.
+- [ ] İptal sonrası disk/bulut yazımı hâlâ başarısızken `MMOSave` dene: "Karakter
+  kaydedilemedi" mesajı görülmeli, "bölge geçişi sürüyor" mesajı gösterilmemelidir.

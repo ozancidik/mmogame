@@ -53,6 +53,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOTestZoneTravelStateChange();
 
+	// Ertelenen ek kayit hatasinda gecis iptali ve sonraki basarili kayitta isaret temizligi.
+	UFUNCTION(Exec)
+	void MMOTestZoneTravelDeferredSaveFailure();
+
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
@@ -95,14 +99,14 @@ protected:
 	bool bTestRetryAfterZoneTravelTimeout = false;
 	float TestZoneTravelTimeoutOverrideSeconds = 0.f;
 
-	void ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange = false);
+	void ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange = false, bool bExpectFlushFailure = false);
 	void HandleZoneTravelSaveComplete(uint64 RequestSerial, const TWeakObjectPtr<class AMMOCharacter>& Character, bool bSuccess);
 	void ClearZoneTravelTestHooks();
 	void HandleZoneTravelSaveTimeout(uint64 RequestSerial);
 	void FinishZoneTravel(uint64 RequestSerial);
 	void AbortZoneTravel(uint64 RequestSerial, const FString& Reason);
 	// Gecis penceresinde ertelenen kayitlari (bkz. IsZoneTravelSaveInFlight) birlestirip yazar.
-	void FlushDeferredCharacterSaves(const TArray<TWeakObjectPtr<class AMMOCharacter>>& Characters);
+	bool FlushDeferredCharacterSaves(const TArray<TWeakObjectPtr<class AMMOCharacter>>& Characters);
 	// Oyun basladiginda oyuncu dogus noktasinin yakinina bir mob spawner yerlestirir.
 	void SpawnMobArea();
 

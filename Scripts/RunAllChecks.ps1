@@ -104,6 +104,11 @@ Step "Bolge gecisi beklerken oyuncu durumu degisimi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Bolge gecisi ertelenen kayit hatasi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelDeferredSave.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

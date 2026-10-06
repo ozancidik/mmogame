@@ -123,9 +123,13 @@ public:
 	// kalkar) ve gecis bitince FlushDeferredSave ile yapilir; boylece ayni yuvaya yeni numarali bir yazim
 	// gecis yazimini "eski" yapip gecisi iptal ettirmez. bForce (EndPlay: karakter yok oluyor) ertelemez.
 	bool SaveCharacterForTravel(bool bForce = false);
-	// Gecis penceresinde ertelenmis bir kayit varsa simdi tek yazimda yapar (AMMOGameMode cagirir).
-	void FlushDeferredSave();
+	// Ertelenmis kayit yoksa veya yazim basariliysa true. Hatada bekleyen isaret korunur.
+	bool FlushDeferredSave();
 	bool IsSaveDeferredByTravel() const { return bSaveDeferredByTravel; }
+#if !UE_BUILD_SHIPPING
+	// Headless hata enjeksiyonu: yalniz ertelenen yazimlari, en fazla iki denemede reddeder.
+	void FailDeferredSavesForTest(int32 Count) { if (HasAuthority()) TestDeferredSaveFailures = FMath::Clamp(Count, 0, 2); }
+#endif
 	// Bolge gecisinin kullandigi asenkron kayit: callback yalniz yazim tamamlandiginda cagrilir; basarisiz
 	// yazimda veya sonuc "eski" ise (ayni yuvaya daha yeni bir yazim basladi) false ile cagrilir ve
 	// AMMOGameMode gecisi iptal eder.
@@ -373,6 +377,9 @@ protected:
 	bool bTravelSaveCommitted = false;
 	// Bolge gecisi kaydi ucustayken bir kayit istegi geldi ve ertelendi (FlushDeferredSave'e kadar).
 	bool bSaveDeferredByTravel = false;
+#if !UE_BUILD_SHIPPING
+	int32 TestDeferredSaveFailures = 0;
+#endif
 	// Son yuklenen/olusturulan/yazilan kayit yuvasi (K-1: ad degisince baska yuvanin ezilmesini engellemek icin).
 	FString ActiveSaveSlot;
 

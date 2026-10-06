@@ -479,15 +479,24 @@ void AMMOCharacter::SetTravelSaveCommitted(bool bCommitted)
 	}
 }
 
-void AMMOCharacter::FlushDeferredSave()
+bool AMMOCharacter::FlushDeferredSave()
 {
-	if (bSaveDeferredByTravel)
+	if (!bSaveDeferredByTravel)
 	{
-		bSaveDeferredByTravel = false;
-		const bool bSaved = SaveCharacterForTravel();
-		UE_LOG(LogTemp, Display, TEXT("[MMOSave] Gecis penceresinde ertelenen kayit yapildi (%s) saved=%d"),
-			*GetSaveSlotName(), bSaved ? 1 : 0);
+		return true;
 	}
+#if !UE_BUILD_SHIPPING
+	if (TestDeferredSaveFailures > 0)
+	{
+		--TestDeferredSaveFailures;
+		UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_DEFERRED_TEST] deferred write intentionally failed"));
+		return false;
+	}
+#endif
+	const bool bSaved = SaveCharacterForTravel();
+	UE_LOG(LogTemp, Display, TEXT("[MMOSave] Gecis penceresinde ertelenen kayit denendi (%s) saved=%d"),
+		*GetSaveSlotName(), bSaved ? 1 : 0);
+	return bSaved;
 }
 
 bool AMMOCharacter::SaveCharacterForTravel(bool bForce)
@@ -519,6 +528,8 @@ bool AMMOCharacter::SaveCharacterForTravel(bool bForce)
 	if (bOk)
 	{
 		ActiveSaveSlot = TargetSlot;
+		// Elle/otomatik/EndPlay kaydi da onceki ertelenen anlik durumu basariyla kalici hale getirir.
+		bSaveDeferredByTravel = false;
 	}
 
 	// "Kaydedildi" mesaji burada DEGIL: bu yol otomatik kayitta (60 sn), klan/ticaret/seyahat
@@ -780,9 +791,14 @@ void AMMOCharacter::MMOSave()
 		{
 			MMONotify::ToOwner(this, TEXT("Kaydedildi"), FColor(120, 220, 120), 2.f);
 		}
-		else if (bSaveDeferredByTravel)
+		else
 		{
-			MMONotify::ToOwner(this, TEXT("Bolge gecisi kaydi suruyor; kayit hemen ardindan yapilacak"), FColor::Orange, 3.f);
+			const UWorld* World = GetWorld();
+			const AMMOGameMode* GameMode = World ? World->GetAuthGameMode<AMMOGameMode>() : nullptr;
+			const bool bWaitingForTravel = GameMode && GameMode->IsZoneTravelSaveInFlight(this);
+			MMONotify::ToOwner(this, bWaitingForTravel
+				? TEXT("Bolge gecisi kaydi suruyor; kayit hemen ardindan yapilacak")
+				: TEXT("Karakter kaydedilemedi; tekrar deneyin"), FColor::Orange, 3.f);
 		}
 	}
 	else
@@ -839,9 +855,13 @@ void AMMOCharacter::ServerSaveCharacter_Implementation()
 	{
 		MMONotify::ToOwner(this, TEXT("Kaydedildi"), FColor(120, 220, 120), 2.f);
 	}
-	else if (bSaveDeferredByTravel)
+	else
 	{
-		MMONotify::ToOwner(this, TEXT("Bolge gecisi kaydi suruyor; kayit hemen ardindan yapilacak"), FColor::Orange, 3.f);
+		const AMMOGameMode* GameMode = World->GetAuthGameMode<AMMOGameMode>();
+		const bool bWaitingForTravel = GameMode && GameMode->IsZoneTravelSaveInFlight(this);
+		MMONotify::ToOwner(this, bWaitingForTravel
+			? TEXT("Bolge gecisi kaydi suruyor; kayit hemen ardindan yapilacak")
+			: TEXT("Karakter kaydedilemedi; tekrar deneyin"), FColor::Orange, 3.f);
 	}
 }
 
