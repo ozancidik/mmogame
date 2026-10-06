@@ -477,62 +477,13 @@ void AMMOCharacter::SetTravelSaveCommitted(bool bCommitted)
 
 bool AMMOCharacter::SaveCharacterForTravel()
 {
-	if (!HasAuthority() || !bInitialLoadComplete)
-	{
-		return false;
-	}
-
-	// Kalicilik tek noktadan (IMMOCharacterStore): bugun yerel .sav, ileride bulut. Magaza yoksa kayit yok.
-	IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(this);
-	if (!Store)
-	{
-		return false;
-	}
-
-	// SECURITY_AUDIT K-1 (kayit ezme): yuklenen/olusturulan yuva ile simdiki yuva (ad degisti) farkliysa
-	// ve hedef yuvada baska birine ait bir kayit zaten varsa YAZMA. Yeni (bos) bir yuvaya yazmak serbest;
-	// mevcut bir kaydi sahiplenmek icin once o adla MMOLoad yapilmalidir (ActiveSaveSlot guncellenir).
-	const FString TargetSlot = GetSaveSlotName();
-	if (!ActiveSaveSlot.IsEmpty() && !ActiveSaveSlot.Equals(TargetSlot, ESearchCase::IgnoreCase)
-		&& Store->Exists(TargetSlot))
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Save refused: %s -> %s already exists (name changed since load)"), *ActiveSaveSlot, *TargetSlot);
-		// Uzak oyuncuya da ulasir (B5): aksi halde cikista ilerlemesini kaybettigini hic ogrenmezdi.
-		MMONotify::ToOwner(this,
-			TEXT("Bu ad baska bir kayda ait: kaydedilmedi. Once MMOLoad ile o kaydi yukle ya da farkli bir ad sec."),
-			FColor::Orange, 5.f);
-		return false;
-	}
-
+	IMMOCharacterStore* Store = nullptr;
+	FString TargetSlot;
 	FMMOCharacterSaveData D;
-	D.bValid = true;
-	if (Stats)
+	if (!BuildCharacterSaveRequest(Store, TargetSlot, D))
 	{
-		Stats->FillSaveData(D);
+		return false;
 	}
-	if (Inventory)
-	{
-		Inventory->FillSaveData(D);
-	}
-	if (SkillComponent)
-	{
-		SkillComponent->FillSaveData(D);
-	}
-	if (QuestComponent)
-	{
-		QuestComponent->FillSaveData(D);
-	}
-	if (ClanComponent)
-	{
-		ClanComponent->FillSaveData(D);
-	}
-	if (FriendsComponent)
-	{
-		FriendsComponent->FillSaveData(D);
-	}
-	D.MapName = UGameplayStatics::GetCurrentLevelName(this, true);
-	D.Location = GetActorLocation();
-	D.Rotation = GetActorRotation();
 
 	const bool bOk = Store->Save(TargetSlot, D);
 	if (bOk)
@@ -544,6 +495,101 @@ bool AMMOCharacter::SaveCharacterForTravel()
 	// kaydinda da calisir ve oyuncuya her seferinde mesaj yagmamali. Yalniz elle kayit
 	// (MMOSave / ServerSaveCharacter) ToOwner ile bildirir.
 	return bOk;
+}
+
+bool AMMOCharacter::BuildCharacterSaveRequest(IMMOCharacterStore*& OutStore, FString& OutSlot,
+	FMMOCharacterSaveData& OutData)
+{
+	OutStore = nullptr;
+	OutSlot.Reset();
+	OutData = FMMOCharacterSaveData();
+	if (!HasAuthority() || !bInitialLoadComplete)
+	{
+		return false;
+	}
+
+	OutStore = UMMOCharacterStoreSubsystem::Get(this);
+	if (!OutStore)
+	{
+		return false;
+	}
+
+	// SECURITY_AUDIT K-1 (kayit ezme): yuklenen/olusturulan yuva ile simdiki yuva (ad degisti) farkliysa
+	// ve hedef yuvada baska birine ait bir kayit zaten varsa YAZMA.
+	OutSlot = GetSaveSlotName();
+	if (!ActiveSaveSlot.IsEmpty() && !ActiveSaveSlot.Equals(OutSlot, ESearchCase::IgnoreCase)
+		&& OutStore->Exists(OutSlot))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Save refused: %s -> %s already exists (name changed since load)"), *ActiveSaveSlot, *OutSlot);
+		MMONotify::ToOwner(this,
+			TEXT("Bu ad baska bir kayda ait: kaydedilmedi. Once MMOLoad ile o kaydi yukle ya da farkli bir ad sec."),
+			FColor::Orange, 5.f);
+		return false;
+	}
+
+	OutData.bValid = true;
+	if (Stats)
+	{
+		Stats->FillSaveData(OutData);
+	}
+	if (Inventory)
+	{
+		Inventory->FillSaveData(OutData);
+	}
+	if (SkillComponent)
+	{
+		SkillComponent->FillSaveData(OutData);
+	}
+	if (QuestComponent)
+	{
+		QuestComponent->FillSaveData(OutData);
+	}
+	if (ClanComponent)
+	{
+		ClanComponent->FillSaveData(OutData);
+	}
+	if (FriendsComponent)
+	{
+		FriendsComponent->FillSaveData(OutData);
+	}
+	OutData.MapName = UGameplayStatics::GetCurrentLevelName(this, true);
+	OutData.Location = GetActorLocation();
+	OutData.Rotation = GetActorRotation();
+	return true;
+}
+
+void AMMOCharacter::SaveCharacterForTravelAsync(TFunction<void(bool bSuccess)>&& Completion)
+{
+	IMMOCharacterStore* Store = nullptr;
+	FString TargetSlot;
+	FMMOCharacterSaveData Data;
+	if (!BuildCharacterSaveRequest(Store, TargetSlot, Data))
+	{
+		if (Completion)
+		{
+			Completion(false);
+		}
+		return;
+	}
+
+	const TWeakObjectPtr<AMMOCharacter> WeakThis(this);
+	Store->SaveAsync(TargetSlot, Data,
+		[WeakThis, TargetSlot, Completion = MoveTemp(Completion)](bool bSuccess) mutable
+		{
+			AMMOCharacter* Character = WeakThis.Get();
+			if (!Character)
+			{
+				bSuccess = false;
+			}
+			else if (bSuccess)
+			{
+				Character->ActiveSaveSlot = TargetSlot;
+			}
+			if (Completion)
+			{
+				Completion(bSuccess);
+			}
+		});
 }
 
 void AMMOCharacter::GrantStarterPack()

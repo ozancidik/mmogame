@@ -3532,3 +3532,22 @@ kontroller, Summer/Winter duman testleri ve çok oyunculu bağlantı testi geçt
   `[MMO_SAVE_JSON_TEST] PASS schema=1 bytes=...` satırı görünmeli.
 - [ ] İleride PlayFab uygulaması bağlanınca aynı karakterin yerel `.sav` ve bulut JSON sonuçlarını
   karşılaştır; başarısız HTTP yazımında yerel kayıt okunabilir kalmalı.
+
+## Asenkron kayıt onaylı bölge geçişi — 2026-10-06
+
+Summer/Winter bölge geçişi, bağlı bütün oyuncuların kayıt callback'leri başarılı olmadan
+`ServerTravel` başlatmayacak şekilde yeniden kuruldu. Yerel dosya mağazası aynı karede tamamlanır;
+gelecekteki PlayFab mağazası aynı sözleşmeyi gecikmeli tamamlayabilir. İstek seri numarası eski
+callback'leri etkisiz kılıyor; kayıt sırasında kaybolan karakter ya da tek bir yazım hatası bütün
+geçişi kaynak haritada iptal ediyor. `Scripts/TestZoneTravel.ps1` headless Summer -> Winter
+geçişinde isteğin kabulünü, kayıt sonrasındaki travel başlangıcını ve Winter dünyasının açılışını
+doğruladı. Zorlanmış UE 5.7 derlemesi geçti.
+
+- [ ] İki oyunculu PIE oturumunda geçişi başlat: ikinci oyuncunun kayıt callback'i bitmeden
+  hiçbir istemci harita değiştirmemeli; ikisi de tamamlanınca birlikte Winter'a geçmeli.
+- [ ] Gecikmeli mağaza taklidiyle bir oyuncunun kaydını başarısız yap: herkes Summer'da kalmalı,
+  geçiş kilidi temizlenmeli ve sonraki başarılı istek çalışmalı.
+- [ ] Kayıt callback'i beklerken bir istemciyi ayır: geçiş iptal edilmeli ve kalan oyuncuların
+  `bTravelSaveCommitted` durumu sonraki normal kaydı engellememeli.
+- [ ] Başarılı seamless travel sonrasında seviye, altın, envanter, görevler, beceri cooldown'ları
+  ve konumun tek kez korunup korunmadığını iki istemcide kontrol et.

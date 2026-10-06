@@ -41,6 +41,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOProbeSurface(float X, float Y, float Radius = 225.f);
 
+	// Headless otomasyon: ilk karakter yuklemesi bittikten sonra gercek bolge gecisini tetikler.
+	UFUNCTION(Exec)
+	void MMOTestZoneTravel();
+
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);
@@ -53,6 +57,15 @@ public:
 
 protected:
 	bool bZoneTravelInProgress = false;
+	uint64 ZoneTravelRequestSerial = 0;
+	int32 PendingZoneTravelSaves = 0;
+	FString PendingZoneTravelTargetMap;
+	FString PendingZoneTravelSourceMap;
+	TArray<TWeakObjectPtr<class AMMOCharacter>> PendingZoneTravelCharacters;
+
+	void HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSuccess);
+	void FinishZoneTravel(uint64 RequestSerial);
+	void AbortZoneTravel(uint64 RequestSerial, const FString& Reason);
 	// Oyun basladiginda oyuncu dogus noktasinin yakinina bir mob spawner yerlestirir.
 	void SpawnMobArea();
 

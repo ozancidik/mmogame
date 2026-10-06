@@ -14,6 +14,7 @@ class UMMOPartyComponent;
 class UMMOTradeComponent;
 class UMMOClanComponent;
 class UMMOFriendsComponent;
+class IMMOCharacterStore;
 
 /**
  * MMO karakterleri (oyuncu ve NPC/mob) için C++ temel sınıfı.
@@ -119,6 +120,8 @@ public:
 	// Harita degisimi oncesi zorunlu kayit: yukleme bitmediyse veya disk yazimi
 	// basarisizsa false doner; GameMode bu durumda seyahati iptal eder.
 	bool SaveCharacterForTravel();
+	// Bulut magazasi icin asenkron karsilik: callback yalniz yazim tamamlandiginda cagrilir.
+	void SaveCharacterForTravelAsync(TFunction<void(bool bSuccess)>&& Completion);
 	void SetTravelSaveCommitted(bool bCommitted);
 	bool LoadCharacter();
 	FString GetSaveSlotName() const;
@@ -361,6 +364,8 @@ protected:
 	// Yeni karakter (kayit dosyasi yok) baslangic paketi: Kisa Kilic + Deri Zirh (kusanili) + 3 Can Iksiri.
 	// Yalniz LoadCharacter'in "kayit yok" dalindan, sunucuda; pawn basina bir kez.
 	void GrantStarterPack();
+	bool BuildCharacterSaveRequest(IMMOCharacterStore*& OutStore, FString& OutSlot,
+		struct FMMOCharacterSaveData& OutData);
 	bool bStarterPackGranted = false;
 	float LastRemoteManualSaveTime = -100.f;
 	static constexpr float RemoteManualSaveCooldown = 10.f;

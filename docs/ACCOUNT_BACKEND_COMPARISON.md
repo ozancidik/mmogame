@@ -1,6 +1,6 @@
 # Hesap + kalıcı karakter arka ucu: Open World Server (OWS) ve PlayFab karşılaştırması
 
-Tarih: 4 Ekim 2026. Durum: araştırma/plan, hiçbir kod değişmedi. Kaynak bağlantıları en altta.
+Tarih: 4 Ekim 2026. Durum: araştırma + uygulama planı; Aşama 1 hazırlıkları sürüyor. Kaynak bağlantıları en altta.
 Doğrulanamayan varsayımlar "[?]" ile işaretlidir ve bölüm 9'da toplanmıştır.
 
 ## 1. Bugünkü durum (koddan okunan)
@@ -173,8 +173,12 @@ fiyatı ölçekte kabul edilemezse. O noktada yalnız Instance Launcher/Instance
   `FMMOCharacterSaveData` alanlarını JSON'a çeviriyor ve bilinmeyen ileri sürümleri reddediyor.
   Gerçek UE yansımasıyla çalışan `Scripts/TestCharacterSaveJson.ps1`, dolu fixture'ın tüm
   alanlarını (özellikle `TMap<FName,int64>`) gidiş-dönüşte karşılaştırıyor; ölçülen örnek blob
-  1158 UTF-8 bayt. PlayFab HTTP uygulaması, asenkron kuyruk/lazy migration ve travel onayı
-  bu hazırlık diliminden sonra hâlâ yapılacak.
+  1158 UTF-8 bayt. `IMMOCharacterStore` asenkron callback giriş noktaları eklendi; yerel
+  uygulama bugünkü senkron davranışı aynı kare callback ile koruyor. Summer/Winter geçişi artık
+  bütün karakter kayıt callback'leri başarılı olmadan `ServerTravel` başlatmıyor; eski veya
+  başarısız callback'ler ve kayıt sırasında ayrılan oyuncular geçişi iptal ediyor. Headless
+  `Scripts/TestZoneTravel.ps1` gerçek Summer -> Winter geçişini doğruluyor. PlayFab HTTP
+  uygulaması, gecikmeli kayıt kuyruğu/lazy migration ve gerçek hata/gecikme enjeksiyonu hâlâ yapılacak.
 - `IMMOCharacterStore` arayüzü + `LocalFile` uygulaması (mevcut davranış) + `PlayFab` uygulaması (dedicated server, REST,
   `FHttpModule`; eklenti şart değil).
 - Sunucu `LoginWithServerCustomId` ile ad-tabanlı sunucu kimliğiyle (`legacyname:<ad>`) giriş yapar, blob'u karakter başına yazar/okur.

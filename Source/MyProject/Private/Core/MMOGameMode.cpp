@@ -32,6 +32,42 @@ AMMOGameMode::AMMOGameMode()
 	bUseSeamlessTravel = true;
 }
 
+void AMMOGameMode::MMOTestZoneTravel()
+{
+#if !UE_BUILD_SHIPPING
+	UWorld* World = GetWorld();
+	if (!World || !HasAuthority())
+	{
+		return;
+	}
+	const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
+	FTimerHandle TestHandle;
+	World->GetTimerManager().SetTimer(TestHandle, FTimerDelegate::CreateLambda([WeakThis]()
+	{
+		AMMOGameMode* GameMode = WeakThis.Get();
+		UWorld* TestWorld = GameMode ? GameMode->GetWorld() : nullptr;
+		if (!GameMode || !TestWorld)
+		{
+			return;
+		}
+		APlayerController* Host = nullptr;
+		for (FConstPlayerControllerIterator It = TestWorld->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* Candidate = It->Get();
+			if (Candidate && Candidate->IsLocalController())
+			{
+				Host = Candidate;
+				break;
+			}
+		}
+		FString FailureReason;
+		const bool bAccepted = GameMode->RequestZoneTravel(Host, FailureReason);
+		UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_TEST] request=%s reason=%s"),
+			bAccepted ? TEXT("ACCEPTED") : TEXT("REJECTED"), *FailureReason);
+	}), 1.5f, false);
+#endif
+}
+
 void AMMOGameMode::MMOProbeSpawn(float X, float Y, float Z, float Radius)
 {
 #if !UE_BUILD_SHIPPING
@@ -357,34 +393,105 @@ bool AMMOGameMode::RequestZoneTravel(APlayerController* Requester, FString& OutF
 	}
 
 	bZoneTravelInProgress = true;
+	const uint64 RequestSerial = ++ZoneTravelRequestSerial;
+	PendingZoneTravelSaves = Characters.Num();
+	PendingZoneTravelTargetMap = TargetMap;
+	PendingZoneTravelSourceMap = CurrentMap;
+	PendingZoneTravelCharacters.Reset(Characters.Num());
 	for (AMMOCharacter* Character : Characters)
 	{
-		if (!Character->SaveCharacterForTravel())
-		{
-			UE_LOG(LogTemp, Error, TEXT("Zone travel aborted: failed to save %s"), *Character->GetSaveSlotName());
-			OutFailureReason = TEXT("Bir karakter kaydedilemedi; gecis iptal edildi");
-			bZoneTravelInProgress = false;
-			return false;
-		}
+		PendingZoneTravelCharacters.Add(Character);
 	}
 	for (AMMOCharacter* Character : Characters)
 	{
+		const TWeakObjectPtr<AMMOGameMode> WeakThis(this);
+		Character->SaveCharacterForTravelAsync([WeakThis, RequestSerial](bool bSuccess)
+		{
+			if (AMMOGameMode* GameMode = WeakThis.Get())
+			{
+				GameMode->HandleZoneTravelSaveComplete(RequestSerial, bSuccess);
+			}
+		});
+	}
+	// Yerel dosya callback'leri ayni karede biter. Bulut magazasinda true yalniz istegin
+	// kabul edildigini belirtir; travel tum kayit callback'leri basarili olduktan sonra baslar.
+	return true;
+}
+
+void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, bool bSuccess)
+{
+	if (!bZoneTravelInProgress || RequestSerial != ZoneTravelRequestSerial)
+	{
+		return;
+	}
+	if (!bSuccess)
+	{
+		AbortZoneTravel(RequestSerial, TEXT("Bir karakter kaydedilemedi; gecis iptal edildi"));
+		return;
+	}
+	if (--PendingZoneTravelSaves <= 0)
+	{
+		FinishZoneTravel(RequestSerial);
+	}
+}
+
+void AMMOGameMode::FinishZoneTravel(uint64 RequestSerial)
+{
+	if (!bZoneTravelInProgress || RequestSerial != ZoneTravelRequestSerial)
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		AbortZoneTravel(RequestSerial, TEXT("Dunya gecis tamamlanmadan kapandi"));
+		return;
+	}
+	for (const TWeakObjectPtr<AMMOCharacter>& WeakCharacter : PendingZoneTravelCharacters)
+	{
+		AMMOCharacter* Character = WeakCharacter.Get();
+		if (!Character)
+		{
+			AbortZoneTravel(RequestSerial, TEXT("Bir oyuncu kayit sirasinda ayrildi; gecis iptal edildi"));
+			return;
+		}
 		Character->SetTravelSaveCommitted(true);
 	}
-	if (!World->ServerTravel(TargetMap))
+
+	if (!World->ServerTravel(PendingZoneTravelTargetMap))
 	{
-		for (AMMOCharacter* Character : Characters)
+		for (const TWeakObjectPtr<AMMOCharacter>& WeakCharacter : PendingZoneTravelCharacters)
 		{
-			Character->SetTravelSaveCommitted(false);
+			if (AMMOCharacter* Character = WeakCharacter.Get())
+			{
+				Character->SetTravelSaveCommitted(false);
+			}
 		}
-		bZoneTravelInProgress = false;
-		UE_LOG(LogTemp, Error, TEXT("Zone travel failed to start: %s"), *TargetMap);
-		OutFailureReason = TEXT("Harita gecisi baslatilamadi");
-		return false;
+		AbortZoneTravel(RequestSerial, TEXT("Harita gecisi baslatilamadi"));
+		return;
 	}
 	UE_LOG(LogTemp, Log, TEXT("Zone travel started: %s -> %s (%d players)"),
-		*CurrentMap, *TargetMap, Characters.Num());
-	return true;
+		*PendingZoneTravelSourceMap, *PendingZoneTravelTargetMap, PendingZoneTravelCharacters.Num());
+	PendingZoneTravelCharacters.Reset();
+	PendingZoneTravelSaves = 0;
+}
+
+void AMMOGameMode::AbortZoneTravel(uint64 RequestSerial, const FString& Reason)
+{
+	if (RequestSerial != ZoneTravelRequestSerial)
+	{
+		return;
+	}
+	bZoneTravelInProgress = false;
+	PendingZoneTravelSaves = 0;
+	PendingZoneTravelCharacters.Reset();
+	PendingZoneTravelTargetMap.Reset();
+	PendingZoneTravelSourceMap.Reset();
+	UE_LOG(LogTemp, Error, TEXT("Zone travel aborted: %s"), *Reason);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, Reason);
+	}
 }
 
 void AMMOGameMode::SpawnMobArea()
