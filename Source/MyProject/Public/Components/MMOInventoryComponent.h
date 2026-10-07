@@ -38,6 +38,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	static bool RunSavedEquipmentLevelSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunVendorEconomySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunFirstEquipSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -131,6 +132,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
 	void EquipByInstanceId(int32 InstanceId);
 
+	// Server-only starter setup; does not count as the player's first equip request.
+	void EquipStarterEquipment(int32 InstanceId);
+
 	/** Slottaki ekipmani cikarip cantaya koyar. Istemciden cagrilirsa sunucuya yonlenir. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Equipment")
 	void UnequipSlot(EMMOEquipSlot Slot);
@@ -208,6 +212,7 @@ protected:
 	const TCHAR* GoldSourceTag = nullptr;
 
 	bool HasAuthorityInternal() const;
+	void EquipByInstanceIdInternal(int32 InstanceId, bool bRecordFirstEquip);
 	bool IsLocallyControlledOwner() const;
 
 	// Sahip, MaxDist icinde bir satici NPC'ye yakin mi? Satin-al/sat RPC'lerinin

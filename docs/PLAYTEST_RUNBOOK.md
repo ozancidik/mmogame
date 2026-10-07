@@ -66,7 +66,7 @@ olaydır; kalan yerde olabilir. Dolu çanta/yığın, ölü/rezervasyona yetkisi
 karakter ve sıfır altın kazancı ilk olay değildir. İlk altın mı, iksir mi,
 ekipman mı olduğundan bağımsız olarak sid başına tek loot olayı vardır.
 Başlangıç paketi/görev/satıcı/debug verme bu olayı tetiklemez. Ekipman loot'u
-kuşanma değildir; onun ölçümü açık. Eski logda eksik loot `sure=?`; first
+kuşanma değildir; ayrı `first_equip` olayı kullanılır. Eski logda eksik loot `sure=?`; first
 satırı normal `gold` akışını veya XP/görev sayısını yeniden toplamaz.
 
 **İlk öldürme kredisi:** `first_kill` aynı controller sid/start/elapsed
@@ -88,6 +88,21 @@ vuruşlar ve ölü alıcılar olay üretmez; sonraki öldürmeler tekilliği sı
 Olay normal kill/XP sayısını ikinci kez artırmaz. Eski logda eksik olayın
 süresi bilinmez. Pawn/gerçek seamless geçiş/reconnect ve uzaktaki istemci
 oynanışı PIE'de açık; fixture süreleri gerçek av süresi değildir.
+
+**İlk başarılı kuşanma isteği:** `first_equip`, mevcut sunucu kuşanma isteği
+çanta/kimlik/seviye/slot kontrollerini geçip ekipman ve bonusları güncelledikten
+sonra, aynı controller sid/start/elapsed kapsamında bir kez yazılır.
+`item=<id> instance=<InstanceId> slot=<0..3>`; slotlar silah=0, zırh=1,
+başlık=2, bot=3. InstanceId oyuncunun envanterine aittir, global eşya kimliği
+değildir. Başlangıç paketinin otomatik kuşanması ve kayıtlı ekipmanın yüklenmesi
+ilk olay sayılmaz. Çantada olmayan/eskimiş kimlik, seviye şartını sağlamayan veya
+geçersiz slot isteği de sayılmaz; başarılı ikinci kuşanma tekilliği sıfırlamaz.
+Ölçülen şey mevcut EquipFromBag/EquipByInstanceId isteğinin başarı zamanıdır;
+debug/C++ üzerinden aynı istek de sayılır. Loot, satın alma veya envantere verme
+tek başına kuşanma değildir. İlk olay XP/altın/görev/kill toplamını artırmaz.
+Eksik ölçüm `sure=?`; kayıtlar kalıcı karakterin ilk kuşanmasını kanıtlamaz.
+Fixture otomatik kuşanma girişini ve bellekte kayıt uygulamasını sınar; gerçek
+başlangıç dalı, dosyadan yeniden giriş, istemci RPC/HUD ve ServerTravel PIE'de açık.
 
 Ölçüm satırları yalnız sunucuda (host) basılır. Logda hiç satır yoksa Kapı 3 **KALDI**: büyük olasılıkla istemci penceresinin logu okunuyor.
 

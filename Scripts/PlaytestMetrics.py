@@ -18,6 +18,7 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   first_quest_accept / first_quest_claim who lv quest scope=controller sid start elapsed
   first_loot who lv kind=gold|item|equipment item amount scope=controller sid start elapsed
   first_kill who lv mob mlv xp credit=fatal|contribution|party|fallback elite scope=controller sid start elapsed
+  first_equip who lv item instance slot=0..3 scope=controller sid start elapsed (successful player equip request)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -28,7 +29,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
-FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip")
 
 
 def project_root():
@@ -114,6 +115,12 @@ def build_stats(events):
                                  and math.isfinite(mob_level) and mob_level >= 1 and mob_level.is_integer()
                                  and math.isfinite(xp) and xp >= 0 and xp.is_integer() and elite in (0, 1)
                                  and e.get("credit") in ("fatal", "contribution", "party", "fallback"))
+            elif ev == "first_equip":
+                instance = to_num(e.get("instance"), float("nan"))
+                slot = to_num(e.get("slot"), float("nan"))
+                payload_valid = (bool(e.get("item")) and e["item"] != "None"
+                                 and math.isfinite(instance) and 0 < instance <= 2147483647 and instance.is_integer()
+                                 and math.isfinite(slot) and 0 <= slot <= 3 and slot.is_integer())
             else:
                 payload_valid = bool(e.get("quest"))
             if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
@@ -131,6 +138,8 @@ def build_stats(events):
                 sample.update(kind=e["kind"], item=e["item"], amount=int(amount))
             elif ev == "first_kill":
                 sample.update(mob=e["mob"], mlv=int(mob_level), xp=int(xp), credit=e["credit"], elite=int(elite))
+            elif ev == "first_equip":
+                sample.update(item=e["item"], instance=int(instance), slot=int(slot))
             else:
                 sample["quest"] = e["quest"]
             session[ev] = sample
@@ -266,6 +275,8 @@ def print_player(who, p):
                         detail = "kind=%s item=%s amount=%d" % (sample["kind"], sample["item"], sample["amount"])
                     elif action == "first_kill":
                         detail = "mob=%s mlv=%d xp=%d credit=%s elite=%d" % (sample["mob"], sample["mlv"], sample["xp"], sample["credit"], sample["elite"])
+                    elif action == "first_equip":
+                        detail = "item=%s instance=%d slot=%d" % (sample["item"], sample["instance"], sample["slot"])
                     else:
                         detail = "quest=%s" % sample["quest"]
                     print("  sid=%s %s sure=%s lv=%d %s" % (

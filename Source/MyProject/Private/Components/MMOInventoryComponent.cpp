@@ -22,11 +22,102 @@
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
+#include "Save/MMOCharacterSaveJson.h"
 #endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOInventoryAudit, Log, All);
 
 #if !UE_BUILD_SHIPPING
+bool UMMOInventoryComponent::RunFirstEquipSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	TArray<AActor*> Fixtures;
+	TArray<AMMOPlayerController*> Controllers;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		UMMOInventoryComponent* Inventories[2] = {};
+		for (int32 Index = 0; Index < 2; ++Index)
+		{
+			const FVector Location(1000000 + Index * 5000, 1000000, 5000);
+			AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			AMMOCharacter* Pawn = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			if (PC) { Controllers.Add(PC); Fixtures.Add(PC); }
+			if (Pawn) { Fixtures.Add(Pawn); Pawn->SetActorEnableCollision(false); }
+			if (!PC || !Pawn || !Pawn->GetInventory()) { OutError = TEXT("fixture spawn failed"); return false; }
+			PC->Possess(Pawn); Inventories[Index] = Pawn->GetInventory();
+		}
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks; return true;
+		};
+		UMMOInventoryComponent* Inv = Inventories[0];
+		auto Snapshot = [&]() { FMMOCharacterSaveData Data; Inv->FillSaveData(Data); return Data; };
+		auto Unchanged = [&](const FMMOCharacterSaveData& Before)
+		{
+			TArray<FString> Fields; FMMOCharacterSaveJson::FindDifferences(Before, Snapshot(), Fields); return Fields.IsEmpty();
+		};
+		Inv->AddEquipmentInstance(TEXT("ShortSword")); Inv->EquipStarterEquipment(1);
+		Inv->AddEquipmentInstance(TEXT("LeatherArmor")); Inv->EquipStarterEquipment(2);
+		if (!Check(Inv->GetEquipped(EMMOEquipSlot::Weapon).InstanceId == 1
+			&& Inv->GetEquipped(EMMOEquipSlot::Armor).InstanceId == 2 && Inv->EquipmentBag.IsEmpty(), TEXT("automatic setup failed"))) return false;
+		const FMMOCharacterSaveData Automatic = Snapshot();
+		Inv->ApplySaveData(Automatic);
+		if (!Check(Unchanged(Automatic), TEXT("save restore changed valid inventory"))) return false;
+		Inv->EquipByInstanceId(0); Inv->EquipByInstanceId(-1); Inv->EquipByInstanceId(999);
+		if (!Check(Unchanged(Automatic), TEXT("stale request changed inventory"))) return false;
+		Inv->AddEquipmentInstance(TEXT("GreatSword"));
+		const FMMOCharacterSaveData BeforeLevel = Snapshot();
+		Inv->EquipByInstanceId(3);
+		if (!Check(Unchanged(BeforeLevel), TEXT("level gate changed inventory"))) return false;
+		Inv->AddEquipmentInstance(TEXT("ShortSword"));
+		const FMMOCharacterSaveData BeforeSlot = Snapshot();
+		const TArray<FMMOEquipmentInstance> Slots = Inv->EquippedItems;
+		Inv->EquippedItems.Reset(); Inv->EquipByInstanceId(4); Inv->EquippedItems = Slots;
+		if (!Check(Unchanged(BeforeSlot), TEXT("invalid slot consumed equipment"))) return false;
+		Inv->EquipFromBag(Inv->FindBagIndexByInstanceId(4));
+		const AMMOCharacter* OwnerChar = Cast<AMMOCharacter>(Inv->GetOwner());
+		const FMMOItemDef* SwordDef = FMMOItemDatabase::Find(TEXT("ShortSword"));
+		if (!Check(Inv->GetEquipped(EMMOEquipSlot::Weapon).InstanceId == 4 && Inv->FindBagIndexByInstanceId(1) != INDEX_NONE
+			&& OwnerChar && OwnerChar->GetStats() && SwordDef
+			&& FMath::IsNearlyEqual(OwnerChar->GetStats()->AttackPower,
+				OwnerChar->GetStats()->Strength * OwnerChar->GetStats()->AttackPerStrength + OwnerChar->GetStats()->Dexterity * 0.5f
+				+ FMMOItemDatabase::GetAttack(*SwordDef, 0)), TEXT("manual swap or bonus failed"))) return false;
+		const FMMOCharacterSaveData AfterManual = Snapshot();
+		Inv->EquipByInstanceId(4);
+		const bool bDuplicateUnchanged = Unchanged(AfterManual);
+		Inv->AddEquipmentInstance(TEXT("LeatherArmor")); Inv->EquipByInstanceId(5);
+		if (!Check(bDuplicateUnchanged && Inv->GetEquipped(EMMOEquipSlot::Armor).InstanceId == 5
+			&& Inv->FindBagIndexByInstanceId(2) != INDEX_NONE, TEXT("duplicate or second slot failed"))) return false;
+		Inventories[1]->AddEquipmentInstance(TEXT("LeatherArmor")); Inventories[1]->EquipByInstanceId(1);
+		return Check(Inventories[1]->GetEquipped(EMMOEquipSlot::Armor).InstanceId == 1
+			&& Inventories[1]->EquipmentBag.IsEmpty(), TEXT("independent controller equip failed"));
+	}();
+	for (AMMOPlayerController* PC : Controllers) if (IsValid(PC)) PC->UnPossess();
+	for (AActor* Fixture : Fixtures) if (IsValid(Fixture)) Fixture->Destroy();
+	return bPassed; // Same frame, memory-only save application; no load/autosave/disk.
+}
+
+namespace
+{
+	struct FMMOFirstEquipTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstEquip"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMOInventoryComponent::RunFirstEquipSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_EQUIP_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstEquipTestExec GMMOFirstEquipTestExec;
+}
+
 bool UMMOInventoryComponent::RunVendorEconomySelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0;
@@ -522,6 +613,17 @@ void UMMOInventoryComponent::EquipFromBag(int32 BagIndex)
 
 void UMMOInventoryComponent::EquipByInstanceId(int32 InstanceId)
 {
+	EquipByInstanceIdInternal(InstanceId, true);
+}
+
+void UMMOInventoryComponent::EquipStarterEquipment(int32 InstanceId)
+{
+	if (!HasAuthorityInternal()) return;
+	EquipByInstanceIdInternal(InstanceId, false);
+}
+
+void UMMOInventoryComponent::EquipByInstanceIdInternal(int32 InstanceId, bool bRecordFirstEquip)
+{
 	if (InstanceId == 0)
 	{
 		return;
@@ -569,6 +671,11 @@ void UMMOInventoryComponent::EquipByInstanceId(int32 InstanceId)
 	EquippedItems[SlotIndex] = Inst;
 
 	RecomputeEquipmentBonuses();
+	if (bRecordFirstEquip)
+	{
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(OwnerChar->GetController()))
+			PC->RecordFirstEquipMetric(Inst.ItemId, Inst.InstanceId, SlotIndex);
+	}
 	OnInventoryChanged.Broadcast();
 }
 

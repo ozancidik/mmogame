@@ -4012,4 +4012,30 @@ Mevcut 6 controller kontrolü kill için de pawn/aktarım tekilliğini sınar.
   controller oturumunun tekilliği korunmalı; yeni bağlantıda yeni sid.
   Controller aktarımı fixture'ı gerçek ServerTravel kanıtı değildir.
 - [ ] Eski logda eksik first_kill `sure=?`; sıfır XP kredisi geçerli ama
-  son vuruşla aynı anlama gelmez. İlk kuşanma ve 20 dk solo/parti süreleri açık.
+  son vuruşla aynı anlama gelmez. Gerçek kuşanma ve 20 dk solo/parti süreleri açık.
+
+## İlk başarılı kuşanma isteği — 2026-10-07 (PIE açık)
+
+`TestFirstEquip.ps1`: **8 UE kontrolü**; otomatik başlangıç kuşanması için
+native giriş, bellekte ApplySaveData, eskimiş kimlik, seviye şartı, geçersiz
+slot, başarılı çanta değişimi/bonus, tekrar ve ikinci slot, bağımsız controller.
+2 sid'de yalnız ShortSword instance=4 slot=0 ve LeatherArmor instance=1 slot=1
+ilk olayları. Tüm GrantStarterPack dalı veya gerçek kayıt dosyası çalıştırılmadı.
+6 controller kontrolü first_equip için de bos pawn/geçersiz payload, pawn
+değişimi, doğrudan SeamlessTravelTo ve yeni sid'i sınar. Sentetik süreler gerçek
+oyuncu süresi değildir. Kuşanmanın mevcut ölüm/replication kuralları değişmedi.
+
+- [ ] Host + uzak istemci yeni kayıtla doğsun: otomatik Kısa Kılıç/Deri Zırh
+  first_equip üretmemeli; mevcut kaydı yüklemek de üretmemeli.
+- [ ] Loot veya satın alma ile ekipmanı çantaya al: kuşanmadan olay olmamalı.
+  I panelinden ilk başarılı kuşanma sunucu logunda tek first_equip üretmeli;
+  item/instance/slot ve controller başlangıcından geçen süre doğru olmalı.
+- [ ] Düşük seviyeli, olmayan/eskimiş kimlik ve gecikmeli çift tıklama: retler
+  ilk ölçümü tüketmemeli. Başarılı ikinci kuşanma yeni ilk olay üretmemeli;
+  eski eşya çantaya dönmeli, bonus ve istemci HUD/slotları eşleşmeli.
+- [ ] Öl/diril, pawn değişimi ve gerçek Summer→Winter seamless geçişinde
+  tekillik korunmalı; yeniden bağlantıda yeni sid başlamalı. Envanter RPC'si
+  gerçek sahip istemciden çalışmalı; fixture doğrudan sunucu çağrısıdır.
+- [ ] Eski logda eksik first_equip `sure=?`; ilk loot ve ilk kuşanma ayrı
+  sürelerdir. First satırı XP/altın/görev/kill toplamını artırmamalı. Gerçek
+  20 dk dört sınıf solo/parti koşuları ve tüm ilk eylemler hâlâ açık.

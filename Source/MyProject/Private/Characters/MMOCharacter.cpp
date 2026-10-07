@@ -760,7 +760,7 @@ void AMMOCharacter::GrantStarterPack()
 		Inventory->AddEquipmentInstance(ItemId);
 		if (Inventory->EquipmentBag.Num() > BagBefore)
 		{
-			Inventory->EquipByInstanceId(Inventory->EquipmentBag.Last().InstanceId);
+			Inventory->EquipStarterEquipment(Inventory->EquipmentBag.Last().InstanceId);
 		}
 	}
 	Inventory->AddItem(FName(TEXT("HealthPotion")), 3);

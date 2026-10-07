@@ -1,0 +1,17 @@
+[MMOMETRIC] t=8 ev=first_equip who=Host lv=1 item=ShortSword instance=4 slot=0 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=9 ev=first_equip who=Host lv=1 item=LeatherArmor instance=5 slot=1 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=9
+[MMOMETRIC] t=15 ev=first_equip who=Host lv=1 item=LeatherArmor instance=1 slot=1 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=12 ev=first_equip who=Client lv=1 item=LeatherHelmet instance=1 slot=2 scope=controller sid=cccccccccccccccccccccccccccccccc start=2 elapsed=10
+[MMOMETRIC] t=20 ev=first_equip who=Peer lv=1 item=LeatherBoots instance=1 slot=3 scope=controller sid=dddddddddddddddddddddddddddddddd start=5 elapsed=15
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=None instance=1 slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 instance=1 slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=0 slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=-1 slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=nan slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=1.5 slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=2147483648 slot=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=1 slot=-1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=1 slot=4 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=1 slot=1.5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_equip who=Bad lv=1 item=ShortSword instance=1 slot=inf scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=gold who=Host src=loot amount=2 balance=2

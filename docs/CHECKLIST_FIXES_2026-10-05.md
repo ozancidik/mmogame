@@ -1032,3 +1032,66 @@ gecti. Summer 49 / Winter 30 mob dogumu, smoke hata=0; NetSmoke 1 join /
 1 welcome ve iki tarafta hata=0 (yalniz baglanti kaniti). Lv33+ beceri
 bosluklari ve StaticLint InitGameState beyaz liste uyarisi acik.
 Dedicated Server/Shipping hedefi ve gercek PIE sure/ag oynanisi kapanmadi.
+
+## 48. Ilk basarili oyuncu kusanma istegi (2026-10-07)
+
+Lv1-30 olcumunun sinirli parcasi: `first_equip`, mevcut EquipFromBag /
+EquipByInstanceId sunucu istegi kimlik/canta/seviye/slot kontrollerini gecip
+ekipman ve bonuslari guncelledikten sonra yazilir. Payload item/instance/slot;
+0 silah, 1 zirh, 2 baslik, 3 bot. InstanceId oyuncunun envanterine aittir.
+Baslangic paketi daha once ayni public equip fonksiyonunu kullaniyordu;
+GrantStarterPack artik yalniz sunucunun native EquipStarterEquipment girisini
+kullanir. Iki giris ayni eski ekipman kurallarini uygulayan internal govdeye
+gider; otomatik giris ilk olayi kaydetmez ve istemci RPC'sine donusmez.
+Kayit ApplySaveData dogrudan slot/bonus kurdugu icin ilk olay uretmez.
+Mevcut esya/olum/bonus/replication/RPC/save semasi degismedi.
+
+RecordFirstEquipMetric C++ helper: veritabaninda esya, pozitif instance,
+gecerli ve esya tanimina uyan slot; ortak authority/player-pawn/sid/start/TSet
+kapilari. Shipping payload/log uretmez, fixture derlenmez. Her controller
+omrunde ilk basari bir kez; pawn ve seamless controller aktarimi korur,
+yeni baglanti yeni sid. Kalici karakterin ilk kuşanmasi degildir. Debug/C++
+ile ayni public istegin basarisi da sayilir; loot/verme/satin alma tek basina
+olay degildir. Parser XP/gold/quest/kill toplamini ikinci kez artirmaz.
+
+Kaniti:
+
+- `TestFirstEquip.ps1` **PASS checks=8**: native otomatik kuşanma, bellekte
+  ApplySaveData, olmayan/eskimis ID, Lv1'de GreatSword ret, slot array yokken
+  ret, başarılı EquipFromBag swap + public AttackPower bonusu, stale tekrar
+  ve ikinci slot, bagimsiz oyuncu. 2 sid'de yalniz ShortSword instance4 slot0
+  ve LeatherArmor instance1 slot1; otomatik/restore/ret ilk olayi tuketmedi.
+  Bu fixture tum GrantStarterPack yeni-kayit dalini calistirmiyor; callsite
+  derleme ile kapsandi. Aynı karede actorler temizlenir, load timer/disk yok.
+- Mevcut **6** controller kontrolu equip icin bos pawn/gecersiz payload,
+  tekrar, pawn degisimi, dogrudan SeamlessTravelTo ve yeni sid'i kapsar.
+  Gorev 2 kabul/1 teslim, loot 2 ve kill 2 korundu; equip 2/sid2.
+- Parser eski12 / quest14 / first-quest16 / loot13 / kill17 / equip17 olay
+  fixture'lari gecti. Equip: dort slot/dort sid, 1 tekrar, 11 bozuk item /
+  instance / slot payload reddi (eksik/None, sifir/negatif/NaN/kesir/int32
+  disi kimlik; negatif/4/kesir/Inf slot); --who ve eksik sure `?` kontrolu.
+  Python slot/esya veritabanini kullanmaz; sunucu wrapper esya-slot uyumunu sinar.
+  Gercek UE first-equip logu da parser'da 2 olay/2 sid, 0 invalid/duplicate;
+  ShortSword4/slot0 ve LeatherArmor1/slot1 payload'lari eslesti.
+- Negatif kontrolde otomatik giris false yerine true yapildi. Mutant
+  derlendi, C++ 8 oyun kontrolu PASS kaldi fakat ilk olay instance1 oldugu
+  icin script **exit=1** ile yakaladi (UE exit=0). finally tam kaynak byte'lari
+  geri yuklendi; DLL yeniden derlendi ve direct test PASS. Mutant commit yok.
+- Ilk derlemede fixture protected EquipmentAttackBonus'a erisiyordu (C2248).
+  Test public turetilmis AttackPower degerini kontrol edecek sekilde duzeltildi;
+  uretim alaninin erisim seviyesi degismedi. Normal Editor derlemesi gecti.
+
+Gercek istemci kuşanma RPC'si, gecikmeli cift tik, HUD/bonus replication,
+baslangic dalinin tamamı, dosyadan yeniden giris, ServerTravel ve 20 dk
+sinif/parti sureleri PIE'de acik; checklist/runbook/plan/tablo guncellendi.
+Agency-agents Unreal Multiplayer Architect ve Test Results Analyzer rol
+rehberleri kullanildi; bagimsiz paralel ajan calismadi.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **30/30 GECTI**; 15 dosya
+PCH'siz /W4, 0 derleyici uyarisi. JSON 111 negatif; 286 yerel yuva
+`loaded=286 invalid=0 loadFailed=0 existsMismatch=0 json ok=286 mismatch=0
+maxLevel=6`, `writeorder ok=1`, `roundtrip equal=1`. Onceki tum kontroller
+ve yeni kuşanma testi gecti. Summer52 / Winter31 mob dogumu, smoke hata=0;
+NetSmoke 1 join / 1 welcome, iki tarafta hata=0 (yalniz baglanti).
+Lv33+ beceri bosluklari ve StaticLint InitGameState beyaz liste uyarisi acik.
+Dedicated Server/Shipping ve gercek PIE sure/ag oynanisi tamamlanmadi.

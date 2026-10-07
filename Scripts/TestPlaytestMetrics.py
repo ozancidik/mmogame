@@ -18,6 +18,7 @@ QUEST_FIXTURE = os.path.join(HERE, "fixtures", "quest_metrics_sample.log")
 FIRST_FIXTURE = os.path.join(HERE, "fixtures", "first_quest_metrics_sample.log")
 LOOT_FIXTURE = os.path.join(HERE, "fixtures", "first_loot_metrics_sample.log")
 KILL_FIXTURE = os.path.join(HERE, "fixtures", "first_kill_metrics_sample.log")
+EQUIP_FIXTURE = os.path.join(HERE, "fixtures", "first_equip_metrics_sample.log")
 
 failures = []
 
@@ -181,6 +182,26 @@ def main(argv):
     code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
     check("first_kill sure=?" in out, "eski logdan ilk kill suresi uydurulmamali")
 
+    equip_events = pm.parse_log(EQUIP_FIXTURE)
+    check(len(equip_events) == 17, "first equip fixture: 17 olay")
+    es = pm.build_stats(equip_events)
+    check(es["Host"]["first_actions"]["a" * 32]["first_equip"] == {
+        "seconds": 8, "lv": 1, "item": "ShortSword", "instance": 4, "slot": 0}, "ilk kusanma ve tekrar korumasi")
+    check(es["Host"]["first_actions"]["b" * 32]["first_equip"]["slot"] == 1
+          and es["Client"]["first_actions"]["c" * 32]["first_equip"]["slot"] == 2
+          and es["Peer"]["first_actions"]["d" * 32]["first_equip"]["slot"] == 3, "dort slot ve oturum/oyuncu ayrimi")
+    check(es["Host"]["first_duplicates"] == 1 and es["Bad"]["first_invalid"] == 11
+          and es["Bad"]["first_actions"] == {}, "gecersiz item/instance/slot payload reddi")
+    check(es["Host"]["src"]["loot"] == [2, 0] and es["Host"]["lv"][0]["gold_in"] == 2
+          and es["Host"]["quests"] == {} and es["Host"]["mobs"] == {}
+          and sum(x["xp"] for x in es["Host"]["lv"].values()) == 0, "first equip altin/XP/gorev/kill saymamali")
+    code, out = run_main(pm, ["x", EQUIP_FIXTURE, "--who", "Host"])
+    check(code == 0 and "first_equip sure=0:08 lv=1 item=ShortSword instance=4 slot=0" in out
+          and "first_equip sure=0:05 lv=1 item=LeatherArmor instance=1 slot=1" in out
+          and "Oyuncu: Client" not in out, "equip raporu ve --who filtresi")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check("first_equip sure=?" in out, "eski logdan ilk kusanma suresi uydurulmamali")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -197,7 +218,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events)))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events)))
     return 0
 
 
