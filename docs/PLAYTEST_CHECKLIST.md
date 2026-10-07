@@ -3896,3 +3896,21 @@ zaten mevcuttu; bu ekleme regresyon testidir. Fixture controllersizdir ve
   Stats iadesini kontrol etti; mastery yatırımı/iadesi uçtan uca ayrıca oynanmalı.
 - [ ] Gerçek Lv30+ kayıtları da doğrula. İmza/hesap yetkilendirmesi bu testle
   tamamlanmış sayılmaz; aşırı değerli bellek fixture'ı gerçek kullanıcı kaydı değildir.
+
+## Mastery ve sınıf iadesinde toplam puan — 2026-10-07 (PIE açık)
+
+`TestMasteryBudget.ps1`: 12 izole UE kontrolü geçti. Gerçek yükleme sırasıyla
+Skill → Stats, geçerli Lv10 dağılımı, bütçeyi aşan/negatif/kısa rütbe dizileri,
+Lv1/seviye tavanı, eski beceri/hotbar korunması, sınıf değişimi, bozuk iade,
+normal yatırım ve bellek roundtrip'i sınandı. Controllersiz fixture oyuncu
+dosyasını okumaz/yazmaz; gerçek ağ RPC'si veya HUD kanıtı değildir.
+
+- [ ] Host ve uzak istemcide Lv10: toplam yatırılmış + harcanmamış puan en fazla
+  18; yatırımda biri artarken diğeri azalmalı, rütbe/bakiye HUD'a gelmeli.
+- [ ] Puan yatır, kaydet/çık/yeniden gir, sınıf değiştir: yatırım sıfırlanmalı,
+  harcanmamış skill puanı 18 olmalı; mevcut can/mana artmamalı. Normal sınıf
+  bekleme ve savaş kuralları geçerli kalmalı.
+- [ ] Ayrı yedek test kaydında aşırı rütbe/bakiye yükle: Basic → Special0..3
+  sırasında bütçeye kırpılmalı; tekrar kaydet/yükle aynı durumu korumalı.
+- [ ] Eski mastery alanı boş kayıt: geçerli öğrenilmiş beceri ve hotbar korunmalı.
+  İmza/hesap ve LearnedSkills'in mastery maliyetine göre tam denetimi ayrı iş.

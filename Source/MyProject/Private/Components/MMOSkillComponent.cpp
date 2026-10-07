@@ -16,6 +16,101 @@
 #include "Net/UnrealNetwork.h"
 #include "Save/MMOSaveGame.h"
 
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+
+bool UMMOSkillComponent::RunMasteryBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required"); return false;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1000000, 1000000, 5000), FRotator::ZeroRotator, Params);
+	if (!Character) { OutError = TEXT("fixture spawn failed"); return false; }
+	const bool bPassed = [&]()
+	{
+		UMMOStatsComponent* S = Character->GetStats();
+		UMMOSkillComponent* K = Character->GetSkillComponent();
+		if (!S || !K) { OutError = TEXT("fixture components missing"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks; return true;
+		};
+		auto Sum = [&]() { int32 Total = 0; for (int32 Rank : K->MasteryRankArray) Total += Rank; return Total; };
+		auto Load = [&](const FMMOCharacterSaveData& D) { K->ApplySaveData(D); S->ApplySaveData(D); }; // Gercek LoadCharacter sirasi.
+		FMMOCharacterSaveData Legal;
+		Legal.Level = 10;
+		Legal.MasteryRanks = {3, 4, 2, 1, 0};
+		Legal.UnspentSkillPoints = 8;
+		Load(Legal);
+		if (!Check(K->MasteryRankArray == Legal.MasteryRanks && S->UnspentSkillPoints == 8, TEXT("legal mastery changed"))) return false;
+		FMMOCharacterSaveData Bad = Legal;
+		Bad.MasteryRanks.Init(10, MasteryTreeCount); Bad.UnspentSkillPoints = 18;
+		Load(Bad);
+		if (!Check(Sum() + S->UnspentSkillPoints <= 18 && Sum() == 18, TEXT("Lv10 loaded 50 ranks plus 18 unspent instead of 18 total"))) return false;
+		Bad = Legal; Bad.UnspentSkillPoints = MAX_int32; Load(Bad);
+		if (!Check(Sum() == 10 && S->UnspentSkillPoints == 8, TEXT("unspent points ignored mastery cost"))) return false;
+		Bad.Level = 1; Bad.MasteryRanks.Init(MAX_int32, MasteryTreeCount); Load(Bad);
+		if (!Check(Sum() == 0 && S->UnspentSkillPoints == 0, TEXT("Lv1 received mastery points"))) return false;
+		Bad.Level = MIN_int32; Load(Bad);
+		if (!Check(S->Level == 1 && Sum() == 0 && S->UnspentSkillPoints == 0, TEXT("negative level bypassed mastery budget"))) return false;
+		Bad.Level = MAX_int32; Load(Bad);
+		if (!Check(S->Level == S->MaxLevel && Sum() == 158 && S->UnspentSkillPoints == 0
+			&& K->MasteryRankArray[0] == 80 && K->MasteryRankArray[1] == 78, TEXT("max-level mastery budget exceeded"))) return false;
+		Bad = Legal; Bad.MasteryRanks = {-10, -1, 2}; Bad.UnspentSkillPoints = MAX_int32; Load(Bad);
+		if (!Check(K->MasteryRankArray.Num() == MasteryTreeCount && Sum() == 2 && S->UnspentSkillPoints == 16,
+			TEXT("negative or short mastery array mishandled"))) return false;
+		FMMOCharacterSaveData Legacy = Legal; Legacy.MasteryRanks.Reset(); Legacy.LearnedSkills.Reset();
+		FName LegacyId = NAME_None;
+		for (const FMMOSkillDef& Def : FMMOSkillDatabase::GetAll())
+		{
+			if (Def.RequiredClass == EMMOClass::Warrior && Def.RequiredLevel == 1) { LegacyId = Def.SkillId; break; }
+		}
+		if (LegacyId.IsNone()) { OutError = TEXT("legacy fixture skill missing"); return false; }
+		Legacy.LearnedSkills.Add(LegacyId); Legacy.Hotbar.Init(NAME_None, HotbarSize); Legacy.Hotbar[0] = LegacyId;
+		Legacy.UnspentSkillPoints = 18; Load(Legacy);
+		if (!Check(K->IsLearned(LegacyId) && K->Hotbar[0] == LegacyId && Sum() == 0 && S->UnspentSkillPoints == 18,
+			TEXT("valid legacy skill lost"))) return false;
+		Load(Legal); S->Health = 25.f; S->Mana = 8.f;
+		K->ChangeClass(EMMOClass::Mage);
+		if (!Check(K->CharacterClass == EMMOClass::Mage && Sum() == 0 && S->UnspentSkillPoints == 18
+			&& S->Health == 25.f && S->Mana == 8.f, TEXT("class change refund or vitals incorrect"))) return false;
+		int32 Str, Dex, Int, Vit; GetClassBaseStats(EMMOClass::Mage, Str, Dex, Int, Vit);
+		S->UnspentSkillPoints = MAX_int32;
+		S->ResetPointsForClassChange(Str, Dex, Int, Vit, MAX_int32);
+		if (!Check(S->UnspentSkillPoints == 18 && S->Health == 25.f && S->Mana == 8.f, TEXT("corrupt refund minted or overflowed points"))) return false;
+		if (!Check(K->RequestInvestMastery(EMMOSkillTree::Basic) && K->RequestInvestMastery(EMMOSkillTree::Basic)
+			&& Sum() == 2 && S->UnspentSkillPoints == 16, TEXT("normal investment did not conserve points"))) return false;
+		FMMOCharacterSaveData Saved; K->FillSaveData(Saved); S->FillSaveData(Saved); Load(Saved);
+		return Check(K->CharacterClass == EMMOClass::Mage && Sum() == 2 && S->UnspentSkillPoints == 16, TEXT("mastery roundtrip lost points"));
+	}();
+	Character->Destroy(); // Controllersiz: oyuncu diski yuklenmez/yazilmaz.
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOMasteryBudgetTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestMasteryBudget"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMOSkillComponent::RunMasteryBudgetSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_MASTERY_BUDGET_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOMasteryBudgetTestExec GMMOMasteryBudgetTestExec;
+}
+#endif
+
 namespace
 {
 	int64 GetUtcCooldownExpirySeconds(const FDateTime& UtcNow, float RemainingSeconds)
@@ -169,13 +264,6 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 		return;
 	}
 
-	// QA MEDIUM-5: harcanan skill puani = mastery rutbelerinin toplami (her rutbe 1 puan).
-	int32 SpentSkillPoints = 0;
-	for (const int32 Rank : MasteryRankArray)
-	{
-		SpentSkillPoints += FMath::Max(0, Rank);
-	}
-
 	CharacterClass = NewClass;
 	if (const UWorld* CW2 = GetWorld())
 	{
@@ -188,7 +276,7 @@ void UMMOSkillComponent::ChangeClass(EMMOClass NewClass)
 
 	int32 Str, Dex, Int, Vit;
 	GetClassBaseStats(NewClass, Str, Dex, Int, Vit);
-	S->ResetPointsForClassChange(Str, Dex, Int, Vit, SpentSkillPoints);
+	S->ResetPointsForClassChange(Str, Dex, Int, Vit);
 
 	GrantStarterSkill();
 
@@ -718,6 +806,26 @@ void UMMOSkillComponent::FillSaveData(FMMOCharacterSaveData& Out) const
 	}
 }
 
+int32 UMMOSkillComponent::GetMasteryPointBudget(int32 Level, int32 PointsPerLevel)
+{
+	const int64 Earned = FMath::Max<int64>(0, static_cast<int64>(Level) - 1) * FMath::Max(0, PointsPerLevel);
+	return static_cast<int32>(FMath::Min<int64>(Earned, MAX_int32));
+}
+
+int32 UMMOSkillComponent::SanitizeMasteryRanks(TArray<int32>& Ranks, int32 Level, int32 PointBudget)
+{
+	Ranks.SetNum(MasteryTreeCount);
+	const int32 Budget = FMath::Max(0, PointBudget);
+	int32 Remaining = Budget;
+	// Deterministic repair: preserve Basic, then Special0..3, within the earned budget.
+	for (int32& Rank : Ranks)
+	{
+		Rank = FMath::Clamp(Rank, 0, FMath::Min(FMath::Max(0, Level), Remaining));
+		Remaining -= Rank;
+	}
+	return Budget - Remaining;
+}
+
 void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 {
 	if (!HasAuthorityInternal())
@@ -736,15 +844,15 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// Mastery rutbeleri: eski kayitlarda bu alan bos gelir (hepsi 0) — ogrenilmis skiller
 	// zaten LearnedSkills'ten dogrudan yuklendigi icin eski kayitlar bozulmaz.
 	MasteryRankArray = In.MasteryRanks;
-	if (MasteryRankArray.Num() != MasteryTreeCount)
-	{
-		MasteryRankArray.SetNum(MasteryTreeCount);
-	}
-	// Kayittan gelen bozuk rutbeleri sinirla. ServerInvestMastery'de bir sonraki
-	// rutbe icin yapilan toplama boylece tasmaz ve KO'nun rutbe<=seviye kurali korunur.
 	const AMMOCharacter* OwnerCharacter = Cast<AMMOCharacter>(GetOwner());
 	const UMMOStatsComponent* Stats = OwnerCharacter ? OwnerCharacter->GetStats() : nullptr;
 	const int32 SavedLevel = FMath::Clamp(In.Level, 1, Stats ? Stats->MaxLevel : 80);
+	const int32 PointBudget = GetMasteryPointBudget(SavedLevel, Stats ? Stats->SkillPointsPerLevel : 2);
+	SanitizeMasteryRanks(MasteryRankArray, SavedLevel, PointBudget);
+	if (MasteryRankArray != In.MasteryRanks && !In.MasteryRanks.IsEmpty())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: mastery ranks repaired within level %d / point budget %d"), SavedLevel, PointBudget);
+	}
 	// Eski kayitlarin gecerli skillerini, mastery rutbesi sifir olsa da koru.
 	// Ancak baska sinifa ait, bilinmeyen veya henuz seviyesi acilmamis skilleri yukleme.
 	LearnedSkills.RemoveAll([this, SavedLevel](const FName& SkillId)
@@ -758,10 +866,6 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		{
 			SlotSkillId = NAME_None;
 		}
-	}
-	for (int32& Rank : MasteryRankArray)
-	{
-		Rank = FMath::Clamp(Rank, 0, SavedLevel);
 	}
 	// Eski Priest kayitlari, Ceza baslangic skili eklenmeden once yalnizca Kutsal Isik'i
 	// sakliyordu. Ogrenilmis skili tamamla; oyuncunun dolu hotbar slotlarina dokunma.

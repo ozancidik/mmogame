@@ -10,6 +10,17 @@ sahip-istemci replikasyonu ve HUD PIE'de oynanmadı. Bu kısmi düzeltme Y-2'yi 
 kapatmaz; dosya imzası, hesap kimliği ve diğer doğrulama maddeleri için ayrı çalışma
 gerekir. Ayrıntı: CHECKLIST_FIXES_2026-10-05.md §39.
 
+Ek güncelleme 2026-10-07: Y-2'nin mastery/harcanmamış skill puanı bütçesi kısmı
+UE'de doğrulandı ve düzeltildi. Lv10'da 50 yatırılmış + 18 harcanmamış puan
+yüklenebiliyordu; kazanılabilir toplam 18'dir. Rütbeler ve bakiye artık aynı
+seviye bütçesine sığar. Sınıf değişimi tam seviye bütçesini iade eder; bozuk
+bakiye/harcama toplamını kullanmaz, taşma veya fazla puan üretmez. 12 izole UE
+kontrolü geçti (ayrıntı §43). Ön koşul sunucunun bozuk/değiştirilmiş kayıt
+yüklemesidir; uzaktan dosya yazma kanıtı değildir. Eski kayıt uyumluluğu için
+geçerli LearnedSkills korunur; bu listenin mastery maliyetine göre tam denetimi,
+kayıt imzası, hesap kimliği ve gerçek istemci PIE kontrolleri açıktır. Y-2 tümüyle
+kapatılmadı.
+
 Tarih: 2026-10-04. Yöntem: yalnızca statik inceleme (kod okuma, grep, git geçmişi taraması, motor kaynağı doğrulaması). Hiçbir dosya düzenlenmedi, derleme/commit/push yapılmadı, oyun çalıştırılmadı. Bu dosya tek yazma çıktısıdır.
 
 Kapsam: `Source/MyProject/**` (69 dosya, yaklaşık 15 bin satır .cpp), `Config/*.ini`, `Scripts/*`, `.claude/`, `.gitignore`, git geçmişi (236 commit), `Saved/SaveGames`, `Saved/Logs`.

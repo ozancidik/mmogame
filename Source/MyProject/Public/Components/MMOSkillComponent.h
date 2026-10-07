@@ -111,6 +111,14 @@ public:
 	// Sinifin baslangic ana stat dagilimi (SetupForClass, ChangeClass ve kayit dogrulamasi ortak).
 	static void GetClassBaseStats(EMMOClass InClass, int32& OutStr, int32& OutDex, int32& OutInt, int32& OutVit);
 
+#if !UE_BUILD_SHIPPING
+	static bool RunMasteryBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
+	// Each rank costs one point; saved ranks and unspent points share this budget.
+	static int32 GetMasteryPointBudget(int32 Level, int32 PointsPerLevel);
+	static int32 SanitizeMasteryRanks(TArray<int32>& Ranks, int32 Level, int32 PointBudget);
+
 protected:
 	// Skill id -> cooldown bitis zamani (dunya saati; her makine kendi kopyasini tutar).
 	TMap<FName, float> CooldownEndTimes;

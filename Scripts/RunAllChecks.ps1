@@ -57,7 +57,7 @@ if ($FullCompile) {
         $src = Join-Path $root "Source\MyProject\Private"
         $files = @(
             "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
-            "Components\MMOStatsComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
+            "Components\MMOStatsComponent.cpp", "Components\MMOSkillComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
             "Components\MMOQuestComponent.cpp", "World\MMOLootPickup.cpp",
             "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
             "Characters\MMOMob.cpp"
@@ -153,6 +153,11 @@ Step "Kayittan ekipman seviye sarti ve kayipsiz kurtarma" {
 
 Step "Kayittan stat XP ve puan butcesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestStatsSaveBudget.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Mastery ve sinif iadesinde toplam puan butcesi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestMasteryBudget.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 

@@ -616,20 +616,18 @@ bool UMMOStatsComponent::SpendSkillPoints(int32 Cost)
 	return true;
 }
 
-void UMMOStatsComponent::ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 SpentSkillPoints)
+void UMMOStatsComponent::ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 /*SpentSkillPoints*/)
 {
 	if (!HasAuthorityInternal())
 	{
 		return;
 	}
 
-	// Iade: puanlarin tek kaynagi HandleLevelUp (seviye basina StatPointsPerLevel /
-	// SkillPointsPerLevel, Lv1'de 0). Stat puaninin toplami seviyeden, skill puaninin
-	// harcanani mastery rutbelerinden gelir; ikisi de "en az seviyeden hesaplanan toplam"
-	// ile alttan sinirlanir (eski skill sisteminden kalan, rutbeye yazilmamis harcamalar icin).
-	const int32 LevelsGained = FMath::Max(0, Level - 1);
-	UnspentStatPoints = FMath::Max(UnspentStatPoints, LevelsGained * StatPointsPerLevel);
-	UnspentSkillPoints = FMath::Max(UnspentSkillPoints + FMath::Max(0, SpentSkillPoints), LevelsGained * SkillPointsPerLevel);
+	// Only HandleLevelUp grants points. A complete reset restores exactly that budget,
+	// including legacy skills, without trusting a corrupt balance or refund addition.
+	// The fifth argument remains for existing C++ callers; it cannot enlarge the budget.
+	UnspentStatPoints = UMMOSkillComponent::GetMasteryPointBudget(Level, StatPointsPerLevel);
+	UnspentSkillPoints = UMMOSkillComponent::GetMasteryPointBudget(Level, SkillPointsPerLevel);
 
 	Strength = NewStrength;
 	Dexterity = NewDexterity;
@@ -963,7 +961,11 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	// veya asiri buyuk bakiyesi class-change iadesini tasirmasin.
 	const int32 LevelsGained = Level - 1;
 	const int32 PointsFromLevels = LevelsGained * FMath::Max(0, StatPointsPerLevel);
-	UnspentSkillPoints = FMath::Clamp(In.UnspentSkillPoints, 0, LevelsGained * FMath::Max(0, SkillPointsPerLevel));
+	const int32 SkillPointBudget = UMMOSkillComponent::GetMasteryPointBudget(Level, SkillPointsPerLevel);
+	// Use the source save and the same repair rule, independent of component load order.
+	TArray<int32> SavedRanks = In.MasteryRanks;
+	const int32 SpentSkillPoints = UMMOSkillComponent::SanitizeMasteryRanks(SavedRanks, Level, SkillPointBudget);
+	UnspentSkillPoints = FMath::Clamp(In.UnspentSkillPoints, 0, SkillPointBudget - SpentSkillPoints);
 	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2 + QA): ana statlar ve harcanmamis puan birlikte
 	// dogrulanir: (harcanmis statlar + harcanmamis puan) <= sinif tabani + (Level-1)*StatPointsPerLevel.
 	// Sinif tabanlari farkli (Savasci/Okcu 50, Rahip 48, Buyucu 46); SkillComponent::ApplySaveData

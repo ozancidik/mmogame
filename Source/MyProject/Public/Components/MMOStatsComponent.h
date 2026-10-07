@@ -254,10 +254,11 @@ public:
 
 	/**
 	 * Sinif degisimi (QA MEDIUM-5/6): ana statlari yeni sinifin baslangic dagilimina ceker,
-	 * level-up'ta kazanilan tum stat puanlarini ve SpentSkillPoints kadar skill puanini iade eder.
+	 * level-up'ta kazanilan tam stat/skill butcesini iade eder. Eski SpentSkillPoints parametresi
+	 * C++ uyumlulugu icin korunur, butceyi artiramaz.
 	 * Can/mana DOLDURULMAZ (mevcut deger korunur, sadece yeni maksimuma kirpilir). Sadece otorite.
 	 */
-	void ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 SpentSkillPoints);
+	void ResetPointsForClassChange(int32 NewStrength, int32 NewDexterity, int32 NewIntelligence, int32 NewVitality, int32 SpentSkillPoints = 0);
 
 	/** Sunucuda yapilan dusmanca eylemi savas zamanlayicisina isler. */
 	void MarkCombatActivity();

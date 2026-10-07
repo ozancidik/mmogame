@@ -777,3 +777,47 @@ loadFailed=0 existsMismatch=0 json ok=250 mismatch=0 maxLevel=6`,
 callback/klan/gorev/loot/iksir/ekipman/satici testleri gecti. Summer 54 / Winter 29
 mob dogumu, 0 hata; NetSmoke 1 join / 1 welcome, iki tarafta 0 hata (yalniz
 baglanti). Lv33+ beceri bosluklari ve InitGameState beyaz liste uyarisi acik.
+
+## 43. Mastery/bakiye ortak butcesi ve sinif iade acigi (2026-10-07)
+
+UE reproducer `MMOTestMasteryBudget` / `TestMasteryBudget.ps1` eklendi. Duzeltme
+oncesi normal Editor derlemesi gecti, gercek Skill → Stats yukleme sirasinda
+fixture **FAIL checks=1** verdi: Lv10 kaydi bes agacta 10'ar rutbe ve 18 bakiye
+yukluyordu (50+18=68, kazanilabilir puan 18). Sinif iadesi harcanan+bakiye
+toplamini alt sinir olarak kullandigindan fazlayi koruyordu. Dogrudan bozuk
+MAX_int32 bakiye + iade toplami ayrica signed overflow riski tasiyordu.
+
+Duzeltme:
+
+- Ortak `SanitizeMasteryRanks`: tam bes agac, negatifleri sifirla, rutbe<=seviye,
+  toplam<=kazanilan puan. Basic, sonra Special0..3 sirasinda deterministik kirpma;
+  gecerli dagilim degismez. Skill butcesi int64 hesaplanip int32 tavanina kirpilir.
+- Stats kayit yuklemesi ayni kayit/rutbe onarim kuralini kullanip harcanmamis
+  skill puanini kalan butceye kirpar; bilesen yukleme sirasina bagli degildir.
+- Sinif degisiminde puanin tek kaynagi HandleLevelUp oldugu icin stat ve skill
+  iadesi tam seviye butcesidir. Bozuk bakiye/harcama toplami okunmaz; eski besinci
+  C++ parametresi uyumluluk icin durur, butceyi artiramaz. Can/mana doldurulmaz.
+- Otorite kapilari ve mevcut replike alanlar korunur; kayit semasi degismedi.
+
+Duzeltme sonrasi normal Editor derlemesi ve **PASS checks=12**: gecerli dagilim,
+50+18 payload, gecerli rutbe+MAX bakiye, Lv1, MIN/MAX seviye (Lv80 toplam158),
+negatif/kisa dizi, gecerli legacy beceri/hotbar, gercek ChangeClass, bozuk
+MAX iade, iki normal yatirim, Skill+Stats bellek roundtrip'i. Izole controllersiz
+aktor ayni cagrida yok edilir; oyuncu diski yuklenmez/yazilmaz. Test komutu ve
+fixture Shipping'de yok. RunAllChecks'e yeni adim ve Skill cpp PCH'siz derlemesi
+eklendi. Agency-agents Multiplayer Architect / AppSec / Backend / Test Results
+Analyzer rehberleri kullanildi; bagimsiz paralel ajan yok.
+
+Sinir: bozuk kaydin sunucuda yuklenmesi on kosuldur; uzaktan dosya yazma kaniti
+degildir. Legacy uyumlulugu icin gecerli LearnedSkills korunur; bu listenin
+mastery maliyetine gore tam dogrulanmasi, hesap kimligi ve imza aciktir. Y-2
+tumden kapanmadi. Gercek yeniden giris, uzak istemci yatirim/sinif RPC'si ve
+HUD PIE'de OYNANMADI; PLAYTEST_CHECKLIST.md'ye eklendi.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **25/25 GECTI**; 15 dosya
+PCH'siz /W4, 0 derleyici uyarisi; JSON 111 negatif; 256 yerel yuva `loaded=256
+invalid=0 loadFailed=0 existsMismatch=0 json ok=256 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`. Summer 49 / Winter 32 mob dogumu,
+iki smoke'ta 0 hata; NetSmoke 1 join / 1 welcome, iki tarafta 0 hata (yalniz
+baglanti). Lv33+ beceri bosluklari ve StaticLint InitGameState beyaz liste
+uyarisi acik. Kalan PIE ve guvenlik maddeleri bu paketle kapanmadi.
