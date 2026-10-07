@@ -10,6 +10,7 @@
 #include "GameFramework/Pawn.h"
 #include "Core/MMONotify.h"
 #include "Core/MMOMetrics.h"
+#include "Player/MMOPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -47,7 +48,7 @@ bool UMMOQuestComponent::RunRewardLifeStateSelfTest(UWorld* World, FString& OutE
 		if (!Character || !ExpectedCharacter || !Giver) { OutError = TEXT("fixture spawn failed"); return false; }
 		// Tek senkron kare: gercek oyuncuya dokunmadan oyuncu telemetri yolunu da sinar.
 		// AutoLoadDeferred timer'i calismadan karakter yok edilir; ilk kayit yuklenmez.
-		APlayerController* Controller = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), TestLocation, FRotator::ZeroRotator, Params);
+		AMMOPlayerController* Controller = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), TestLocation, FRotator::ZeroRotator, Params);
 		if (!Controller) { OutError = TEXT("fixture controller spawn failed"); return false; }
 		Fixtures.Add(Controller);
 		Controller->Possess(Character);
@@ -324,6 +325,10 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	{
 		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=quest_accept who=%s lv=%d quest=%s"),
 			MMOMetrics::Seconds(), *MMOMetrics::WhoName(Owner), Owner->GetStats()->Level, *QuestId.ToString());
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Owner->GetController()))
+		{
+			PC->RecordFirstQuestMetric(TEXT("quest_accept"), QuestId);
+		}
 	}
 
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev alindi: %s"), *Def->Name), FColor(120, 200, 255), 2.5f);
@@ -495,6 +500,10 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=quest_claim who=%s lv=%d to=%d quest=%s xp_reward=%d capped=%d"),
 			MMOMetrics::Seconds(), *MMOMetrics::WhoName(Owner), RewardLevel, Owner->GetStats()->Level,
 			*QuestId.ToString(), FMath::Max(0, Def->RewardXP), Owner->GetStats()->Level >= Owner->GetStats()->MaxLevel ? 1 : 0);
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Owner->GetController()))
+		{
+			PC->RecordFirstQuestMetric(TEXT("quest_claim"), QuestId);
+		}
 	}
 
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin)"), *Def->Name, Def->RewardXP, Def->RewardGold), FColor(120, 255, 120), 3.f);

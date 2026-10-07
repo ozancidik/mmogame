@@ -1,0 +1,16 @@
+[MMOMETRIC] t=10 ev=quest_accept who=Host lv=1 quest=Q_Goblins
+[MMOMETRIC] t=10 ev=first_quest_accept who=Host lv=1 quest=Q_Goblins scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=8
+[MMOMETRIC] t=11 ev=first_quest_accept who=Host lv=1 quest=Q_Goblins scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=9
+[MMOMETRIC] t=40 ev=quest_claim who=Host lv=1 to=2 quest=Q_Goblins xp_reward=200 capped=0
+[MMOMETRIC] t=40 ev=first_quest_claim who=Host lv=2 quest=Q_Goblins scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=38
+[MMOMETRIC] t=55 ev=first_quest_accept who=Host lv=2 quest=Q_Cleanup scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=50 elapsed=5
+[MMOMETRIC] t=13 ev=first_quest_accept who=Client lv=1 quest=Q_Goblins scope=controller sid=cccccccccccccccccccccccccccccccc start=4 elapsed=9
+[MMOMETRIC] t=2 ev=first_quest_claim who=Bad lv=1 quest=Q_Goblins scope=controller sid=dddddddddddddddddddddddddddddddd start=3 elapsed=-1
+[MMOMETRIC] t=10 ev=first_quest_accept who=Bad lv=1 quest=Q_Goblins scope=controller sid=dddddddddddddddddddddddddddddddd start=2 elapsed=nan
+[MMOMETRIC] t=10 ev=first_quest_accept who=Bad lv=1 quest=Q_Goblins scope=controller sid=bad start=2 elapsed=8
+[MMOMETRIC] t=10 ev=first_quest_accept who=Bad lv=1 quest=Q_Goblins scope=pawn sid=dddddddddddddddddddddddddddddddd start=2 elapsed=8
+[MMOMETRIC] t=10 ev=first_quest_accept who=Bad lv=1 quest=Q_Goblins scope=controller sid=dddddddddddddddddddddddddddddddd start=2 elapsed=9
+[MMOMETRIC] t=10 ev=first_quest_claim who=Bad lv=1 quest=Q_Goblins scope=controller sid=dddddddddddddddddddddddddddddddd start=2 elapsed=inf
+[MMOMETRIC] t=10 ev=first_quest_accept who=Bad lv=nan quest=Q_Goblins scope=controller sid=dddddddddddddddddddddddddddddddd start=2 elapsed=8
+[MMOMETRIC] t=10 ev=first_quest_accept who=Bad lv=1 scope=controller sid=dddddddddddddddddddddddddddddddd start=2 elapsed=8
+[MMOMETRIC] t=nan ev=first_quest_accept who=Bad lv=1 quest=Q_Goblins scope=controller sid=dddddddddddddddddddddddddddddddd start=2 elapsed=8

@@ -3914,3 +3914,27 @@ dosyasını okumaz/yazmaz; gerçek ağ RPC'si veya HUD kanıtı değildir.
   sırasında bütçeye kırpılmalı; tekrar kaydet/yükle aynı durumu korumalı.
 - [ ] Eski mastery alanı boş kayıt: geçerli öğrenilmiş beceri ve hotbar korunmalı.
   İmza/hesap ve LearnedSkills'in mastery maliyetine göre tam denetimi ayrı iş.
+
+## İlk görev kabul/teslim ölçümü — 2026-10-07 (PIE açık)
+
+`TestFirstQuestMetrics.ps1` 6 UE kontrolünde boş pawn/geçersiz olay reddi,
+tek kabul, yeni pawn'da tekilliğin korunması, controller aktarımı ve bağımsız
+yeni oturumu sınadı. Mevcut 8 görev kontrolü gerçek başarılı kod yolundan
+1 ilk kabul + 1 ilk teslim, aynı sid üretti; iki normal kabulden yalnız ilki
+ilk olaydır. Senkron fixture süreleri oynanış ölçümü değildir; disk/RPC/gerçek
+ServerTravel kontrolü değildir. İlk olay kaydı sunucudadır; replike görev
+durumu ve ödül kuralları değişmedi.
+
+- [ ] Host + uzak istemcide iki görev kabul et, birini teslim et: sunucuda her
+  controller sid'si için yalnız 1 `first_quest_accept`, 1 `first_quest_claim`;
+  istemci loglarında kopya olmamalı. Ölü/uzak/eksik/tekrar teslim üretmemeli.
+- [ ] Öl/diril veya pawn değiştir, sonra başka görev al: aynı controller/sid
+  altında ilk olay yeniden yazılmamalı. Görev HUD/ödül normal çalışmalı.
+- [ ] Gerçek Summer→Winter seamless geçişten sonra olay tekrarlanmamalı;
+  controller değişirse sid/start/tekillik taşınmalı. Yeniden bağlantı ise yeni
+  controller/sid olarak ayrı görünmeli (kalıcı karakter ilk eylemi değil).
+- [ ] Logu `PlaytestMetrics.py` ile oku: ilk süre controller BeginPlay'den
+  ölçülmeli; first olayları XP/altın/görev sayısını iki katına çıkarmamalı.
+  Önceki oturumdaki aktif görevin ilk teslimi ilk kabulden önce gelebilir.
+- [ ] İlk olay olmayan/eski loglarda `?`/bilinmiyor; ilk öldürme/loot/ekipman ve
+  gerçek 20 dk sınıf/parti süreleri ayrıca açık.

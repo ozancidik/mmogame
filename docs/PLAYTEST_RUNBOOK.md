@@ -47,6 +47,18 @@ altında yoksa `ort_sure=?`; önceki oturumdan yüklenen görevin süresi tahmin
 Eski loglarda görev sütununun 0 olması sıfır görev kazancı kanıtı değildir.
 Bu araç henüz kalıcı hesap kimliğiyle farklı oturumları birleştirmez.
 
+**İlk görev eylemi ölçümü:** Sunucu `first_quest_accept` / `first_quest_claim`
+olaylarını başarılı kod yolunda birer kez yazar. `scope=controller`, `sid`
+rastgele geçici oturum kimliği, `start` controller BeginPlay zamanı, `elapsed`
+bu başlangıçtan geçen saniyedir. Yeni pawn aynı controller altında tekrar olay
+üretmez; controller seamless aktarımında durum taşınır. Yeniden bağlanma/yeni
+controller yeni sid demektir; kalıcı karakterin ilk görevi ölçülmez. Kaydedilmiş
+aktif görev teslimi, bu oturumun ilk kabulünden önce ilk teslim olabilir.
+Parser sid bazında ilk süreyi korur; tekrar/geçersiz kayıtları sayar. Eksik olay
+`sure=?`, eski logda ilk olay yoksa süre bilinmiyor; sıfır varsayılmaz. `--who`
+oyuncu adını filtreler, ad değiştiren oyuncunun farklı ad altındaki satırlarını
+birleştirmez. İlk olaylar görev adedi, XP ve altını tekrar toplamaz.
+
 Ölçüm satırları yalnız sunucuda (host) basılır. Logda hiç satır yoksa Kapı 3 **KALDI**: büyük olasılıkla istemci penceresinin logu okunuyor.
 
 ## Sonuç şablonu (kopyala, doldur, bana gönder)

@@ -15,6 +15,7 @@
 #include "Core/MMOTargeting.h"
 #include "Core/MMOGameMode.h"
 #include "Core/MMOAdmin.h"
+#include "Core/MMOMetrics.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -68,6 +69,13 @@ void AMMOPlayerController::MMOTravel()
 void AMMOPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	#if !UE_BUILD_SHIPPING
+	if (HasAuthority() && !FirstQuestMetricsSession.IsValid())
+	{
+		FirstQuestMetricsSession = FGuid::NewGuid();
+		FirstQuestMetricsStart = MMOMetrics::Seconds();
+	}
+	#endif
 
 	// OS imleci gizli ama fare serbest ve konumu takip edilir; kendi imlecimizi HUD cizer.
 	bShowMouseCursor = true;
@@ -119,7 +127,112 @@ void AMMOPlayerController::SeamlessTravelTo(APlayerController* NewPC)
 	// asili kalip hareketi kilitlemesin.
 	CloseChatInput();
 	Super::SeamlessTravelTo(NewPC);
+#if !UE_BUILD_SHIPPING
+	if (HasAuthority() && FirstQuestMetricsSession.IsValid())
+	{
+		if (AMMOPlayerController* MMO = Cast<AMMOPlayerController>(NewPC))
+		{
+			MMO->FirstQuestMetricsSession = FirstQuestMetricsSession;
+			MMO->FirstQuestMetricsStart = FirstQuestMetricsStart;
+			MMO->RecordedFirstQuestMetrics = RecordedFirstQuestMetrics;
+		}
+	}
+#endif
 }
+
+bool AMMOPlayerController::RecordFirstQuestMetric(FName Action, FName QuestId)
+{
+#if !UE_BUILD_SHIPPING
+	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
+	if (!HasAuthority() || !MetricPawn || !MetricPawn->HasAuthority() || !MetricPawn->IsPlayerControlled()
+		|| !MetricPawn->GetStats() || !FirstQuestMetricsSession.IsValid() || FirstQuestMetricsStart < 0.0
+		|| QuestId.IsNone() || (Action != TEXT("quest_accept") && Action != TEXT("quest_claim"))
+		|| RecordedFirstQuestMetrics.Contains(Action))
+	{
+		return false;
+	}
+	RecordedFirstQuestMetrics.Add(Action);
+	const double Now = MMOMetrics::Seconds();
+	UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.3f ev=first_%s who=%s lv=%d quest=%s scope=controller sid=%s start=%.3f elapsed=%.3f"),
+		Now, *Action.ToString(), *MMOMetrics::WhoName(MetricPawn), MetricPawn->GetStats()->Level, *QuestId.ToString(),
+		*FirstQuestMetricsSession.ToString(EGuidFormats::Digits), FirstQuestMetricsStart, FMath::Max(0.0, Now - FirstQuestMetricsStart));
+	return true;
+#else
+	static_cast<void>(Action);
+	static_cast<void>(QuestId);
+	return false;
+#endif
+}
+
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+
+bool AMMOPlayerController::RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required"); return false;
+	}
+	TArray<AActor*> Fixtures;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOPlayerController* PCs[3] = {};
+		AMMOCharacter* Pawns[3] = {};
+		for (int32 i = 0; i < 3; ++i)
+		{
+			const FVector Location(1000000 + i * 5000, 1000000, 5000);
+			PCs[i] = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			Pawns[i] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			if (PCs[i]) Fixtures.Add(PCs[i]);
+			if (Pawns[i]) Fixtures.Add(Pawns[i]);
+			if (!PCs[i] || !Pawns[i]) { OutError = TEXT("fixture spawn failed"); return false; }
+		}
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks; return true;
+		};
+		const FName Accept(TEXT("quest_accept")), Claim(TEXT("quest_claim")), Quest(TEXT("Q_Goblins"));
+		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest), TEXT("controller without pawn emitted"))) return false;
+		PCs[0]->Possess(Pawns[0]);
+		if (!Check(!PCs[0]->RecordFirstQuestMetric(TEXT("unknown"), Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, NAME_None), TEXT("invalid event emitted"))) return false;
+		if (!Check(PCs[0]->RecordFirstQuestMetric(Accept, Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, TEXT("Q_Cleanup")), TEXT("first acceptance not unique"))) return false;
+		PCs[0]->Possess(Pawns[1]);
+		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest) && PCs[0]->RecordFirstQuestMetric(Claim, Quest), TEXT("pawn replacement reset first event"))) return false;
+		const FGuid OriginalSession = PCs[0]->FirstQuestMetricsSession;
+		const double OriginalStart = PCs[0]->FirstQuestMetricsStart;
+		PCs[0]->SeamlessTravelTo(PCs[1]);
+		PCs[1]->Possess(Pawns[2]);
+		if (!Check(PCs[1]->FirstQuestMetricsSession == OriginalSession && PCs[1]->FirstQuestMetricsStart == OriginalStart
+			&& !PCs[1]->RecordFirstQuestMetric(Accept, Quest) && !PCs[1]->RecordFirstQuestMetric(Claim, Quest), TEXT("controller transfer reset first event"))) return false;
+		PCs[2]->Possess(Pawns[0]);
+		return Check(PCs[2]->FirstQuestMetricsSession != OriginalSession && PCs[2]->RecordFirstQuestMetric(Accept, Quest), TEXT("new controller did not start independent session"));
+	}();
+	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
+	return bPassed; // Same synchronous frame: no player load timer or disk save.
+}
+
+namespace
+{
+	struct FMMOFirstQuestMetricsTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstQuestMetrics"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOPlayerController::RunFirstQuestMetricsSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_QUEST_METRICS_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstQuestMetricsTestExec GMMOFirstQuestMetricsTestExec;
+}
+#endif
 
 void AMMOPlayerController::Say(const FString& Message)
 {

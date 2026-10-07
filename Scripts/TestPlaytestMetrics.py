@@ -15,6 +15,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURE = os.path.join(HERE, "fixtures", "playtest_metrics_sample.log")
 QUEST_FIXTURE = os.path.join(HERE, "fixtures", "quest_metrics_sample.log")
+FIRST_FIXTURE = os.path.join(HERE, "fixtures", "first_quest_metrics_sample.log")
 
 failures = []
 
@@ -112,6 +113,33 @@ def main(argv):
     check(reversed_pair["seconds"] == [] and reversed_pair["unmatched"] == 1,
           "ters saat farki sifir sure diye raporlanmamali")
 
+    first_events = pm.parse_log(FIRST_FIXTURE)
+    check(len(first_events) == 16, "first fixture: 16 olay")
+    fs = pm.build_stats(first_events)
+    first = fs["Host"]["first_actions"]
+    check(first["a" * 32]["first_quest_accept"]["seconds"] == 8
+          and first["a" * 32]["first_quest_claim"]["seconds"] == 38, "ilk gorev sureleri ve tekrar korumasi")
+    check(first["b" * 32]["first_quest_accept"]["seconds"] == 5
+          and "first_quest_claim" not in first["b" * 32], "yeni kontrolcu/eksik teslim karismamali")
+    check(fs["Client"]["first_actions"]["c" * 32]["first_quest_accept"]["seconds"] == 9,
+          "oyuncularin ilk olaylari ayrilmali")
+    check(fs["Host"]["first_duplicates"] == 1 and fs["Bad"]["first_invalid"] == 9
+          and fs["Bad"]["first_actions"] == {}, "gecersiz/tekrar ilk olaylar")
+    check(fs["Host"]["quests"]["Q_Goblins"]["accepts"] == 1
+          and fs["Host"]["quests"]["Q_Goblins"]["claims"] == 1
+          and fs["Host"]["lv"][1]["quest_xp_reward"] == 200, "first olaylari gorev/XP'yi cift saymamali")
+    check(o["first_actions"] == {} and host["first_actions"] == {}, "eski logdan ilk eylem uydurulmamali")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check(code == 0 and "first_quest_accept sure=0:08" in out
+          and "first_quest_claim sure=0:38" in out and "first_quest_claim sure=?" in out,
+          "ilk gorev tablosu/missing teslim raporu")
+    check("Oyuncu: Client" not in out and "Oyuncu: Bad" not in out, "first --who filtresi")
+    code, bad_out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Bad"])
+    check(code == 0 and "gecersiz=9 tekrar=0" in bad_out and "first_* suresi bilinmiyor" in bad_out,
+          "bozuk sayilar/eksik alan raporu hata vermeden reddedilmeli")
+    code, old_out = run_main(pm, ["x", FIXTURE])
+    check("first_* suresi bilinmiyor" in old_out, "eski log ilk eylem olcumu yok uyarisini vermeli")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -128,7 +156,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski log: %d olay, 2 oyuncu; gorev: %d olay, 3 oyuncu)." % (len(events), len(quest_events)))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay)." % (len(events), len(quest_events), len(first_events)))
     return 0
 
 

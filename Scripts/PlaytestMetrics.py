@@ -15,10 +15,12 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   gold     who src amount balance            (amount: +kazanc / -harcama)
   quest_accept who lv quest
   quest_claim  who lv to quest xp_reward capped (lv = odulden once; xp_reward = nominal odul)
+  first_quest_accept / first_quest_claim who lv quest scope=controller sid start elapsed
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
 import os
+import math
 import re
 import sys
 from collections import defaultdict
@@ -32,7 +34,8 @@ def project_root():
 
 def to_num(text, default=0.0):
     try:
-        return float(text)
+        value = float(text)
+        return value if math.isfinite(value) else default
     except (TypeError, ValueError):
         return default
 
@@ -83,10 +86,29 @@ def build_stats(events):
             "quests": defaultdict(lambda: {"accepts": 0, "claims": 0, "xp_reward": 0,
                                             "seconds": [], "unmatched": 0, "capped": 0}),
             "quest_start": {},
+            "first_actions": {}, "first_invalid": 0, "first_duplicates": 0,
         })
         p["last_t"] = max(p["last_t"], t)
         ev = e["ev"]
-        if ev == "levelup":
+        if ev in ("first_quest_accept", "first_quest_claim"):
+            # Explicit controller lifetime, never guessed from first log time or player name.
+            sid = e.get("sid", "")
+            start = to_num(e.get("start"), float("nan"))
+            elapsed = to_num(e.get("elapsed"), float("nan"))
+            event_time = to_num(e.get("t"), float("nan"))
+            level = to_num(e.get("lv"), float("nan"))
+            if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
+                    or not all(math.isfinite(n) and n >= 0 for n in (start, elapsed, event_time))
+                    or not math.isfinite(level) or level < 1 or not level.is_integer() or not e.get("quest")
+                    or event_time < start or abs(event_time - start - elapsed) > 0.01):
+                p["first_invalid"] += 1
+                continue
+            session = p["first_actions"].setdefault(sid.lower(), {})
+            if ev in session:
+                p["first_duplicates"] += 1
+                continue
+            session[ev] = {"seconds": elapsed, "lv": int(level), "quest": e["quest"]}
+        elif ev == "levelup":
             frm = int(to_num(e.get("from")))
             to = int(to_num(e.get("to")))
             enter = p["enter"].get(frm, p["first_t"] if p["level"] is None else t)
@@ -208,6 +230,20 @@ def print_player(who, p):
         print("(?) Kabul bu logda yoksa (onceki oturum/kayit/ad degisimi) gorev suresi bilinmez.")
     else:
         print("Gorev olayi yok: XP(quest)=0, eski loglarda gercek sifir kazanc kaniti degildir.")
+    if p["first_actions"]:
+        print("Ilk gorev eylemleri (sunucu kontrolcu omru; kalici karakter ilerlemesi degil):")
+        for sid, actions in sorted(p["first_actions"].items()):
+            for action in ("first_quest_accept", "first_quest_claim"):
+                sample = actions.get(action)
+                if sample:
+                    print("  sid=%s %s sure=%s lv=%d quest=%s" % (
+                        sid, action, fmt_time(sample["seconds"]), sample["lv"], sample["quest"]))
+                else:
+                    print("  sid=%s %s sure=? (bu logda olay yok)" % (sid, action))
+    else:
+        print("Ilk gorev olayi yok: first_* suresi bilinmiyor; sifir sure veya basarisizlik kaniti degil.")
+    if p["first_invalid"] or p["first_duplicates"]:
+        print("Ilk olay atlanan: gecersiz=%d tekrar=%d" % (p["first_invalid"], p["first_duplicates"]))
 
 
 def main(argv):

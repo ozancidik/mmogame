@@ -821,3 +821,55 @@ invalid=0 loadFailed=0 existsMismatch=0 json ok=256 mismatch=0 maxLevel=6`,
 iki smoke'ta 0 hata; NetSmoke 1 join / 1 welcome, iki tarafta 0 hata (yalniz
 baglanti). Lv33+ beceri bosluklari ve StaticLint InitGameState beyaz liste
 uyarisi acik. Kalan PIE ve guvenlik maddeleri bu paketle kapanmadi.
+
+## 44. Kontrolcu oturumunda ilk gorev eylemleri (2026-10-07)
+
+Lv1-30 olcum planinin sinirli ilk eylem parcasi: basarili gorev kabul/teslimi
+`AMMOPlayerController::RecordFirstQuestMetric` uzerinden sunucuda
+`first_quest_accept` / `first_quest_claim` yazar. Olay whitelisti, pawn/otorite
+kapisi, quest None reddi ve controller TSet tekilligi vardir; client RPC yok.
+Baslangic server controller BeginPlay, sid gecici rastgele GUID'dir. Pawn
+degismesi sifirlamaz; SeamlessTravelTo yeni MMO controller'a kimlik/baslangic/
+isaretleri kopyalar. Yeni controller yeni oturumdur. Kalici kayda/replikasyon
+semasina ek yok; gorev/XP/odul kurallari degismedi. Alanlar ve olay govdesi
+Shipping'de derlenmez. Ilk teslim seviyesi odul SONRASI andir; eski quest_claim
+nominal XP tablosunun teslim ONCESI seviyesi aynen kalir.
+
+Derlemedeki ilk C4458, local Character'in AController::Character uyelerini
+gizlemesiydi; MetricPawn diye adlandirilip normal UE derlemesi gecti. Sistemde
+`python` alias'i kurulu runtime'a gitmedigi icin mevcut RunAllChecks gibi
+motorun bundled Python'u kullanildi. Basarili dogrulamalar:
+
+- `TestFirstQuestMetrics.ps1`: **PASS checks=6**, iki bagimsiz sid'de 2 ilk
+  kabul / 1 ilk teslim. Bos pawn/yanlis olay/bos quest reddi, tekrar engeli,
+  pawn degisimi, dogrudan controller SeamlessTravelTo aktarimi, yeni oturum.
+- Gorev fixture'i 8 kural + 2 kabul/1 teslim + ayni sid'de 1 ilk kabul/1 ilk
+  teslim. Reddedilen oluluk/eksik/uzak/tekrarlar basarili olay uretmez. Gecici
+  MMO controller/karakterler ayni senkron karede yok edilir; auto-load timer
+  calismaz, oyuncu diski okunmaz/yazilmaz.
+- Parser eski 12 olay, gorev 14 olay, yeni ilk eylem 16 olay fixture'i gecti.
+  Iki Host sid'si/Client ayrimi, tekrar, eksik teslim, negatif/NaN/Inf sure,
+  bozuk sid, yanlis kapsam, uyumsuz timestamp, eksik quest, NaN seviye/zaman
+  reddi (9 gecersiz), --who ve XP tek sayim. Son sayi korumalari sonrasi parser
+  adimi ayrica tekrar calistirilip gecti; derleme/UE kodu bu sirada degismedi.
+  Gecici parser kopyasinda elapsed=0.0 bozulmasi fixture'i exit=1 ile dusurdu;
+  kaynak/DLL degismedi. Gercek UE gorev logu parser'da da ilk olaylari ve
+  nominal 200 XP/+120 altini tek saydi; sifir sureli fixture gercek kosu degil.
+
+Parser oyuncu adi altinda sid'leri ayirir; ad degisimi/kalici hesap/farkli
+log/surecler birlestirilmez. Iki ilk gorev olayi tum `first_*` planini bitirmez:
+ilk oldurme/loot/ekipman, gercek 20 dk solo/parti ve model karsilastirmasi acik.
+Gercek ag RPC'si, pawn degisimi ve Summer/Winter seamless oynanisi PIE'de
+OYNANMADI; PLAYTEST_CHECKLIST/PLAYTEST_RUNBOOK guncellendi. Agency-agents Unreal
+Multiplayer Architect / Test Results Analyzer rehberleri kullanildi; ayri
+paralel ajan yok.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile` **26/26 GECTI**; 15 dosya
+PCH'siz /W4, 0 derleyici uyarisi. JSON 111 negatif; 262 yerel yuva `loaded=262
+invalid=0 loadFailed=0 existsMismatch=0 json ok=262 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`. Onceki gecis/parti/callback/klan/gorev/
+loot/iksir/ekipman/stat/mastery/satici testleri ve yeni ilk eylem adimi gecti.
+Summer 50 / Winter 27 mob dogumu, iki smoke'ta 0 hata; NetSmoke 1 join / 1
+welcome, iki tarafta 0 hata (yalniz baglanti). Lv33+ beceri bosluklari ve
+StaticLint InitGameState beyaz liste uyarisi acik. Gercek ilk eylem sureleri
+ve PIE ag/oynanis kaniti bu test paketinden cikarilmaz.

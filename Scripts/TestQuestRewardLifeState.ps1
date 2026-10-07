@@ -18,14 +18,23 @@ $pass = Select-String -LiteralPath $log -Pattern '\[MMO_QUEST_LIFE_STATE_TEST\] 
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_QUEST_LIFE_STATE_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 $accepts = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=quest_accept ')
 $claims = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=quest_claim ')
+$firstAccept = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=first_quest_accept ')
+$firstClaim = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=first_quest_claim ')
 $metricOk = $accepts.Count -eq 2 -and $claims.Count -eq 1
 if ($metricOk) {
     $metricOk = $accepts[0].Line -match 'quest=Q_Goblins\b' -and $accepts[1].Line -match 'quest=Q_Cleanup\b' `
         -and $claims[0].Line -match 'lv=1 to=2 quest=Q_Goblins xp_reward=200 capped=0\b'
 }
+$metricOk = $metricOk -and $firstAccept.Count -eq 1 -and $firstClaim.Count -eq 1
+if ($metricOk) {
+    $metricOk = $firstAccept[0].Line -match 'quest=Q_Goblins scope=controller sid=([a-fA-F0-9]{32}) start=[0-9.]+ elapsed=[0-9.]+'
+    $sessionId = $Matches[1]
+    $metricOk = $metricOk -and $firstClaim[0].Line -match "quest=Q_Goblins scope=controller sid=$sessionId "
+}
 if ($pass -and -not $fail -and $process.ExitCode -eq 0 -and $metricOk) {
     Write-Output $pass.Line
     Write-Output '[MMO_QUEST_METRICS_TEST] PASS accepts=2 claims=1 (reddedilen istekler olay uretmedi)'
+    Write-Output '[MMO_FIRST_QUEST_HOOKS_TEST] PASS first_accept=1 first_claim=1 (ayni kontrolcu oturumu)'
     exit 0
 }
 if (-not $metricOk) { Write-Output "Gorev telemetrisi KALDI (accepts=$($accepts.Count) claims=$($claims.Count))" }

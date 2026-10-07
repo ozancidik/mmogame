@@ -54,10 +54,22 @@ public:
 
 	bool IsChatInputOpen() const { return ChatBox.IsValid(); }
 
+	// Server telemetry only, after successful quest mutation. No client RPC or saved progress.
+	bool RecordFirstQuestMetric(FName Action, FName QuestId);
+#if !UE_BUILD_SHIPPING
+	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SeamlessTravelTo(APlayerController* NewPC) override;
+
+#if !UE_BUILD_SHIPPING
+	FGuid FirstQuestMetricsSession;
+	double FirstQuestMetricsStart = -1.0;
+	TSet<FName> RecordedFirstQuestMetrics;
+#endif
 
 	UFUNCTION(Server, Reliable)
 	void ServerSendChat(const FString& Message);
