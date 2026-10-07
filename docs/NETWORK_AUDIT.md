@@ -27,7 +27,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O3 | ORTA | `/klan kur` her çağrıda tüm kayıt dosyalarını senkron okur, cooldown yok | MMOClanComponent.cpp:46-64, 250 |
 | O4 | ORTA | Ticaret davetinde aynı davetçi sınırsız tekrar bildirim; Parti davetinde "davet kapma" koruması yok | MMOTradeComponent.cpp:251-260; MMOPartyComponent.cpp:194-196 |
 | O5 | ORTA | Arkadaş listesi rızasız: başkasının giriş/çıkış ve seviyesini izlemek mümkün | MMOFriendsComponent.cpp:107-164, 206-231, 233-276 |
-| O6 | ORTA | `bTravelSaveCommitted` penceresinde ilerleme kaybı (geri sarma); `bZoneTravelInProgress` yalnız hata yollarında sıfırlanıyor (güncel durum: aşağıdaki O6 bölümü); tek oyuncu toplu geçişi kilitleyebilir | `AMMOCharacter::EndPlay`, `AMMOGameMode::RequestZoneTravel/FinishZoneTravel/AbortZoneTravel` |
+| O6 | ORTA | **Kısmen düzeltildi:** tüm onaylardan sonra son ilerleme kaydı yenilenir; son kayıt–pawn yok oluşu penceresi ve mağaza yazım sırası/iptal açık (güncel durum aşağıda) | `AMMOCharacter::EndPlay`, `AMMOGameMode::RequestZoneTravel/FinishZoneTravel/AbortZoneTravel` |
 | O7 | ORTA | **Kapandı:** elit ölüm duyurusu sunucuda tüm PlayerController'lara sahip-istemci `ClientReceiveChat` ile gider | MMOMob.cpp:916-934 |
 | O8 | ORTA | **Büyük kısmı kapandı:** hedef taraması 5 Hz önbellekli; spawner sunucuya özel ve replike değil. Mob animasyon/hareket tick'i karelik kalıyor | MMOMob.cpp; MMOMobSpawner.cpp |
 | O9 | ORTA | Stats/Quest/Skill/Party alanları da herkese (gizlilik + bant) | MMOStatsComponent.cpp:77-92; MMOQuestComponent.cpp:26-27; MMOSkillComponent.cpp:42-45; MMOPartyComponent.cpp:19-20 |
@@ -217,6 +217,25 @@ PIE'de denenmedi. Bu bulgu O4 davet kapma ve O13 parti birleştirmeden ayrıdır
 - **Seamless travel'da pawn yok edilirken `IsPlayerControlled()` hâlâ true mu?** `EndPlay` bloğu (MMOCharacter.cpp:377-403) buna bağlı; false ise parti çıkışı ve kayıt atlanır **[doğrulanmalı: PIE'de iki oyunculu `MMOTravel`, log ile]**. Kayıt bölge geçişinde `SaveCharacterForTravelAsync` ile (geçiş istenirken) alındığı için o ana kadarki veri kaybı yok (anlık görüntü ile `ServerTravel` arasındaki ilerleme penceresi için O6'ya bak), ama parti dağılması garanti değil.
 
 ### O6 · ORTA · `bTravelSaveCommitted` penceresi ve toplu geçiş kilidi
+
+**Güncel sınır (2026-10-07):** `FinishZoneTravel`, tüm ilk kayıt onaylarından sonra
+her karakter için `FlushDeferredSave(true)` ile güncel durumu senkron yeniden yazar.
+XP/altın değişiminin ayrıca `SaveCharacter` çağırmasına bağlı değildir. Başarısız son
+yazım geçişi iptal eder; bekleyen işaret korunur ve iptal sonrası yeniden deneme yolu
+çalışır. Yerel mağazada karakter başına geçişte ikinci bir yazım yapılır. Bu mevcut
+senkron mağaza sözleşmesine dayanır; gelecekte bulut için son snapshot da ayrı async
+bariyere alınmalı ve depoda yazım sırası/iptal uygulanmalıdır.
+
+Yeni `TestZoneTravelProgress.ps1`, ilk yerel yazımın onayını düşürür; kayıt isteği
+olmadan 37 XP/23 altın ekleyip onayı gerçek GameMode yoluna gönderir. Düzeltme öncesi
+`FAIL changed=1 xp=0 gold=0 started=1 cleared=1`; sonrası aynı diskteki kaydın seviye/XP
+ve altını güncel değerlerle eşleşti (`PASS`, tüm alanlar 1). Gerçek bulut gecikmesi
+değildir. Son yazım hatası testi de ek kayıt isteği olmadan iki hata enjeksiyonu ile
+iptal/işaret korunması/başarılı yeniden kaydı denetler.
+
+**Açık:** son senkron yazımdan `ServerTravel`/pawn yok oluşuna kadar devam eden
+oynanış, iki oyunculu gerçek yeniden yükleme ve motor travel hatası. Aşağıdaki ilk
+denetim ve önceki düzeltme notları tarihsel bağlamdır; O6 tümden kapanmadı.
 - `RequestZoneTravel` her karakter için `SaveCharacterForTravelAsync` çağırır → tüm callback'ler başarılıysa `FinishZoneTravel` `SetTravelSaveCommitted(true)` yapar → `ServerTravel`. Harita değişimi *asenkron*: bayrak true iken `EndPlay` kaydı atlanır ama oyun sürer (mob'lar, loot, görev teslimi, depo, ticaret). Anlık görüntü ile pawn'ın gerçekten yok edilmesi arasındaki saniyelerde olan her şey (altın, XP, ödül, depo hareketi) **geri sarılır**. Yerel (senkron) mağazada pencere 0 kare; bulut mağazada 15 sn'ye kadar. Çoğaltma değil yalnız geri sarma (her karakter için tutarlı anlık görüntü), ama oyuncu için algılanan kayıp. Takas bu pencerede tamamlanırsa `TryExecuteTrade` iki tarafı yeniden kaydediyor (MMOTradeComponent.cpp) — **yalnız senkron/yerel mağaza için tutarlı; bulut mağaza için yuva başına yazım sırası/kilit gerekir** (aşağıdaki 2026-10-07 notu): bulutta eski travel anlık görüntüsü yeni takas kaydından SONRA inerse A eski (kılıç var), B yeni (kılıç var) durumuyla kalıp kılıç ikilenebilir.
   - **Düzeltme:** Travel başlayınca oyuncu girdisini/RPC'leri kilitle (`bTravelLocked` → Server RPC'ler erken döner, hasar bağışıklığı) ya da `EndPlay` içinde `EndPlayReason == LevelTransition` ise de ikinci kez kaydet (aynı slot, idempotent).
 - `bZoneTravelInProgress` yalnız `AbortZoneTravel` yollarında (kayıt hatası, zaman aşımı, oyuncu ayrılması, `ServerTravel` false) sıfırlanıyor; `ServerTravel` true dönüp harita sonradan yüklenemezse bayrak kalıcı true → geçiş sunucu yeniden başlayana dek kapalı. Seamless travel yeni GameMode örneği yarattığından başarı yolunda sorun yok. **[doğrulanmalı]**

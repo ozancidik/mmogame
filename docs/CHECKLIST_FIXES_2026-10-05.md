@@ -485,3 +485,40 @@ Agency-agents AppSec Engineer ve Unreal Multiplayer Architect rol belgelerinden
 yararlanildi; bagimsiz paralel ajan calistirilmadi. O14 kod yolu duzeltildi, gercek
 yeniden baglanti/kalici uyelik dogrulamasi bekliyor. O6 snapshot-sonrasi XP/altin
 penceresi ve magaza yazim sirasi/iptal konulari acik kalir.
+
+## 35. O6: ilk snapshot sonrasi XP/altini gecis oncesi yeniden kaydet (2026-10-07)
+
+`FlushDeferredSave` yalniz yeni kayit istegi ertelenmisse yaziyordu. Ilk gecis kaydi
+alinip onay beklenirken pasif XP/ganimet gibi `SaveCharacter` cagirmayan mutasyonlar
+diske gecmiyordu; basarili onaydan sonra eski snapshot guncelmis gibi kullaniliyordu.
+`FinishZoneTravel`, tum onaylar tamamlaninca her oyuncuda `FlushDeferredSave(true)`
+ile guncel snapshot'i senkron yeniler. Son yazim hata verirse gecis iptal edilir;
+bekleyen isaret korunur, iptal sonrasi tekrar denenir. Basari isareti temizler.
+Kayit semasi/replikasyon degismedi; sunucu otoritesi korunur.
+
+Yeni `TestZoneTravelProgress.ps1` once duzeltmesiz UE'de **FAIL** verdi:
+`changed=1 xp=0 gold=0 started=1 cleared=1` (script exit=1). Ilk yerel yazimin
+callback'i test kancasiyla dusuruldu; 37 XP ve 23 altin sunucuda eklendi, ek kayit
+istegi verilmedi. Gercek GameMode callback girisinden sonra diskteki son kayit
+okundu. Duzeltme sonrasi **PASS changed=1 xp=1 gold=1 started=1 cleared=1**:
+seviye/XP ve altin guncel degerlerle eslesir. Bu test gercek bulut gecikmesi ya da
+hedef haritada yeniden yukleme testi DEGILDIR. Normal gecis testi Winter'i ayrica yukler.
+`TestZoneTravelDeferredSave.ps1` da artik ek kayit istegi OLMADAN son snapshot icin
+iki yazim hatasi enjekte eder: iptal, isaret korunmasi ve basarili yeniden kayit GECTI.
+
+Normal UE 5.7 editor derlemesi GECTI. `RunAllChecks.ps1 -SkipBuild -FullCompile`
+**18/18 GECTI**: 12 dosya PCH'siz /W4, 0 derleyici uyarisi; JSON 111 negatif;
+208 yerel yuva `loaded=208 invalid=0 loadFailed=0 json ok=208 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`; normal/timeout/durum/son yazim hatasi ve yeni
+ilerleme regresyonlari; parti 10, callback 9, klan 9 senaryo; Summer 51 / Winter 34
+mob dogumu, 0 hata; NetSmoke 1 server join / 1 client welcome, iki tarafta 0 hata.
+NetSmoke baglanti kontroludur. Lv33+ beceri boslugu ve InitGameState beyaz liste
+uyarisi ayni; hata degil, acik islerdir.
+
+Sinir/maliyet: yerel magazada her geciste karakter basina ikinci senkron yazim var.
+Bulut magazasi geldiginde bu son snapshot icin de async bariyer ve depoda seri yazim/
+iptal gerekir. Son yazimdan `ServerTravel`/pawn yok olusuna kadarki oynanis penceresi
+KAPANMADI. Iki oyunculu gercek PIE, hedef haritada deger yukleme, motor travel hatasi
+ve dedicated dogrulamasi acik; adimlar `PLAYTEST_CHECKLIST.md`'ye eklendi.
+Agency-agents Backend Architect ve Unreal Multiplayer Architect rol belgeleri
+kullanildi; bagimsiz paralel ajan calistirilmadi. O6 tumden kapanmadi.

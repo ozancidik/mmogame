@@ -3749,3 +3749,20 @@ yeniden bağlantı, sohbet RPC, rol replikasyonu/HUD oynanmadı; en az üç oyun
 - [ ] A gelmeden, yetkili vekil B'nin daveti kabul edildiğinde normal üyelik kurulmalıdır.
 - [ ] Davetçi ayrılsın veya bağlantısı kopsun: bekleyen davet kabul edilmemeli. Üyelik
   değişimi kaydet/yeniden giriş sonrasında korunmalıdır.
+
+## Bölge geçişinde ilk snapshot sonrası ilerleme — 2026-10-07
+
+Tüm ilk kayıt onayları gelince `ServerTravel` öncesi her oyuncunun son durumu tekrar
+yazılır. UE headless testinde ek kayıt isteği olmadan kazanılan XP/altının diskte
+korunması doğrulandı; test ilk yerel yazımın onayını düşürerek beklemeyi kurar.
+Gerçek gecikmeli mağaza ve iki oyunculu PIE oynanmadı.
+
+- [ ] İki oyuncuyla gecikmeli kayıt onayı beklerken pasif parti XP'si, altın, görev
+  ilerlemesi ve hareket değişsin. Ek elle kayıt olmadan geçiş tamamlandıktan sonra
+  yüklenen değerleri son kaynak harita durumuyla karşılaştır.
+- [ ] İlk kaydı erken tamamlanan oyuncu, diğer oyuncuyu beklerken elle kayıt yapsın;
+  ardından yeniden XP/altın kazansın. Son yazım bu ikinci değişimi de korumalıdır.
+- [ ] Son snapshot yazımı başarısızsa kimse hedef haritaya geçmemeli; iptal ve başarılı
+  tekrar kayıt sonrasında güncel değerler korunmalıdır. Disk/bulut arızası oynanmadı.
+- [ ] Son yazım ile pawn yok oluşu arasındaki oynanışı ayrıca ölç: bu kalan pencere
+  kapanmadı. Motor yükleme hatası, dedicated server ve bulut yazım sırası/iptal açık.

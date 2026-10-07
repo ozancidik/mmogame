@@ -479,8 +479,14 @@ void AMMOCharacter::SetTravelSaveCommitted(bool bCommitted)
 	}
 }
 
-bool AMMOCharacter::FlushDeferredSave()
+bool AMMOCharacter::FlushDeferredSave(bool bRefreshSnapshot)
 {
+	// Ilk snapshot sonrasi pasif XP/ganimet, SaveCharacter cagirmadan degisebilir.
+	// Tum travel onaylari geldikten sonra son durumu yaz; hata/iptal yolunda da yeniden denensin.
+	if (bRefreshSnapshot && HasAuthority())
+	{
+		bSaveDeferredByTravel = true;
+	}
 	if (!bSaveDeferredByTravel)
 	{
 		return true;

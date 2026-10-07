@@ -118,13 +118,14 @@ public:
 	// Karakteri diske yazar / diskten yukler (sadece otorite; istemciden Exec cagrilirsa sunucuya yonlenir).
 	void SaveCharacter();
 	// SENKRON kayit (otomatik kayit, MMOSave, klan/ticaret sonrasi, EndPlay): yukleme bitmediyse veya
-	// yazim basarisizsa false doner. Bolge gecisi bunu KULLANMAZ; asagidaki asenkron yolu kullanir.
+	// yazim basarisizsa false doner. Bolge gecisi once asenkron bariyeri, sonra son senkron snapshot'i kullanir.
 	// Bu karakterin bolge gecisi kaydi UCUSTAYKEN (bulut magaza) yazim ERTELENIR (false doner, bSaveDeferredByTravel
 	// kalkar) ve gecis bitince FlushDeferredSave ile yapilir; boylece ayni yuvaya yeni numarali bir yazim
 	// gecis yazimini "eski" yapip gecisi iptal ettirmez. bForce (EndPlay: karakter yok oluyor) ertelemez.
 	bool SaveCharacterForTravel(bool bForce = false);
-	// Ertelenmis kayit yoksa veya yazim basariliysa true. Hatada bekleyen isaret korunur.
-	bool FlushDeferredSave();
+	// Ertelenmis kayit yoksa veya yazim basariliysa true. bRefreshSnapshot tum onaylar sonrasi
+	// son ilerlemeyi de yazar (XP/altin mutasyonu ayri kayit istememis olabilir). Hatada isaret korunur.
+	bool FlushDeferredSave(bool bRefreshSnapshot = false);
 	bool IsSaveDeferredByTravel() const { return bSaveDeferredByTravel; }
 #if !UE_BUILD_SHIPPING
 	// Headless hata enjeksiyonu: yalniz ertelenen yazimlari, en fazla iki denemede reddeder.

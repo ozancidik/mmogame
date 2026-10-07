@@ -1,4 +1,4 @@
-# Ertelenen yazim hatasi gecisi iptal etmeli; sonraki basarili kayit bekleyen isareti temizlemeli.
+# Ek kayit istegi olmadan son snapshot hatasi gecisi iptal etmeli; sonraki kayit isareti temizlemeli.
 # Headless test kancasi iki flush denemesini reddeder, gercek disk arizasi/bulut testi degildir.
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "MyProject.uproject"

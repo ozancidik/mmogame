@@ -110,6 +110,11 @@ Step "Bolge gecisi ertelenen kayit hatasi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Bolge gecisi snapshot sonrasi XP/altin" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelProgress.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Parti birlesme lider onayi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestPartyConsent.ps1") | Out-Host
     $LASTEXITCODE -eq 0
