@@ -3732,3 +3732,20 @@ geri almamalı; eski/yabancı/geç callback bariyere dokunmamalıdır.
   bozulmamalıdır. Ayrılmış pawn için gelen başarı da ilerleme olarak sayılmamalıdır.
 - [ ] Motor geçişi başlattıktan sonra aynı isteğin başarı/hata sonucunu tekrar gönder:
   kaynak GameMode geçiş kilidi erken açılmamalı, ikinci ServerTravel başlamamalıdır.
+
+## Klan davetinde kabul anında lider yetkisi — 2026-10-07
+
+Kabul anında davetçi aynı klanda ve hâlâ lider olmalıdır. Yetkili asıl/vekil lider
+davetleri çalışır; yetkisini kaybeden üyenin eski daveti reddedilip tüketilir. Hata
+düzeltme öncesi UE'de üretildi; sonrası izole sunucu yolunda 9 senaryo geçti. Gerçek
+yeniden bağlantı, sohbet RPC, rol replikasyonu/HUD oynanmadı; en az üç oyuncu gerekir.
+
+- [ ] A uzak istemci, B host, C diğer istemci olsun. A klan lideri, B üye iken A çıksın;
+  B vekil lider olmalı. B, klansız C'ye davet göndersin ve C kabul etmeden A geri girsin.
+  B'nin liderliği düştükten sonra C'nin `/klan kabul` komutu reddedilmeli; C klansız,
+  A lider, B sıradan üye kalmalıdır. Eski davet tekrar kabul edilememelidir.
+- [ ] Asıl lider A yeni davet göndersin: C kabul edip üye olarak katılmalı; isim plakası,
+  klan listesi ve sahibin lider bayrağı tüm ilgili istemcilerde doğru görünmelidir.
+- [ ] A gelmeden, yetkili vekil B'nin daveti kabul edildiğinde normal üyelik kurulmalıdır.
+- [ ] Davetçi ayrılsın veya bağlantısı kopsun: bekleyen davet kabul edilmemeli. Üyelik
+  değişimi kaydet/yeniden giriş sonrasında korunmalıdır.

@@ -67,6 +67,10 @@ public:
 	void FillSaveData(struct FMMOCharacterSaveData& Out) const;
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);
 
+#if !UE_BUILD_SHIPPING
+	static bool RunInviteAuthoritySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 protected:
 	UFUNCTION()
 	void OnRep_Clan();

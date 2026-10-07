@@ -57,7 +57,8 @@ if ($FullCompile) {
         $src = Join-Path $root "Source\MyProject\Private"
         $files = @(
             "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
-            "Components\MMOStatsComponent.cpp", "Components\MMOPartyComponent.cpp", "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
+            "Components\MMOStatsComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
+            "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
             "Characters\MMOMob.cpp"
         ) | ForEach-Object { Join-Path $src $_ }
         $files += (Get-ChildItem (Join-Path $src "Save") -Filter *.cpp | ForEach-Object { $_.FullName })
@@ -116,6 +117,11 @@ Step "Parti birlesme lider onayi" {
 
 Step "Bolge gecisi callback bariyeri" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Klan daveti kabul aninda lider yetkisi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestClanInviteAuthority.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 

@@ -452,3 +452,36 @@ Architect rol belgelerinden yararlanildi; bagimsiz paralel ajan calistirilmadi.
 O6'nin depoda Revision/seri yazim/iptal ve snapshot-sonrasi XP/altin penceresi acik.
 Sonraki sinirli is secimi bu konularin veya iki-surecli admin/PvP dogrulamasinin
 mevcut kaynakta kanitlanabilen kismindan yapilacak; bu tur O6 tumden kapatilmadi.
+
+## 34. O14: bekleyen klan davetinde guncel lider yetkisi (2026-10-07)
+
+`CmdInvite` lider yetkisi istiyordu, fakat `CmdAccept` davetcinin yalniz ayni klanda
+kalmasini denetliyordu. Asil lider yeniden baglaninca `ApplySaveData` vekil lideri
+uyeye indirir; bu uyenin bekleyen daveti eski yetkiyle yeni uye alabiliyordu.
+Kabul aninda `bIsLeader` yeniden denetlenir. Yetkisini kaybeden davetcinin pending
+daveti tuketilir, hedefin uyeligi degismez. Yetkili asil/vekil lider kabul yolu korunur.
+Sunucu otoritesi ve mevcut uyelik replikasyonu korunur.
+
+Regresyon once duzeltmesiz UE'de calistirildi: `FAIL checks=0 reason=demoted inviter
+accepted` (motor exit=0, test script exit=1). Duzeltme sonrasi
+`TestClanInviteAuthority.ps1` **PASS checks=9**: yetkisini kaybeden davetci, asil lider,
+yetkili vekil, mevcut uyelik, klandan ayrilan davetci, gecersiz zaman damgasi, kendine
+davet, eksik davetci ve yok edilmis davetci. Bu izole test pending daveti ve rol
+degisimini sunucuda kurar; controllersiz/ilk kaydi yuklenmemis fixture'lar oyuncu
+kaydi yazamaz. Shipping'de test komutu derlenmez. Gercek lider yeniden baglantisi,
+sahip-istemci sohbet RPC ve HUD/rol replikasyonu testi DEGILDIR.
+
+Normal UE 5.7 editor derlemesi GECTI. `RunAllChecks.ps1 -SkipBuild -FullCompile`
+**17/17 GECTI**: 12 dosya PCH'siz /W4, 0 derleyici uyarisi (klan dosyasi eklendi);
+JSON 111 negatif; 201 yerel yuva `loaded=201 invalid=0 loadFailed=0 json ok=201
+mismatch=0 maxLevel=6`, `writeorder ok=1`, `roundtrip equal=1`; normal/timeout/durum/
+ertelenen hata gecisleri; parti 10, callback 9, klan 9 senaryo; Summer 48 / Winter 35
+mob dogumu, 0 hata; NetSmoke 1 server join / 1 client welcome, iki tarafta 0 hata.
+NetSmoke yalniz baglanti dogrulamasidir. Lv33+ beceri boslugu ve StaticLint
+InitGameState beyaz liste uyarilari onceki gibi acik.
+
+En az uc oyunculu PIE adimlari `PLAYTEST_CHECKLIST.md`'ye eklendi; OYNANMADI.
+Agency-agents AppSec Engineer ve Unreal Multiplayer Architect rol belgelerinden
+yararlanildi; bagimsiz paralel ajan calistirilmadi. O14 kod yolu duzeltildi, gercek
+yeniden baglanti/kalici uyelik dogrulamasi bekliyor. O6 snapshot-sonrasi XP/altin
+penceresi ve magaza yazim sirasi/iptal konulari acik kalir.

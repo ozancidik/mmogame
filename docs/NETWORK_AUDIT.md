@@ -35,6 +35,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O11 | ORTA | Dedicated için engeller: Server target yok, admin yolu `IsLocalController`'a bağlı, geri bildirim `IsLocallyControlled`'a bağlı, HUD'a bağlı sunucu kodu | bkz. bölüm 6 |
 | O12 | ORTA | **Kapandı (yerel log; Shipping'de derlenmez, bkz. O12 bölümü):** takas/iptal, klan, yükseltme/yanma, satış, depo ve ad değişimi yapılandırılmış sunucu loguna yazılır | bölüm 1 |
 | O13 | ORTA | **Kod düzeltildi, PIE bekliyor (2026-10-07):** üye kabulü mevcut grubun tamamını lider izni olmadan birleştiriyordu; mevcut gruplar için lider yetkisi davet ve kabul anında denetleniyor | `UMMOPartyComponent::CanCombineParties/FormOrJoin` |
+| O14 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** eski/vekil liderin yetkisini kaybetmiş bekleyen klan daveti kabul ediliyordu; lider rolü kabul anında yeniden denetleniyor | `UMMOClanComponent::CmdAccept` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -95,6 +96,22 @@ Kontrolsüz test karakterleri kullanılır; pending daveti test kodu sunucuda ku
 Gerçek sahip-istemci RPC, çoğaltma/HUD ve dedicated server doğrulaması değildir.
 Bu bulgu, O4'teki eski davet kapma bulgusundan ayrıdır; mevcut parti kodunda pending
 davet ezmeme/aynı daveti yenilememe koruması zaten vardır.
+
+### O14 · ORTA · Bekleyen klan davetinde bayat lider yetkisi — düzeltildi (2026-10-07)
+
+`CmdInvite` yalnız lider için açıkken `CmdAccept` davetçinin sadece aynı klanda kalmasını
+denetliyordu. `ApplySaveData` asıl lider dönünce vekil lideri sıradan üyeye indirir; bu
+oyuncunun bekleyen daveti 30 saniyelik pencere içinde hâlâ üye alabiliyordu. Kabul anında
+`IC->bIsLeader` denetimi eklendi. Davet eski rolü taşımıyor; yetkisiz kabul, pending
+daveti tüketip üyeliğe dokunmadan reddediliyor. Yetkili vekil lider davet edebilir.
+
+`TestClanInviteAuthority.ps1` düzeltme ÖNCESİ gerçek UE'de `FAIL checks=0 reason=demoted
+inviter accepted` verdi (test çıkışı 1, motor çıkışı 0). Düzeltme sonrası **9 senaryo
+geçti**: demotion reddi, asıl/vekil lider kabulü, mevcut üyelik korunması, klandan ayrılan
+davetçi, geçersiz zaman damgası, kendi kendine davet, eksik ve yok edilmiş davetçi.
+Controllersiz fixture'lar kullanılır; pending ve rol değişimini test kodu kurar. Diskte
+oyuncu kaydı yazılmaz. Gerçek yeniden bağlantı/lider devri, sohbet RPC ve HUD/replikasyon
+PIE'de denenmedi. Bu bulgu O4 davet kapma ve O13 parti birleştirmeden ayrıdır.
 
 ### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
 - **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.

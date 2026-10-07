@@ -11,8 +11,135 @@
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+#endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOClanAudit, Log, All);
+
+#if !UE_BUILD_SHIPPING
+bool UMMOClanComponent::RunInviteAuthoritySelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	TArray<AMMOCharacter*> Actors;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		for (int32 I = 0; I < 2; ++I)
+		{
+			AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
+			if (!Character) { OutError = TEXT("fixture spawn failed"); return false; }
+			Actors.Add(Character);
+		}
+		UMMOClanComponent* Inviter = Actors[0]->GetClanComponent();
+		UMMOClanComponent* Target = Actors[1]->GetClanComponent();
+		// Hicbir gercek cevrimici gruba bildirim/liderlik yan etkisi olmasin.
+		const FString FixtureClan = TEXT("Tst") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(9);
+		TArray<AMMOCharacter*> Online;
+		Inviter->GatherOnlineMembers(FixtureClan, Online, false);
+		if (!Online.IsEmpty()) { OutError = TEXT("fixture name collision"); return false; }
+		Inviter->ClanName = FixtureClan;
+		Inviter->bIsLeader = true;
+		auto SetInvite = [&]()
+		{
+			Target->PendingInviteFrom = Actors[0];
+			Target->PendingInviteClan = FixtureClan;
+			Target->PendingInviteTime = World->GetTimeSeconds();
+		};
+		auto Consumed = [&]()
+		{
+			return !Target->PendingInviteFrom.IsValid() && Target->PendingInviteClan.IsEmpty() && Target->PendingInviteTime < 0.f;
+		};
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		SetInvite();
+		Inviter->bIsLeader = false; // Liderligi kaybetti ama ayni klanda uye olarak kaldi.
+		Target->CmdAccept();
+		if (!Check(!Target->IsInClan() && Consumed(), TEXT("demoted inviter accepted"))) { return false; }
+		Inviter->bIsLeader = true;
+		SetInvite();
+		Target->CmdAccept();
+		if (!Check(Target->ClanName == FixtureClan && !Target->bIsLeader && Consumed(), TEXT("valid leader rejected"))) { return false; }
+		Target->ClanName.Reset();
+		Inviter->bActingLeader = true;
+		SetInvite();
+		Target->CmdAccept();
+		if (!Check(Target->ClanName == FixtureClan && !Target->bIsLeader && Consumed(), TEXT("valid acting leader rejected"))) { return false; }
+		Inviter->bActingLeader = false;
+		SetInvite();
+		Target->CmdAccept();
+		if (!Check(Target->ClanName == FixtureClan && Consumed(), TEXT("existing membership changed"))) { return false; }
+		Target->ClanName.Reset();
+		SetInvite();
+		Inviter->ClanName.Reset();
+		Target->CmdAccept();
+		if (!Check(!Target->IsInClan() && Consumed(), TEXT("departed inviter accepted"))) { return false; }
+		Inviter->ClanName = FixtureClan;
+		SetInvite();
+		Target->PendingInviteTime -= InviteExpirySeconds + 1.f;
+		Target->CmdAccept();
+		if (!Check(!Target->IsInClan() && Consumed(), TEXT("invalid invite timestamp accepted"))) { return false; }
+		SetInvite();
+		Target->PendingInviteFrom = Actors[1];
+		Target->CmdAccept();
+		if (!Check(!Target->IsInClan() && Consumed(), TEXT("self invitation accepted"))) { return false; }
+		SetInvite();
+		Target->PendingInviteFrom.Reset();
+		Target->CmdAccept();
+		if (!Check(!Target->IsInClan() && Consumed(), TEXT("missing inviter accepted"))) { return false; }
+		SetInvite();
+		Inviter->bIsLeader = false; // Fixture'in EndPlay'i gercek oyuncular icin lider secmemeli.
+		Inviter->ClanName.Reset();
+		Actors[0]->Destroy();
+		Target->CmdAccept();
+		if (!Check(!Target->IsInClan() && Consumed(), TEXT("destroyed inviter accepted"))) { return false; }
+		return true;
+	}();
+	for (AMMOCharacter* Character : Actors)
+	{
+		if (IsValid(Character))
+		{
+			// EndPlay'deki lider devri ve bildirimleri yalniz fixture icinde tut.
+			Character->GetClanComponent()->ClanName.Reset();
+			Character->GetClanComponent()->bIsLeader = false;
+			Character->Destroy();
+		}
+	}
+	// Controllersiz/ilk kaydi yuklenmemis fixture'lar CmdAccept'te diske kayit yazamaz.
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOClanInviteAuthorityTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestClanInviteAuthority"))) { return false; }
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = UMMOClanComponent::RunInviteAuthoritySelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_CLAN_INVITE_AUTHORITY_TEST] %s checks=%d reason=%s"),
+				bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOClanInviteAuthorityTestExec GMMOClanInviteAuthorityTestExec;
+}
+#endif
 
 namespace
 {
@@ -413,11 +540,12 @@ void UMMOClanComponent::CmdAccept()
 		NotifyOwner(TEXT("Zaten bir klandasin."));
 		return;
 	}
-	// Davet eden hala o klanda olmali (ayrildiysa / atildiysa davet gecersiz).
+	// Davet eden hala o klanda ve lider olmali: vekil lider, asil lider donunce yetkisini
+	// kaybedebilir. Bekleyen davet eski liderin uye alma yetkisini devam ettirmemeli.
 	const UMMOClanComponent* IC = ClanCompOf(Inviter);
-	if (!IC || !IC->ClanName.Equals(InviteClan, ESearchCase::IgnoreCase))
+	if (!IC || !IC->bIsLeader || !IC->ClanName.Equals(InviteClan, ESearchCase::IgnoreCase))
 	{
-		NotifyOwner(TEXT("Davet gecersiz: davet eden artik o klanda degil."));
+		NotifyOwner(TEXT("Davet gecersiz: davet eden artik bu klanin lideri degil."));
 		return;
 	}
 
