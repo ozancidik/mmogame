@@ -37,6 +37,7 @@ public:
 
 #if !UE_BUILD_SHIPPING
 	static bool RunSavedEquipmentLevelSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunVendorEconomySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

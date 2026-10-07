@@ -3839,3 +3839,20 @@ Denemelerde gerçek oyuncu kayıtları yerine ayrı test karakteri ve kayıt yed
   davranışı korunmalıdır. Aynı InstanceId bulunan fixture'da kimlikler ayrılmalıdır.
 - [ ] Kurtarılan ekipmanı kaydet/çık/yeniden yükle: ikinci yükleme eşya çoğaltmamalı
   veya silmemeli. Bu kontrol kayıt imzası/hesap doğrulaması sağlandığı anlamına gelmez.
+
+## Satıcı ekonomi kapasite ve yetki kapıları — 2026-10-07
+
+Mevcut kurallar izole UE testinde 14 kontrol ile geçti. Test sunucu metotlarını
+doğrudan çağırır; gerçek RPC, gecikmeli HUD ve kayıt/yeniden giriş oynanmadı.
+
+- [ ] Host ve uzak istemcide satıcı yakınında tek ekipman al: doğru fiyat düşmeli,
+  tek eşya gelmeli. Çanta 12 doluyken tekrar dene: altın ve eşya sayısı değişmemeli.
+- [ ] Test karakteri satıcı yakınında ölsün veya açık dükkanla uzaklaşsın. Ekipman,
+  can/mana iksiri alış ve ekipman satış istekleri sunucuda reddedilmeli; istemci
+  görüntüsü son sunucu durumuna dönmeli. Diriliş/yaklaşma sonrası normal işlem çalışmalı.
+- [ ] 999 dolu iksir yığınında alış ucret almamalı. 998 adette çoklu alış yalnız
+  bir adet ekleyip bir adet fiyat düşürmeli; can ve mana iksirini ayrı dene.
+- [ ] 64 farklı yığında yeni iksir türü alınamamalı; mevcut yığının boşluğu
+  doldurulabilmeli. Yetersiz altın/bozuk tanım isteği altın veya eşya üretmemeli.
+- [ ] 200 ms gecikmeyle aynı ekipmanı hızlı iki kez satmayı dene: aynı InstanceId
+  yalnız bir kez satılmalı. Kaydet/yeniden girişte bakiye ve çanta aynen korunmalı.

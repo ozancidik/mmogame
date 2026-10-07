@@ -27,6 +27,93 @@
 DEFINE_LOG_CATEGORY_STATIC(LogMMOInventoryAudit, Log, All);
 
 #if !UE_BUILD_SHIPPING
+bool UMMOInventoryComponent::RunVendorEconomySelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FVector Origin(1000000, 1000000, 5000);
+	AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Origin, FRotator::ZeroRotator, Params);
+	AMMOVendorNPC* Vendor = World->SpawnActor<AMMOVendorNPC>(AMMOVendorNPC::StaticClass(), Origin + FVector(100, 0, 0), FRotator::ZeroRotator, Params);
+	if (!Character || !Vendor)
+	{
+		if (Character) Character->Destroy();
+		if (Vendor) Vendor->Destroy();
+		OutError = TEXT("fixture spawn failed");
+		return false;
+	}
+	Vendor->SetActorEnableCollision(false);
+	const bool bPassed = [&]()
+	{
+		UMMOInventoryComponent* Inv = Character->GetInventory();
+		UMMOStatsComponent* Stats = Character->GetStats();
+		const FMMOItemDef* Sword = FMMOItemDatabase::Find(TEXT("ShortSword"));
+		const FMMOConsumableDef* Mana = FMMOConsumableDatabase::Find(TEXT("ManaPotion"));
+		if (!Inv || !Stats || !Sword || !Mana) { OutError = TEXT("fixture definitions missing"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		auto Reset = [&]() { Inv->Items.Reset(); Inv->EquipmentBag.Reset(); Inv->Gold = 100000; Stats->bIsDead = false; Character->SetActorLocation(Origin); };
+		Reset();
+		Inv->BuyEquipment(TEXT("ShortSword"));
+		if (!Check(Inv->EquipmentBag.Num() == 1 && Inv->Gold == 100000 - FMMOItemDatabase::GetBuyPrice(*Sword), TEXT("equipment price or delivery wrong"))) return false;
+		Reset();
+		for (int32 Index = 0; Index < MaxBagSize; ++Index) Inv->AddEquipmentInstance(TEXT("ShortSword"), 0);
+		Inv->BuyEquipment(TEXT("ShortSword"));
+		if (!Check(Inv->EquipmentBag.Num() == MaxBagSize && Inv->Gold == 100000, TEXT("full bag charged"))) return false;
+		Reset(); Inv->Gold = 0;
+		Inv->BuyEquipment(TEXT("ShortSword")); Inv->BuyPotion(1); Inv->BuyConsumable(TEXT("ManaPotion"), 1);
+		if (!Check(Inv->Gold == 0 && Inv->Items.IsEmpty() && Inv->EquipmentBag.IsEmpty(), TEXT("insufficient gold created items"))) return false;
+		Reset();
+		Inv->BuyEquipment(TEXT("UnknownVendorFixture")); Inv->BuyConsumable(TEXT("UnknownVendorFixture"), MAX_int32);
+		if (!Check(Inv->Gold == 100000 && Inv->Items.IsEmpty() && Inv->EquipmentBag.IsEmpty(), TEXT("unknown purchase changed inventory"))) return false;
+		Inv->AddEquipmentInstance(TEXT("ShortSword"), 0);
+		const int32 SaleId = Inv->EquipmentBag[0].InstanceId;
+		Stats->bIsDead = true;
+		Inv->BuyEquipment(TEXT("ShortSword")); Inv->BuyPotion(1); Inv->BuyConsumable(TEXT("ManaPotion"), 1); Inv->SellByInstanceId(SaleId);
+		if (!Check(Inv->Gold == 100000 && Inv->Items.IsEmpty() && Inv->EquipmentBag.Num() == 1 && Inv->EquipmentBag[0].InstanceId == SaleId, TEXT("dead vendor mutation"))) return false;
+		Stats->bIsDead = false; Character->SetActorLocation(Origin + FVector(2000, 0, 0));
+		Inv->BuyEquipment(TEXT("ShortSword")); Inv->BuyPotion(1); Inv->BuyConsumable(TEXT("ManaPotion"), 1); Inv->SellByInstanceId(SaleId);
+		if (!Check(Inv->Gold == 100000 && Inv->Items.IsEmpty() && Inv->EquipmentBag.Num() == 1 && Inv->EquipmentBag[0].InstanceId == SaleId, TEXT("distant vendor mutation"))) return false;
+		Reset(); Inv->BuyPotion(MAX_int32);
+		if (!Check(Inv->Gold == 100000 - FMMOItemDatabase::PotionPrice * MaxStackSize && Inv->GetItemCount(TEXT("HealthPotion")) == MaxStackSize, TEXT("oversized potion request created gold or exceeded cap"))) return false;
+		Reset(); Inv->AddItem(TEXT("HealthPotion"), MaxStackSize);
+		Inv->BuyPotion(MAX_int32);
+		if (!Check(Inv->Gold == 100000 && Inv->GetItemCount(TEXT("HealthPotion")) == MaxStackSize, TEXT("full potion stack charged"))) return false;
+		Reset(); Inv->AddItem(TEXT("HealthPotion"), MaxStackSize - 1);
+		Inv->BuyPotion(MAX_int32);
+		if (!Check(Inv->Gold == 100000 - FMMOItemDatabase::PotionPrice && Inv->GetItemCount(TEXT("HealthPotion")) == MaxStackSize, TEXT("partial potion purchase not priced by delivery"))) return false;
+		Reset(); Inv->AddItem(TEXT("ManaPotion"), MaxStackSize - 1);
+		Inv->BuyConsumable(TEXT("ManaPotion"), MAX_int32);
+		if (!Check(Inv->Gold == 100000 - Mana->Price && Inv->GetItemCount(TEXT("ManaPotion")) == MaxStackSize, TEXT("partial consumable purchase not priced by delivery"))) return false;
+		Inv->Gold = 100000; Inv->BuyConsumable(TEXT("ManaPotion"), MAX_int32);
+		if (!Check(Inv->Gold == 100000 && Inv->GetItemCount(TEXT("ManaPotion")) == MaxStackSize, TEXT("full consumable stack charged"))) return false;
+		Reset();
+		for (int32 Index = 0; Index < MaxItemStacks; ++Index) Inv->AddItem(FName(*FString::Printf(TEXT("VendorStackFixture%d"), Index)), 1);
+		Inv->BuyPotion(1); Inv->BuyConsumable(TEXT("ManaPotion"), 1);
+		if (!Check(Inv->Gold == 100000 && Inv->Items.Num() == MaxItemStacks && Inv->GetItemCount(TEXT("HealthPotion")) == 0 && Inv->GetItemCount(TEXT("ManaPotion")) == 0, TEXT("full stack list charged"))) return false;
+		Inv->Items[0].ItemId = TEXT("HealthPotion"); Inv->Items[0].Count = MaxStackSize - 1;
+		Inv->BuyPotion(MAX_int32);
+		if (!Check(Inv->Gold == 100000 - FMMOItemDatabase::PotionPrice && Inv->Items.Num() == MaxItemStacks && Inv->GetItemCount(TEXT("HealthPotion")) == MaxStackSize, TEXT("existing stack at list limit rejected"))) return false;
+		Reset(); Inv->AddEquipmentInstance(TEXT("ShortSword"), 0);
+		const int32 FinalSaleId = Inv->EquipmentBag[0].InstanceId;
+		const int32 ExpectedGold = 100000 + FMMOItemDatabase::GetSellPrice(*Sword, 0);
+		Inv->SellByInstanceId(FinalSaleId); Inv->SellByInstanceId(FinalSaleId);
+		return Check(Inv->Gold == ExpectedGold && Inv->EquipmentBag.IsEmpty(), TEXT("sale repeated or price wrong"));
+	}();
+	Vendor->Destroy(); Character->Destroy(); // Controllersiz; oyuncu kaydi yuklenmez/yazilmaz.
+	return bPassed;
+}
+
 bool UMMOInventoryComponent::RunSavedEquipmentLevelSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0;
@@ -113,6 +200,14 @@ namespace
 	{
 		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
 		{
+			if (FParse::Command(&Cmd, TEXT("MMOTestVendorEconomy")))
+			{
+				FString Error;
+				int32 Checks = 0;
+				const bool bPassed = UMMOInventoryComponent::RunVendorEconomySelfTest(InWorld, Error, Checks);
+				Ar.Logf(TEXT("[MMO_VENDOR_ECONOMY_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+				return true;
+			}
 			if (!FParse::Command(&Cmd, TEXT("MMOTestSavedEquipmentLevel"))) return false;
 			FString Error;
 			int32 Checks = 0;

@@ -661,3 +661,39 @@ Architect ve Test Results Analyzer rol belgeleri kullanildi; bagimsiz paralel aj
 calistirilmadi. Bu tur Y-2'nin yalniz ekipman seviye sartini kapatir; imza/hesap
 kimligi, diger yukleme denetimleri, O6 kalan gecis penceresi, magaza yazim sirasi/
 iptal ve dedicated hazirligi ayri calisma olarak acik kalir.
+
+## 40. Satici ekonomi kurallarinin UE regresyonu (2026-10-07)
+
+Satici kapasite/canlilik/mesafe korumalari kodda vardi; bu tur bunlar icin otomatik
+UE fixture'i ekledi. Oynanis kurali degismedi, yeni acik bulundu/duzeltildi iddiasi
+yoktur. TestVendorEconomy.ps1 ve Development-only MMOTestVendorEconomy komutu,
+izole controllersiz karakter ve yakin satici ile **PASS checks=14** verdi:
+
+- Ekipmanin dogru fiyatla tek teslimi; dolu cantada ucret alinmamasi.
+- Yetersiz altin ve bilinmeyen tanimda esya/altin degismemesi.
+- Olu karakterin uc satin alma yolu ve satisi reddi; ayni yollarin uzaktan reddi.
+- MAX_int32 iksir isteginde 999 tavan ve dogru ucret; dolu yiginda ucret yok.
+- Bir adet yer varken can/mana iksirinde yalniz bir adedin ucreti.
+- Dolu mana yigini; 64 farkli yiginda yeni yigin reddi; mevcut yigini tamamlama.
+- Ayni InstanceId'nin iki satis isteginde yalniz bir kez satilmasi.
+
+Bayrak/konum/yiginlar fixture'da kurulur; sunucu metotlari dogrudan cagirilir.
+Gercek owning-client RPC tasimasi, HUD, gecikme, disk roundtrip'i veya dedicated
+hedef testi degildir. Gercek oyuncu kaydi yuklenmez/yazilmaz; karakter ve satici
+senkron test bitiminde yok edilir. Test komutu Shipping'de derlenmez. Mevcut
+satinalma/satis ve replikasyon semasi degismedi. Normal UE 5.7 editor derlemesi GECTI.
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **23/23 GECTI**: 14 dosya PCH'siz /W4,
+0 derleyici uyarisi; JSON 111 negatif; 238 yerel yuva `loaded=238 invalid=0
+loadFailed=0 existsMismatch=0 json ok=238 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`; gecis normal/timeout/durum/son yazim
+hatasi/ilerleme; parti 10, callback 9, klan 9, gorev 8, loot 10, iksir 11,
+kayitli ekipman 11 ve satici 14 kontrol. Summer 49 / Winter 33 mob dogumu,
+0 hata; NetSmoke 1 server join / 1 client welcome, iki tarafta 0 hata.
+NetSmoke yalniz baglanti kontroludur. Lv33+ beceri boslugu ve StaticLint
+InitGameState beyaz liste uyarilari onceki gibi acik.
+
+Sahip-istemci/HUD ve kaydet/yeniden giris PIE'de OYNANMADI; PLAYTEST_CHECKLIST.md'ye
+adimlar eklendi. Agency-agents Unreal Multiplayer Architect ve Test Results Analyzer
+rol belgeleri kullanildi; bagimsiz paralel ajan calistirilmadi. O6 kalan gecis
+penceresi, hesap/imza, magaza yazim sirasi/iptal ve dedicated hazirligi acik kalir.

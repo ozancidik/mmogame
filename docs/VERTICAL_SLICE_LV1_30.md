@@ -1,5 +1,12 @@
 # Dikey dilim planı: Lv1–30 oynanabilir deneyim
 
+**2026-10-07 doğrulama eklemesi:** Satıcı ekonomi kuralları artık
+`Scripts/TestVendorEconomy.ps1` ile UE'de 14 izole kontrol içerir: doğru fiyat/teslim,
+çanta ve yığın tavanları, ölü/uzak karakter reddi ve aynı eşyanın tek satışı.
+Mevcut kurallar değişmedi. Bu kanıt gerçek Lv1–30 oynanış süresi, ekonomi dengesi,
+uzak istemci RPC/HUD veya kayıt kalıcılığı ölçümü değildir; PIE adımları
+`PLAYTEST_CHECKLIST.md`'de açık. Aşağıdaki 2026-10-04 analizi tarihsel halini korur.
+
 **Durum:** Salt okunur analiz, 2026-10-04. Bu belge kod, veri ve mevcut belgeler okunarak yazıldı; **hiçbir şey PIE'de oynanmadı** (`docs/PLAYTEST_CHECKLIST.md` içinde 886 maddenin yalnızca 4'ü işaretli). Kod, belge ve git'e dokunulmadı; tek çıktı bu dosyadır.
 
 **Etiketler** (her sayı/iddia birini taşır):

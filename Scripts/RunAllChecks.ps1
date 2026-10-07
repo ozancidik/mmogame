@@ -151,6 +151,11 @@ Step "Kayittan ekipman seviye sarti ve kayipsiz kurtarma" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Satici ekonomi kapasite ve yetki kapilari" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestVendorEconomy.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host
