@@ -55,6 +55,101 @@ DEFINE_LOG_CATEGORY_STATIC(LogMMOIdentityAudit, Log, All);
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
+#include "Misc/CommandLine.h"
+
+bool AMMOCharacter::RunMeleeCooldownSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	// Synthetic timestamps can reach cosmetic HUD entries. Only an explicitly disposable
+	// automation process may run this fixture; restoring the clock alone cannot undo a HUD.
+	if (!FParse::Param(FCommandLine::Get(), TEXT("MMOAllowSyntheticWorldTime")))
+	{ OutError = TEXT("requires -MMOAllowSyntheticWorldTime in disposable automation process"); return false; }
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FVector Location(1200000, 1000000, 5000);
+	AMMOCharacter* C = World->SpawnActor<AMMOCharacter>(StaticClass(), Location, FRotator::ZeroRotator, Params);
+	const FTransform TM(FRotator::ZeroRotator, Location + FVector(100, 0, 0));
+	AMMOMob* M = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), TM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (M)
+	{
+		M->AutoPossessAI = EAutoPossessAI::Disabled; M->ArchetypeId = TEXT("Goblin");
+		UGameplayStatics::FinishSpawningActor(M, TM);
+		M->bHasHub = false; M->XPReward = 0;
+	}
+	const double OriginalTime = World->TimeSeconds;
+	const bool bPassed = [&]()
+	{
+		if (!C || !M) { OutError = TEXT("fixture spawn failed"); return false; }
+		C->SetActorEnableCollision(false); C->SetActorTickEnabled(false); C->EndSpawnProtection();
+		M->SetActorEnableCollision(false); M->SetActorTickEnabled(false);
+		C->Stats->AttackPower = 10.f;
+		M->Stats->MaxHealth = 10000.f; M->Stats->Defense = 0.f;
+		auto Check = [&](bool Condition, const TCHAR* Label, double Now)
+		{
+			if (!Condition) { OutError = FString::Printf(TEXT("%s uptime=%.0f"), Label, Now); return false; }
+			++OutChecks; return true;
+		};
+		// Same frame only: no world tick, timers, save/load or player controllers.
+		for (double Now : {100., 600., 1000., 3600., 86400., 604800., 10000000.})
+		{
+			World->TimeSeconds = Now; M->Stats->Health = 10000.f;
+			C->LastMeleeTime = Now - 2.; C->ServerAttackTarget_Implementation(M);
+			if (!Check(M->Stats->Health == 9990.f && C->LastMeleeTime == Now, TEXT("expired RPC rejected or timestamp changed"), Now)) return false;
+			C->ServerAttackTarget_Implementation(M);
+			if (!Check(M->Stats->Health == 9990.f && C->LastMeleeTime == Now, TEXT("duplicate RPC damaged"), Now)) return false;
+			C->LastMeleeTime = Now - .5; const double EarlyTime = C->LastMeleeTime;
+			C->ServerAttackTarget_Implementation(M);
+			if (!Check(M->Stats->Health == 9990.f && C->LastMeleeTime == EarlyTime, TEXT("early RPC damaged or advanced clock"), Now)) return false;
+			C->LastMeleeTime = Now - .55; C->ServerAttackTarget_Implementation(M);
+			if (!Check(M->Stats->Health == 9980.f && C->LastMeleeTime == Now, TEXT("RPC jitter tolerance rejected"), Now)) return false;
+			C->LastMeleeTime = Now - .55; const double LocalTime = C->LastMeleeTime;
+			C->AttackTarget(M);
+			if (!Check(M->Stats->Health == 9980.f && C->LastMeleeTime == LocalTime, TEXT("direct attack gained RPC tolerance"), Now)) return false;
+			C->LastMeleeTime = Now - .61; C->AttackTarget(M);
+			if (!Check(M->Stats->Health == 9970.f && C->LastMeleeTime == Now, TEXT("expired direct attack rejected"), Now)) return false;
+			for (bool bRPC : {false, true})
+			{
+				const double Threshold = bRPC ? C->MeleeCooldown * 0.9f : C->MeleeCooldown;
+				for (double Offset : {-0.000001, 0., 0.000001})
+				{
+					M->Stats->Health = 10000.f;
+					C->LastMeleeTime = Now - (Threshold + Offset);
+					const double Before = C->LastMeleeTime;
+					if (bRPC) C->ServerAttackTarget_Implementation(M); else C->AttackTarget(M);
+					const bool bExpected = Offset >= 0.;
+					if (!Check(M->Stats->Health == (bExpected ? 9990.f : 10000.f)
+						&& C->LastMeleeTime == (bExpected ? Now : Before),
+						bRPC ? TEXT("RPC threshold boundary changed") : TEXT("direct threshold boundary changed"), Now)) return false;
+				}
+			}
+		}
+		const double Now = 100.; World->TimeSeconds = Now;
+		C->Stats->bIsDead = true; C->LastMeleeTime = Now - 2.;
+		C->ServerAttackTarget_Implementation(M);
+		if (!Check(C->LastMeleeTime == Now - 2., TEXT("dead RPC advanced clock"), Now)) return false;
+		C->Stats->bIsDead = false;
+		TActorIterator<APlayerStart> Starts(World);
+		if (!Starts) { OutError = TEXT("hub fixture needs PlayerStart"); return false; }
+		C->SetActorLocation(Starts->GetActorLocation());
+		C->ServerAttackTarget_Implementation(M);
+		if (!Check(C->LastMeleeTime == Now - 2., TEXT("hub RPC advanced clock"), Now)) return false;
+		C->SetActorLocation(Location);
+		C->ServerAttackTarget_Implementation(C);
+		if (!Check(C->LastMeleeTime == Now, TEXT("self target did not consume attempt cooldown"), Now)) return false;
+		C->LastMeleeTime = Now - 2.; M->SetActorLocation(Location + FVector(1000, 0, 0));
+		C->ServerAttackTarget_Implementation(M);
+		if (!Check(C->LastMeleeTime == Now, TEXT("far target did not consume attempt cooldown"), Now)) return false;
+		C->LastMeleeTime = Now - 2.; C->ServerAttackTarget_Implementation(nullptr);
+		if (!Check(C->LastMeleeTime == Now, TEXT("missing target did not consume attempt cooldown"), Now)) return false;
+		return true;
+	}();
+	World->TimeSeconds = OriginalTime; // Restore even on a failed assertion before destroying fixtures.
+	if (IsValid(C)) C->Destroy();
+	if (IsValid(M)) M->Destroy();
+	return bPassed;
+}
 
 bool AMMOCharacter::RunFirstBasicAttackSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
@@ -254,6 +349,21 @@ bool AMMOCharacter::RunConsumableBenefitSelfTest(UWorld* World, FString& OutErro
 
 namespace
 {
+	struct FMMOMeleeCooldownTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestMeleeCooldown"))) return false;
+			FString Error; int32 Checks = 0;
+			const double Before = InWorld ? InWorld->GetTimeSeconds() : 0.;
+			const bool bPassed = AMMOCharacter::RunMeleeCooldownSelfTest(InWorld, Error, Checks)
+				&& InWorld && InWorld->GetTimeSeconds() == Before;
+			Ar.Logf(TEXT("[MMO_MELEE_COOLDOWN_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOMeleeCooldownTestExec GMMOMeleeCooldownTestExec;
+
 	struct FMMOFirstBasicAttackTestExec : public FSelfRegisteringExec
 	{
 		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
@@ -1438,6 +1548,11 @@ void AMMOCharacter::MMOAttack()
 
 void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 {
+	AttackTargetInternal(Target, MeleeCooldown);
+}
+
+void AMMOCharacter::AttackTargetInternal(AMMOCharacter* Target, float RequiredCooldown)
+{
 	UWorld* World = GetWorld();
 	if (!World || !Stats || Stats->bIsDead)
 	{
@@ -1461,8 +1576,8 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	}
 
 	// Yerel cooldown kapisi (istemcide RPC spamini, sunucuda cift vurusu engeller).
-	const float Now = World->GetTimeSeconds();
-	if (Now - LastMeleeTime < MeleeCooldown)
+	const double Now = World->GetTimeSeconds();
+	if (Now - LastMeleeTime < RequiredCooldown)
 	{
 		return;
 	}
@@ -1614,20 +1729,10 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 
 void AMMOCharacter::ServerAttackTarget_Implementation(AMMOCharacter* Target)
 {
-	// Sunucu-OTORITER cooldown: istemcinin dogru cadence'te gonderdigine GUVENME.
-	// (Eskiden LastMeleeTime=-100 yapiliyordu => kapi hic tetiklenmiyor, hilelı/
-	// laglı istemci sinirsiz DPS atabiliyordu.) Ag jitter'i icin %10 tolerans birak;
-	// cok erken gelen istegi sessizce reddet.
-	const UWorld* W = GetWorld();
-	const float Now = W ? W->GetTimeSeconds() : 0.f;
-	if (Now - LastMeleeTime < MeleeCooldown * 0.9f)
-	{
-		return;
-	}
-	// AttackTarget kendi kapisini (Now - LastMeleeTime < MeleeCooldown) yeniden uygular;
-	// tam gecmesi icin LastMeleeTime'i bir cooldown geriye al, o da LastMeleeTime=Now yapar.
-	LastMeleeTime = Now - MeleeCooldown;
-	AttackTarget(Target);
+	if (!HasAuthority()) return;
+	// Server-owned threshold; retain 10% jitter tolerance with one gate and actual time.
+	// Rewriting Now-cooldown and checking again could reject an expired request by rounding.
+	AttackTargetInternal(Target, MeleeCooldown * 0.9f);
 }
 
 bool AMMOCharacter::CanHarmPlayer(const AMMOCharacter* Victim, const TCHAR*& OutReason) const

@@ -4146,3 +4146,28 @@ gücünü bundan sonra kurar; oyun denge hatası olarak yorumlanmaz.
 - [ ] 20 dk sınıf koşusunda gerçek süreyi ölç; eksik eski log `sure=?` olmalı.
   Kabul edilen saldırı pozitif hasarı kanıtlamaz; görsel sayı, HP ve kullanıcı
   girdisi gecikmesi ayrıca doğrulanmalı. Native süreler oyuncu süresi değildir.
+
+## 2026-10-07 — Temel saldırıda tek cooldown kapısı (PIE açık)
+
+`TestMeleeCooldown.ps1`: 89 native UE kontrolü. Yedi sentetik dünya zamanı
+(100, 600, 1000, 3600, 86400, 604800, 10000000 saniye), süresi bitmiş RPC,
+anlık tekrar, erken istek, mevcut %10 tolerans, doğrudan saldırının tam beklemesi,
+iki eşiğin ±1 mikrosaniye/tam sınırı ve retlerin damga davranışı. Dünya saati
+aynı frame içinde değiştirilip geri alınır; tick/timer veya gerçek oyuncu kaydı
+kullanılmaz. Uzun oturum gerçekten çalıştırılmadı; gerçek uzak RPC teslimi yok.
+Komut `-MMOAllowSyntheticWorldTime` olmadan fixture oluşturmadan reddedilir;
+bayrak yalnız testin başlatıp hemen kapattığı ayrı süreçte kullanılır. Normal
+editöre bu bayrağı ekleme: saat geri alınsa da sentetik HUD yazıları geri alınmaz.
+
+- [ ] Summer'da 100 saniyeden sonra host ve uzak istemciyle normal saldır;
+  menzil/geçerli hedef aynıyken cooldown'u bitmiş uzak vuruşlar kaybolmamalı.
+  HP ve animasyonları iki pencerede karşılaştır.
+- [ ] Paket gecikmesi/jitter ile uzaktaki otomatik saldırıyı dene; erken ve
+  aynı karede tekrar istekler çift hasar vermemeli. Sunucu toleransı mevcut
+  %10'dur (varsayılan 0,6 sn için yaklaşık 0,54 sn); bu ayrı bir denge değişimi değildir.
+- [ ] Host/doğrudan normal saldırı tam 0,6 sn beklemeyi sürdürmeli. Ölüm ve
+  hub giriş/çıkışında geçerli saldırı yeniden çalışmalı; ret nedeniyle koruma
+  bitmesi, combat'a girme veya ilk kabul metriği olmamalı.
+- [ ] Kendisi/uzak/hedefsiz hedef retleri denendikten sonra geçerli hedefe dön;
+  cooldown'u geçen deneme gerçek zamanı tüketmeli. Respawn ve Summer→Winter
+  geçişi sonrası saldırıyı ayrıca doğrula; sentetik saat testi bunun kanıtı değildir.

@@ -32,6 +32,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	static bool RunConsumableBenefitSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstBasicAttackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunMeleeCooldownSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
@@ -468,7 +469,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "MMO|Combat")
 	float MeleeCooldown = 0.6f;
 
-	float LastMeleeTime = -100.f;
+	double LastMeleeTime = -100.;
 
 	// Sunucu: saldirana gonderilen son ret sebebi ve zamani (ayni sebebi 1 sn icinde tekrar yollama).
 	FString LastAttackFeedbackText;
@@ -502,4 +503,8 @@ protected:
 	// Blueprint'te ölüm animasyonu/efekti için override edilebilir olay.
 	UFUNCTION(BlueprintImplementableEvent, Category = "MMO")
 	void OnCharacterDied();
+
+private:
+	// Threshold is selected by local C++ entry points, never supplied in the RPC payload.
+	void AttackTargetInternal(AMMOCharacter* Target, float RequiredCooldown);
 };

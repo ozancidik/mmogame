@@ -1361,3 +1361,81 @@ xp201 yapılan ayrı kopyada aynı blok false verdi. Kaynak ve oyuncu kayıtlar�
 bu log denemesinde değiştirilmedi. Lv33+ beceri boşlukları, InitGameState lint
 uyarısı, gerçek PIE/RPC ve kaynak motorla Server/Shipping hedefleri açık.
 Proje iskeleti tablosu son sonuçlarla güncellendi.
+
+## 53. Temel saldırı RPC'sinde çift cooldown ve yuvarlama — 2026-10-07
+
+ORTA savaş/ağ hatası önce gerçek Editor DLL ile yeniden üretildi. Eski RPC
+`LastMeleeTime = Now - MeleeCooldown` yazar, ardından `AttackTarget` ikinci kez
+tam cooldown kontrolü yapardı. Float dünya zamanı 100 saniyeyken 0,6'nın geri
+çıkarılıp tekrar çıkarılması yaklaşık 0,5999985 verir; yeterince beklemiş
+istek ikinci kapıda reddedilir. Native test **FAIL checks=0 uptime=100**, UE
+exit0 fakat PS exit1 verdi. Ekran/input veya ağ taşınması ölçümü değildir.
+
+Public `AttackTarget` ve mevcut `ServerAttackTarget` payload'ı korunur. Private
+`AttackTargetInternal(Target, RequiredCooldown)` ortak gövdeyi bir kez çalıştırır.
+Doğrudan/host/istemci istek yolunda tam cooldown; authority korumalı RPC girişinde
+sunucunun kendi `MeleeCooldown * 0.9f` eşiği seçilir. İstemci eşik gönderemez.
+Mevcut %10 tolerans korunur; tam 0,6 saniyeye kıyasla yaklaşık 0,54 saniye RPC
+kabulü yeni denge politikası değildir. Hasar, hedef/mesafe/PvP/parti/klan/hub/
+koruma kontrolleri, combat ve metrik sırası aynı ortak gövdededir.
+
+`Now` ve replike olmayan `LastMeleeTime` motorun double dünya saatini kullanır;
+sentetik geri yazım yoktur. Dünya/stats/ölü/hub ve erken cooldown retlerinde
+önceki damga korunur. Kapıyı geçen hedef/geçersiz menzil gibi aşağı akış retleri
+mevcut doğrudan saldırı davranışıyla gerçek `Now`yu tüketir. Yeni RPC, replike
+alan, kayıt şeması veya istemci hasar yetkisi eklenmedi.
+
+`MMOTestMeleeCooldown` / `TestMeleeCooldown.ps1`: **89 kontrol PASS**. Yedi
+sentetik uptime (100, 600, 1000, 3600, 86400, 604800, 10000000 saniye) başına
+süresi bitmiş RPC, anlık tekrar, erken istek, toleranslı istek, doğrudan tam
+cooldown ve iki eşiğin ±1 mikrosaniye/tam sınırı. Ek olarak ölü ve hub RPC
+retlerinde damga korunması, self/uzak/hedefsiz retlerde gerçek damga tüketimi.
+Başarı yalnız HP miktarı değil doğru/korunan zaman damgasını da ister.
+
+Test aynı frame'de controllerless iki fixture kullanır; AI/çarpışma/tick kapalı,
+öldürme/XP veya oyuncu store yükleme/yazma yoktur. Public World.TimeSeconds
+yalnız non-Shipping fixture'da değiştirilir; başarısız kontrol dahil geri alınır,
+exec ayrıca saat eşitliğini doğrular ve fixture'lar yok edilir. Bu gerçek uzun
+oturum, timer çalışması, istemci replikasyonu veya RPC teslimi kanıtı değildir.
+Uzak ağ/jitter, host ve gerçek respawn/travel kontrolü PLAYTEST_CHECKLIST'te açık.
+
+Agency Unreal Multiplayer Architect rolüyle Archimedes ajanı salt okunur
+inceleme yaptı; ayrı private eşik, doğrudan yolun tam cooldown'u, ret damgası
+ve eşik sınırlarının korunmasını önerdi. Parent kod/test/derlemeyi yürüttü.
+Normal Editor derlemesi Succeeded; doğrudan 89 kontrol geçti. Son paket sonucu
+aşağıda kaydedildi.
+
+İkinci salt okunur incelemede ajan sentetik zamanların combat text üzerinden
+mevcut yerel HUD'a sızabileceğini buldu. Saat geri almak HUD metinlerini geri
+almadığı için test non-Shipping `-MMOAllowSyntheticWorldTime` başlatma bayrağı
+ister; normal editör/oyun çağrısı fixture kurmadan reddedilir. Bayrak yalnız
+PS runner'ın ayrı başlatıp hemen quit ettiği disposable süreç içindir. Runner
+bayraklı başarıdan sonra ikinci bayraksız süreçte FAIL checks=0/requires mesajı,
+UE exit0 ve hata/yanlış PASS yokluğu bekler. HUD restore implementasyonu veya
+oynanışta zaman değiştirme API'si eklenmedi. Beş ek ret fixture'ı damgayı sınar;
+HP/koruma/combat/metric bütünlüğünü ayrıca kanıtlamaz. Null fallback taraması
+gerçek dünya moblarını kullanır; uzak fixture alanında hedef olmadığı varsayılır.
+
+Başlatma korumasının negatif kanıtı: korumasız eski DLL ile yeni PS runner'da
+bayraklı 89 kontrol PASS, ardından bayraksız çağrı da fixture'ı çalıştırdığı için
+guard **FAILED exit1, rejections=0** verdi. Koruma eklenmiş DLL normal Editor
+derlemesinde Succeeded; doğrudan runner tekrar **89 PASS + unflagged command
+rejected before fixtures PASS** verdi. Ajan son guard/PS diff'inde yeni bulgu
+bildirmedi ve kapatıldı. İlk tamamlanan paket guard ekinden önce 35/35 idi;
+koruma eklendikten sonra tam paket son kaynakla yeniden çalıştırıldı.
+
+Son `RunAllChecks.ps1 -SkipBuild -FullCompile`: **35/35 GECTI**, exit0.
+Normal Editor DLL derlemesi ayrıca Succeeded. 16 PCH'siz /W4 dosya, compiler
+warning0; ValidateData51 mob/13 elit/53 eşya/79 görev/81 beceri/12 efekt/29 spawner,
+parser312/312, lint negatif15/veri negatif14, JSON111 negatif geçti. Store334/
+loaded334/invalid0/loadFailed0/existsMismatch0/jsonMismatch0/maxLevel6,
+writeorder1/roundtrip equal1. Cooldown89 + bayraksız guard reddi, temel saldırı21/
+sekiz olay, skill17/yedi olay, oturum6 ve önceki tüm regresyonlar geçti.
+Summer50/Winter27 mob doğumu smoke hata0; NetSmoke1join/1welcome, server/client
+hata0 (`mmo_net_server_171451.log`, `mmo_net_client_171451.log`, TEMP dizini).
+Final paket boyunca C++ ve test/runner dosyaları değişmedi; Git blob kimlikleri
+önce/sonra eşleşti. Smoke doğuş, NetSmoke bağlantı kanıtıdır; gerçek gameplay
+replication, uzun oturum, değişik Blueprint cooldown değerleri ve gerçek
+Server/Shipping paketleri için kanıt değildir. Lv33+ beceri boşlukları ve
+InitGameState lint beyaz liste uyarısı mevcut; compiler uyarısı değildir.
+PLAYTEST_CHECKLIST, ağ denetimi ve proje tablosu güncellendi.

@@ -39,6 +39,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O15 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter görevi teslim ederek XP ödülünü kaybediyordu; sunucuda kabul/teslim için canlılık denetlenir | `UMMOQuestComponent::AcceptQuest/ClaimReward` |
 | O16 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter yerdeki altın/sarf/ekipmanı toplayabiliyordu; ortak sunucu toplama kapısı canlılık denetler | `AMMOLootPickup::TryCollect` |
 | O17 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** dolu can/mana saf iksiri ve ortak kullanım beklemesini harcıyordu; ihtiyaç yoksa tüketim öncesi reddedilir | `AMMOCharacter::UseConsumable` |
+| O18 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** temel saldırı RPC'si sentetik zaman damgasından sonra ikinci cooldown kapısında geçerli vuruşu reddediyordu | `AMMOCharacter::AttackTargetInternal/ServerAttackTarget_Implementation` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -173,6 +174,22 @@ parşömeni; geçersiz tanım ve normal dolu can iksirinin reddi. İzole control
 karakter kullanılır, vitaller/cooldown testte kurulur ve sunucu girişleri doğrudan
 çağrılır. Gerçek istemci RPC ulaşımı, gecikme, HUD ve kayıt/yeniden giriş oynanmadı.
 Fixture oyuncu kaydı yazmaz, Shipping'de test komutu derlenmez.
+
+### O18 · ORTA · Temel saldırı RPC'sinde yuvarlamayla kaybolan vuruş — düzeltildi (2026-10-07)
+
+Eski RPC, %10 tolerans kapısını geçince `LastMeleeTime=Now-MeleeCooldown` yazıp
+doğrudan saldırının tam cooldown kapısını tekrar çalıştırıyordu. Float saatin
+100 saniye olduğu UE fixture'ında süresi bitmiş ilk istek reddedildi:
+FAIL checks=0 uptime=100 (UE exit0/PS exit1). Ortak private gövde artık doğrudan
+yol için tam, RPC için sunucudan seçilen `0.9f` eşiğini tek kez denetler; gerçek
+double saati yazar. Authority/hasar ve diğer hedef kuralları korunur.
+
+Yedi sentetik uptime ve sınır/ret damgaları için 89 native kontrol geçti.
+Fixture uzun oturum veya gerçek RPC taşınması değildir; tam ağ/jitter/PIE
+kontrolleri açıktır. Sentetik zaman komutu ayrı otomasyon sürecinde açık
+başlatma bayrağı ister; normal editörde fixture kurmadan reddedilir. HUD'a
+sentetik zaman bırakma riskini gidermek için normal editöre bu bayrak eklenmez.
+Ayrıntılı derleme/paket ve negatif kanıt: `CHECKLIST_FIXES_2026-10-05.md` §53.
 
 ### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
 - **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.

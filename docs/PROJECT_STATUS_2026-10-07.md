@@ -1,8 +1,10 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 7 Ekim 2026. Kaynak kod ve son tamamlanan test paketi esas alınmıştır.
-Önceki kod/test kanıtı: `b3d352b`; ilk kabul edilen temel saldırı da
-sunucu controller oturumunda, hasar/XP öncesinde ölçülüyor (düzeltme kaydı §52).
+Önceki kod/test kanıtı: `7aa7f42`; ilk kabul edilen temel saldırı sunucu controller
+oturumunda, hasar/XP öncesinde ölçülüyor (§52). Yeni sınırlı düzeltme: temel saldırı
+RPC'sinde çift cooldown ve saat yuvarlaması (§53); 89 native kontrol ve test
+komutunun bayraksız reddi doğrulandı. Gerçek ağ oynanışı hâlâ açık.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -16,7 +18,7 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | --- | --- | --- | --- |
 | Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | Editor hedefi derlendi; 16 kritik dosya PCH olmadan /W4 ile 0 uyarı | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
 | Karakter ve statlar | STR/DEX/INT/VIT, can/mana, XP/seviye, stat puanı, ölüm/diriliş; sunucu otoritesi | Kayıt stat/XP/puan bütçesi ve dört sınıf için 15 UE kontrolü; ölüm kuralları ayrı fixture'larda | Gerçek ölüm/respawn, kayıt sonrası istemci stat paneli ve uzun oturum |
-| Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi | Kod/derleme; GameState'te PvP aynası; temel saldırı için 21 native kontrol, ret kapıları/PvP/XP öncesi kayıt | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü |
+| Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi; tek cooldown kapısı ve double damga | Temel saldırı 21 kontrol; yeni cooldown 89 kontrol, yedi sentetik uptime/eşik sınırları; eski RPC önce UE'de FAIL0 verdi | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü; gerçek uzun oturum |
 | Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; rütbe + bakiye bütçesi; kayıtlı ücretli beceriyi minimum ağaç rütbesine taşıma | 81 beceri; 12 bütçe/iade + 12 yeni öğrenilmiş-beceri kontrolü; hata önce UE'de yeniden üretildi | Gerçek legacy dosya göçü, yatırım/kayıt/sınıf RPC ve HUD; sınıf dengesi, Lv33+ beceri boşlukları |
 | Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Veri/kod/derleme | İstemci efekt süresi ve Network Profiler bant ölçümü |
 | Ekipman ve envanter | 53 ekipman; InstanceId ile kuşanma/satış/yükseltme; çanta/yığın sınırları; nadirlik/+; ilk başarılı istek ölçümü | Kayıtlı ekipman seviye şartı: 11 kontrol; yeni kuşanma ölçümü: 8 kontrol, otomatik/restore hariç | Gecikmeli çift tıklama, uzak HUD, gerçek dosyadan yeniden giriş |
@@ -30,7 +32,7 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | Ticaret ve depo | Çift onay/teklif revizyonu, kimlikle eşya, kapasite/altın tavanı; NPC yakınlığında depo | Kod/derleme; satış kapasitesi yeni satıcı testinde | Ticaretin iki kaydı birlikte kalıcılaştırması; çökme/bağlantı kopması; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, arkadaş listesi, sohbet ve hız sınırları | Klan davetinde güncel lider yetkisi: 9 kontrol | Çevrimdışı üyelik/rıza, yeniden giriş ve çok oyunculu sosyal akış |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 322 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 334 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
@@ -63,7 +65,8 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `6b5630f` | Ücretli kayıtlı beceriyi rütbe/bakiye bütçesine katma; ücretsiz starter ve geçerli legacy hotbar korunur | Önce FAIL checks=0, düzeltme sonrası 12 yeni UE kontrolü; stats-first/skill-first, roundtrip, max ağaç maliyeti ve iade; 31/31 paket |
 | `dfa39de` | Tablo doluyken yeni anahtarın oyuncu kotasını atlamasını reddetme; mevcut oyuncular devam eder | Önce UE FAIL11, ardından 25 kontrol PASS; 32/32 tam paket; HTTP/disk/callback testleri açık |
 | `b3d352b` | Mana ödemesinden sonra etki/XP öncesi ilk kabul; skill/effect/mana ve controller tekilliği | 17 yeni UE kontrolü, 7 tür/olay; 6 oturum kontrolü genişletildi; parser 150/150 assert; yanlış log saat etkisi düzeltildi; 33/33 son paket; gerçek RPC/PIE açık |
-| 7 Ekim ilk temel saldırı (bu belgeyle aynı commit) | Sunucu kabulünde hasar/XP öncesi lv ve gerçek hedef; controller oturumunda tek ölçüm | 21 native kontrol/8 olay; 6 oturum kontrolü genişletildi; parser312/312; negatif metadata/sıfır hasar, native ilk RPC ve tam öldürme XP'si; 34/34 son paket; gerçek ağ/PIE açık |
+| `7aa7f42` | Sunucu kabulünde hasar/XP öncesi lv ve gerçek hedef; controller oturumunda tek ölçüm | 21 native kontrol/8 olay; 6 oturum kontrolü genişletildi; parser312/312; negatif metadata/sıfır hasar, native ilk RPC ve tam öldürme XP'si; 34/34 paket; gerçek ağ/PIE açık |
+| 7 Ekim temel saldırı cooldown'u (bu belgeyle aynı commit) | RPC'nin çift cooldown/sentetik saatini ortak tek kapı ve double gerçek damgayla değiştirme; mevcut %10 tolerans | Önce UE FAIL0 uptime100, ardından 89 kontrol; unflagged test komutu reddi ve eksik koruma negatif kanıtı; 35/35 son paket; gerçek RPC/jitter/PIE açık |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -83,13 +86,14 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **34/34 geçti**.
+7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **35/35 geçti**.
 Normal Editor derlemesi ayrıca geçti. 16 dosyanın PCH olmadan /W4 derlemesinde
 derleyici uyarısı yok. Veri denetiminde Lv33+ beceri boşluğu uyarıları, StaticLint'te
 InitGameState override beyaz liste uyarısı açık. Yerel test edilen en yüksek gerçek
-kayıt seviyesi 6; 322 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
-Önceki stats-first fixture dahil beceri12, LLM25, skill17, yeni temel saldırı21/8 olay, parser312/312 ve tüm eski kontroller bu
-pakette geçti. Summer49/Winter32 smoke hata0; NetSmoke1join/1welcome, iki tarafta
+kayıt seviyesi 6; 334 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
+Önceki stats-first fixture dahil beceri12, LLM25, skill17, temel saldırı21/8 olay,
+yeni cooldown89 ve test komutunun bayraksız reddi, parser312/312 ve tüm eski kontroller bu
+pakette geçti. Summer50/Winter27 smoke hata0; NetSmoke1join/1welcome, iki tarafta
 hata0. LLM fixture'i bellek helper'larını sınar; gerçek HTTP, dosya kalıcılığı,
 callback zamanlaması ve uzak istemci HUD'ı için kanıt değildir.
 Son parser sayısal/eksik alan korumaları da bu tam pakette geçti.
@@ -113,6 +117,12 @@ Sıfır saldırı gücüyle kabul edilen olay da fixture'da sayılır; öldürü
 vuruş seviye artmadan yazılır. Aktarım testi kayıt sonrasını kapsar; gerçek
 RPC, input gecikmesi ve 20 dk sınıf ölçümü açık.
 
+Cooldown fixture'ı yedi sentetik dünya zamanıyla çift/tam/toleranslı eşikleri
+sınar; dünya tick/timer'ları veya gerçek uzun oturum çalıştırmaz. Test komutu
+başlatma bayrağı olmadan fixture oluşturmadan reddedilir. Bayrak yalnız ayrı
+başlatılıp hemen kapanan test süreçleri içindir; normal editöre eklenmez,
+çünkü dünya saatini geri almak sentetik HUD yazılarını geri almaz.
+
 - [Ayrıntılı düzeltme ve test kaydı](CHECKLIST_FIXES_2026-10-05.md)
 - [Oynanacak kontroller](PLAYTEST_CHECKLIST.md)
 - [İlk koşu yöntemi](PLAYTEST_RUNBOOK.md)
@@ -121,8 +131,10 @@ RPC, input gecikmesi ve 20 dk sınıf ölçümü açık.
 - [Güvenlik ve hesap sınırları](SECURITY_AUDIT.md)
 
 Agency-agents rol belgeleri geliştirme/review rehberi olarak kullanılıyor.
-Bu son işte Ptolemy paralel ajanı parser/test/fixture/validator dosyalarını yazıp
-UE Python assertlerini çalıştırdı; C++/PS entegrasyonunu salt okunur inceledi.
-Önerdiği sıfır hasarlı kabul, ilk native RPC ve tam XP kontrolleri tamamlandı.
-Unreal/QA rol rehberleri kullanıldı; C++/PS/derleme parent tarafından yürütüldü. Önceki işlerin rol
-belgeleri ayrı çalışan ajan veya oyunun runtime AI bağımlılığı değildir.
+Son cooldown işinde Archimedes paralel ajanı Unreal Multiplayer Architect
+rolüyle ortak kapı/eşik/ret damgalarını salt okunur inceledi; sentetik HUD zamanı
+riski için disposable süreç başlatma koruması eklendi ve guard/PS tekrar incelendi.
+C++/PS/test/derleme parent tarafından yürütüldü, ajan kapatıldı. Önceki §52 işinde
+Ptolemy parser/test/fixture/validator dosyalarını yazıp UE Python assertlerini
+çalıştırdı; önerdiği sıfır hasarlı kabul, ilk native RPC ve tam XP kontrolleri
+tamamlandı. Rol belgeleri oyunun runtime AI bağımlılığı değildir.

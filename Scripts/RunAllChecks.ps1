@@ -166,6 +166,11 @@ Step "Ilk kabul edilen temel saldiri ve ret kapilari" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Temel saldiri tek cooldown kapisi ve uzun oturum" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestMeleeCooldown.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ganimet toplamada oluluk ve tek sefer grant" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLootLifeState.ps1") | Out-Host
     $LASTEXITCODE -eq 0
