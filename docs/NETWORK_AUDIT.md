@@ -38,6 +38,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O14 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** eski/vekil liderin yetkisini kaybetmiş bekleyen klan daveti kabul ediliyordu; lider rolü kabul anında yeniden denetleniyor | `UMMOClanComponent::CmdAccept` |
 | O15 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter görevi teslim ederek XP ödülünü kaybediyordu; sunucuda kabul/teslim için canlılık denetlenir | `UMMOQuestComponent::AcceptQuest/ClaimReward` |
 | O16 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter yerdeki altın/sarf/ekipmanı toplayabiliyordu; ortak sunucu toplama kapısı canlılık denetler | `AMMOLootPickup::TryCollect` |
+| O17 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** dolu can/mana saf iksiri ve ortak kullanım beklemesini harcıyordu; ihtiyaç yoksa tüketim öncesi reddedilir | `AMMOCharacter::UseConsumable` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -152,6 +153,26 @@ Zamanlayıcının gerçek overlap listesi, fiziksel ceset, sahip-istemci replica
 gerçek respawn ve yeniden giriş PIE'de oynanmadı. Fixture aynı çağrıda unpossess edilip
 yok edilir; ilk yükleme/autosave çalışmaz, oyuncu kaydı yazılmaz. Shipping'de test
 komutu derlenmez. Bu bulgu O15 görev ödülünden ayrıdır.
+
+### O17 · ORTA · Dolu can/manada saf iksir kaybı — düzeltildi (2026-10-07)
+
+Normal can iksiri dolu kaynakta reddedilirken genel tüketilebilir yolundaki büyük can,
+normal/büyük mana iksirleri envanterden çıkarılıyor, ortak cooldown harcanıyor ve
+iyileştirme clamp ile etkisiz kalıyordu. `UseConsumable`, eşya ve cooldown tüketmeden
+önce tanımın can veya mana yenileyebileceğini denetler. Sadece `EffectId` içermeyen
+saf iksirler etkisizse reddedilir; buff parşömenleri tam kaynakta kullanılabilir.
+Kontrol sahip istemcinin ön denetiminde ve sunucu RPC uygulamasında aynı yoldadır.
+Mana havuzu sıfırsa mana iksiri korunur. Birden fazla kaynak yenileyen saf tanımda
+herhangi bir kaynak eksikse kullanım izinlidir; mevcut veride böyle tanım yoktur.
+
+`TestConsumableBenefit.ps1` düzeltme öncesi gerçek UE'de `FAIL checks=0 reason=full
+health consumed potion or cooldown` verdi (motor exit=0, script exit=1). Sonrasında
+**11 kontrol geçti**: dolu büyük can, normal/büyük mana, sıfır mana havuzu; ihtiyaç
+anında büyük can ve mana; ortak cooldown; ölü kullanım reddi; tam can/manada Rage
+parşömeni; geçersiz tanım ve normal dolu can iksirinin reddi. İzole controllersiz
+karakter kullanılır, vitaller/cooldown testte kurulur ve sunucu girişleri doğrudan
+çağrılır. Gerçek istemci RPC ulaşımı, gecikme, HUD ve kayıt/yeniden giriş oynanmadı.
+Fixture oyuncu kaydı yazmaz, Shipping'de test komutu derlenmez.
 
 ### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
 - **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.

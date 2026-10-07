@@ -51,6 +51,98 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOIdentityAudit, Log, All);
 
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+
+bool AMMOCharacter::RunConsumableBenefitSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1000000, 1000000, 5000), FRotator::ZeroRotator, Params);
+	if (!Character) { OutError = TEXT("fixture spawn failed"); return false; }
+	const bool bPassed = [&]()
+	{
+		UMMOStatsComponent* S = Character->GetStats();
+		UMMOInventoryComponent* I = Character->GetInventory();
+		if (!S || !I) { OutError = TEXT("fixture components missing"); return false; }
+		const FName HP(TEXT("GreaterHealthPotion")), MP(TEXT("ManaPotion")), GMP(TEXT("GreaterManaPotion")), Scroll(TEXT("ScrollRage"));
+		I->AddItem(HP, 3); I->AddItem(MP, 3); I->AddItem(GMP, 3); I->AddItem(Scroll, 2);
+		I->AddItem(TEXT("HealthPotion"), 3);
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		auto ResetCooldown = [&]() { Character->LastConsumableUseTime = World->GetTimeSeconds() - 2.f; };
+		S->Health = S->MaxHealth; S->Mana = S->MaxMana;
+		ResetCooldown();
+		const float BeforeTime = Character->LastConsumableUseTime;
+		Character->ServerUseConsumable_Implementation(HP);
+		if (!Check(I->GetItemCount(HP) == 3 && Character->LastConsumableUseTime == BeforeTime, TEXT("full health consumed potion or cooldown"))) return false;
+		Character->UseManaPotion();
+		if (!Check(I->GetItemCount(MP) == 3 && Character->LastConsumableUseTime == BeforeTime, TEXT("full mana consumed potion or cooldown"))) return false;
+		Character->ServerUseConsumable_Implementation(GMP);
+		if (!Check(I->GetItemCount(GMP) == 3 && Character->LastConsumableUseTime == BeforeTime, TEXT("full mana consumed greater potion"))) return false;
+		const float OldMaxMana = S->MaxMana;
+		S->MaxMana = 0.f; S->Mana = 0.f;
+		Character->UseManaPotion();
+		if (!Check(I->GetItemCount(MP) == 3 && Character->LastConsumableUseTime == BeforeTime, TEXT("zero mana pool consumed potion"))) return false;
+		S->MaxMana = OldMaxMana; S->Mana = 0.f;
+		S->Health = S->MaxHealth - 50.f;
+		Character->ServerUseConsumable_Implementation(HP);
+		if (!Check(I->GetItemCount(HP) == 2 && S->Health == S->MaxHealth, TEXT("needed health potion failed"))) return false;
+		Character->UseManaPotion();
+		if (!Check(I->GetItemCount(MP) == 3 && S->Mana == 0.f, TEXT("shared cooldown bypassed"))) return false;
+		ResetCooldown();
+		Character->UseManaPotion();
+		if (!Check(I->GetItemCount(MP) == 2 && S->Mana == FMath::Min(60.f, S->MaxMana), TEXT("needed mana potion failed"))) return false;
+		ResetCooldown(); S->bIsDead = true;
+		S->Health = 0.f;
+		Character->UseConsumable(HP);
+		if (!Check(I->GetItemCount(HP) == 2 && S->Health == 0.f, TEXT("dead potion consumed"))) return false;
+		S->Revive(); ResetCooldown();
+		Character->UseConsumable(Scroll);
+		if (!Check(I->GetItemCount(Scroll) == 1 && S->ActiveEffects.ContainsByPredicate([](const FMMOActiveEffect& E) { return E.EffectId == FName(TEXT("Rage")); }), TEXT("full vitals blocked buff scroll"))) return false;
+		ResetCooldown();
+		const float AfterReset = Character->LastConsumableUseTime;
+		Character->UseConsumable(TEXT("UnknownConsumableFixture"));
+		if (!Check(Character->LastConsumableUseTime == AfterReset, TEXT("invalid item consumed cooldown"))) return false;
+		const int32 BaseHP = I->GetItemCount(TEXT("HealthPotion"));
+		Character->UseHealthPotion();
+		return Check(I->GetItemCount(TEXT("HealthPotion")) == BaseHP && Character->LastConsumableUseTime == AfterReset, TEXT("full base health potion consumed"));
+	}();
+	Character->Destroy(); // Controllersiz fixture: kayit yuklenmez/yazilmaz.
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOConsumableBenefitTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestConsumableBenefit"))) return false;
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = AMMOCharacter::RunConsumableBenefitSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_CONSUMABLE_BENEFIT_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOConsumableBenefitTestExec GMMOConsumableBenefitTestExec;
+}
+#endif
+
 namespace
 {
 	// Hile/debug komutlari (MMOGiveItem, MMOGainXP, MMOSpawnMob vb.) Shipping derlemede
@@ -1996,6 +2088,15 @@ void AMMOCharacter::UseConsumable(FName ItemId)
 	if (Inventory->GetItemCount(ItemId) <= 0)
 	{
 		MMONotify::ToOwner(this, FString::Printf(TEXT("%s yok!"), *Def->Name), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+	// Saf iksir hic can/mana yenileyemiyorsa esyayi ve ortak cooldown'u harcama.
+	// Etki parsomenleri tam can/mana ile de kullanilabilir (buff yenileme).
+	const bool bCanRestoreHealth = Def->Heal > 0.f && Stats->Health < Stats->MaxHealth;
+	const bool bCanRestoreMana = Def->ManaRestore > 0.f && Stats->Mana < Stats->MaxMana;
+	if (Def->EffectId.IsNone() && !bCanRestoreHealth && !bCanRestoreMana)
+	{
+		MMONotify::ToOwner(this, TEXT("Can/mana zaten dolu"), FColor::Silver, 1.5f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 

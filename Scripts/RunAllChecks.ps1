@@ -141,6 +141,11 @@ Step "Ganimet toplamada oluluk ve tek sefer grant" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Saf iksir faydasi ve ortak bekleme suresi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestConsumableBenefit.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

@@ -29,6 +29,10 @@ class MYPROJECT_API AMMOCharacter : public ACharacter
 public:
 	AMMOCharacter();
 
+#if !UE_BUILD_SHIPPING
+	static bool RunConsumableBenefitSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
 	TObjectPtr<UMMOStatsComponent> Stats;
 

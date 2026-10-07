@@ -591,3 +591,35 @@ PIE'de OYNANMADI; adimlar `PLAYTEST_CHECKLIST.md`'ye eklendi. Agency-agents Unre
 Multiplayer Architect ve Test Results Analyzer rol belgeleri kullanildi; bagimsiz
 paralel ajan calistirilmadi. O6 son snapshot-pawn yok olusu, magaza yazim sirasi/iptal
 ve dedicated hazirligi acik kalir. Bu tur O16 canlilik kuralini kapatti.
+
+## 38. O17: dolu can/manada saf iksiri ve beklemeyi harcama (2026-10-07)
+
+`UseConsumable` buyuk can ve normal/buyuk mana iksirini ilgili kaynak dolu olsa da
+harciyordu; Heal/RestoreMana clamp'i faydayi sifirliyordu. Saf tanimda can veya mana
+yenileme ihtiyaci yoksa, esya ve ortak cooldown'dan once reddedilir. EffectId tasiyan
+parsomenler tam kaynakta da kullanilir; sifir mana havuzunda mana iksiri korunur.
+Sunucu RPC ayni kontrolu uygular; istemci on kontrolune guvenilmez. Kayit/replikasyon
+semasi degismez. Birden fazla kaynakli saf iksir gelecekte varsa herhangi bir eksik
+kaynak yeterlidir; mevcut veride hibrit tanim yok, hibrit runtime senaryosu denenmedi.
+
+Regresyon duzeltmesiz UE'de **FAIL checks=0 reason=full health consumed potion or
+cooldown** verdi (motor exit=0, script exit=1). Sonrasinda **PASS checks=11**:
+dolu buyuk can/normal mana/buyuk mana; sifir mana havuzu; gerekli can/mana yenileme;
+ortak bekleme; olu kullanim reddi; tam kaynakta Rage parsomeni; gecersiz tanim ve
+normal can iksiri reddi. Controllersiz fixture, dogrudan sunucu girisi ve testte
+kurulan vital/cooldown degerleri kullanildi; oyuncu kaydi yazilmaz. Shipping test
+komutu derlenmez. Normal UE 5.7 editor derlemesi GECTI.
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **21/21 GECTI**: 14 dosya PCH'siz /W4,
+0 derleyici uyarisi; JSON 111 negatif; 226 yerel yuva `loaded=226 invalid=0
+loadFailed=0 json ok=226 mismatch=0 maxLevel=6`, `writeorder ok=1`,
+`roundtrip equal=1`; gecis normal/timeout/durum/son yazim hatasi/ilerleme;
+parti 10, callback 9, klan 9, gorev 8, loot 10, iksir 11 kontrol;
+Summer 45 / Winter 29 mob dogumu, 0 hata; NetSmoke 1 server join / 1 client welcome,
+iki tarafta 0 hata. NetSmoke yalniz baglanti kontroludur; gercek iksir RPC/PIE degildir.
+Lv33+ beceri boslugu ve StaticLint InitGameState beyaz liste uyarilari onceki gibi acik.
+
+Gercek sahip-istemci RPC/gecikme/HUD ve yeniden giris PIE'de OYNANMADI; adimlar
+`PLAYTEST_CHECKLIST.md`'ye eklendi. Agency-agents AppSec Engineer ve Test Results
+Analyzer rol belgeleri kullanildi; bagimsiz paralel ajan calistirilmadi. O6 kalan
+gecis penceresi, magaza yazim sirasi/iptal ve dedicated hazirligi acik kalir.

@@ -3801,3 +3801,20 @@ overlap listesi, rezervasyon timer'ı, sahip-istemci HUD ve kalıcılık oynanma
   korumalıdır; rezervasyon bitmeden hak sahibi olmayan canlı oyuncu alamamalıdır.
 - [ ] Kaydet/yeniden giriş: ölü deneme bakiye/çanta/yığını artırmamalı, canlı toplama
   sonrasındaki kazanım bir kez kalıcı olmalıdır. Normal ganimet ömrü uzatılmadı.
+
+## Saf iksir faydası ve ortak kullanım beklemesi — 2026-10-07
+
+Can/mana zaten doluysa ilgili saf iksir harcanmaz; ortak cooldown başlamaz. Etki
+parşömenleri tam can/manada kullanılabilir. İzole UE testinde 11 kontrol geçti;
+gerçek uzak istemci, gecikme/HUD ve kayıt kalıcılığı PIE'de oynanmadı.
+
+- [ ] Host ve uzak istemcide tam can ile büyük can iksirine, tam mana ile normal ve
+  büyük mana iksirine envanterden tıkla/G kullan: adet düşmemeli, dolu mesajı görünmeli.
+- [ ] Can dolu, mana eksikken büyük can iksirini reddettir; hemen mana iksiri kullan.
+  Reddedilen istek beklemeyi harcamamalı, mana tek iksir kadar yenilenmelidir.
+- [ ] İhtiyaç anında büyük can/mana iksirleri bir adet tüketmeli; hemen ikinci iksir
+  ortak cooldown nedeniyle reddedilmeli. Gecikmeli uzak istemciyi ayrıca dene.
+- [ ] Tam can/manada Ofke/Hiz/Koruma/Yenilenme parşömenleri çalışmalı; etki yenileme,
+  ölümde ret ve normal can iksiri davranışı korunmalıdır.
+- [ ] Kaydet/yeniden giriş: reddedilen iksir adetleri korunmalı, geçerli kullanımın
+  harcadığı tek adet kalıcı olmalıdır. Mana havuzu sıfır olan fixture'da mana harcanmamalı.
