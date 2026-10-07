@@ -315,6 +315,89 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		Trades[0]->EndTradeServer(TEXT("fixture inactive offer actions"));
 		for (int32 Kind = 0; Kind < 3; ++Kind)
 			if (!Check(RejectedAction(0, Kind, Trades[0]->TradeSessionId, Trades[0]->OfferRevision) && Ended(), TEXT("inactive offer action"))) return false;
+		// Cancellation has session identity, but deliberately does not depend on the offer revision.
+		auto CancelUnchanged = [&](int32 Side, uint64 SeenSession, bool bDecline = false)
+		{
+			struct FCancelSnapshot
+			{
+				FMMOTradeOffer Mine, Theirs; FMMOCharacterSaveData Inventory;
+				TWeakObjectPtr<AMMOCharacter> Peer, Pending; FString Name;
+				uint64 Session; int32 Revision; float OfferTime, ChangeTime, ConfirmTime, InviteTime, LastInvite;
+				bool Active, Timer;
+			} Before[2];
+			for (int32 I = 0; I < 2; ++I)
+			{
+				const UMMOTradeComponent* T = Trades[I]; FCancelSnapshot& S = Before[I];
+				S.Mine = T->MyOffer; S.Theirs = T->TheirOffer; S.Inventory = Snapshot(Inventories[I]);
+				S.Peer = T->Partner; S.Pending = T->PendingInviteFrom; S.Name = T->PartnerName;
+				S.Session = T->TradeSessionId; S.Revision = T->OfferRevision; S.OfferTime = T->LastOfferChangeTime;
+				S.ChangeTime = T->LastTradeChangeTime; S.ConfirmTime = T->LastConfirmTime;
+				S.InviteTime = T->PendingInviteTime; S.LastInvite = T->LastInviteTime; S.Active = T->bTradeActive;
+				S.Timer = World->GetTimerManager().IsTimerActive(T->ValidateTimerHandle);
+			}
+			if (bDecline) Trades[Side]->ServerDeclineInvite_Implementation();
+			else Trades[Side]->RequestCancelSeen(SeenSession);
+			for (int32 I = 0; I < 2; ++I)
+			{
+				const UMMOTradeComponent* T = Trades[I]; const FCancelSnapshot& S = Before[I];
+				if (!SameOffer(S.Mine, T->MyOffer) || !SameOffer(S.Theirs, T->TheirOffer) || !Equal(S.Inventory, Snapshot(Inventories[I]))
+					|| S.Peer != T->Partner || S.Pending != T->PendingInviteFrom || S.Name != T->PartnerName
+					|| S.Session != T->TradeSessionId || S.Revision != T->OfferRevision || S.OfferTime != T->LastOfferChangeTime
+					|| S.ChangeTime != T->LastTradeChangeTime || S.ConfirmTime != T->LastConfirmTime
+					|| S.InviteTime != T->PendingInviteTime || S.LastInvite != T->LastInviteTime || S.Active != T->bTradeActive
+					|| S.Timer != World->GetTimerManager().IsTimerActive(T->ValidateTimerHandle)) return false;
+			}
+			return true;
+		};
+		Reset();
+		const uint64 OldCancelSession = Trades[0]->TradeSessionId;
+		Trades[0]->EndTradeServer(TEXT("fixture cancel restart"));
+		StartTradeServer(Pawns[0], Pawns[1]); Add(0, 0); Gold(1, 25); AgeConfirm(); Trades[1]->RequestConfirm();
+		if (!Check(Trades[0]->TradeSessionId > OldCancelSession && Trades[0]->GetValidPartnerComp() == Trades[1]
+			&& Trades[1]->MyOffer.bConfirmed, TEXT("cancel new session/approved offer fixture"))) return false;
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			const uint64 Session = Trades[Side]->TradeSessionId;
+			if (!Check(CancelUnchanged(Side, OldCancelSession), TEXT("previous session cancel ended new trade"))) return false;
+			if (!Check(CancelUnchanged(Side, 0), TEXT("zero session cancel"))) return false;
+			if (!Check(CancelUnchanged(Side, Session + 1), TEXT("future session cancel"))) return false;
+			if (!Check(CancelUnchanged(Side, 0, true), TEXT("inactive decline must not cancel active trade"))) return false;
+			++Trades[1 - Side]->TradeSessionId;
+			const bool PeerRejected = CancelUnchanged(Side, Session);
+			Trades[1 - Side]->TradeSessionId = Session;
+			if (!Check(PeerRejected, TEXT("mismatched partner session cancel"))) return false;
+		}
+		const FMMOCharacterSaveData CancelA = Snapshot(Inventories[0]), CancelB = Snapshot(Inventories[1]);
+		const uint64 DrawnCancelSession = Trades[0]->TradeSessionId;
+		const int32 DrawnCancelRevision = Trades[0]->OfferRevision;
+		Gold(0, 37); // A change since drawing cannot block a legitimate session cancellation.
+		Trades[0]->RequestCancelSeen(DrawnCancelSession);
+		if (!Check(Ended() && Trades[0]->OfferRevision != DrawnCancelRevision && BothUnchanged(CancelA, CancelB),
+			TEXT("fresh cancel after revision change/no transfer/timer cleanup"))) return false;
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			Reset(); Gold(0, 29); Trades[Side]->RequestCancel();
+			if (!Check(Ended() && BothUnchanged(CancelA, CancelB), TEXT("current snapshot cancel wrapper"))) return false;
+		}
+		// An old active cancel arriving after completion must not erase a new pending invitation.
+		Trades[0]->PendingInviteFrom = Pawns[1]; Trades[0]->PendingInviteTime = World->GetTimeSeconds();
+		Trades[1]->PendingInviteFrom = Pawns[0]; Trades[1]->PendingInviteTime = World->GetTimeSeconds();
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			if (!Check(CancelUnchanged(Side, Trades[Side]->TradeSessionId), TEXT("inactive old active cancel preserves pending invite"))) return false;
+			const float PeerTime = Trades[1 - Side]->PendingInviteTime;
+			Trades[Side]->RequestCancel();
+			if (!Check(!Trades[Side]->PendingInviteFrom.IsValid() && Trades[Side]->PendingInviteTime == -1.f
+				&& (Side == 1 || (Trades[1]->PendingInviteFrom.Get() == Pawns[0] && Trades[1]->PendingInviteTime == PeerTime))
+				&& Ended() && BothUnchanged(CancelA, CancelB), TEXT("inactive cancel declines own pending invite only"))) return false;
+		}
+		Reset();
+		Trades[0]->Partner.Reset(); // Broken reciprocal state still allows the caller to leave its own session.
+		Trades[0]->RequestCancelSeen(Trades[0]->TradeSessionId);
+		if (!Check(!Trades[0]->bTradeActive && !World->GetTimerManager().IsTimerActive(Trades[0]->ValidateTimerHandle)
+			&& Trades[1]->bTradeActive && BothUnchanged(CancelA, CancelB), TEXT("broken reciprocal cancel local cleanup"))) return false;
+		Trades[1]->RequestCancelSeen(Trades[1]->TradeSessionId);
+		if (!Check(Ended() && BothUnchanged(CancelA, CancelB), TEXT("broken reciprocal peer cleanup"))) return false;
 		// An old confirmation must not approve a different session with the same numeric revision.
 		Reset(); Gold(0, 25);
 		const int32 PreviousSessionRevision = Trades[0]->OfferRevision;

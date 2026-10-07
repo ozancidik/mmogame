@@ -84,6 +84,8 @@ public:
 	void RequestInviteNearest();
 	void RequestAccept();
 	void RequestCancel();
+	// Active trade cancellation follows the drawn session, even if offers changed since drawing.
+	void RequestCancelSeen(uint64 SeenSessionId);
 	void RequestAddItem(int32 InstanceId);
 	void RequestRemoveItem(int32 InstanceId);
 	void RequestSetGold(int32 NewGold);
@@ -114,7 +116,11 @@ protected:
 	void ServerAccept();
 
 	UFUNCTION(Server, Reliable)
-	void ServerCancel();
+	void ServerCancel(uint64 SeenSessionId);
+
+	// Inactive cancel intent cannot cancel a trade that started while the request was in flight.
+	UFUNCTION(Server, Reliable)
+	void ServerDeclineInvite();
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItem(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId);

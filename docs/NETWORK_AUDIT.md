@@ -42,6 +42,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O18 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** temel saldırı RPC'si sentetik zaman damgasından sonra ikinci cooldown kapısında geçerli vuruşu reddediyordu | `AMMOCharacter::AttackTargetInternal/ServerAttackTarget_Implementation` |
 | O19 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** aynı revizyonlu yeni takasta eski oturumun onayı kabul ediliyordu; onay artık sunucu oturum kimliği + görülen revizyonla doğrulanır | `UMMOTradeComponent::ServerConfirm/StartTradeServer`, `AMMOHUD::DrawTrade/HandleTradeClick` |
 | O20 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski teklif aksiyonunun altını yeni takasa yazılıyordu; add/remove/gold RPC'leri de görülen session/revision ile doğrulanır | `UMMOTradeComponent::IsSeenOfferCurrent/ServerSetGold/ServerAddItem/ServerRemoveItem`, `AMMOHUD::HandleTradeClick` |
+| O21 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski aktif takas iptali yeni takası sonlandırıyordu; cancel/X görülen session ile doğrulanır, inaktif davet reddi ayrı RPC'dir | `UMMOTradeComponent::ServerCancel/ServerDeclineInvite`, `AMMOHUD::HandleTradeClick/HandleWindowClick` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -552,7 +553,8 @@ native fixture'da çalıştırılmadı. Ayrı replike alanlar bütün ağ koşul
 atomik payload/token görünümü garantisi olarak yorumlanmaz.
 
 Bu §55 çalışmasında Cancel/X, add/remove ve gold RPC'leri session taşımıyordu;
-add/remove/gold sonraki O20/§56'da düzeltildi. Cancel/X ayrı açık risktir. Reentrant inventory
+add/remove/gold sonraki O20/§56'da, aktif Cancel/X O21/§57'de düzeltildi.
+Bekleyen davet kimliği ve gerçek HUD/ağ doğrulaması açıktır. Reentrant inventory
 rollback, ortak kalıcı işlem, gerçek Server/Shipping ve PIE kontrolleri açık.
 Agency Unreal Multiplayer Architect/QA rehberi ve yerel UE5.7 UHT/RepLayout
 kaynak incelemesi kullanıldı. Son paket36/36 ve takas96 geçti; derleme/smoke/NetSmoke
@@ -589,6 +591,38 @@ add geçerli ve henüz teklif edilmemiş çanta eşyasıdır. Native162, DLL ve 
 paket geçti; 18 PCH'siz dosyada derleyici uyarısı0. Tam paket kaydı §56'da tutulur.
 Canvas/input/takas RPC taşıma çalıştırılmadı; NetSmoke bağlantı kontrolüdür.
 
-Cancel/X ve bekleyen davet kabul/iptalinin kimliği ayrı açıktır. Genel replike
+§56 sırasında Cancel/X açıktı; aktif iptal §57/O21'de session'a bağlandı.
+Bekleyen davet kabul/reddinin davet kimliği hâlâ açıktır. Genel replike
 payload/token atomikliği, reentrant rollback, ortak kalıcı işlem, Server/Shipping
 ve gerçek iki oyunculu PIE kanıtı bu sınırlı düzeltmeyle tamamlanmaz.
+
+### O21 · ORTA · Aktif takas iptalinde görülen oturum (2026-10-07)
+
+HEAD `ddea095` üzerinde eski parametresiz cancel'ın sunucu gövdesi, iptal/yeniden
+açılmış takası sonlandırdı: native **FAIL checks=145, check=146**, UE exit0/PS exit1.
+Bu fixture gerçek gecikmeli Reliable paket veya uzak oyuncu exploit'i oluşturmaz;
+aktif iptal isteğinin yeni oturuma uygulanabildiğini sunucu gövdesinde kanıtlar.
+
+`ServerCancel(SeenSessionId)` authority, aktif durum, sıfır olmayan eşleşen session
+ve geçerli karşılıklı partner varsa onun aynı session'da olduğunu denetler.
+Teklif revizyonu iptali engellemez: teklif değişmiş olsa da oyuncu aynı oturumdan
+çıkabilmelidir. Bozuk karşılıklılıkta kendi yerel oturumunu temizlemek mümkündür.
+HUD iptal düğmesi/X son çizilen weak component ve session'ı gönderir. Console/C++
+`RequestCancel` aktifken güncel yerel session'ı, inaktifken ayrı `ServerDeclineInvite`
+isteğini gönderir. İnaktif ret yeni başlamış aktif takası iptal edemez; eski aktif
+cancel da artık inaktif durumdaki yeni bekleyen daveti silemez. Yeni RPC imzaları
+iki uçta aynı derlemeyi gerektirir; owner-only alanlar/kayıt şeması değişmedi.
+
+Native **182 kontrol = önceki162 +20**: kurulum, iki yönde eski/sıfır/ileri session,
+aktifken inaktif ret ve partner session uyuşmazlığı; revizyon değişince geçerli
+iptal; iki current wrapper; inaktif eski cancel'ın daveti koruması ve kendi
+davetinin reddi; bozuk karşılıklılıkta iki tarafın temizliği. Ret snapshot'ı tam
+teklif/ayna payload'larını, tüm envanteri, partner/davet/name/session/revision,
+saat damgalarını, aktiflik ve timer durumunu karşılaştırır. Normal DLL ve doğrudan
+182 testi geçti. Son tam paket kanıtı §57'de tutulur. Controller'sız/aynı frame;
+dünya saati değiştirilmez, gerçek RPC/Canvas veya kalıcı save kapısı çalıştırılmaz.
+
+Bekleyen davet kabul/reddi hâlâ davet nonce'u taşımaz: inaktifken gecikmiş ret
+daha yeni bekleyen daveti silebilir. Bu ayrı açık iştir. Gerçek owner-only teslim,
+HUD input/pawn değişimi, bağlantının sürmesi, payload/token atomikliği, reentrant
+rollback, ortak kalıcı işlem ve gerçek Server/Shipping doğrulamaları açıktır.

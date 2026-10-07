@@ -1616,3 +1616,67 @@ Belge güncellemeleri ayrıdır. Editör kapalı; bilinen Lv33+ beceri boşluğu
 InitGameState whitelist uyarıları sürüyor. Gerçek Canvas/input, HUD click,
 remote RPC/owner-only teslim, bağlantının sürmesi ve latency UX PIE listesinde
 açıktır. Ortak kalıcı takas/rollback/Server/Shipping/Lv1–30 ölçümü tamamlanmadı.
+
+## 57. Aktif takas iptalinde görülen oturum ve ayrı davet reddi (2026-10-07)
+
+Başlangıç HEAD `ddea095`; tracked temiz, .agents/.codex/AGENTS.md untracked
+korundu. Aktif yazan ajan veya UE süreci yoktu. Önce eski parametresiz cancel'ın
+sunucu gövdesine native reproducer eklendi ve eski üretim kodu normal derlendi.
+İptal/yeniden açma sonrası eski iptal yeni takası bitirdi:
+**MMO_TRADE_TEST FAIL checks=145, previous session cancel ended new trade (check=146)**
+(15:41:59 UTC), UE exit0/PS exit1. Gerçek Reliable sırası veya uzak istemci
+exploit'i/ekonomik kayıp oluşturulmadı; gövde düzeyinde oturum eksikliği kanıtıdır.
+
+`ServerCancel(uint64 SeenSessionId)` authority/aktiflik/sıfır olmayan eşleşen
+session ve geçerli karşılıklı partner varsa aynı session'ı doğrular. İptal teklif
+revizyonuna bağlı değildir: aynı takasta teklif değişince oyuncu çıkabilmelidir.
+Bozuk partner karşılıklılığında kendi oturum temizliği kullanılabilir. HUD iptal
+ve X son çizilen weak component/session'ı kullanır; eksik draw veya yeni pawn'ın
+component'i eski cache ile dispatch etmez. Console/C++ RequestCancel aktifken
+son yerel session'ı kullanır; inaktifken ayrı ServerDeclineInvite gönderir.
+İnaktif ret aktif takası bitiremez; eski aktif cancel da inaktifken yeni bekleyen
+daveti silemez. Ret mutasyon öncesi normal return'dür, disconnect validation yok.
+Yeni cancel RPC imzası iki uçta aynı DLL gerektirir. Kayıt şeması ve owner-only
+session/offer alanları değişmedi; kabul/otomatik ölüm/ayrılma iptalleri aynı akışta.
+
+Native182 = önceki162 +20: yeni session/onaylı teklif kurulumu (1), iki yönde
+eski/sıfır/ileri session, aktifken inaktif ret, partner session uyuşmazlığı (10),
+revizyon değişiminden sonra Seen iptali (1), iki current wrapper (2), inaktif eski
+cancel'ın daveti koruması ve kendi bekleyen davetini reddi (4), bozuk partnerle
+iki yerel temizlik (2). Ret snapshot'ı tam MyOffer/TheirOffer Items payload'ları,
+altın/onay, tüm envanter, partner/pending/name/session/revision, offer/change/
+confirm/invite damgaları, aktiflik/timer durumunu karşılaştırır. Geçerli iptal
+çift envanteri korur; Ended kontrolü teklif/partner/timer temizliğini sınar.
+Controller'sız/aynı frame, dünya saati değişmez; fixture kayıt yüklemez/save kapısı
+açılmaz. Canvas/input ve gerçek RPC taşınması bu testte çalıştırılmaz.
+
+Üretim/test DLL derlemesi editör kapalıyken **Succeeded** (15:43 UTC'de başlatılan
+build'in completion'ı bu turda alındı). İlk doğrudan native182 PASS'e rağmen runner
+hâlâ162 beklediğinden PS exit1 verdi; beklenen marker182'ye güncellendi. Tekrar
+TestTrade.ps1 **PASS checks=182, exit0** (18:45:28 UTC). Ardından son kaynak ve
+runner ile tam paket başlatıldı. Önceki bekleyen heartbeat'ler sırasında yeni
+kod/test/commit yapılmadı; kesilen bu güvenli değişiklik önce tamamlandı.
+
+Agency Unreal Multiplayer Architect ve QA rehberleri kullanıldı. Boyle salt
+okunur inceleme için açıldı, kullanım sınırıyla errored döndü; inceleme sonucu
+üretemedi ve kapatıldı. Bağımsız ajan onayı yoktur. Parent caller'ları, sunucu
+kapılarını, native20 kontrol sayısını, iki HUD dispatch dalını yerel olarak
+inceledi; kod/test/build/belgeyi yürüttü. Davet kabul/reddi hâlâ nonce taşımaz;
+inaktifken gecikmiş ret daha yeni daveti silebilir. Ayrı açık kapsamdır.
+
+Son kaynakla `RunAllChecks.ps1 -SkipBuild -FullCompile`: **36/36 GECTI, exit0**.
+18 PCH'siz /W4 dosya, toplam compiler warning C0; native Trade182 PASS.
+ValidateData temiz (Lv33+ beceri boşluğu uyarıları sürüyor), StaticLint temiz
+(InitGameState override whitelist uyarısı sürüyor), negatif lint15/veri14,
+parser312/312, JSON111 ve önceki tüm regresyonlar geçti. Store370 loaded370
+invalid0/loadFailed0/existsMismatch0/jsonMismatch0, maxLevel6, writeorder1 ve
+roundtrip equal1. Summer51/Winter34 mob doğumu, smoke exit0/hata0;
+NetSmoke1join/1welcome, server/client hata0 (`mmo_net_server_215329.log`,
+`mmo_net_client_215329.log`, TEMP). Paket logu
+`mmo_all_trade_cancel_final_20261007.log` (TEMP). Source/Scripts SHA256 listesi
+paket öncesi/sonrası aynı; kod/test/runner paket boyunca değişmedi. Belge
+güncellemeleri ayrıdır; editör/UE süreçleri kapalı. Gerçek owning-client RPC,
+owner-only teslim, bağlantının sürmesi, Canvas/input/pawn değişimi ve genel
+payload/token atomikliği PIE listesinde açık. Bekleyen davet nonce'u, reentrant
+rollback/ortak kalıcı işlem, gerçek Server/Shipping ve Lv1–30 oynanış ölçümü
+bu sınırlı düzeltmeyle tamamlanmadı.

@@ -1944,7 +1944,8 @@ bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
 	}
 	if (TradeCancelRect.IsInside(Pos))
 	{
-		Trade->RequestCancel();
+		if (DrawnTradeComponent.Get() == Trade && DrawnTradeSessionId != 0)
+			Trade->RequestCancelSeen(DrawnTradeSessionId);
 		return true;
 	}
 	// Offer controls refer to the same last drawn component/session/revision as confirmation.
@@ -3109,7 +3110,10 @@ bool AMMOHUD::HandleWindowClick(const FVector2D& Pos)
 			// X = ticareti iptal et.
 			if (AMMOCharacter* TC = Cast<AMMOCharacter>(GetOwningPawn()))
 			{
-				if (UMMOTradeComponent* T = TC->GetTradeComponent()) { T->RequestCancel(); }
+				if (UMMOTradeComponent* T = TC->GetTradeComponent())
+				{
+					if (DrawnTradeComponent.Get() == T && DrawnTradeSessionId != 0) T->RequestCancelSeen(DrawnTradeSessionId);
+				}
 			}
 		}
 		else

@@ -4235,7 +4235,8 @@ fare tıklaması, RPC taşıma, owner-only replication veya gerçek oyuncu kayd�
   kullanmaz. Host ve uzak console davranışını bu semantikle karşılaştır.
 - [ ] Eski cancel/X/add/remove/gold tıklamalarının yeni takası etkilemesini ayrı
   dene; §55'te bu RPC'ler session taşımıyordu. Add/remove/gold §56'da düzeltildi;
-  cancel/X ayrı açık. Aşağıdaki yeni offer kontrol listesi de oynanmalı.
+  aktif cancel/X §57'de session'a bağlandı; gerçek HUD/ağ kontrolü aşağıda açık.
+  Aşağıdaki yeni offer ve cancel kontrol listeleri de oynanmalı.
   Reentrant rollback ve iki kaydın ortak kalıcılık/çökme kontrolleri de açık.
 
 ## 2026-10-07 — Takas add/remove/altın için görülen teklif (PIE açık)
@@ -4259,6 +4260,31 @@ oyuncu kayıt kalıcılığı veya remote bağlantının sürmesini çalıştır
 - [ ] Yeni session revizyon0'da fresh altın/add isteği kabul edilmeli; console
   MMOTradeGold güncel yerel snapshot semantiğini korumalı. Host ve uzak istemci
   aynı güncel teklifi görmeli. Owner-only gizlilik ve büyük uint64 taşımasını ölç.
-- [ ] Cancel düğmesi/X ve bekleyen davet kabul/iptalinin eski olayları ayrı
-  araştırılmalı; bu RPC'ler hâlâ bu session/revision teklif korumasında değildir.
+- [ ] Cancel düğmesi/X §57'de session'a bağlandı; aşağıdaki gerçek input/ağ adımlarını
+  çalıştır. Bekleyen davet kabul/reddi hâlâ davet kimliği taşımaz; ayrı araştırılmalı.
   Crash/iki kayıt atomikliği/reentrant rollback önceki açık maddelerdir.
+
+## 2026-10-07 — Aktif takas iptalini görülen oturuma bağlama (PIE açık)
+
+Native182 kontrol (önceki162 +20) ve normal Editor DLL derlemesi geçti. Eski
+aktif cancel yeni takası sonlandırıyordu: düzeltme öncesi FAIL145/check146.
+Fixture yalnız controller'sız sunucu wrapper/gövdesini sınar; Canvas/input,
+Reliable taşıma/ownership, uzak bağlantı veya iki kalıcı kayıt kanıtı değildir.
+
+- [ ] İki uç aynı yeni DLL: takası iptal et/yeniden aç; önceki oturumun iptal
+  düğmesi ve X olayını gecikmeli gönder. Yeni takas/teklif/onay/timer korunmalı,
+  iki oyuncunun bağlantısı sürmeli. Yeni görünümü çizip iptal edince iki pencere
+  ve partner/timer durumu temizlenmeli; altın/eşya aktarılmamalı.
+- [ ] Aynı session'da draw'dan sonra herhangi bir oyuncu teklifini değiştirsin:
+  eski çizimin iptal/X'i session geçerli olduğu için çalışmalı. Revizyon değişimi
+  oyuncuyu takasta tutmamalı. Console MMOTradeCancel güncel yerel session'ı kullanır.
+- [ ] DrawHUD/DrawTrade atlanması, Canvas/pawn/stats yokluğu, respawn/pawn değişimi
+  ve Summer→Winter sonrası eski hitbox/cache iptal dispatch etmemeli. Native test
+  render/input dalını çalıştırmaz; host ve uzak HUD'da ayrı doğrula.
+- [ ] İnaktifken verilen davet reddi aktif takas başladıktan sonra ulaşsın:
+  aktif takası sonlandırmamalı. Eski aktif cancel takas bittikten ve yeni davet
+  geldikten sonra ulaşsın: bekleyen daveti silmemeli. Normal inaktif iptal yalnız
+  kendi davetini reddetmeli; owner-only redraw iki tarafta kontrol edilmeli.
+- [ ] Daha yeni bekleyen davete gecikmiş inaktif ret/kabul ulaşmasını ayrıca
+  araştır: bekleyen davet nonce'u bu düzeltmede eklenmedi. Payload/token atomikliği,
+  gerçek RPC kayıp/gecikmesi ve kalıcı takas/rollback testleri açık kalır.

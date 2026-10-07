@@ -208,7 +208,15 @@ void UMMOTradeComponent::RequestAccept()
 
 void UMMOTradeComponent::RequestCancel()
 {
-	if (HasAuthorityInternal()) { ServerCancel_Implementation(); } else { ServerCancel(); }
+	if (bTradeActive) { RequestCancelSeen(TradeSessionId); }
+	else if (HasAuthorityInternal()) { ServerDeclineInvite_Implementation(); }
+	else { ServerDeclineInvite(); }
+}
+
+void UMMOTradeComponent::RequestCancelSeen(uint64 SeenSessionId)
+{
+	if (HasAuthorityInternal()) { ServerCancel_Implementation(SeenSessionId); }
+	else { ServerCancel(SeenSessionId); }
 }
 
 void UMMOTradeComponent::RequestAddItem(int32 InstanceId)
@@ -364,18 +372,20 @@ void UMMOTradeComponent::ServerAccept_Implementation()
 	StartTradeServer(Inviter, Self);
 }
 
-void UMMOTradeComponent::ServerCancel_Implementation()
+void UMMOTradeComponent::ServerCancel_Implementation(uint64 SeenSessionId)
 {
-	if (bTradeActive)
-	{
-		EndTradeServer(TEXT("Ticaret iptal edildi."));
-	}
-	else
-	{
-		// Bekleyen daveti de dusur.
-		PendingInviteFrom.Reset();
-		PendingInviteTime = -1.f;
-	}
+	if (!HasAuthorityInternal() || !bTradeActive || SeenSessionId == 0 || SeenSessionId != TradeSessionId) return;
+	// Revision does not gate cancellation: an offer change must not trap the player in a trade.
+	const UMMOTradeComponent* PC = GetValidPartnerComp();
+	if (PC && PC->TradeSessionId != TradeSessionId) return;
+	EndTradeServer(TEXT("Ticaret iptal edildi."));
+}
+
+void UMMOTradeComponent::ServerDeclineInvite_Implementation()
+{
+	if (!HasAuthorityInternal() || bTradeActive) return;
+	PendingInviteFrom.Reset();
+	PendingInviteTime = -1.f;
 }
 
 void UMMOTradeComponent::ServerAddItem_Implementation(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId)
