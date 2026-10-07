@@ -1147,3 +1147,64 @@ ardindan Skill rutbe4. Normal yeniden derleme, skill PCH'siz tek-dosya derleme
 ve 12 kontrol direct PASS; uretim helper'i degismedi. Tam paket tekrar kosulmadi.
 Lv33+ beceri bosluklari/InitGameState lint uyarisi acik. Gercek dosya göcu,
 istemci RPC/HUD, Server/Shipping hedefi ve 20 dk oyun sureleri acik.
+
+## 50. LLM oyuncu kota tablosu dolunca siniri atlama yolunu kapatma (2026-10-07)
+
+Mevcut oyuncu basi gunluk kota zaten vardi (QA ORTA-1'in eski metni tarihsel).
+Yeni bulunan sinir hatasi: 4096 anahtar dolunca yeni oyuncunun istegi genel
+butceye yaziliyor, fakat oyuncu sayaci tutulmuyordu. Bu anahtar sonraki
+isteklerde oyuncu kotasini asabiliyordu; genel gunluk/oturum/dakika tavanlari
+atlatilmiyordu. UE reproducer, eski kuralli ortak helper ile **FAIL checks=11**
+`full player table bypassed per-player quota` verdi (UE exit0, PS exit1).
+Varsayilan 1500 gunluk tavanla yalniz sayilan istekler tabloyu dolduramaz;
+iadeli isteklerin sifir sayacli anahtarlari tutuldugu icin tablo bu yoldan
+veya daha yuksek limitsiz/ayarlanmis butcelerle dolabilir. Bu, yeni dogrulanmis
+sinir davranisidir; gercek uzaktan/HTTP suistimal kosusu yapilmadi.
+
+Kota acikken yeni anahtar izlenemiyorsa **rezervasyondan once ret**:
+HTTP kurulmaz, toplam/oyuncu/oturum/es-zamanli sayac ve yeni dakika yuvasi
+harcanmaz, mevcut callback NPC yedegine doner. Var olan anahtarlar kendi
+kotalari dahilinde devam eder. Acikca `MaxDailyRequests=0` sinirsiz modunun
+onceki davranisi ve 4096 bellek tavani korunur. UTC gun degisimi tabloyu
+sifirlar. Bu kapasite reddi yeni oyuncunun LLM ozelligini erteler; oynanisi
+engellemez. Oyuncu adi hala hesap kimligi degildir; yeniden adlandirma/kimlik
+suistimali, coklu surec sayac ayrismasi ve kalicilik penceresi acik kalir.
+
+Bütce rezervasyonu, gun sifirlama ve iade bellek helper'larina ayrildi;
+uretim cagiranlari dosya yazimi ve HTTP'yi yurutur. RefundRequest gunluk
+sayac degistiyse true doner, mevcut callback/baslatma hatasi yollari bu
+sonucta NoteBudgetChanged cagirir. Eski gun iadesi yalniz oturumdan duser;
+es-zamanli yuva birakilir. Timeout/HTTP200 ucret kurali ve callback'in
+tek-sefer bSlotReleased kapisi degismedi; sayaclar istemciye replike edilmez,
+mevcut server RPC mesafe/cooldown ve owner ClientReceiveNpcDialogue yolu kullanilir.
+
+`MMOTestDialogueBudget` / `TestDialogueBudget.ps1`: **25 UE kontrol PASS**.
+Kayitli GI subsystem'i yerine ayni GI outer'i altinda kayitsiz test UObject'i;
+Initialize/Deinitialize, RollDailyBudget dosya yolu, NoteBudgetChanged, API
+anahtari, HTTP ve saglayiciya cagri yok. Gercek dunya sadece Exec icin gereklidir.
+Kontroller: anahtar normalizasyonu/alias, kota formulu, rezervasyon sayaclari,
+oyuncu/oturum/gun/dakika/es-zamanli retleri, tam60sn pencere, iade/dakika
+koruma/eski gun/alt tasma, dolu tablo yeni ret/mevcut kabul/kota/sinirsiz,
+gun sifirlama/ayni gun, baslatilamayan rezervasyon temizligi, ucreti koruma,
+son oturum/gun/oyuncu ve 4095->4096 son takip yuvasi sinirlari.
+Test HTTP durum siniflandirmasini, gercek callback sirasi/cift callback'i,
+gercek UTC saati/gece yarisi, dosya yeniden girisi/atomik yazmayi veya uzak
+istemci HUD'ini calistirmaz. Ilk testte GameInstance ClassWithin nedeniyle
+fixture outer assert'i oldu; GameInstance outer ile duzeltildi. Bu fixture
+kurulum hatasiydi, uretim subsystem'indeki bir hata degildi.
+
+Normal Editor derlemesi gecti. RunAllChecks'e yeni adim ve dialogue dosyasi
+PCH'siz /W4 listesine eklendi. Tam paket sonucu asagidadir.
+Agency-agents Unreal Systems Engineer rehberi ve Sartre paralel QA ajani
+kullanildi. Sartre salt okunur sinir matrisi/entegrasyon review'u yapti;
+dosya yazmadi, UE/derleme veya saglayici istegi calistirmadi.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **32/32 GECTI**; 16 dosya
+PCH'siz /W4, derleyici uyari0. JSON111 negatif; store298/loaded298,
+invalid0/loadFailed0/existsMismatch0/jsonMismatch0/maxLevel6, writeorder1,
+roundtrip equal1. Onceki stats-first fixture dahil beceri12, mastery12,
+equip8, vendor14 ve tum gecis/olum/gorev/loot kontrolleri gecti. Yeni LLM25
+bu tam pakette de PASS. Summer51 / Winter34 smoke hata0; NetSmoke1join /
+1welcome, server/client hata0 (yalniz baglanti). Lv33+ beceri bosluklari,
+InitGameState lint uyarisi, gercek HTTP/PIE ve Server/Shipping hedefi acik.
+Bu testte duzeltme sonrasi uretim kodu veya fixture degistirilmedi.

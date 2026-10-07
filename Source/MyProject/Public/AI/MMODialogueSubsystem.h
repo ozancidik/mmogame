@@ -58,6 +58,11 @@ public:
 	/** Secili saglayicinin API anahtari tanimli mi? (tanimli degilse istek atmayiz) */
 	bool HasApiKey() const;
 
+#if !UE_BUILD_SHIPPING
+	// Bellek ici butce testi: HTTP, API anahtari ve sayac dosyasi kullanmaz.
+	static bool RunBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 	// --- Ayarlar ---
 
 	// Hangi LLM saglayicisi. Varsayilan NVIDIA NIM (ucretsiz katman). Anthropic'e
@@ -147,8 +152,9 @@ protected:
 	int64 DailyBudgetDay = -1;
 	bool bDailyBudgetLoaded = false;
 
-	// Oyuncu anahtari (kucuk harf) -> bugunku istek sayisi. Boyut tavani asilirsa yeni anahtar izlenmez
-	// (kota uygulanmaz, genel tavan korur) — sahte adlarla bellek sisirilemesin.
+	// Oyuncu anahtari (kucuk harf) -> bugunku istek sayisi. Kota acikken tablo doluysa yeni
+	// anahtar yedek replige doner; mevcut anahtarlar kotasi dahilinde devam eder.
+	// Acikca sinirsiz gunluk modda (0) yeni anahtar izlenmez; bellek yine sinirli kalir.
 	TMap<FString, int32> PlayerDailyCounts;
 	static constexpr int32 MaxTrackedPlayers = 4096;
 
@@ -163,6 +169,11 @@ protected:
 
 	// Gunluk sayaci yukler/sifirlar (gun degistiyse). SendRequest'in basinda cagrilir.
 	void RollDailyBudget();
+	// Saf bellek islemleri; diske yazma ve HTTP yalniz SendRequest/RollDailyBudget tarafinda.
+	bool ResetDailyBudgetForDay(int64 Today);
+	bool TryReserveRequest(double NowSec, const FString& PlayerKey);
+	// Gunluk sayac degistiyse true; cagiran NoteBudgetChanged ile kalicilastirir.
+	bool ReleaseRequestBudget(const FString& PlayerKey, int64 RequestDay, bool bRefund);
 	// Degisikligi isaretler; sik yazimi sinirlar (bForce = hemen yaz).
 	void NoteBudgetChanged(bool bForce = false);
 	void WriteDailyBudgetFile();
@@ -170,7 +181,7 @@ protected:
 	static FString NormalizePlayerKey(const FString& PlayerKey);
 	// Atilmis ama saglayicinin yanit uretmedigi bir istegi sayaclardan dusurur (Session + Daily + oyuncu).
 	// RequestDay != bugunse gun sayaclari dokunulmaz (gun donmus, yeni gunun sayaci yanlis dusmesin).
-	void RefundRequest(const FString& PlayerKey, int64 RequestDay);
+	bool RefundRequest(const FString& PlayerKey, int64 RequestDay);
 
 	// Hiz siniri durumu (yalniz bu subsystem'de, replike degil).
 	TArray<double> RecentRequestTimes;

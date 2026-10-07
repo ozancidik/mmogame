@@ -38,6 +38,17 @@ Editör kapalıydı (süreç listesi kontrol edildi). `Binaries/Win64/UnrealEdit
 
 ### ORTA-1 — LLM günlük tavanı (`a8bea14`)
 
+**2026-10-07 güncellemesi (güncel kod; eski bulgu metni aşağıda):** Oyuncu
+başına günlük kota, ini/CLI tavanı, başarısız HTTP iadesi ve seyreltilmiş dosya
+yazımı önceki düzeltmelerde eklenmişti. Yeni §50 düzeltmesi 4096 anahtarlık
+kota tablosu dolunca yeni anahtarın oyuncu kotasını atlamasını reddeder;
+mevcut anahtarlar kotası içinde devam eder. Bellek içi UE testinde önce
+FAIL checks=11, sonra 25 kontrol PASS; HTTP/saat/disk/uzak istemci doğrulaması
+değildir. Genel tavan aşılmıyordu. Varsayılan1500 ile sayılan istekler tek
+başına tabloyu dolduramaz; iadeler sıfır sayaçlı anahtar bırakır. Oyuncu adı
+kimliği, çoklu süreç sayacı ve gerçek HTTP/yeniden giriş testleri açık.
+
+
 Yer: `Source/MyProject/Private/AI/MMODialogueSubsystem.cpp:50-80` (`RollDailyBudget`/`SaveDailyBudget`), `:141-152` (tavan + artış), `:293` (iade); `Public/AI/MMODialogueSubsystem.h` (`MaxDailyRequests=1500`); çağıran `MMOPlayerController.cpp:1257` (`ServerRequestNpcDialogue`).
 
 Doğru olanlar (kodla doğrulandı): gün numarası `UtcNow().GetTicks()/TicksPerDay` (UTC; yerel gece yarısı DEĞİL — Türkiye'de UTC 00:00 = 03:00); gün değişince sıfırlama `SendRequest` başında her istekte kontrol ediliyor (süreç gece yarısını aşsa da çalışır); dosya bozuk/eksik/boş ise `Split` başarısız veya `Atoi64`=0 → gün farkı → bugün için 0'dan başlar (çökmez); gelecekteki/eski gün numarası da sıfırlanır; dosya yalnız ilk kullanımda okunur; tavan kontrolü anahtar/dakikalık/eşzamanlı/oturum kontrollerinden SONRA ve artıştan ÖNCE; `ProcessRequest()` başlamazsa üç sayaç da iade ediliyor; `MaxDailyRequests=0` sınırsız.

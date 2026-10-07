@@ -4064,3 +4064,25 @@ stats-first ve skill-first yükleme aynı toplamı verir. Sınıf iadesi bütçe
 - [ ] Sınıf değişimi sonrası eski ücretli beceriler gitmeli, yalnız kazanılmış
   skill bütçesi iade edilmeli. Kaydın kimliği/imzası ve iki taraflı ticaret
   kalıcılığı ayrı açık işlerdir.
+
+## NPC LLM kota ve tablo kapasitesi — 2026-10-07 (PIE/HTTP acik)
+
+`TestDialogueBudget.ps1`: 25 bellek ici UE kontrolu; once FAIL checks=11,
+duzeltme sonrasi PASS. Gercek API/HTTP, butce dosyasi, callback zamanlamasi
+ve uzak istemci kullanilmadi. Genel tavan atlama degil, 4096 oyuncu anahtari
+dolunca yeni anahtar icin oyuncu kotasinin uygulanmamasi duzeltildi.
+
+- [ ] Izole test Saved dizininde, mevcut butce dosyasini yedekleyerek host ve
+  uzak istemcide NPC konus: server mesafe/cooldown kapisi ve cevap yalniz
+  isteyen oyuncunun HUD'ina gitmeli. Ret halinde NPC'nin kendi yedegi gelmeli.
+- [ ] Kota acik ve izole dosyada 4096 sifir sayacli anahtar varken yeni adla
+  konus: sunucu `Oyuncu kota tablosu dolu` reddi, provider istegi/sayac artisi
+  olmamali; dosyadaki mevcut ad kotasi dahilinde LLM kullanabilmeli. API
+  denemesi saglayici kotasina tabi; sadece ayri test ortaminda dogrula.
+- [ ] Gercek baslatma hatasi, baglanti hatasi, HTTP200/bozuk200, HTTP!=200 ve
+  timeout: uygun iade/ucret koruma, bir callback ve es-zamanli yuva temizligi.
+  Bellek fixture'i bu HTTP siniflandirmasini veya cift callback'i dogrulamaz.
+- [ ] UTC gun degisimi, bekleyen eski-gun cevabi, host yeniden acma ve gecici
+  dosya kurtarmasi: yeni gunun sayaci iade nedeniyle dusmemeli, kalicilik
+  kurallari korunmali. Oyuncu adini degistirme hesap kotasi degildir; coklu
+  host ayni Saved dizinini paylasirsa merkezi toplam garanti edilmez.

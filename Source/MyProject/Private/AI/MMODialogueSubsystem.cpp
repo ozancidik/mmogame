@@ -16,6 +16,137 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
+#if !UE_BUILD_SHIPPING
+#include "Engine/World.h"
+#include "Engine/GameInstance.h"
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+
+bool UMMODialogueSubsystem::RunBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client || !World->GetGameInstance())
+	{ OutError = TEXT("server game world required"); return false; }
+	// Kayitli GI subsystem'i DEGIL: Initialize/Deinitialize ve dosya/HTTP yollarina girilmez.
+	UMMODialogueSubsystem* D = NewObject<UMMODialogueSubsystem>(World->GetGameInstance());
+	auto Check = [&](bool Condition, const TCHAR* Label)
+	{ if (!Condition) { OutError = Label; return false; } ++OutChecks; return true; };
+	auto Reset = [&]()
+	{
+		D->MaxDailyRequests = 200; D->MaxSessionRequests = 400;
+		D->MaxRequestsPerMinute = 30; D->MaxConcurrentRequests = 4;
+		D->SessionRequestCount = 0; D->DailyRequestCount = 0; D->DailyBudgetDay = 10;
+		D->InFlightRequests = 0; D->RecentRequestTimes.Reset(); D->PlayerDailyCounts.Reset();
+	};
+	Reset();
+	if (!Check(NormalizePlayerKey(TEXT("  ALICE  ")) == TEXT("alice")
+		&& NormalizePlayerKey(TEXT("\t\r\n")) == TEXT("?")
+		&& NormalizePlayerKey(FString::ChrN(100, TEXT('a'))).Len() == 64
+		&& !NormalizePlayerKey(TEXT("ab\tcd\nEF")).Contains(TEXT("\t")), TEXT("player key normalization"))) return false;
+	D->MaxDailyRequests = 1500; const bool bDefaultQuota = D->GetPerPlayerDailyQuota() == 375;
+	D->MaxDailyRequests = 1; const bool bSmallQuota = D->GetPerPlayerDailyQuota() == 50;
+	D->MaxDailyRequests = 0;
+	if (!Check(bDefaultQuota && bSmallQuota && D->GetPerPlayerDailyQuota() == 0, TEXT("quota formula"))) return false;
+	Reset();
+	if (!Check(D->TryReserveRequest(100, TEXT("alice")) && D->SessionRequestCount == 1
+		&& D->DailyRequestCount == 1 && D->InFlightRequests == 1 && D->PlayerDailyCounts.FindRef(TEXT("alice")) == 1
+		&& D->RecentRequestTimes.Num() == 1, TEXT("reservation counters"))) return false;
+	Reset(); D->PlayerDailyCounts.Add(TEXT("alice"), 50);
+	if (!Check(!D->TryReserveRequest(100, TEXT("alice")) && D->DailyRequestCount == 0
+		&& D->InFlightRequests == 0 && D->RecentRequestTimes.IsEmpty(), TEXT("player quota charged rejected request"))) return false;
+	Reset(); D->SessionRequestCount = 400;
+	if (!Check(!D->TryReserveRequest(100, TEXT("alice")) && D->DailyRequestCount == 0, TEXT("session limit"))) return false;
+	Reset(); D->DailyRequestCount = 200;
+	if (!Check(!D->TryReserveRequest(100, TEXT("alice")) && D->SessionRequestCount == 0, TEXT("daily limit"))) return false;
+	Reset(); D->RecentRequestTimes.Init(99, 30);
+	if (!Check(!D->TryReserveRequest(100, TEXT("alice")) && D->DailyRequestCount == 0, TEXT("minute limit"))) return false;
+	Reset(); D->InFlightRequests = 4;
+	if (!Check(!D->TryReserveRequest(100, TEXT("alice")) && D->DailyRequestCount == 0, TEXT("concurrency limit"))) return false;
+	Reset(); D->MaxRequestsPerMinute = 1; D->RecentRequestTimes.Add(40);
+	const bool bBoundaryRejected = !D->TryReserveRequest(100, TEXT("alice"));
+	if (!Check(bBoundaryRejected && D->TryReserveRequest(100.001, TEXT("alice"))
+		&& D->RecentRequestTimes.Num() == 1, TEXT("60 second window boundary"))) return false;
+	Reset(); D->TryReserveRequest(100, TEXT("alice"));
+	if (!Check(D->ReleaseRequestBudget(TEXT("alice"), 10, true) && D->SessionRequestCount == 0
+		&& D->DailyRequestCount == 0 && D->InFlightRequests == 0 && D->PlayerDailyCounts.FindRef(TEXT("alice")) == 0
+		&& D->RecentRequestTimes.Num() == 1, TEXT("refunded attempt lost minute throttle or leaked budget"))) return false;
+	Reset(); D->SessionRequestCount = 2; D->DailyRequestCount = 3; D->InFlightRequests = 1;
+	D->PlayerDailyCounts.Add(TEXT("alice"), 3);
+	if (!Check(!D->ReleaseRequestBudget(TEXT("alice"), 9, true) && D->SessionRequestCount == 1
+		&& D->DailyRequestCount == 3 && D->PlayerDailyCounts.FindRef(TEXT("alice")) == 3
+		&& D->InFlightRequests == 0, TEXT("old day refund debited current day"))) return false;
+	Reset();
+	for (int32 i = 0; i < MaxTrackedPlayers; ++i) D->PlayerDailyCounts.Add(FString::Printf(TEXT("key%d"), i), 0);
+	if (!Check(!D->TryReserveRequest(100, TEXT("new-key")) && D->DailyRequestCount == 0
+		&& D->SessionRequestCount == 0 && D->InFlightRequests == 0 && D->RecentRequestTimes.IsEmpty()
+		&& D->PlayerDailyCounts.Num() == MaxTrackedPlayers, TEXT("full player table bypassed per-player quota"))) return false;
+	if (!Check(D->TryReserveRequest(100, TEXT("key0")) && D->PlayerDailyCounts.FindRef(TEXT("key0")) == 1,
+		TEXT("full player table blocked tracked player"))) return false;
+	D->PlayerDailyCounts.FindChecked(TEXT("key1")) = 50;
+	if (!Check(!D->TryReserveRequest(100, TEXT("key1")) && D->DailyRequestCount == 1, TEXT("tracked quota at full table"))) return false;
+	D->MaxDailyRequests = 0;
+	if (!Check(D->TryReserveRequest(100, TEXT("unlimited-key")) && D->PlayerDailyCounts.Num() == MaxTrackedPlayers,
+		TEXT("explicit unlimited mode or memory ceiling changed"))) return false;
+	const int32 SessionBeforeDay = D->SessionRequestCount; const int32 FlightBeforeDay = D->InFlightRequests;
+	if (!Check(D->ResetDailyBudgetForDay(11) && D->DailyBudgetDay == 11 && D->DailyRequestCount == 0
+		&& D->PlayerDailyCounts.IsEmpty() && D->SessionRequestCount == SessionBeforeDay
+		&& D->InFlightRequests == FlightBeforeDay && D->RecentRequestTimes.Num() == 2, TEXT("day reset altered session/rate state"))) return false;
+	D->DailyRequestCount = 3; D->PlayerDailyCounts.Add(TEXT("alice"), 3);
+	if (!Check(!D->ResetDailyBudgetForDay(11) && D->DailyRequestCount == 3
+		&& D->PlayerDailyCounts.FindRef(TEXT("alice")) == 3, TEXT("same day reset counters"))) return false;
+	Reset(); D->MaxRequestsPerMinute = 1; D->TryReserveRequest(100, TEXT("alice"));
+	D->ReleaseRequestBudget(TEXT("alice"), 10, true);
+	if (!Check(!D->TryReserveRequest(101, TEXT("alice")) && D->SessionRequestCount == 0,
+		TEXT("refunded attempts bypassed minute cap"))) return false;
+	Reset(); D->TryReserveRequest(100, TEXT("alice")); D->RecentRequestTimes.RemoveSingle(100);
+	if (!Check(D->ReleaseRequestBudget(TEXT("alice"), 10, true) && D->RecentRequestTimes.IsEmpty()
+		&& D->DailyRequestCount == 0 && D->SessionRequestCount == 0 && D->InFlightRequests == 0,
+		TEXT("unstarted request cleanup"))) return false;
+	Reset(); D->PlayerDailyCounts.Add(TEXT("alice"), 0); D->ReleaseRequestBudget(TEXT("alice"), 10, true);
+	if (!Check(D->DailyRequestCount == 0 && D->SessionRequestCount == 0 && D->InFlightRequests == 0
+		&& D->PlayerDailyCounts.FindRef(TEXT("alice")) == 0, TEXT("refund underflow"))) return false;
+	Reset(); D->TryReserveRequest(100, TEXT("alice"));
+	if (!Check(!D->ReleaseRequestBudget(TEXT("alice"), 10, false) && D->InFlightRequests == 0
+		&& D->DailyRequestCount == 1 && D->SessionRequestCount == 1 && D->PlayerDailyCounts.FindRef(TEXT("alice")) == 1,
+		TEXT("retained attempt was refunded"))) return false;
+	Reset(); D->SessionRequestCount = 399;
+	const bool bLastSession = D->TryReserveRequest(100, TEXT("alice"));
+	if (!Check(bLastSession && !D->TryReserveRequest(101, TEXT("bob")) && D->SessionRequestCount == 400,
+		TEXT("last session reservation boundary"))) return false;
+	Reset(); D->DailyRequestCount = 199;
+	const bool bLastDaily = D->TryReserveRequest(100, TEXT("alice"));
+	if (!Check(bLastDaily && !D->TryReserveRequest(101, TEXT("bob")) && D->DailyRequestCount == 200,
+		TEXT("last daily reservation boundary"))) return false;
+	Reset(); D->PlayerDailyCounts.Add(TEXT("alice"), 49);
+	const bool bLastPlayer = D->TryReserveRequest(100, NormalizePlayerKey(TEXT(" ALICE ")));
+	if (!Check(bLastPlayer && !D->TryReserveRequest(101, NormalizePlayerKey(TEXT("Alice")))
+		&& D->PlayerDailyCounts.FindRef(TEXT("alice")) == 50 && D->PlayerDailyCounts.Num() == 1,
+		TEXT("normalized player quota boundary"))) return false;
+	Reset();
+	for (int32 i = 0; i < MaxTrackedPlayers - 1; ++i) D->PlayerDailyCounts.Add(FString::Printf(TEXT("key%d"), i), 0);
+	const bool bLastTracked = D->TryReserveRequest(100, TEXT("last-key"));
+	return Check(bLastTracked && !D->TryReserveRequest(101, TEXT("next-key")) && D->DailyRequestCount == 1
+		&& D->PlayerDailyCounts.Num() == MaxTrackedPlayers && D->PlayerDailyCounts.FindRef(TEXT("last-key")) == 1,
+		TEXT("last tracked player boundary"));
+}
+
+namespace
+{
+	struct FMMODialogueBudgetTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestDialogueBudget"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMODialogueSubsystem::RunBudgetSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_DIALOGUE_BUDGET_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMODialogueBudgetTestExec GMMODialogueBudgetTestExec;
+}
+#endif
+
 namespace
 {
 	// Saglayiciya gore anahtarin okunacagi ortam degiskeninin adi.
@@ -155,14 +286,19 @@ void UMMODialogueSubsystem::RollDailyBudget()
 			break;
 		}
 	}
-	const int64 Today = UtcDayNumber();
-	if (DailyBudgetDay != Today)
+	if (ResetDailyBudgetForDay(UtcDayNumber()))
 	{
-		DailyBudgetDay = Today;
-		DailyRequestCount = 0;
-		PlayerDailyCounts.Reset();
 		NoteBudgetChanged(true);
 	}
+}
+
+bool UMMODialogueSubsystem::ResetDailyBudgetForDay(int64 Today)
+{
+	if (DailyBudgetDay == Today) return false;
+	DailyBudgetDay = Today;
+	DailyRequestCount = 0;
+	PlayerDailyCounts.Reset();
+	return true;
 }
 
 void UMMODialogueSubsystem::NoteBudgetChanged(bool bForce)
@@ -202,7 +338,7 @@ void UMMODialogueSubsystem::WriteDailyBudgetFile()
 	}
 }
 
-void UMMODialogueSubsystem::RefundRequest(const FString& PlayerKey, int64 RequestDay)
+bool UMMODialogueSubsystem::RefundRequest(const FString& PlayerKey, int64 RequestDay)
 {
 	SessionRequestCount = FMath::Max(0, SessionRequestCount - 1);
 	if (RequestDay == DailyBudgetDay)
@@ -212,8 +348,15 @@ void UMMODialogueSubsystem::RefundRequest(const FString& PlayerKey, int64 Reques
 		{
 			*PlayerCount = FMath::Max(0, *PlayerCount - 1);
 		}
-		NoteBudgetChanged();
+		return true;
 	}
+	return false;
+}
+
+bool UMMODialogueSubsystem::ReleaseRequestBudget(const FString& PlayerKey, int64 RequestDay, bool bRefund)
+{
+	InFlightRequests = FMath::Max(0, InFlightRequests - 1);
+	return bRefund && RefundRequest(PlayerKey, RequestDay);
 }
 
 void UMMODialogueSubsystem::RequestNpcLine(const FString& NpcName, const FString& NpcRole,
@@ -245,6 +388,58 @@ void UMMODialogueSubsystem::RequestRaw(const FString& SystemPrompt, const FStrin
 	SendRequest(SystemPrompt, UserPrompt, OnReady, PlayerKey);
 }
 
+bool UMMODialogueSubsystem::TryReserveRequest(double NowSec, const FString& PlayerKey)
+{
+	// Sunucu geneli hiz siniri: dakikada MaxRequestsPerMinute, ayni anda MaxConcurrentRequests.
+	RecentRequestTimes.RemoveAll([NowSec](double T) { return NowSec - T > 60.0; });
+	if (RecentRequestTimes.Num() >= MaxRequestsPerMinute || InFlightRequests >= MaxConcurrentRequests)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Hiz siniri asildi (%d/dk, %d eszamanli); istek atlandi."),
+			RecentRequestTimes.Num(), InFlightRequests);
+		return false;
+	}
+	// Oturum butcesi (SECURITY_AUDIT Y-4): dolunca istek atilmaz, NPC yedek replige duser.
+	if (MaxSessionRequests > 0 && SessionRequestCount >= MaxSessionRequests)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oturum LLM butcesi doldu (%d); istek atlandi."), MaxSessionRequests);
+		return false;
+	}
+	// Gunluk (oturum-otesi) tavan: UTC gun degisince sayac sifirlanir; dolunca yedek replik.
+	if (MaxDailyRequests > 0 && DailyRequestCount >= MaxDailyRequests)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Gunluk LLM butcesi doldu (%d); istek atlandi."), MaxDailyRequests);
+		return false;
+	}
+	// Oyuncu basi gunluk kota: tek oyuncu genel tavani bitirip digerlerini yedek replige dusurmesin.
+	const int32 PlayerQuota = GetPerPlayerDailyQuota();
+	if (PlayerQuota > 0)
+	{
+		const int32* Used = PlayerDailyCounts.Find(PlayerKey);
+		// Yeni anahtari izleyemiyorsak oyuncu kotasini uygulayamayiz. Genel tavani
+		// tuketmesine izin vermek yerine yedek replige don; mevcut oyuncular devam eder.
+		if (!Used && PlayerDailyCounts.Num() >= MaxTrackedPlayers)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oyuncu kota tablosu dolu; yeni anahtar icin istek atlandi."));
+			return false;
+		}
+		if (Used && *Used >= PlayerQuota)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oyuncu gunluk LLM kotasi doldu (%s, %d); istek atlandi."),
+				*PlayerKey, PlayerQuota);
+			return false;
+		}
+	}
+	RecentRequestTimes.Add(NowSec);
+	++InFlightRequests;
+	++SessionRequestCount;
+	++DailyRequestCount;
+	if (PlayerDailyCounts.Contains(PlayerKey) || PlayerDailyCounts.Num() < MaxTrackedPlayers)
+	{
+		++PlayerDailyCounts.FindOrAdd(PlayerKey);
+	}
+	return true;
+}
+
 void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FString& UserPrompt,
 	FMMOOnDialogueReady OnReady, const FString& PlayerKeyRaw)
 {
@@ -256,52 +451,13 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		return;
 	}
 
-	// Sunucu geneli hiz siniri: dakikada MaxRequestsPerMinute, ayni anda MaxConcurrentRequests.
 	const double NowSec = FPlatformTime::Seconds();
-	RecentRequestTimes.RemoveAll([NowSec](double T) { return NowSec - T > 60.0; });
-	if (RecentRequestTimes.Num() >= MaxRequestsPerMinute || InFlightRequests >= MaxConcurrentRequests)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Hiz siniri asildi (%d/dk, %d eszamanli); istek atlandi."),
-			RecentRequestTimes.Num(), InFlightRequests);
-		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
-		return;
-	}
-	// Oturum butcesi (SECURITY_AUDIT Y-4): dolunca istek atilmaz, NPC yedek replige duser.
-	if (MaxSessionRequests > 0 && SessionRequestCount >= MaxSessionRequests)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oturum LLM butcesi doldu (%d); istek atlandi."), MaxSessionRequests);
-		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
-		return;
-	}
-	// Gunluk (oturum-otesi) tavan: UTC gun degisince sayac sifirlanir; dolunca yedek replik.
-	RollDailyBudget();
-	if (MaxDailyRequests > 0 && DailyRequestCount >= MaxDailyRequests)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Gunluk LLM butcesi doldu (%d); istek atlandi."), MaxDailyRequests);
-		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
-		return;
-	}
-	// Oyuncu basi gunluk kota: tek oyuncu genel tavani bitirip digerlerini yedek replige dusurmesin.
 	const FString PlayerKey = NormalizePlayerKey(PlayerKeyRaw);
-	const int32 PlayerQuota = GetPerPlayerDailyQuota();
-	if (PlayerQuota > 0)
+	RollDailyBudget();
+	if (!TryReserveRequest(NowSec, PlayerKey))
 	{
-		const int32* Used = PlayerDailyCounts.Find(PlayerKey);
-		if (Used && *Used >= PlayerQuota)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] Oyuncu gunluk LLM kotasi doldu (%s, %d); istek atlandi."),
-				*PlayerKey, PlayerQuota);
-			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
-			return;
-		}
-	}
-	RecentRequestTimes.Add(NowSec);
-	++InFlightRequests;
-	++SessionRequestCount;
-	++DailyRequestCount;
-	if (PlayerDailyCounts.Contains(PlayerKey) || PlayerDailyCounts.Num() < MaxTrackedPlayers)
-	{
-		++PlayerDailyCounts.FindOrAdd(PlayerKey);
+		OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
+		return;
 	}
 	const int64 RequestDay = DailyBudgetDay;
 	NoteBudgetChanged();
@@ -402,7 +558,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 				return; // baslatma basarisizligi zaten islendi (cift cevap yok)
 			}
 			*bSlotReleased = true;
-			WeakThis->InFlightRequests = FMath::Max(0, WeakThis->InFlightRequests - 1);
+			WeakThis->ReleaseRequestBudget(PlayerKey, RequestDay, false);
 
 			if (!bConnectedOk || !Resp.IsValid())
 			{
@@ -412,7 +568,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 					bTimedOut ? TEXT(" (zaman asimi; sayac iade edilmedi)") : TEXT(" (sayac iade edildi)"));
 				if (!bTimedOut)
 				{
-					WeakThis->RefundRequest(PlayerKey, RequestDay);
+					if (WeakThis->RefundRequest(PlayerKey, RequestDay)) WeakThis->NoteBudgetChanged();
 				}
 				OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 				return;
@@ -424,7 +580,7 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 			if (Code != 200)
 			{
 				// 401/403/429/5xx...: saglayici yanit uretmedi -> sayac iade (genel/oyuncu/oturum).
-				WeakThis->RefundRequest(PlayerKey, RequestDay);
+				if (WeakThis->RefundRequest(PlayerKey, RequestDay)) WeakThis->NoteBudgetChanged();
 				// Hata govdesi kisaltilir: bazi saglayicilar iletide anahtar parcasi yankilar (SECURITY_AUDIT D-10).
 				UE_LOG(LogTemp, Warning, TEXT("[MMODialogue] HTTP %d: %s"), Code, *RespBody.Left(200));
 				OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
@@ -451,9 +607,8 @@ void UMMODialogueSubsystem::SendRequest(const FString& SystemPrompt, const FStri
 		if (!*bSlotReleased)
 		{
 			*bSlotReleased = true;
-			InFlightRequests = FMath::Max(0, InFlightRequests - 1);
 			RecentRequestTimes.RemoveSingle(NowSec); // atilmayan istek dakika sinirini tuketmesin
-			RefundRequest(PlayerKey, RequestDay); // ... ne de oturum/gunluk/oyuncu butcesini
+			if (ReleaseRequestBudget(PlayerKey, RequestDay, true)) NoteBudgetChanged();
 			OnReady.ExecuteIfBound(false, TEXT("(NPC su an konusamiyor.)"));
 		}
 	}

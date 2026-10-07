@@ -334,6 +334,16 @@ Tasma kurali (mevcut davranis korundu, sessizlik giderildi): loot/gorev/satis gi
 
 ### 9.3 LLM (Y-4)
 
+**7 Ekim ek doğrulama:** Mevcut günlük/oyuncu kotasında 4096 takip anahtarı
+dolunca yeni anahtar için oyuncu muhasebesi atlanıyordu. Genel tavanı aşmaz,
+oyuncu kotasını atlatır. Rezervasyon öncesi kapasite reddi eklendi; mevcut
+anahtarlar devam eder, açıkça sınırsız günlük mod korunur. Önce UE FAIL11,
+sonra 25 bellek kontrolü PASS (§50). Sıfır sayaçlı iade anahtarları tabloyu
+doldurabilir; varsayılan günlük1500 sayılan isteklerle tek başına dolduramaz.
+Bu test API/HTTP/disk veya gerçek uzak istemci suistimal kanıtı değildir.
+Ad temelli kimlik ve çoklu süreç toplam kotası ayrı açık işlerdir.
+
+
 - `MaxTokens` 2048 -> 400 (NVIDIA yolu; dusunme yok). Anthropic yolu ayri `AnthropicMaxTokens = 1024` kullanir: Opus 5'te dusunme + metin ayni tavana sayildigi icin 400 cevabi kesip yedege dusurebilir (olculmedi; Anthropic'e gecilirse yedek replik sikligina bak).
 - Mevcut sunucu geneli sinir (dakikada 30, eszamanli 4) korundu; eklenenler: oyuncu basina sunucu cooldown'u 2 sn -> 5 sn (dakikada en fazla 12 istek), ve oturum toplam butcesi `MaxSessionRequests = 400` (`SessionRequestCount`; dolunca istek atilmaz, NPC yedek replige duser; 0 = sinirsiz; baslatilamayan istek butceyi tuketmez).
 - Oyuncu metni LLM'e gecmez (dogrulandi): `RequestNpcLine` yalniz `NpcName`/`NpcRole` (NPC aktor alanlari, tasarimci verisi) ve `PlayerInfo` alir; iki cagiran da sunucunun kurdugu sabit sablonu ("seviye N bir maceraci") verir; oyuncu adi/sohbet dahil degil. `RequestRaw` yalniz kodda tanimli; hicbir RPC'ye bagli degil. Yorum `RequestNpcLine` basina eklendi.

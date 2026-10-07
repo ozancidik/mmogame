@@ -60,7 +60,7 @@ if ($FullCompile) {
             "Components\MMOStatsComponent.cpp", "Components\MMOSkillComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
             "Components\MMOQuestComponent.cpp", "World\MMOLootPickup.cpp",
             "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
-            "Characters\MMOMob.cpp"
+            "Characters\MMOMob.cpp", "AI\MMODialogueSubsystem.cpp"
         ) | ForEach-Object { Join-Path $src $_ }
         $files += (Get-ChildItem (Join-Path $src "Save") -Filter *.cpp | ForEach-Object { $_.FullName })
         $allOk = $true
@@ -193,6 +193,11 @@ Step "Satici ekonomi kapasite ve yetki kapilari" {
 
 Step "Kayitli ogrenilmis becerilerin mastery butcesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLearnedSkillBudget.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Diyalog LLM kota rezervasyon ve iade sinirlari" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestDialogueBudget.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 
