@@ -16,6 +16,128 @@
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
 
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+
+namespace
+{
+	bool RunMMOStatsSaveBudgetTest(UWorld* World, FString& OutError, int32& OutChecks)
+	{
+		OutChecks = 0;
+		if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+		{
+			OutError = TEXT("server game world required");
+			return false;
+		}
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1000000, 1000000, 5000), FRotator::ZeroRotator, Params);
+		if (!Character) { OutError = TEXT("fixture spawn failed"); return false; }
+		const bool bPassed = [&]()
+		{
+			UMMOStatsComponent* S = Character->GetStats();
+			if (!S) { OutError = TEXT("fixture stats missing"); return false; }
+			auto Check = [&](bool Condition, const TCHAR* Label)
+			{
+				if (!Condition) { OutError = Label; return false; }
+				++OutChecks;
+				return true;
+			};
+			auto Total = [&]() { return S->Strength + S->Dexterity + S->Intelligence + S->Vitality; };
+			auto ValidData = [](EMMOClass Class)
+			{
+				FMMOCharacterSaveData Data;
+				Data.CharacterClass = Class;
+				Data.Level = 10;
+				Data.Experience = 17;
+				UMMOSkillComponent::GetClassBaseStats(Class, Data.Strength, Data.Dexterity, Data.Intelligence, Data.Vitality);
+				Data.Strength += 7;
+				Data.Dexterity += 3;
+				Data.UnspentStatPoints = 17; // 9 * 3 = 27; 10 harcanmis, 17 kalan.
+				Data.UnspentSkillPoints = 18;
+				return Data;
+			};
+			for (EMMOClass Class : { EMMOClass::Warrior, EMMOClass::Archer, EMMOClass::Mage, EMMOClass::Priest })
+			{
+				const FMMOCharacterSaveData Legal = ValidData(Class);
+				S->ApplySaveData(Legal);
+				if (!Check(S->Level == 10 && S->Experience == 17 && S->UnspentStatPoints == 17 && S->UnspentSkillPoints == 18
+					&& S->Strength == Legal.Strength && S->Dexterity == Legal.Dexterity
+					&& S->Intelligence == Legal.Intelligence && S->Vitality == Legal.Vitality, TEXT("legal class stats changed"))) return false;
+				const int32 Budget = Total() + S->UnspentStatPoints;
+				FMMOCharacterSaveData Hostile = Legal;
+				Hostile.Strength = Hostile.Dexterity = Hostile.Intelligence = Hostile.Vitality = MAX_int32;
+				Hostile.UnspentStatPoints = Hostile.UnspentSkillPoints = Hostile.Experience = MAX_int32;
+				S->ApplySaveData(Hostile);
+				if (!Check(Total() == Budget && S->UnspentStatPoints == 0 && S->UnspentSkillPoints == 18
+					&& S->Experience == S->ExperienceToNextLevel - 1 && S->Level == 10,
+					TEXT("hostile class stats exceeded budget or granted levels"))) return false;
+			}
+			FMMOCharacterSaveData Bad = ValidData(EMMOClass::Warrior);
+			Bad.Level = Bad.Experience = Bad.UnspentStatPoints = Bad.UnspentSkillPoints = MIN_int32;
+			Bad.Strength = Bad.Dexterity = Bad.Intelligence = Bad.Vitality = MIN_int32;
+			S->ApplySaveData(Bad);
+			if (!Check(S->Level == 1 && S->Experience == 0 && Total() == 4 && S->UnspentStatPoints == 0 && S->UnspentSkillPoints == 0
+				&& FMath::IsFinite(S->MaxHealth) && S->MaxHealth >= 1.f && FMath::IsFinite(S->MaxMana) && S->MaxMana >= 0.f,
+				TEXT("negative save values survived"))) return false;
+			Bad.Level = Bad.Experience = Bad.UnspentStatPoints = Bad.UnspentSkillPoints = MAX_int32;
+			Bad.Strength = Bad.Dexterity = Bad.Intelligence = Bad.Vitality = MAX_int32;
+			S->ApplySaveData(Bad);
+			if (!Check(S->Level == S->MaxLevel && S->Experience == 0 && Total() == 50 + (S->MaxLevel - 1) * S->StatPointsPerLevel
+				&& S->UnspentStatPoints == 0 && S->UnspentSkillPoints == (S->MaxLevel - 1) * S->SkillPointsPerLevel,
+				TEXT("max-level save exceeded budget"))) return false;
+			Bad.Level = 1;
+			Bad.CharacterClass = static_cast<EMMOClass>(255);
+			S->ApplySaveData(Bad);
+			if (!Check(Total() == 50 && S->UnspentStatPoints == 0 && S->UnspentSkillPoints == 0,
+				TEXT("invalid class bypassed warrior budget"))) return false;
+			const FMMOCharacterSaveData Legal = ValidData(EMMOClass::Warrior);
+			S->ApplySaveData(Legal);
+			FMMOCharacterSaveData Roundtrip;
+			S->FillSaveData(Roundtrip);
+			S->ApplySaveData(Roundtrip);
+			if (!Check(S->Level == Legal.Level && S->Experience == Legal.Experience && S->Strength == Legal.Strength
+				&& S->Dexterity == Legal.Dexterity && S->Intelligence == Legal.Intelligence && S->Vitality == Legal.Vitality
+				&& S->UnspentStatPoints == Legal.UnspentStatPoints && S->UnspentSkillPoints == Legal.UnspentSkillPoints,
+				TEXT("legal stats roundtrip lost points"))) return false;
+			S->Health = 25.f; S->Mana = 8.f;
+			if (!Check(S->SpendStatPoint(TEXT("Vitality"), 1) && S->Vitality == Legal.Vitality + 1
+				&& S->UnspentStatPoints == 16 && S->Health == 25.f && S->Mana == 8.f,
+				TEXT("spending vitality refilled health or lost points"))) return false;
+			const int32 BeforeTotal = Total();
+			if (!Check(!S->SpendStatPoint(TEXT("Unknown"), 1) && !S->SpendStatPoint(TEXT("Strength"), 0)
+				&& !S->SpendStatPoint(TEXT("Strength"), -1) && !S->SpendStatPoint(TEXT("Strength"), MAX_int32)
+				&& Total() == BeforeTotal && S->UnspentStatPoints == 16 && S->Health == 25.f && S->Mana == 8.f,
+				TEXT("invalid stat request changed state"))) return false;
+			int32 Str, Dex, Int, Vit;
+			UMMOSkillComponent::GetClassBaseStats(EMMOClass::Mage, Str, Dex, Int, Vit);
+			S->ResetPointsForClassChange(Str, Dex, Int, Vit, 0);
+			S->ResetPointsForClassChange(Str, Dex, Int, Vit, 0);
+			return Check(S->UnspentStatPoints == 27 && S->UnspentSkillPoints == 18 && Total() == 46
+				&& S->Health == 25.f && S->Mana == 8.f, TEXT("repeated class refund created points or healing"));
+		}();
+		Character->Destroy(); // Controllersiz: AutoLoad/AutoSave ve oyuncu diski yok.
+		return bPassed;
+	}
+
+	struct FMMOStatsSaveBudgetTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestStatsSaveBudget"))) return false;
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = RunMMOStatsSaveBudgetTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_STATS_SAVE_BUDGET_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOStatsSaveBudgetTestExec GMMOStatsSaveBudgetTestExec;
+}
+#endif
+
 UMMOStatsComponent::UMMOStatsComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;

@@ -3876,3 +3876,23 @@ Bu kontrol gerçek istemci RPC'si, HUD veya Lv1–30 oynanış ölçümü değil
   yoksa süre `?`/eşleşmeyen; sıfır saniyelik görev diye gösterilmiyor.
 - [ ] Seviye tavanındaki teslim `capped=1`; nominal XP net bakiye diye
   yorumlanmıyor. Gerçek 20 dk solo/parti ölçümü ve `first_*` olayları açık.
+
+
+## Kayıttan stat/XP/puan bütçesi — 2026-10-07 (PIE açık)
+
+`TestStatsSaveBudget.ps1`: **15 UE kontrolü** geçti. Dört sınıfta geçerli Lv10
+stat dağılımı korunur; aşırı/negatif stat, XP ve harcanmamış puan sınırları,
+geçersiz sınıfın Warrior bütçesi, bellek roundtrip'i, VIT harcarken can/mana
+korunması, geçersiz harcama ve tekrarlanan sınıf iadesi sınanır. Oynanış kuralları
+zaten mevcuttu; bu ekleme regresyon testidir. Fixture controllersizdir ve
+`ApplySaveData`/`FillSaveData` kullanır; gerçek dosya ve istemci RPC testi değildir.
+
+- [ ] Dört sınıfta statları dağıt, kaydet/çık/yeniden gir: seviye, XP, dağılım ve
+  harcanmamış stat/skill puanları sunucu ile sahip istemcide aynı kalmalı.
+- [ ] Can/mana düşükken VIT/INT puanı harca; mevcut can/mana artmamalı, maksimum
+  değerler ve kalan puan istemci HUD'ına gelmeli.
+- [ ] Sınıf değişimini normal UI yolu ve bekleme kurallarıyla tekrarla; iade edilen
+  toplam puan büyümemeli, ücretsiz can/mana yenilenmesi olmamalı. Fixture yalnız
+  Stats iadesini kontrol etti; mastery yatırımı/iadesi uçtan uca ayrıca oynanmalı.
+- [ ] Gerçek Lv30+ kayıtları da doğrula. İmza/hesap yetkilendirmesi bu testle
+  tamamlanmış sayılmaz; aşırı değerli bellek fixture'ı gerçek kullanıcı kaydı değildir.

@@ -151,6 +151,11 @@ Step "Kayittan ekipman seviye sarti ve kayipsiz kurtarma" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Kayittan stat XP ve puan butcesi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestStatsSaveBudget.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Satici ekonomi kapasite ve yetki kapilari" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestVendorEconomy.ps1") | Out-Host
     $LASTEXITCODE -eq 0

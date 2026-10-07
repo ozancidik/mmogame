@@ -741,3 +741,39 @@ invalid=0 loadFailed=0 existsMismatch=0 json ok=244 mismatch=0 maxLevel=6`,
 iksir/ekipman/satici testleri gecti. Summer 48 / Winter 30 mob dogumu, 0 hata;
 NetSmoke 1 join / 1 welcome, iki tarafta 0 hata (yalniz baglanti kaniti).
 Lv33+ beceri bosluklari ve StaticLint InitGameState beyaz liste uyarisi acik.
+
+## 42. Kayit stat/XP/puan butcesi UE regresyonu (2026-10-07)
+
+Mevcut `UMMOStatsComponent::ApplySaveData`, puan harcama ve sinif iadesi kurallari
+icin Development-only `MMOTestStatsSaveBudget` / `TestStatsSaveBudget.ps1` eklendi.
+Yeni bug duzeltmesi degildir: runtime kurallari ve kayit/replikasyon semasi aynidir.
+Controllersiz izole karakterle **PASS checks=15**:
+
+- Dort sinifta gecerli Lv10 dagilimi, XP ve harcanmamis puan korunmasi (4 kontrol).
+- Dort sinifta MAX_int32 stat/XP/puan girisinin sinif tabani + seviye butcesine
+  kirpilmasi; fazladan level verilmemesi (4 kontrol).
+- MIN_int32 degerlerin duzeltilmesi ve gecerli can/mana maksimumlari.
+- MAX_int32 seviyenin MaxLevel'e kirpilmasi, tavanda XP=0 ve puan tavanlari.
+- Gecersiz sinifin Warrior butcesine dusmesi.
+- Gecerli statlarin bellek FillSaveData/ApplySaveData roundtrip'i.
+- VIT harcamasinda puan dogru duserken mevcut can/mana korunmasi.
+- Bilinmeyen stat, sifir/negatif ve yetersiz puanli harcamada durum korunmasi.
+- Iki kez sinif iadesinde fazladan puan/can/mana verilmemesi (Stats API'si).
+
+Normal UE 5.7 editor derlemesi GECTI. Negatif kontrolde yalniz kayittan gelen
+harcanmamis skill puani clamp'i gecici olarak kaldirildi; mutant derlendi ve fixture
+**FAIL checks=1** verdi. Kaynak kodu finally blogunda birebir geri yuklendi,
+DLL tekrar derlendi ve **PASS checks=15** alindi. Mutant commit edilmedi.
+Bu test gercek dosya yukleme, imza/kimlik, mastery iadesinin toplam butcesi veya
+uzak istemci HUD/replikasyon kaniti degildir. PIE adimlari PLAYTEST_CHECKLIST.md'de.
+Test komutu Shipping'de yoktur; oyuncu diski yuklenmez/yazilmaz. Agency-agents
+AppSec Engineer, Backend Architect ve Test Results Analyzer rehberleri kullanildi;
+bagimsiz paralel ajan yok.
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **24/24 GECTI**: 14 dosya PCH'siz /W4,
+0 derleyici uyarisi; JSON 111 negatif; 250 yerel yuva `loaded=250 invalid=0
+loadFailed=0 existsMismatch=0 json ok=250 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`. Yeni 15 stat kontrolu dahil gecis/parti/
+callback/klan/gorev/loot/iksir/ekipman/satici testleri gecti. Summer 54 / Winter 29
+mob dogumu, 0 hata; NetSmoke 1 join / 1 welcome, iki tarafta 0 hata (yalniz
+baglanti). Lv33+ beceri bosluklari ve InitGameState beyaz liste uyarisi acik.
