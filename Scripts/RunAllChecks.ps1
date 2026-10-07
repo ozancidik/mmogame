@@ -58,7 +58,7 @@ if ($FullCompile) {
         $files = @(
             "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
             "Components\MMOStatsComponent.cpp", "Components\MMOSkillComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
-            "Components\MMOQuestComponent.cpp", "World\MMOLootPickup.cpp",
+            "Components\MMOQuestComponent.cpp", "Components\MMOTradeComponent.cpp", "Tests\MMOTradeSelfTest.cpp", "World\MMOLootPickup.cpp",
             "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
             "Characters\MMOMob.cpp", "AI\MMODialogueSubsystem.cpp"
         ) | ForEach-Object { Join-Path $src $_ }
@@ -203,6 +203,11 @@ Step "Mastery ve sinif iadesinde toplam puan butcesi" {
 
 Step "Satici ekonomi kapasite ve yetki kapilari" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestVendorEconomy.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Takas revizyon onay ve ekonomi butunlugu" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestTrade.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 

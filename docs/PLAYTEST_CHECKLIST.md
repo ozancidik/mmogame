@@ -4171,3 +4171,36 @@ editöre bu bayrağı ekleme: saat geri alınsa da sentetik HUD yazıları geri 
 - [ ] Kendisi/uzak/hedefsiz hedef retleri denendikten sonra geçerli hedefe dön;
   cooldown'u geçen deneme gerçek zamanı tüketmeli. Respawn ve Summer→Winter
   geçişi sonrası saldırıyı ayrıca doğrula; sentetik saat testi bunun kanıtı değildir.
+
+## 2026-10-07 — Takas sunucu regresyonu (PIE açık)
+
+`TestTrade.ps1` / `MMOTestTrade`: 79 native kontrol geçti. İki controller'sız
+karakter, aynı frame, gerçek teklif/onay sunucu gövdeleri; zaman kapıları özel
+damgalarla yaşlandırılır, dünya saati değiştirilmez. İki envanter snapshot'ı
+eşya payload'ı, alıcının yeni InstanceId sayacı, altın, kuşanım, depo ve yığınları
+karşılaştırır. Fixture oyuncu kaydı yüklemez; completion save çağrıları ilk yükleme
+kapısından geçmez. Bu test RPC sahipliği, ağ taşınması, owner-only replication,
+HUD/davet veya iki karakter kaydının birlikte kalıcılaşması için kanıt değildir.
+Eşya aynasının adedi ve onay bayrakları denetlenir; `TheirOffer.Items` payload'ı
+bağımsız karşılaştırılmadı. Runner sabit TEMP log adıyla sırayla çalıştırılır;
+eşzamanlı iki TestTrade süreci doğrulanmadı.
+
+- [ ] İki PIE penceresinde davet/kabul; add/remove/altın değişikliklerinin iki
+  HUD aynasına ve ortak revizyona ulaşmasını, dört onay bayrağının temizlenmesini
+  doğrula. Tek onay ve tekrar tıklaması aktarım yapmamalı.
+- [ ] Paket gecikmesi/jitter ile eski revizyon onayı yolla; teklif değiştikten
+  sonra reddedilmeli. Yeni teklif görüldükten sonra 1 saniyelik kilit çalışmalı.
+- [ ] İki yönde aynı tür/+nadirlikte birden fazla eşya ve farklı altınları takas
+  et; alıcının kimlikleri kendi sayacından ayrılmalı, altın/eşya toplamı korunmalı.
+  Dolu çantada bir ver/bir al başarılı; yalnız gelen eşya ve tavanı aşan altın reddedilmeli.
+- [ ] Teklif sonrası kuşan/sat/upgrade/altın harca; ölüm, 800 birimden uzaklaşma,
+  AFK, disconnect ve bölge geçişini dene. İptal meşru ara değişimi geri sarmamalı;
+  iki pencere, envanter ve timer/partner kilitleri temizlenmeli.
+- [ ] Eski takası iptal edip aynı revizyon sayısına ulaşan yeni takas aç; eski
+  HUD/onay olayının yeni oturuma taşınmasını araştır. Başlangıç revizyonu 0'a
+  döner; oturum kimliği eksikliği kaynakta görüldü, gerçek istemci erişimi doğrulanmadı.
+- [ ] Takasın iki ayrı kayıt çağrısı arasında hata/çökme, ardından iki oyuncuda
+  yeniden giriş: duplikasyon/kayıp kontrolü. Native test bunu çalıştırmaz; mevcut
+  iki Save çağrısı ortak kalıcı işlem sağlamaz. Synchronous envanter delegate'i
+  sırasında mutasyonla savunma amaçlı extraction/delivery rollback dallarını
+  ayrıca sınamak gerekir; yeni fixture bu dallara fault injection yapmaz.

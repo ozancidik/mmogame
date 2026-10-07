@@ -478,3 +478,36 @@ Bu taramada "küçük ve risksiz" düzeltme gerektiren, hedef nesneden denetleyi
   6. Paketle: `D:\UE57Src\Engine\Build\BatchFiles\RunUAT.bat BuildCookRun -project="<proje>\MyProject.uproject" -noP4 -platform=Win64 -serverconfig=Development -server -noclient -build -cook -stage -pak -archive -archivedirectory=<çıktı>`.
   7. Çalıştır ve test et: `MyProjectServer.exe /Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene -log -MMOPassword=<parola>`; ayrı süreçten `UnrealEditor.exe <proje> 127.0.0.1?Name=<ad>?Password=<parola> -game`. Dedicated'da bölge geçişi/PvP anahtarı/test komutlarının **kapalı** olduğunu doğrula (`MMOAdmin::IsServerAdmin` false) ve yönetim yolu (token/hesap) eklenene dek bunun kabul edilebilir olduğuna karar ver.
   8. `Config/DefaultEngine.ini` içindeki `GlobalDefaultServerGameMode=None` değerini `BP_ThirdPersonGameMode`'a çevir (dedicated varsayılan oyun modu); `RunAllChecks`'e server hedefi duman testini ekle.
+
+### Takas regresyon kanıtı ve açık sınırlar (2026-10-07)
+
+`MMOTestTrade` / `Scripts/TestTrade.ps1`: 79 native sunucu kontrolü. Teklif
+revizyon/ayna, değişimde iki onay temizliği, eski revizyon reddi, throttle/kilit,
+çift onay/tek aktarım, alıcıya yeni InstanceId, tam envanter snapshot'ı ve altın
+korunumu; iki yönde altın tavanı/net bakiye, dolu çanta/net kapasite, değişmiş
+eşya/gold, ölüm/mesafe, ValidateTick/idle ve 800 birim sınırı kapsanır.
+Geçici revizyon koruması mutasyonu testte FAIL checks=12/check13 üretti (UE exit0,
+PS exit1); koruma geri alındı ve normal DLL yeniden derlendi, 79 PASS doğrulandı.
+Üretim takas kuralı/RPC/replication değişmedi. QA ve ekonomi Agency rolleri
+okunarak salt okunur yan ajan incelemesi yapıldı.
+
+Controller'sız, aynı-frame çağrılar; RPC sahipliği/transport, davet keşfi ve
+COND_OwnerOnly/HUD doğrulanmadı. İlk yüklemesi olmayan fixture completion save
+kapısından geçmez; gerçek iki oyuncunun kalıcı kaydı/çökme testi değildir.
+Eşya aynasında adet/onay kontrolü vardır; `TheirOffer.Items` payload'ının tüm
+alanları bağımsız karşılaştırılmadı. Runner sabit TEMP log adı kullanır ve
+pakette sırayla çalışır; eşzamanlı runner süreçleri kapsam dışıdır. Salt okunur
+QA son kaynak/runner incelemesinde engelleyici sorun bildirmedi.
+
+İncelemede kalanlar (doğrulanmış yeni exploit olarak sınıflandırılmadı):
+
+- StartTradeServer revizyonu 0'a döndürür; confirm yalnız görülen revizyonu taşır.
+  Eski oturumdan aynı sayılı onayın yeni oturuma erişimi gerçek istemcide
+  araştırılmalı. Aynı oturumda eski revizyon reddi test edildi.
+- Extraction-failure dalı çıkardıklarını ReceiveTradedEquipment ile geri verir
+  (yeni kimlik); delivery-failure çantaları geri alırken allocation sayacını
+  ve envanter bildirimi durumunu aynı şekilde geri almaz. Ön doğrulama sonrası
+  synchronous delegate mutasyonu gibi koşullar fault injection ile sınanmadı.
+- İki SaveCharacter çağrısı ortak kalıcı işlem değildir; başarısızlık/çökme
+  ve yeniden girişte ekonomik bütünlük hâlâ açık. Development denetim logu
+  Shipping/dedicated log garantisi sağlamaz (O12 sınırı sürer).

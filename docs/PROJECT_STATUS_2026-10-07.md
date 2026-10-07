@@ -1,10 +1,11 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 7 Ekim 2026. Kaynak kod ve son tamamlanan test paketi esas alınmıştır.
-Önceki kod/test kanıtı: `7aa7f42`; ilk kabul edilen temel saldırı sunucu controller
-oturumunda, hasar/XP öncesinde ölçülüyor (§52). Yeni sınırlı düzeltme: temel saldırı
-RPC'sinde çift cooldown ve saat yuvarlaması (§53); 89 native kontrol ve test
-komutunun bayraksız reddi doğrulandı. Gerçek ağ oynanışı hâlâ açık.
+Önceki kod/test kanıtı: `3dec6f5`; temel saldırı RPC'sinde çift cooldown ve saat
+yuvarlaması giderildi (§53), 89 native kontrol ve bayraksız test komutu reddi
+doğrulandı. Yeni sınırlı iş: mevcut takas kurallarını 79 native kontrolle otomatik
+pakete alma (§54); revizyon korumasının bozulması negatif testte yakalandı.
+Gerçek ağ oynanışı ve kalıcı takas işlemi hâlâ açık.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -16,7 +17,7 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 
 | Katman / sistem | Yaptık | Mevcut kanıt | Yapacağız |
 | --- | --- | --- | --- |
-| Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | Editor hedefi derlendi; 16 kritik dosya PCH olmadan /W4 ile 0 uyarı | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
+| Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | Editor hedefi derlendi; 18 kritik dosya PCH olmadan /W4 ile 0 uyarı | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
 | Karakter ve statlar | STR/DEX/INT/VIT, can/mana, XP/seviye, stat puanı, ölüm/diriliş; sunucu otoritesi | Kayıt stat/XP/puan bütçesi ve dört sınıf için 15 UE kontrolü; ölüm kuralları ayrı fixture'larda | Gerçek ölüm/respawn, kayıt sonrası istemci stat paneli ve uzun oturum |
 | Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi; tek cooldown kapısı ve double damga | Temel saldırı 21 kontrol; yeni cooldown 89 kontrol, yedi sentetik uptime/eşik sınırları; eski RPC önce UE'de FAIL0 verdi | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü; gerçek uzun oturum |
 | Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; rütbe + bakiye bütçesi; kayıtlı ücretli beceriyi minimum ağaç rütbesine taşıma | 81 beceri; 12 bütçe/iade + 12 yeni öğrenilmiş-beceri kontrolü; hata önce UE'de yeniden üretildi | Gerçek legacy dosya göçü, yatırım/kayıt/sınıf RPC ve HUD; sınıf dengesi, Lv33+ beceri boşlukları |
@@ -26,13 +27,13 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 79 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 51 arketip (13 elit), 29 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 49, Winter 32 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 49, Winter 27 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider kuralları; parti birleşmesinde lider onayı | Lider/rıza regresyonu: 10 kontrol | Çok pencerede birleşme/ayrılma, gerçek katkı ve XP paylaşımı |
-| Ticaret ve depo | Çift onay/teklif revizyonu, kimlikle eşya, kapasite/altın tavanı; NPC yakınlığında depo | Kod/derleme; satış kapasitesi yeni satıcı testinde | Ticaretin iki kaydı birlikte kalıcılaştırması; çökme/bağlantı kopması; gerçek depo RPC |
+| Ticaret ve depo | Çift onay/teklif revizyonu, kimlikle eşya, kapasite/altın tavanı; NPC yakınlığında depo | 79 native takas kontrolü; tam envanter/altın/kimlik sayacı, iki yönde sınırlar ve retler; eski revizyon koruması bozulunca test yakaladı | Gerçek davet/RPC/HUD; oturumlar arası eski onay ve reentrant rollback; iki kaydı birlikte kalıcılaştırma, çökme/yeniden giriş; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, arkadaş listesi, sohbet ve hız sınırları | Klan davetinde güncel lider yetkisi: 9 kontrol | Çevrimdışı üyelik/rıza, yeniden giriş ve çok oyunculu sosyal akış |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 334 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 340 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
@@ -66,7 +67,8 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `dfa39de` | Tablo doluyken yeni anahtarın oyuncu kotasını atlamasını reddetme; mevcut oyuncular devam eder | Önce UE FAIL11, ardından 25 kontrol PASS; 32/32 tam paket; HTTP/disk/callback testleri açık |
 | `b3d352b` | Mana ödemesinden sonra etki/XP öncesi ilk kabul; skill/effect/mana ve controller tekilliği | 17 yeni UE kontrolü, 7 tür/olay; 6 oturum kontrolü genişletildi; parser 150/150 assert; yanlış log saat etkisi düzeltildi; 33/33 son paket; gerçek RPC/PIE açık |
 | `7aa7f42` | Sunucu kabulünde hasar/XP öncesi lv ve gerçek hedef; controller oturumunda tek ölçüm | 21 native kontrol/8 olay; 6 oturum kontrolü genişletildi; parser312/312; negatif metadata/sıfır hasar, native ilk RPC ve tam öldürme XP'si; 34/34 paket; gerçek ağ/PIE açık |
-| 7 Ekim temel saldırı cooldown'u (bu belgeyle aynı commit) | RPC'nin çift cooldown/sentetik saatini ortak tek kapı ve double gerçek damgayla değiştirme; mevcut %10 tolerans | Önce UE FAIL0 uptime100, ardından 89 kontrol; unflagged test komutu reddi ve eksik koruma negatif kanıtı; 35/35 son paket; gerçek RPC/jitter/PIE açık |
+| `3dec6f5` | RPC'nin çift cooldown/sentetik saatini ortak tek kapı ve double gerçek damgayla değiştirme; mevcut %10 tolerans | Önce UE FAIL0 uptime100, ardından 89 kontrol; unflagged test komutu reddi ve eksik koruma negatif kanıtı; 35/35 paket; gerçek RPC/jitter/PIE açık |
+| 7 Ekim takas regresyonu (bu belgeyle aynı commit) | Mevcut revizyon/çift onay/ekonomik bütünlük kurallarını otomatik pakete alma; üretim kuralı değişmedi | 79 kontrol; revizyon koruması mutasyonunda FAIL12/check13; 36/36 son paket, 18 PCH'siz dosya; gerçek ağ/kalıcı işlem açık |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -86,14 +88,14 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **35/35 geçti**.
-Normal Editor derlemesi ayrıca geçti. 16 dosyanın PCH olmadan /W4 derlemesinde
+7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **36/36 geçti**.
+Normal Editor derlemesi ayrıca geçti. 18 dosyanın PCH olmadan /W4 derlemesinde
 derleyici uyarısı yok. Veri denetiminde Lv33+ beceri boşluğu uyarıları, StaticLint'te
 InitGameState override beyaz liste uyarısı açık. Yerel test edilen en yüksek gerçek
-kayıt seviyesi 6; 334 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
+kayıt seviyesi 6; 340 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
 Önceki stats-first fixture dahil beceri12, LLM25, skill17, temel saldırı21/8 olay,
-yeni cooldown89 ve test komutunun bayraksız reddi, parser312/312 ve tüm eski kontroller bu
-pakette geçti. Summer50/Winter27 smoke hata0; NetSmoke1join/1welcome, iki tarafta
+yeni cooldown89 ve test komutunun bayraksız reddi, takas79, parser312/312 ve tüm eski kontroller bu
+pakette geçti. Summer49/Winter27 smoke hata0; NetSmoke1join/1welcome, iki tarafta
 hata0. LLM fixture'i bellek helper'larını sınar; gerçek HTTP, dosya kalıcılığı,
 callback zamanlaması ve uzak istemci HUD'ı için kanıt değildir.
 Son parser sayısal/eksik alan korumaları da bu tam pakette geçti.
@@ -122,6 +124,13 @@ sınar; dünya tick/timer'ları veya gerçek uzun oturum çalıştırmaz. Test k
 başlatma bayrağı olmadan fixture oluşturmadan reddedilir. Bayrak yalnız ayrı
 başlatılıp hemen kapanan test süreçleri içindir; normal editöre eklenmez,
 çünkü dünya saatini geri almak sentetik HUD yazılarını geri almaz.
+
+Takas fixture'ı iki controller'sız karakteri aynı frame içinde kullanır; gerçek
+sunucu gövdelerinde snapshot/ret ve alıcıya kimlik ayrılmasını sınar. Eşya aynasında
+adet/onay kontrolü vardır, tüm `TheirOffer.Items` payload'ı bağımsız karşılaştırılmaz.
+Dünya saati değiştirilmez; kayıt yükleme ve kalıcı takas save kapısı açılmaz.
+İki oyuncunun ortak kalıcı işlemi, session discriminator, fault injection ile
+rollback, gerçek owner-only replication/davet/HUD doğrulaması açık.
 
 - [Ayrıntılı düzeltme ve test kaydı](CHECKLIST_FIXES_2026-10-05.md)
 - [Oynanacak kontroller](PLAYTEST_CHECKLIST.md)

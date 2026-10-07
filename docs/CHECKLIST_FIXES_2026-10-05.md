@@ -1439,3 +1439,60 @@ replication, uzun oturum, değişik Blueprint cooldown değerleri ve gerçek
 Server/Shipping paketleri için kanıt değildir. Lv33+ beceri boşlukları ve
 InitGameState lint beyaz liste uyarısı mevcut; compiler uyarısı değildir.
 PLAYTEST_CHECKLIST, ağ denetimi ve proje tablosu güncellendi.
+
+## 54. Takas revizyon/çift onay ve ekonomi regresyonu (2026-10-07)
+
+Önceki HEAD `3dec6f5`; Git ağacı yalnız korunacak `.agents/`, `.codex/`,
+`AGENTS.md` untracked girdilerini içeriyordu. Aktif yazan paralel ajan yoktu.
+Agency Economy Designer ve Test Results Analyzer rehberleriyle salt okunur
+Mencius yan incelemesi yapıldı; son kaynak/runner incelemesinde engelleyici sorun
+bulmadı, aynanın payload karşılaştırması ve sabit TEMP log sınırları belgeye alındı.
+Ajan kapatıldı. Üretim takas kuralı, RPC payload'ı veya replication değişmedi.
+
+Yeni `Private/Tests/MMOTradeSelfTest.cpp`, `RunTradeSelfTest` ve dev-only
+`MMOTestTrade`; iki controller'sız karakter, aynı frame, gerçek StartTradeServer
+ve teklif/onay/ValidateTick gövdeleri. Zaman kapılarının özel damgaları yaşlandırılır;
+dünya saati değiştirilmez, tick/gerçek bekleme çalıştırılmaz. İlk yükleme kapısı
+completion save'i engeller. Tüm boolean hata çıkışlarında fixture'lar temizlenir.
+
+| Grup | Native kontrol | Kapsam |
+| --- | --- | --- |
+| Teklif/onay | 15 | Boş onay, ortak revizyon/ayna adedi, offer throttle, duplicate/stale kimlik, gold clamp/no-op, lock/confirm throttle, tek onayda aktarım yok, değişimde onay temizliği, eski revizyon, remove, dört eşya sınırı |
+| Başarılı takas/tekrar | 4 | İki aynı payload'lı eşya; farklı +/nadirlik; iki yön altın; duplicate ilk/son onay; temiz partner/timer; tam snapshot ve alıcının NextInstanceId'sinden ayrılan kimlik |
+| Altın sınırları | 12 | İki yönde tam tavan, tavanı bir aşma ve tavanda gönderip alma sonrası net bakiye |
+| Çanta sınırları | 8 | İki yönde dolu çantaya yalnız alma reddi ve bir ver/bir al başarısı |
+| Son anda yeniden doğrulama | 32 | Her iki taraf için kaldırma, kuşanma, ItemId/+ /nadirlik değişimi, altın harcama, ölüm, uzaklaşma; ara mutasyondan SONRA alınan snapshot korunur |
+| ValidateTick | 8 | Ölüm, 800 üstü, idle ve tam 800 sınırı; envanter değişmez |
+
+Toplam **79 kontrol** (compound koşullar içerir, 79 bağımsız ağ senaryosu değildir).
+Snapshot karşılaştırması çanta sırası/payload/kimlik, altın, kuşanım, depo, sarf
+yığınları ve NextInstanceId'yi kapsar. `TheirOffer.Items` için adet/onay kontrolü
+vardır; karşı tarafta gösterilen tüm payload bağımsız karşılaştırılmadı.
+
+Negatif kanıt: SeenRevision koruması geçici `false &&` ile devre dışı bırakılıp
+DLL derlendi; runner **FAIL checks=12, stale revision confirmation (check=13)**
+verdi. UE exit0 iken PS exit1 verdi. Mutasyon geri alındı; üretim Trade.cpp Git
+diff'i boş. Normal DLL tekrar Succeeded, doğrudan test **79 PASS**. Bu yeni bir
+oynanış bug düzeltmesi değil, mevcut korumanın regresyon kanıtıdır.
+
+`Scripts/TestTrade.ps1`, tam bir PASS79 satırı, UE exit0 ve hata/FAIL yokluğu ister;
+sabit TEMP log adıyla sıralı runner. RunAllChecks'e adım, PCH'siz listeye Trade.cpp
+ve test cpp eklendi. Son `RunAllChecks.ps1 -SkipBuild -FullCompile`: **36/36 GECTI,
+exit0**; normal Editor DLL derlemesi ayrıca Succeeded. 18 PCH'siz /W4 dosya,
+compiler warning0. Lint83 dosya, bilinen InitGameState whitelist uyarısı;
+ValidateData51 mob/13 elit/53 eşya/79 görev/81 beceri/12 efekt/29 spawner, mevcut
+Lv33+ gap uyarıları. Parser312/312, lint negatif15/veri negatif14, JSON111;
+Store340 loaded340 invalid0/loadFailed0/existsMismatch0/jsonMismatch0/maxLevel6,
+writeorder1/roundtrip equal1. Takas79, cooldown89/guard ve tüm önceki regresyonlar
+geçti. Summer49/Winter27 mob doğumu smoke hata0; NetSmoke1join/1welcome ve iki
+tarafta hata0 (`mmo_net_server_174004.log`, `mmo_net_client_174004.log`, TEMP).
+Paket logu `mmo_all_trade_20261007.log`; Source/Scripts SHA256 listesi önce/sonra
+aynı, kod/test/runner paket boyunca değişmedi. Belge düzenlemeleri ayrıdır.
+
+Gerçek davet/ownership/RPC taşıma/owner-only replication/HUD, iki oyuncunun ortak
+kalıcı işlemi ve çökme/yeniden giriş doğrulanmadı. StartTradeServer revizyonunu
+0'a döndürdüğü için oturumlar arası aynı revizyonla eski onay erişimi araştırılmalı;
+bu tur gerçek istemci exploit'i olarak kanıtlanmadı. Extraction/delivery rollback
+dalında synchronous delegate mutasyonuyla fault injection yapılmadı; allocator
+ve bildirim davranışı açık. PLAYTEST_CHECKLIST ve NETWORK_AUDIT sınırları içerir.
+Gerçek Server/Shipping derlemesi ve Lv1–30 oynanış ölçümü hâlâ açık.

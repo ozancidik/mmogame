@@ -84,6 +84,11 @@ public:
 	void RequestSetGold(int32 NewGold);
 	void RequestConfirm();
 
+#if !UE_BUILD_SHIPPING
+	// Same-frame, controllerless server fixtures; no RPC transport or durable save proof.
+	static bool RunTradeSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 protected:
 	UFUNCTION()
 	void OnRep_Trade();
