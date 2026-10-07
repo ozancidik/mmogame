@@ -153,6 +153,16 @@ UMMOTradeComponent* UMMOTradeComponent::GetValidPartnerComp() const
 	return PC;
 }
 
+bool UMMOTradeComponent::IsSeenOfferCurrent(uint64 SeenSessionId, int32 SeenRevision) const
+{
+	if (!HasAuthorityInternal() || SeenSessionId == 0 || SeenSessionId != TradeSessionId || SeenRevision != OfferRevision)
+	{
+		return false;
+	}
+	const UMMOTradeComponent* PC = GetValidPartnerComp();
+	return PC && PC->TradeSessionId == TradeSessionId && PC->OfferRevision == OfferRevision;
+}
+
 AMMOCharacter* UMMOTradeComponent::FindNearestTradeTarget() const
 {
 	AMMOCharacter* Self = GetOwnerCharacter();
@@ -203,17 +213,35 @@ void UMMOTradeComponent::RequestCancel()
 
 void UMMOTradeComponent::RequestAddItem(int32 InstanceId)
 {
-	if (HasAuthorityInternal()) { ServerAddItem_Implementation(InstanceId); } else { ServerAddItem(InstanceId); }
+	RequestAddItemSeen(TradeSessionId, OfferRevision, InstanceId);
 }
 
 void UMMOTradeComponent::RequestRemoveItem(int32 InstanceId)
 {
-	if (HasAuthorityInternal()) { ServerRemoveItem_Implementation(InstanceId); } else { ServerRemoveItem(InstanceId); }
+	RequestRemoveItemSeen(TradeSessionId, OfferRevision, InstanceId);
 }
 
 void UMMOTradeComponent::RequestSetGold(int32 NewGold)
 {
-	if (HasAuthorityInternal()) { ServerSetGold_Implementation(NewGold); } else { ServerSetGold(NewGold); }
+	RequestSetGoldSeen(TradeSessionId, OfferRevision, NewGold);
+}
+
+void UMMOTradeComponent::RequestAddItemSeen(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId)
+{
+	if (HasAuthorityInternal()) { ServerAddItem_Implementation(SeenSessionId, SeenRevision, InstanceId); }
+	else { ServerAddItem(SeenSessionId, SeenRevision, InstanceId); }
+}
+
+void UMMOTradeComponent::RequestRemoveItemSeen(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId)
+{
+	if (HasAuthorityInternal()) { ServerRemoveItem_Implementation(SeenSessionId, SeenRevision, InstanceId); }
+	else { ServerRemoveItem(SeenSessionId, SeenRevision, InstanceId); }
+}
+
+void UMMOTradeComponent::RequestSetGoldSeen(uint64 SeenSessionId, int32 SeenRevision, int32 NewGold)
+{
+	if (HasAuthorityInternal()) { ServerSetGold_Implementation(SeenSessionId, SeenRevision, NewGold); }
+	else { ServerSetGold(SeenSessionId, SeenRevision, NewGold); }
 }
 
 void UMMOTradeComponent::RequestConfirm()
@@ -350,8 +378,9 @@ void UMMOTradeComponent::ServerCancel_Implementation()
 	}
 }
 
-void UMMOTradeComponent::ServerAddItem_Implementation(int32 InstanceId)
+void UMMOTradeComponent::ServerAddItem_Implementation(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId)
 {
+	if (!IsSeenOfferCurrent(SeenSessionId, SeenRevision)) return;
 	UMMOTradeComponent* PC = GetValidPartnerComp();
 	AMMOCharacter* Self = GetOwnerCharacter();
 	const UMMOInventoryComponent* Inv = Self ? Self->GetInventory() : nullptr;
@@ -388,8 +417,9 @@ void UMMOTradeComponent::ServerAddItem_Implementation(int32 InstanceId)
 	OnMyOfferChanged();
 }
 
-void UMMOTradeComponent::ServerRemoveItem_Implementation(int32 InstanceId)
+void UMMOTradeComponent::ServerRemoveItem_Implementation(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId)
 {
+	if (!IsSeenOfferCurrent(SeenSessionId, SeenRevision)) return;
 	if (!GetValidPartnerComp() || !GetWorld())
 	{
 		return;
@@ -412,8 +442,9 @@ void UMMOTradeComponent::ServerRemoveItem_Implementation(int32 InstanceId)
 	OnMyOfferChanged();
 }
 
-void UMMOTradeComponent::ServerSetGold_Implementation(int32 NewGold)
+void UMMOTradeComponent::ServerSetGold_Implementation(uint64 SeenSessionId, int32 SeenRevision, int32 NewGold)
 {
+	if (!IsSeenOfferCurrent(SeenSessionId, SeenRevision)) return;
 	AMMOCharacter* Self = GetOwnerCharacter();
 	const UMMOInventoryComponent* Inv = Self ? Self->GetInventory() : nullptr;
 	if (!GetValidPartnerComp() || !Inv || !GetWorld())
@@ -446,8 +477,7 @@ void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int3
 	}
 
 	// Onay, oyuncunun GORDUGU teklife baglidir: arada teklif degistiyse reddet.
-	if (SeenSessionId == 0 || SeenSessionId != TradeSessionId || PC->TradeSessionId != TradeSessionId
-		|| PC->OfferRevision != OfferRevision || SeenRevision != OfferRevision)
+	if (!IsSeenOfferCurrent(SeenSessionId, SeenRevision))
 	{
 		NotifyOwner(TEXT("Teklif degisti; yeni teklifi gorup tekrar onayla."));
 		return;

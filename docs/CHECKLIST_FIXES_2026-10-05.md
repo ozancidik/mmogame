@@ -1557,3 +1557,62 @@ pawn replacement ve delayed-client ekonomik erişim doğrulanmadı. Cancel/X,
 add/remove/gold session taşımaz; ayrı açık eski aksiyon riski. Reentrant envanter
 rollback ve iki kaydın ortak kalıcı işlemi, gerçek Server/Shipping/Lv1–30 akış
 kanıtı açık. PLAYTEST_CHECKLIST ve O19 bu sınırlara göre güncellendi.
+
+## 56. Takas teklif aksiyonlarında görülen oturum/revizyon (2026-10-07)
+
+Başlangıç HEAD97b9f76; tracked temiz, korunacak .agents/.codex/AGENTS.md
+untracked. Editör/başka UE süreci yok; önceki Pasteur kapalı, aktif yazan ajan
+yok. Agency Unreal Multiplayer Architect/QA rehberleriyle Noether salt okunur
+yan inceleme yaptı; parent kod/test/build/doc işini yürüttü.
+
+Önce yalnız native reproducer eklendi ve eski DLL derlendi: takası iptal et,
+yeniden aç, önceki altın25 aksiyonunu al. Yeni teklif/revizyon değişti:
+**MMO_TRADE_TEST FAIL checks=79, previous session gold action accepted (check=80)**.
+UE exit0/PS exit1. Gerçek Reliable sırası/uzak oyuncu exploit'i/ekonomik aktarım
+üretilmedi; server-body teklif mutasyonunun oturum kimliği eksikliği doğrulandı.
+
+Üç offer RPC (add/remove/gold) session+revision taşır. Ortak IsSeenOfferCurrent
+authority, karşılıklı aktif partner ve iki tarafta aynı session/revision ile
+görülen çifti doğrular. Ret herhangi cooldown, onay, ayna, envanter yazımından
+öncedir; normal return, validation disconnect yok. Confirm helper'ı da ortak.
+HUD Seen wrapper'lara son çizilen weakcomponent/session/revision ve gold delta
+için son çizilen gold ile gider. Console/C++ güncel yerel snapshot; reset0/fresh
+revision0 geçerlidir. Sunucu mevcut clamp/kapasite/hız sınırlarını korur.
+RPC imzaları değişti; iki uç aynı derlemeye geçmelidir. Kayıt/replication şeması
+değişmedi. Cancel/X ve invite/accept ayrı kaldı; genel atomik view garantisi yok.
+
+Native162 PASS = önceki96 +66: setup/old gold/fresh revision0 (3), iki yönde
+üç aksiyon * sekiz ret bağlamı (48), fresh Seen ve current wrapper + eski çiftin
+tekrarı (12), inactive üç aksiyon (3). Eski/sıfır/ileri session, eski/ileri/
+negatif revizyon, partner session/revision mismatch; otherwise-valid remove/add
+girdileri. Ret iki teklif ve tüm Item payload aynaları/altın/onay, revizyon,
+offer/trade-change/confirm damgaları ve iki envanter snapshot'ını değiştirmez.
+Başarılı offer değişimi ortak revizyon artırır ve onayları temizler; aktarım yok.
+Controller'sız/tek frame, dünya saati değişmez; fixture disk/save kapısı açılmaz.
+
+Noether'in son sınırlı incelemesi üretim/caller/cache/count engeli bulmadı;
+P3 test zayıflığı: post-accept replay aynı eşya/aynı altınla zaten no-op oluyordu.
+Test güçlendirildi: eski çiftle henüz teklif edilmemiş bag2 ekleme, hâlâ teklifteki
+bag1 çıkarma ve farklı altın19 istenir. Böylece ret idempotent payload'a dayanmaz.
+Kontrol sayısı162 kaldı; güçlendirilmiş test DLL'i ve paketi yeniden doğrulandı.
+Son salt okunur inceleme iki yöndeki yeni payload'ların geçerli olduğunu ve
+162 sayısını doğruladı; yeni bulgu yok, Noether kapatıldı.
+
+Normal DLL derlemesi Succeeded, doğrudan TestTrade.ps1 PASS162/exit0.
+İlk162 DLL ile paket36/36 geçti: 18 PCH'siz dosya/warning0, Store358/maxLevel6,
+Summer46/Winter32/hata0, Net1join/1welcome/hata0 (`mmo_net_server_182718.log`,
+client182718). Son P3 test güçlendirmesinden sonra normal DLL tekrar Succeeded,
+doğrudan162 PASS (15:29:20 UTC); son kaynakla tam paket tekrar çalıştırıldı.
+Son kaynakla `RunAllChecks.ps1 -SkipBuild -FullCompile`: **36/36 GECTI, exit0**.
+18 PCH'siz /W4 dosya, toplam compiler warning C0; native Trade162 PASS.
+Parser312/312, lint negatif15/veri negatif14, JSON111 ve önceki tüm regresyonlar
+geçti. Store364 loaded364 invalid0/loadFailed0/existsMismatch0/jsonMismatch0,
+maxLevel6, writeorder1 ve roundtrip equal1. Summer52/Winter35 mob doğumu,
+smoke exit0/hata0; Net1join/1welcome/server-client hata0
+(`mmo_net_server_183722.log`, `mmo_net_client_183722.log`, TEMP).
+Paket logu `mmo_all_trade_offer_final_20261007.log` (TEMP). Source/Scripts SHA256
+listesi paket öncesi/sonrası aynı; test/runner/kod paket boyunca değişmedi.
+Belge güncellemeleri ayrıdır. Editör kapalı; bilinen Lv33+ beceri boşluğu ve
+InitGameState whitelist uyarıları sürüyor. Gerçek Canvas/input, HUD click,
+remote RPC/owner-only teslim, bağlantının sürmesi ve latency UX PIE listesinde
+açıktır. Ortak kalıcı takas/rollback/Server/Shipping/Lv1–30 ölçümü tamamlanmadı.

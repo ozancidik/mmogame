@@ -4234,5 +4234,31 @@ fare tıklaması, RPC taşıma, owner-only replication veya gerçek oyuncu kayd�
 - [ ] Console `MMOTradeConfirm` en son yerel snapshot'ı onaylar; HUD draw cache'ini
   kullanmaz. Host ve uzak console davranışını bu semantikle karşılaştır.
 - [ ] Eski cancel/X/add/remove/gold tıklamalarının yeni takası etkilemesini ayrı
-  dene; bu RPC'ler session taşımıyor, bu düzeltmenin kapsamı dışında kaldı.
+  dene; §55'te bu RPC'ler session taşımıyordu. Add/remove/gold §56'da düzeltildi;
+  cancel/X ayrı açık. Aşağıdaki yeni offer kontrol listesi de oynanmalı.
   Reentrant rollback ve iki kaydın ortak kalıcılık/çökme kontrolleri de açık.
+
+## 2026-10-07 — Takas add/remove/altın için görülen teklif (PIE açık)
+
+Native162 kontrol (önceki96 +66) ve normal Editor DLL derlemesi geçti. Eski
+altın aksiyonunun yeni takasta kabulü önce FAIL79/check80 ile üretildi. Yeni
+sunucu gövdeleri session/revision doğrular; fixture RPC taşıma, input/Canvas,
+oyuncu kayıt kalıcılığı veya remote bağlantının sürmesini çalıştırmaz.
+
+- [ ] İki uç aynı yeni DLL: iptal/yeniden aç sonrası eski altın/add/remove
+  olaylarını gönder. Yeni takas ve iki HUD teklifi değişmemeli; remove'un hedefi
+  yeni teklifte bulunmalı, add eşyası geçerli ve çantada olmalı. Bağlantı sürmeli.
+- [ ] Aynı session'da iki taraftan herhangi biri teklifi değiştirsin; önceki
+  revizyonla altın/add/remove reddedilmeli. Onaylar/cooldown/güncel aynalar
+  reddedilen istek yüzünden değişmemeli; redraw + uygun cooldown sonrası yeni
+  aksiyon başarılı olmalı. Hızlı ardışık inputta yeniden çizim deneyimini ölç.
+- [ ] Altın reset ve +/- düğmeleri draw token'ını göndersin; delta son çizilen
+  altından hesaplansın. Draw ile click arasındaki replication eski inputu yeni
+  session/revizyona taşımamalı. Canvas/pawn/stats yokluğu veya replacement pawn
+  eski bölgeden add/remove/gold dispatch etmemeli. Native fixture HUD'ı çalıştırmaz.
+- [ ] Yeni session revizyon0'da fresh altın/add isteği kabul edilmeli; console
+  MMOTradeGold güncel yerel snapshot semantiğini korumalı. Host ve uzak istemci
+  aynı güncel teklifi görmeli. Owner-only gizlilik ve büyük uint64 taşımasını ölç.
+- [ ] Cancel düğmesi/X ve bekleyen davet kabul/iptalinin eski olayları ayrı
+  araştırılmalı; bu RPC'ler hâlâ bu session/revision teklif korumasında değildir.
+  Crash/iki kayıt atomikliği/reentrant rollback önceki açık maddelerdir.

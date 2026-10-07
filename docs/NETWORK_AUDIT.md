@@ -41,6 +41,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O17 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** dolu can/mana saf iksiri ve ortak kullanım beklemesini harcıyordu; ihtiyaç yoksa tüketim öncesi reddedilir | `AMMOCharacter::UseConsumable` |
 | O18 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** temel saldırı RPC'si sentetik zaman damgasından sonra ikinci cooldown kapısında geçerli vuruşu reddediyordu | `AMMOCharacter::AttackTargetInternal/ServerAttackTarget_Implementation` |
 | O19 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** aynı revizyonlu yeni takasta eski oturumun onayı kabul ediliyordu; onay artık sunucu oturum kimliği + görülen revizyonla doğrulanır | `UMMOTradeComponent::ServerConfirm/StartTradeServer`, `AMMOHUD::DrawTrade/HandleTradeClick` |
+| O20 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski teklif aksiyonunun altını yeni takasa yazılıyordu; add/remove/gold RPC'leri de görülen session/revision ile doğrulanır | `UMMOTradeComponent::IsSeenOfferCurrent/ServerSetGold/ServerAddItem/ServerRemoveItem`, `AMMOHUD::HandleTradeClick` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -550,9 +551,44 @@ Render/input, replacement pawn HUD, gerçek RPC transport ve owner-only teslim
 native fixture'da çalıştırılmadı. Ayrı replike alanlar bütün ağ koşullarında
 atomik payload/token görünümü garantisi olarak yorumlanmaz.
 
-Cancel/X, add/remove ve gold RPC'leri session taşımaz; eski aksiyonun yeni takası
-etkilemesi ayrı açık risktir. Bu tur bu yolları değiştirmedi. Reentrant inventory
+Bu §55 çalışmasında Cancel/X, add/remove ve gold RPC'leri session taşımıyordu;
+add/remove/gold sonraki O20/§56'da düzeltildi. Cancel/X ayrı açık risktir. Reentrant inventory
 rollback, ortak kalıcı işlem, gerçek Server/Shipping ve PIE kontrolleri açık.
 Agency Unreal Multiplayer Architect/QA rehberi ve yerel UE5.7 UHT/RepLayout
 kaynak incelemesi kullanıldı. Son paket36/36 ve takas96 geçti; derleme/smoke/NetSmoke
 sonuçları düzeltme kaydı §55'te. Bu bağlantı testi takas RPC/HUD oynanış kanıtı değildir.
+
+## O20 — Teklif aksiyonlarını görülen oturum/revizyona bağlama (2026-10-07)
+
+HEAD97b9f76 ile native reproducer: takası iptal et/yeniden aç, eski altın25
+aksiyonunu gönder. Yeni teklif altını25 ve revizyon1 oldu; beklenen değişmezlik
+**FAIL checks=79 / check80** verdi (UE exit0, PS exit1). Bu server-body kabul
+kanıtıdır; Reliable mesaj sırası, gerçek eski HUD tıklaması veya uzak exploit
+bu fixture'da oluşturulmadı. Mevcut altın clamp'i ve çift onay sonraki kapılardır.
+
+Add/remove/gold RPC'leri artık `(SeenSessionId, SeenRevision, değer/InstanceId)`
+taşır. IsSeenOfferCurrent authority, aktif karşılıklı partner, sıfır olmayan
+session, iki tarafın session/revision eşliği ve görülen revizyonu denetler.
+Ret cooldown, teklif, dört onay/ayna veya envanter mutasyonundan önce olur;
+beklenen eski girdi normal return ile reddedilir, bağlantı koparılmaz.
+Confirm aynı helper'ı kullanır. Kayıt şeması ve owner-only replication değişmedi.
+
+HUD add/remove/altın reset/delta son başarılı draw'ın weak component/session/
+revision çiftini kullanır; delta çizilen altından hesaplanır. Skipped draw veya
+pawn değişimi offer dispatch'ini engeller. Console/C++ wrapper'ları güncel yerel
+snapshot'ı taşır. Yeni RPC imzaları iki uçta aynı DLL gerektirir. Revision0 yeni
+aktif session için geçerlidir; hızlı ardışık eski-revizyon istekleri reddedilir,
+kullanıcı güncel teklifi yeniden görmelidir. Gerçek latency UX ölçülmedi.
+
+Test162 = önceki96 +66: iki yönde üç aksiyonun eski/sıfır/ileri session,
+eski/ileri/negatif revizyon ve partner session/revision uyuşmazlıkları; fresh0,
+fresh Seen/current wrapper, tekrar eski revizyon ve inactive ret. Ret snapshot'ı
+iki teklifin tüm Items payload'ı/altın/onay aynaları, revizyon ve üç saat damgası
+ile iki envanteri karşılaştırır. Remove hedefi yeni teklifte gerçekten vardır;
+add geçerli ve henüz teklif edilmemiş çanta eşyasıdır. Native162, DLL ve son36/36
+paket geçti; 18 PCH'siz dosyada derleyici uyarısı0. Tam paket kaydı §56'da tutulur.
+Canvas/input/takas RPC taşıma çalıştırılmadı; NetSmoke bağlantı kontrolüdür.
+
+Cancel/X ve bekleyen davet kabul/iptalinin kimliği ayrı açıktır. Genel replike
+payload/token atomikliği, reentrant rollback, ortak kalıcı işlem, Server/Shipping
+ve gerçek iki oyunculu PIE kanıtı bu sınırlı düzeltmeyle tamamlanmaz.

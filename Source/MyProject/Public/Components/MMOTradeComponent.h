@@ -90,6 +90,9 @@ public:
 	void RequestConfirm();
 	// HUD supplies the last rendered offer's identity, not newer state received before the click.
 	void RequestConfirmSeen(uint64 SeenSessionId, int32 SeenRevision);
+	void RequestAddItemSeen(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId);
+	void RequestRemoveItemSeen(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId);
+	void RequestSetGoldSeen(uint64 SeenSessionId, int32 SeenRevision, int32 NewGold);
 
 #if !UE_BUILD_SHIPPING
 	// Same-frame, controllerless server fixtures; no RPC transport or durable save proof.
@@ -114,13 +117,13 @@ protected:
 	void ServerCancel();
 
 	UFUNCTION(Server, Reliable)
-	void ServerAddItem(int32 InstanceId);
+	void ServerAddItem(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId);
 
 	UFUNCTION(Server, Reliable)
-	void ServerRemoveItem(int32 InstanceId);
+	void ServerRemoveItem(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId);
 
 	UFUNCTION(Server, Reliable)
-	void ServerSetGold(int32 NewGold);
+	void ServerSetGold(uint64 SeenSessionId, int32 SeenRevision, int32 NewGold);
 
 	UFUNCTION(Server, Reliable)
 	void ServerConfirm(uint64 SeenSessionId, int32 SeenRevision);
@@ -144,6 +147,8 @@ protected:
 
 	// Karsi tarafin bileseni; karsilikli eslesme gecerli degilse nullptr.
 	UMMOTradeComponent* GetValidPartnerComp() const;
+	// Used before any offer/confirmation mutation, including authority shortcut calls.
+	bool IsSeenOfferCurrent(uint64 SeenSessionId, int32 SeenRevision) const;
 
 	AMMOCharacter* FindNearestTradeTarget() const;
 

@@ -1925,6 +1925,7 @@ void AMMOHUD::DrawTrade(AMMOCharacter* PlayerChar)
 	DrawnTradeComponent = Trade;
 	DrawnTradeSessionId = Trade->TradeSessionId;
 	DrawnTradeRevision = Trade->OfferRevision;
+	DrawnTradeGold = Trade->MyOffer.Gold;
 }
 
 bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
@@ -1946,11 +1947,16 @@ bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
 		Trade->RequestCancel();
 		return true;
 	}
+	// Offer controls refer to the same last drawn component/session/revision as confirmation.
+	if (DrawnTradeComponent.Get() != Trade || DrawnTradeSessionId == 0 || DrawnTradeRevision == INDEX_NONE)
+	{
+		return true;
+	}
 	for (const FMMOClickRegion& R : TradeBagRegions)
 	{
 		if (R.Rect.IsInside(Pos))
 		{
-			Trade->RequestAddItem(R.Slot);
+			Trade->RequestAddItemSeen(DrawnTradeSessionId, DrawnTradeRevision, R.Slot);
 			return true;
 		}
 	}
@@ -1958,7 +1964,7 @@ bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
 	{
 		if (R.Rect.IsInside(Pos))
 		{
-			Trade->RequestRemoveItem(R.Slot);
+			Trade->RequestRemoveItemSeen(DrawnTradeSessionId, DrawnTradeRevision, R.Slot);
 			return true;
 		}
 	}
@@ -1969,13 +1975,13 @@ bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
 			const int32 NumDeltas = UE_ARRAY_COUNT(TradeGoldDeltas);
 			if (R.Slot >= NumDeltas)
 			{
-				Trade->RequestSetGold(0);
+				Trade->RequestSetGoldSeen(DrawnTradeSessionId, DrawnTradeRevision, 0);
 			}
 			else
 			{
 				// Sunucu cuzdana gore tekrar sikistirir; burada yalnizca tasmayi onle.
-				const int64 Next = (int64)Trade->MyOffer.Gold + TradeGoldDeltas[R.Slot];
-				Trade->RequestSetGold((int32)FMath::Min<int64>(Next, MAX_int32));
+				const int64 Next = (int64)DrawnTradeGold + TradeGoldDeltas[R.Slot];
+				Trade->RequestSetGoldSeen(DrawnTradeSessionId, DrawnTradeRevision, (int32)FMath::Min<int64>(Next, MAX_int32));
 			}
 			return true;
 		}

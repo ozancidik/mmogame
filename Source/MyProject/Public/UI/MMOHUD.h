@@ -250,6 +250,7 @@ protected:
 	TWeakObjectPtr<class UMMOTradeComponent> DrawnTradeComponent;
 	uint64 DrawnTradeSessionId = 0;
 	int32 DrawnTradeRevision = INDEX_NONE;
+	int32 DrawnTradeGold = 0;
 	TArray<FMMOClickRegion> TradeBagRegions;
 	TArray<FMMOClickRegion> TradeOfferRegions;
 	TArray<FMMOClickRegion> TradeGoldRegions;

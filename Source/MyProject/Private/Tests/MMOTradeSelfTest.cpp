@@ -69,10 +69,10 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		auto Add = [&](int32 Side, int32 BagIndex)
 		{
 			Trades[Side]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f;
-			Trades[Side]->ServerAddItem_Implementation(Inventories[Side]->EquipmentBag[BagIndex].InstanceId);
+			Trades[Side]->ServerAddItem_Implementation(Trades[Side]->TradeSessionId, Trades[Side]->OfferRevision, Inventories[Side]->EquipmentBag[BagIndex].InstanceId);
 		};
 		auto Gold = [&](int32 Side, int32 Amount)
-		{ Trades[Side]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f; Trades[Side]->ServerSetGold_Implementation(Amount); };
+		{ Trades[Side]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f; Trades[Side]->ServerSetGold_Implementation(Trades[Side]->TradeSessionId, Trades[Side]->OfferRevision, Amount); };
 		auto AgeConfirm = [&]()
 		{
 			for (UMMOTradeComponent* Trade : Trades)
@@ -99,9 +99,9 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		if (!Check(!Trades[0]->MyOffer.bConfirmed && !Trades[1]->MyOffer.bConfirmed && BothUnchanged(InitialA, InitialB), TEXT("empty confirmation"))) return false;
 		Add(0, 0);
 		if (!Check(Trades[0]->OfferRevision == 1 && Trades[1]->OfferRevision == 1 && Trades[1]->TheirOffer.Items.Num() == 1, TEXT("add revision/mirror"))) return false;
-		Trades[0]->ServerAddItem_Implementation(Inventories[0]->EquipmentBag[1].InstanceId);
+		Trades[0]->ServerAddItem_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision, Inventories[0]->EquipmentBag[1].InstanceId);
 		if (!Check(Trades[0]->OfferRevision == 1 && Trades[0]->MyOffer.Items.Num() == 1, TEXT("offer throttle"))) return false;
-		Add(0, 0); Trades[0]->ServerRemoveItem_Implementation(-1);
+		Add(0, 0); Trades[0]->ServerRemoveItem_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision, -1);
 		if (!Check(Trades[0]->OfferRevision == 1 && Trades[0]->MyOffer.Items.Num() == 1, TEXT("duplicate/stale item request"))) return false;
 		Gold(0, MAX_int32);
 		if (!Check(Trades[0]->MyOffer.Gold == 1000 && Trades[1]->TheirOffer.Gold == 1000 && Trades[0]->OfferRevision == 2, TEXT("gold wallet clamp"))) return false;
@@ -126,7 +126,7 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, OldRevision);
 		if (!Check(!Trades[0]->MyOffer.bConfirmed && BothUnchanged(InitialA, InitialB), TEXT("stale revision confirmation"))) return false;
 		Trades[0]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f;
-		Trades[0]->ServerRemoveItem_Implementation(Inventories[0]->EquipmentBag[0].InstanceId);
+		Trades[0]->ServerRemoveItem_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision, Inventories[0]->EquipmentBag[0].InstanceId);
 		if (!Check(Trades[0]->MyOffer.Items.IsEmpty() && Trades[1]->TheirOffer.Items.IsEmpty() && Trades[0]->OfferRevision == OldRevision + 2, TEXT("remove revision/mirror"))) return false;
 		Reset();
 		for (int32 Index = 0; Index < 2; ++Index) Inventories[0]->AddEquipmentInstance(TEXT("ShortSword"));
@@ -219,6 +219,102 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 			if (!Check(Scenario == 3 ? Trades[0]->bTradeActive && Trades[1]->bTradeActive : Ended(), TEXT("validation tick/boundary"))
 				|| !Check(BothUnchanged(A, B), TEXT("validation tick changed inventory"))) return false;
 		}
+		// Old offer actions must leave both complete offers, approval flags, clocks and inventory intact.
+		auto SameOffer = [&](const FMMOTradeOffer& A, const FMMOTradeOffer& B)
+		{
+			FMMOCharacterSaveData Left, Right;
+			Left.EquipmentBag = A.Items; Right.EquipmentBag = B.Items;
+			return A.Gold == B.Gold && A.bConfirmed == B.bConfirmed && Equal(Left, Right);
+		};
+		Reset();
+		const uint64 OldActionSession = Trades[0]->TradeSessionId;
+		Trades[0]->EndTradeServer(TEXT("fixture old offer action"));
+		StartTradeServer(Pawns[0], Pawns[1]);
+		if (!Check(Trades[0]->TradeSessionId != OldActionSession && Trades[0]->OfferRevision == 0,
+			TEXT("old action/new session same revision setup"))) return false;
+		Trades[0]->RequestSetGoldSeen(OldActionSession, 0, 25);
+		if (!Check(Trades[0]->MyOffer.Gold == 0 && Trades[0]->OfferRevision == 0,
+			TEXT("previous session gold action accepted"))) return false;
+		Trades[0]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f;
+		Trades[0]->RequestSetGoldSeen(Trades[0]->TradeSessionId, 0, 25);
+		if (!Check(Trades[0]->MyOffer.Gold == 25 && Trades[1]->TheirOffer.Gold == 25
+			&& Trades[0]->OfferRevision == 1 && Trades[1]->OfferRevision == 1,
+			TEXT("fresh revision zero offer action"))) return false;
+		Add(0, 0); Add(1, 0); Gold(0, 25); AgeConfirm();
+		Trades[0]->RequestConfirm();
+		const FMMOCharacterSaveData ActionA = Snapshot(Inventories[0]), ActionB = Snapshot(Inventories[1]);
+		auto Action = [&](int32 Side, int32 Kind, uint64 Session, int32 Revision, bool bDifferentPayload = false)
+		{
+			const int32 BagIndex = bDifferentPayload ? (Kind == 1 ? 1 : 2) : (Kind == 1 ? 0 : 1);
+			const int32 Id = Inventories[Side]->EquipmentBag[BagIndex].InstanceId;
+			if (Kind == 0) Trades[Side]->RequestAddItemSeen(Session, Revision, Id);
+			else if (Kind == 1) Trades[Side]->RequestRemoveItemSeen(Session, Revision, Id);
+			else Trades[Side]->RequestSetGoldSeen(Session, Revision, bDifferentPayload ? 19 : 17);
+		};
+		auto RejectedAction = [&](int32 Side, int32 Kind, uint64 Session, int32 Revision, bool bDifferentPayload = false)
+		{
+			FMMOTradeOffer Mine[2], Theirs[2]; int32 Revisions[2]; float OfferTimes[2], ChangeTimes[2], ConfirmTimes[2];
+			for (int32 I = 0; I < 2; ++I)
+			{
+				Mine[I] = Trades[I]->MyOffer; Theirs[I] = Trades[I]->TheirOffer; Revisions[I] = Trades[I]->OfferRevision;
+				OfferTimes[I] = Trades[I]->LastOfferChangeTime; ChangeTimes[I] = Trades[I]->LastTradeChangeTime; ConfirmTimes[I] = Trades[I]->LastConfirmTime;
+			}
+			Action(Side, Kind, Session, Revision, bDifferentPayload);
+			for (int32 I = 0; I < 2; ++I)
+				if (!SameOffer(Mine[I], Trades[I]->MyOffer) || !SameOffer(Theirs[I], Trades[I]->TheirOffer)
+					|| Revisions[I] != Trades[I]->OfferRevision || OfferTimes[I] != Trades[I]->LastOfferChangeTime
+					|| ChangeTimes[I] != Trades[I]->LastTradeChangeTime || ConfirmTimes[I] != Trades[I]->LastConfirmTime) return false;
+			return BothUnchanged(ActionA, ActionB);
+		};
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			Trades[Side]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f; // Rejection cannot rely on throttle.
+			for (int32 Kind = 0; Kind < 3; ++Kind)
+			{
+				const uint64 Session = Trades[Side]->TradeSessionId;
+				const int32 Revision = Trades[Side]->OfferRevision;
+				if (!Check(RejectedAction(Side, Kind, OldActionSession, Revision), TEXT("old session offer action"))) return false;
+				if (!Check(RejectedAction(Side, Kind, 0, Revision), TEXT("zero session offer action"))) return false;
+				if (!Check(RejectedAction(Side, Kind, Session + 1, Revision), TEXT("future session offer action"))) return false;
+				if (!Check(RejectedAction(Side, Kind, Session, Revision - 1), TEXT("old revision offer action"))) return false;
+				if (!Check(RejectedAction(Side, Kind, Session, Revision + 1), TEXT("future revision offer action"))) return false;
+				if (!Check(RejectedAction(Side, Kind, Session, -1), TEXT("negative revision offer action"))) return false;
+				++Trades[1 - Side]->TradeSessionId;
+				const bool SessionRejected = RejectedAction(Side, Kind, Session, Revision);
+				Trades[1 - Side]->TradeSessionId = Session;
+				if (!Check(SessionRejected, TEXT("partner session offer action"))) return false;
+				++Trades[1 - Side]->OfferRevision;
+				const bool RevisionRejected = RejectedAction(Side, Kind, Session, Revision);
+				Trades[1 - Side]->OfferRevision = Revision;
+				if (!Check(RevisionRejected, TEXT("partner revision offer action"))) return false;
+			}
+		}
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			for (int32 Kind = 0; Kind < 3; ++Kind)
+			{
+				const uint64 Session = Trades[Side]->TradeSessionId;
+				const int32 Revision = Trades[Side]->OfferRevision;
+				Trades[Side]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f;
+				// Seen HUD path and current-snapshot Console/C++ path must both remain usable.
+				if (Side == 0) Action(Side, Kind, Session, Revision);
+				else if (Kind == 0) Trades[Side]->RequestAddItem(Inventories[Side]->EquipmentBag[1].InstanceId);
+				else if (Kind == 1) Trades[Side]->RequestRemoveItem(Inventories[Side]->EquipmentBag[0].InstanceId);
+				else Trades[Side]->RequestSetGold(17);
+				const int32 ExpectedItems = Kind == 0 ? 2 : 1;
+				if (!Check(Trades[Side]->OfferRevision == Revision + 1 && Trades[1 - Side]->OfferRevision == Revision + 1
+					&& Trades[Side]->MyOffer.Items.Num() == ExpectedItems && (Kind != 2 || Trades[Side]->MyOffer.Gold == 17)
+					&& !Trades[0]->MyOffer.bConfirmed && !Trades[1]->MyOffer.bConfirmed
+					&& SameOffer(Trades[Side]->MyOffer, Trades[1 - Side]->TheirOffer) && BothUnchanged(ActionA, ActionB),
+					TEXT("current offer action/revision/mirror/approval reset"))) return false;
+				Trades[Side]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f;
+				// A different actionable payload isolates old-revision rejection from idempotent no-ops.
+				if (!Check(RejectedAction(Side, Kind, Session, Revision, true), TEXT("old revision actionable replay after accepted action"))) return false;
+			}
+		}
+		Trades[0]->EndTradeServer(TEXT("fixture inactive offer actions"));
+		for (int32 Kind = 0; Kind < 3; ++Kind)
+			if (!Check(RejectedAction(0, Kind, Trades[0]->TradeSessionId, Trades[0]->OfferRevision) && Ended(), TEXT("inactive offer action"))) return false;
 		// An old confirmation must not approve a different session with the same numeric revision.
 		Reset(); Gold(0, 25);
 		const int32 PreviousSessionRevision = Trades[0]->OfferRevision;
