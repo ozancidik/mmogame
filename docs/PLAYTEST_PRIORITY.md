@@ -1,5 +1,11 @@
 # Güncel durum, açık sorunlar ve ilk oyun içi test sırası
 
+**2026-10-07:** Güncel yaptık/yapacağız tablosu ve doğrulama sınırları
+[PROJECT_STATUS_2026-10-07.md](PROJECT_STATUS_2026-10-07.md) içindedir. Son otomatik
+paket 23/23 geçti; gerçek PIE oynanışı açık. Aşağıdaki tarihli değerlendirmelerdeki
+"derlenmedi" ve eski içerik sayıları o değerlendirme tarihini anlatır; güncel
+derleme/içerik durumu için yeni tablo ve CHECKLIST_FIXES_2026-10-05.md kullanılır.
+
 > **Test oturumu için başlangıç noktası: `docs/PLAYTEST_RUNBOOK.md`** (derle → `PR1_VERIFY` 1–18 → aşağıdaki ilk 7 test → `[MMOMETRIC]` koşusu, geçti/kaldı şablonu). Bu belge durum ve açık sorun listesidir.
 
 **Tarih:** 2026-10-04. Kaynak: `PLAYTEST_CHECKLIST.md`, `SECURITY_AUDIT.md`, `NETWORK_AUDIT.md`, `VERTICAL_SLICE_LV1_30.md`, `FIRST_PLAYTEST.md` ve kod sayımı. Bu belge oynanarak doğrulanmış hiçbir şey içermez; etiketler: **[KOD]** kaynakta okundu, **[BELGE]** başka bir belgeden alındı, **[TAHMİN]** doğrulanmadı.

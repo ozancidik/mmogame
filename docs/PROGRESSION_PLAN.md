@@ -1,5 +1,9 @@
 # İlerleme planı: 1–80. seviyeler
 
+**2026-10-07 durum tablosu:** Mevcut sistemler, otomatik test kanıtı ve sıradaki işler
+[PROJECT_STATUS_2026-10-07.md](PROJECT_STATUS_2026-10-07.md) içinde özetlenir. Bu
+belgenin eski tarihlerdeki sayıları ve önerileri, güncel oynanış ölçümü yerine geçmez.
+
 **Durum:** Tasarım planı, 2026-09-28. `[IMPLEMENTED]` mevcut C++ kaynak kodunda uygulanmış olanı, `[PROPOSED]` önerilen işi, `[PLACEHOLDER]` ise henüz oynanışta sınanmamış geçici denge hedefini belirtir. Kaynak koddaki eski denge çalışmalarına ilişkin yorumlar geçmişe dair bağlam sağlar; güncel oynanış testi sonucu sayılmaz. Bu belge kaynak kod incelemesine dayanır. Haritada erişilebilirlik, dövüş süresi ve ekonomi hissi PIE içinde ayrıca gözlemlenmelidir.
 
 > **2026-10-04 notu (2026-10-05 sayımıyla doğrulandı):** Bu belgenin Lv51–80 "eksik" diyen yerleri bayattır. Lv51–80 mob, görev ve ekipman kodlandı (48 arketip, 73 görev, 53 ekipman); hiçbiri PIE'de oynanmadı. Güncel durum ve test sırası: `docs/PLAYTEST_PRIORITY.md`.
