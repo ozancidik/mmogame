@@ -4,6 +4,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOStatsComponent.h"
+#include "Player/MMOPlayerController.h"
 #include "Engine/World.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
@@ -316,13 +317,13 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		for (int32 Kind = 0; Kind < 3; ++Kind)
 			if (!Check(RejectedAction(0, Kind, Trades[0]->TradeSessionId, Trades[0]->OfferRevision) && Ended(), TEXT("inactive offer action"))) return false;
 		// Cancellation has session identity, but deliberately does not depend on the offer revision.
-		auto CancelUnchanged = [&](int32 Side, uint64 SeenSession, bool bDecline = false)
+		auto CancelUnchanged = [&](int32 Side, uint64 SeenSession, int32 Intent = 0)
 		{
 			struct FCancelSnapshot
 			{
 				FMMOTradeOffer Mine, Theirs; FMMOCharacterSaveData Inventory;
 				TWeakObjectPtr<AMMOCharacter> Peer, Pending; FString Name;
-				uint64 Session; int32 Revision; float OfferTime, ChangeTime, ConfirmTime, InviteTime, LastInvite;
+				uint64 Session, Invite; int32 Revision; float OfferTime, ChangeTime, ConfirmTime, InviteTime, LastInvite;
 				bool Active, Timer;
 			} Before[2];
 			for (int32 I = 0; I < 2; ++I)
@@ -330,19 +331,20 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 				const UMMOTradeComponent* T = Trades[I]; FCancelSnapshot& S = Before[I];
 				S.Mine = T->MyOffer; S.Theirs = T->TheirOffer; S.Inventory = Snapshot(Inventories[I]);
 				S.Peer = T->Partner; S.Pending = T->PendingInviteFrom; S.Name = T->PartnerName;
-				S.Session = T->TradeSessionId; S.Revision = T->OfferRevision; S.OfferTime = T->LastOfferChangeTime;
+				S.Session = T->TradeSessionId; S.Invite = T->PendingInviteId; S.Revision = T->OfferRevision; S.OfferTime = T->LastOfferChangeTime;
 				S.ChangeTime = T->LastTradeChangeTime; S.ConfirmTime = T->LastConfirmTime;
 				S.InviteTime = T->PendingInviteTime; S.LastInvite = T->LastInviteTime; S.Active = T->bTradeActive;
 				S.Timer = World->GetTimerManager().IsTimerActive(T->ValidateTimerHandle);
 			}
-			if (bDecline) Trades[Side]->ServerDeclineInvite_Implementation();
+			if (Intent == 1) Trades[Side]->RequestDeclineInviteSeen(SeenSession);
+			else if (Intent == 2) Trades[Side]->RequestAcceptSeen(SeenSession);
 			else Trades[Side]->RequestCancelSeen(SeenSession);
 			for (int32 I = 0; I < 2; ++I)
 			{
 				const UMMOTradeComponent* T = Trades[I]; const FCancelSnapshot& S = Before[I];
 				if (!SameOffer(S.Mine, T->MyOffer) || !SameOffer(S.Theirs, T->TheirOffer) || !Equal(S.Inventory, Snapshot(Inventories[I]))
 					|| S.Peer != T->Partner || S.Pending != T->PendingInviteFrom || S.Name != T->PartnerName
-					|| S.Session != T->TradeSessionId || S.Revision != T->OfferRevision || S.OfferTime != T->LastOfferChangeTime
+					|| S.Session != T->TradeSessionId || S.Invite != T->PendingInviteId || S.Revision != T->OfferRevision || S.OfferTime != T->LastOfferChangeTime
 					|| S.ChangeTime != T->LastTradeChangeTime || S.ConfirmTime != T->LastConfirmTime
 					|| S.InviteTime != T->PendingInviteTime || S.LastInvite != T->LastInviteTime || S.Active != T->bTradeActive
 					|| S.Timer != World->GetTimerManager().IsTimerActive(T->ValidateTimerHandle)) return false;
@@ -380,8 +382,8 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 			if (!Check(Ended() && BothUnchanged(CancelA, CancelB), TEXT("current snapshot cancel wrapper"))) return false;
 		}
 		// An old active cancel arriving after completion must not erase a new pending invitation.
-		Trades[0]->PendingInviteFrom = Pawns[1]; Trades[0]->PendingInviteTime = World->GetTimeSeconds();
-		Trades[1]->PendingInviteFrom = Pawns[0]; Trades[1]->PendingInviteTime = World->GetTimeSeconds();
+		if (!Trades[0]->SetPendingInviteServer(Pawns[1]) || !Trades[1]->SetPendingInviteServer(Pawns[0]))
+		{ OutError = TEXT("pending cancel fixture setup"); return false; }
 		for (int32 Side = 0; Side < 2; ++Side)
 		{
 			if (!Check(CancelUnchanged(Side, Trades[Side]->TradeSessionId), TEXT("inactive old active cancel preserves pending invite"))) return false;
@@ -398,6 +400,50 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 			&& Trades[1]->bTradeActive && BothUnchanged(CancelA, CancelB), TEXT("broken reciprocal cancel local cleanup"))) return false;
 		Trades[1]->RequestCancelSeen(Trades[1]->TradeSessionId);
 		if (!Check(Ended() && BothUnchanged(CancelA, CancelB), TEXT("broken reciprocal peer cleanup"))) return false;
+		// Invitation identity is recipient-generated and survives accept/decline/session cleanup.
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			UMMOTradeComponent* T = Trades[Side]; AMMOCharacter* From = Pawns[1 - Side];
+			const uint64 BeforeInvite = T->PendingInviteId;
+			if (!Check(T->SetPendingInviteServer(From) && T->PendingInviteId == BeforeInvite + 1,
+				TEXT("first fresh recipient invitation generation"))) return false;
+			const uint64 OldInvite = T->PendingInviteId;
+			T->RequestDeclineInviteSeen(OldInvite);
+			if (!Check(!T->PendingInviteFrom.IsValid() && T->PendingInviteTime == -1.f && T->PendingInviteId == OldInvite
+				&& Ended() && BothUnchanged(CancelA, CancelB), TEXT("fresh decline retains generation/no transfer"))) return false;
+			if (!Check(T->SetPendingInviteServer(From) && T->PendingInviteId == OldInvite + 1,
+				TEXT("replacement invitation gets new generation"))) return false;
+			const uint64 CurrentInvite = T->PendingInviteId;
+			auto RejectInvite = [&](uint64 Seen, bool bAccept)
+			{
+				return CancelUnchanged(Side, Seen, bAccept ? 2 : 1) && T->PendingInviteFrom.Get() == From
+					&& T->PendingInviteId == CurrentInvite && Ended() && BothUnchanged(CancelA, CancelB);
+			};
+			for (uint64 Bad : {OldInvite, uint64(0), CurrentInvite + 1})
+			{
+				if (!Check(RejectInvite(Bad, false), TEXT("old/zero/future decline preserves replacement invite"))) return false;
+				if (!Check(RejectInvite(Bad, true), TEXT("old/zero/future accept preserves replacement invite"))) return false;
+			}
+			if (Side == 0) T->RequestAcceptSeen(CurrentInvite); else T->RequestAccept();
+			if (!Check(Trades[0]->bTradeActive && Trades[1]->bTradeActive && T->GetValidPartnerComp() == Trades[1 - Side]
+				&& !T->PendingInviteFrom.IsValid() && T->PendingInviteTime == -1.f && T->PendingInviteId == CurrentInvite
+				&& BothUnchanged(CancelA, CancelB), TEXT("fresh Seen/current invitation accept starts trade once"))) return false;
+			if (!Check(CancelUnchanged(Side, CurrentInvite, 1), TEXT("fresh invite decline cannot cancel active trade"))) return false;
+			if (!Check(CancelUnchanged(Side, CurrentInvite, 2), TEXT("duplicate invite accept cannot restart trade"))) return false;
+			T->RequestCancel();
+			if (!Check(Ended() && T->PendingInviteId == CurrentInvite && BothUnchanged(CancelA, CancelB),
+				TEXT("session cleanup retains recipient invite generation"))) return false;
+		}
+		const uint64 InviteBeforeOverflow = Trades[0]->PendingInviteId;
+		Trades[0]->PendingInviteId = MAX_uint64 - 1;
+		if (!Check(Trades[0]->SetPendingInviteServer(Pawns[1]) && Trades[0]->PendingInviteId == MAX_uint64,
+			TEXT("invite max generation is usable"))) return false;
+		Trades[0]->RequestCancel();
+		if (!Check(!Trades[0]->SetPendingInviteServer(Pawns[1]) && Trades[0]->PendingInviteId == MAX_uint64
+			&& !Trades[0]->PendingInviteFrom.IsValid() && Trades[0]->PendingInviteTime == -1.f,
+			TEXT("invite generation overflow fails closed"))) return false;
+		Trades[0]->PendingInviteId = InviteBeforeOverflow; // Isolate later trade-session overflow fixtures.
+		if (!AMMOPlayerController::RunTradeChatContextSelfTest(World, OutError, OutChecks)) return false;
 		// An old confirmation must not approve a different session with the same numeric revision.
 		Reset(); Gold(0, 25);
 		const int32 PreviousSessionRevision = Trades[0]->OfferRevision;

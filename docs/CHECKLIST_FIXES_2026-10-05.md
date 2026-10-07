@@ -1680,3 +1680,89 @@ owner-only teslim, bağlantının sürmesi, Canvas/input/pawn değişimi ve gene
 payload/token atomikliği PIE listesinde açık. Bekleyen davet nonce'u, reentrant
 rollback/ortak kalıcı işlem, gerçek Server/Shipping ve Lv1–30 oynanış ölçümü
 bu sınırlı düzeltmeyle tamamlanmadı.
+
+## 58. Takas daveti kimliği ve sohbet gönderim bağlamı (2026-10-07)
+
+Başlangıç HEAD `e1cf40e`; tracked temiz, .agents/.codex/AGENTS.md korundu;
+aktif yazan ajan/UE süreci yoktu. Önce eski parametresiz ret gövdesiyle native
+reproducer ve eski üretim DLL'i derlendi. Yeniden kurulmuş bekleyen davet silindi:
+**MMO_TRADE_TEST FAIL checks=165, old decline cleared replacement invite (check=166)**
+(19:03:08 UTC), UE exit0/PS exit1. Gerçek gecikmeli ağ paketi/uzak exploit yapılmadı;
+parametresiz sunucu gövdesinin eski ret niyetini yeni davetten ayıramadığı kanıtıdır.
+
+Alıcının pawn ömrü içinde artan owner-only uint64 `PendingInviteId` eklendi.
+Gerçek davet seçimi/menzil/cooldown/duplicate/takeover kapılarından sonra
+SetPendingInviteServer authority, aynı dünya ve farklı geçerli inviter ile yeni
+kimlik verir; MAX'ta yeniden kullanmadan kapalı kalır. Kimlik tüketim/oturum
+temizliğinden sonra korunur. ServerAccept/ServerDeclineInvite artık SeenInviteId
+alır; authority/aktiflik/sıfır olmayan eşleşme ret kapısı pending alanlarını
+silmeden öncedir. Mevcut kabul anındaki süre/ölüm/menzil/partner kontrolleri sürer.
+C++/Character Exec wrapper'ı yerel güncel kimliği RPC'ye gönderir. Kayıt şeması
+değişmedi; active session ve invitation generation ayrı kimliklerdir.
+
+Say ve OnChatCommitted aynı SendChatWithContext yardımcısına bağlandı. Genel
+ServerSendChat sözleşmesi metne ek gönderim anındaki pawn, inviteId ve yalnız
+aktifken sessionId taşır. /trade kabul ve iptal dalları bu Seen değerleri kullanır;
+geliş anında sunucunun güncel wrapper'ına fallback yoktur. İptal niyeti session0
+ise invitation decline, nonzero ise active cancel'dır. Pawn pointer mevcut GetPawn
+ile uyuşmadan accept/decline/cancel çalışmaz; sayısal ID yeni pawn'da çakışsa da
+eski controller mesajı yeni pawn'a yönlenmez. Normal 200 karakter/0,7 sn sohbet
+kontrolü korunur; diğer sohbet dalları metadatasını kullanmaz. RPC'nin ek kimlik/
+pawn alanları sohbet trafiği maliyetini artırır; gerçek bant ölçülmedi. Chat ve
+trade RPC imzaları değiştiğinden iki uç aynı DLL ile çalışmalıdır.
+
+Native218 = önceki182 +28 invitation +8 controller chat kontrolü. Invitation:
+iki yönde fresh generation/retention/replacement, eski/sıfır/ileri ID için
+accept+decline retleri, fresh Seen/current accept, active decline/duplicate accept
+ve session cleanup (2*13); MAX-1->MAX ve overflow ret (2). Ret helper'ı iki tarafın
+tam offer/ayna payload'ları, envanter, partner/pending/name/session/revision/
+inviteID, saatler, aktiflik/timer snapshot'ını karşılaştırır. Önceki cancel test
+kurulumları da gerçek generation seam'ini kullanır; toplam önceki182 korunur.
+
+Ek8 kontrol: ayrı üç native PC+Pawn ve gerçek nearest invite seçimi; native
+OnChatCommitted fresh decline, başka inviter ile replacement; eski chat accept,
+eski decline sonrası Say fresh accept, inactive intent active ret, wrong-pawn
+ve null context active cancel ret, Say fresh active cancel/no-transfer. Null
+context testi active geçerli session iptaliyle aksiyonel hale getirildi; duplicate
+accept tam snapshot ret helper'ını kullanır. Component testleri controller'sız,
+chat kısmı native controller'lıdır; hepsi aynı frame, dünya saati değişmez.
+Slate input/RPC taşıma veya gerçek owning-remote bağlantı çalıştırılmaz. Fixture
+kayıt yüklemez; iki karakterin kalıcı takas save kapısı bu kanıtın parçası değildir.
+
+İlk component DLL'i Succeeded ve native210 PASS; sonra controller8 eklenip DLL
+Succeeded/native218 PASS. Runner eski182 beklediği için bu ilk PASS'lerde PS1;
+runner218'e güncellendi. Test güçlendirmeleri sonrası normal DLL Succeeded ve
+**TestTrade.ps1 PASS checks=218 / exit0 (19:11:23 UTC)**. Son kaynak/runner ile
+RunAllChecks -SkipBuild -FullCompile başlatıldı; final kanıt aşağıya eklenir.
+
+Agency Unreal Multiplayer Architect/QA rehberleriyle Nietzsche salt okunur
+caller incelemesi yaptı: iki chat gönderim yolu, iki server trade dalı ve pawn
+replacement/intent sınırlarını belirledi. Parent bunları uyguladı, kod/test/build
+ve belgeleri yürüttü. Görülen bildirimle kimlik atomik değildir: gönderimdeki
+latest replicated davet kimliği yakalanır, oyuncunun daha eski sohbet satırını
+okuyup yeni kimlik replike olduktan sonra kabul yazması engellenmez. Bildirim
+kimliği/görünümü ayrı açık iştir. Metin kimlikten önce gelebilir; eski/0 kimlik
+ret edilir, güncel kimlik geldiğinde yeniden denemek gerekir. Bunlar PIE listesinde.
+
+Nietzsche son salt okunur incelemede imza/dispatch sorunu bulmadı, count218 ve
+runner/header kapsamını doğruladı. Null context cancel'ın geçerli aktif session
+ile aksiyonel testi ve duplicate accept'in tam snapshot'ı incelendi. İki sınır
+not edildi: duplicate accept boş pending durumunda guard'ın tek başına varlığını
+kanıtlamaz; chat fresh cancel yalnız active/envanteri sınar, tam partner/offer/
+timer temizliği component kontrollerindedir. Parent bunları kapsam sınırı olarak
+kaydetti; ajan son DLL/testi çalıştırmadı, sonuç doğrulaması parent'tadır. Ajan kapatıldı.
+
+Son kaynakla `RunAllChecks.ps1 -SkipBuild -FullCompile`: **36/36 GECTI, exit0**.
+18 PCH'siz /W4 dosya, toplam compiler warning C0; native Trade218 PASS.
+ValidateData/StaticLint temiz; bilinen Lv33+ beceri boşluğu ve InitGameState
+whitelist uyarıları sürer. Negatif lint15/veri14, parser312/312, JSON111 ve eski
+regresyonlar geçti. Store376 loaded376 invalid0/loadFailed0/existsMismatch0/
+jsonMismatch0, maxLevel6, writeorder1 ve roundtrip equal1. Summer53/Winter31
+mob doğumu, smoke exit0/hata0. NetSmoke1join/1welcome, server/client hata0
+(`mmo_net_server_222021.log`, `mmo_net_client_222021.log`, TEMP).
+Paket logu `mmo_all_trade_invite_final_20261007.log` (TEMP). Source/Scripts
+SHA256 listesi paket öncesi/sonrası aynı; kod/test/runner paket boyunca değişmedi.
+Belge güncellemeleri ayrıdır. Editör/UE süreçleri kapalı. Gerçek remote ownership,
+RPC/owner-only teslim, bağlantının sürmesi, Slate input/pawn replacement ve
+bildirim ile kimliğin ortak görünümü PLAYTEST_CHECKLIST'te açık. Ortak kalıcı
+işlem/reentrant rollback/Server/Shipping/Lv1–30 oynanış ölçümü tamamlanmadı.

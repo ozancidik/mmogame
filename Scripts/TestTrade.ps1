@@ -1,4 +1,4 @@
-# Controllerless same-frame server calls; this does not exercise RPC transport or persistence.
+# Same-frame component fixtures and native controller chat calls; no RPC transport or persistence.
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'MyProject.uproject'
 $exe = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
@@ -10,7 +10,7 @@ $ueArgs = @("`"$project`"", $map, '-game', '-NullRHI', '-nosound', '-unattended'
 $process = Start-Process -FilePath $exe -ArgumentList $ueArgs -PassThru -WindowStyle Hidden
 if (-not $process.WaitForExit(60000)) { $process.Kill(); Write-Output 'Trade test timeout'; exit 2 }
 if (-not (Test-Path -LiteralPath $log)) { Write-Output 'Trade test log missing'; exit 1 }
-$pass = @(Select-String -LiteralPath $log -Pattern '\[MMO_TRADE_TEST\] PASS checks=182\b')
+$pass = @(Select-String -LiteralPath $log -Pattern '\[MMO_TRADE_TEST\] PASS checks=218\b')
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_TRADE_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 if ($pass.Count -eq 1 -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $pass[0].Line

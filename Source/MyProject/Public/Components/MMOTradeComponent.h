@@ -70,6 +70,10 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_Trade)
 	uint64 TradeSessionId = 0;
 
+	// Recipient-generated owner-only invitation generation; retained after consumption.
+	UPROPERTY(ReplicatedUsing = OnRep_Trade)
+	uint64 PendingInviteId = 0;
+
 	UPROPERTY(ReplicatedUsing = OnRep_Trade, BlueprintReadOnly, Category = "MMO|Trade")
 	FMMOTradeOffer TheirOffer;
 
@@ -83,6 +87,8 @@ public:
 	// --- Sahip istemciden cagrilir (sunucuya yonlenir) ---
 	void RequestInviteNearest();
 	void RequestAccept();
+	void RequestAcceptSeen(uint64 SeenInviteId);
+	void RequestDeclineInviteSeen(uint64 SeenInviteId);
 	void RequestCancel();
 	// Active trade cancellation follows the drawn session, even if offers changed since drawing.
 	void RequestCancelSeen(uint64 SeenSessionId);
@@ -97,7 +103,7 @@ public:
 	void RequestSetGoldSeen(uint64 SeenSessionId, int32 SeenRevision, int32 NewGold);
 
 #if !UE_BUILD_SHIPPING
-	// Same-frame, controllerless server fixtures; no RPC transport or durable save proof.
+	// Same-frame server fixtures plus native controller chat calls; no transport or durable save proof.
 	static bool RunTradeSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -113,14 +119,14 @@ protected:
 	void ServerInviteNearest();
 
 	UFUNCTION(Server, Reliable)
-	void ServerAccept();
+	void ServerAccept(uint64 SeenInviteId);
 
 	UFUNCTION(Server, Reliable)
 	void ServerCancel(uint64 SeenSessionId);
 
 	// Inactive cancel intent cannot cancel a trade that started while the request was in flight.
 	UFUNCTION(Server, Reliable)
-	void ServerDeclineInvite();
+	void ServerDeclineInvite(uint64 SeenInviteId);
 
 	UFUNCTION(Server, Reliable)
 	void ServerAddItem(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId);
@@ -157,6 +163,8 @@ protected:
 	bool IsSeenOfferCurrent(uint64 SeenSessionId, int32 SeenRevision) const;
 
 	AMMOCharacter* FindNearestTradeTarget() const;
+	// Called only after invite selection/cooldown/duplicate checks; assigns a fresh recipient generation.
+	bool SetPendingInviteServer(AMMOCharacter* Inviter);
 
 	// Iki taraf icin ticareti baslatir.
 	static void StartTradeServer(AMMOCharacter* A, AMMOCharacter* B);

@@ -68,6 +68,8 @@ public:
 	bool RecordFirstBasicAttackMetric(FName TargetKind, FName TargetId, int32 TargetLevel);
 #if !UE_BUILD_SHIPPING
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	// Native controller chat bodies/owning pawn context; no network transport or Slate input.
+	static bool RunTradeChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
@@ -83,7 +85,9 @@ protected:
 #endif
 
 	UFUNCTION(Server, Reliable)
-	void ServerSendChat(const FString& Message);
+	void ServerSendChat(const FString& Message, AMMOCharacter* SeenTradePawn, uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId);
+	// Capture trade command context before the owning client sends chat, not when the server parses it.
+	void SendChatWithContext(const FString& Message);
 
 	// Sunucu tarafi sohbet spam korumasi.
 	float LastChatServerTime = -100.f;

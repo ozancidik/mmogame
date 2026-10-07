@@ -95,6 +95,7 @@ void UMMOTradeComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, TheirOffer, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, OfferRevision, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, TradeSessionId, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOTradeComponent, PendingInviteId, COND_OwnerOnly);
 }
 
 void UMMOTradeComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -203,14 +204,23 @@ void UMMOTradeComponent::RequestInviteNearest()
 
 void UMMOTradeComponent::RequestAccept()
 {
-	if (HasAuthorityInternal()) { ServerAccept_Implementation(); } else { ServerAccept(); }
+	RequestAcceptSeen(PendingInviteId);
+}
+
+void UMMOTradeComponent::RequestAcceptSeen(uint64 SeenInviteId)
+{
+	if (HasAuthorityInternal()) { ServerAccept_Implementation(SeenInviteId); } else { ServerAccept(SeenInviteId); }
+}
+
+void UMMOTradeComponent::RequestDeclineInviteSeen(uint64 SeenInviteId)
+{
+	if (HasAuthorityInternal()) { ServerDeclineInvite_Implementation(SeenInviteId); } else { ServerDeclineInvite(SeenInviteId); }
 }
 
 void UMMOTradeComponent::RequestCancel()
 {
 	if (bTradeActive) { RequestCancelSeen(TradeSessionId); }
-	else if (HasAuthorityInternal()) { ServerDeclineInvite_Implementation(); }
-	else { ServerDeclineInvite(); }
+	else { RequestDeclineInviteSeen(PendingInviteId); }
 }
 
 void UMMOTradeComponent::RequestCancelSeen(uint64 SeenSessionId)
@@ -323,14 +333,26 @@ void UMMOTradeComponent::ServerInviteNearest_Implementation()
 		NotifyOwner(TEXT("Oyuncunun bekleyen baska bir daveti var; biraz sonra tekrar dene."));
 		return;
 	}
-	TC->PendingInviteFrom = Self;
-	TC->PendingInviteTime = Now;
+	if (!TC->SetPendingInviteServer(Self)) return;
 	TC->NotifyOwner(FString::Printf(TEXT("%s seninle ticaret etmek istiyor. Kabul: /trade kabul"), *TradeNameOf(Self)));
 	NotifyOwner(FString::Printf(TEXT("%s adli oyuncuya ticaret daveti gonderildi."), *TradeNameOf(Target)));
 }
 
-void UMMOTradeComponent::ServerAccept_Implementation()
+bool UMMOTradeComponent::SetPendingInviteServer(AMMOCharacter* Inviter)
 {
+	const AMMOCharacter* Self = GetOwnerCharacter();
+	const UWorld* World = GetWorld();
+	if (!HasAuthorityInternal() || bTradeActive || !Self || !World || !Inviter || Inviter == Self
+		|| !Inviter->HasAuthority() || Inviter->GetWorld() != World || PendingInviteId == MAX_uint64) return false;
+	++PendingInviteId; // Never wrap to a previously accepted token in this recipient pawn's lifetime.
+	PendingInviteFrom = Inviter;
+	PendingInviteTime = World->GetTimeSeconds();
+	return true;
+}
+
+void UMMOTradeComponent::ServerAccept_Implementation(uint64 SeenInviteId)
+{
+	if (!HasAuthorityInternal() || bTradeActive || SeenInviteId == 0 || SeenInviteId != PendingInviteId) return;
 	AMMOCharacter* Self = GetOwnerCharacter();
 	AMMOCharacter* Inviter = PendingInviteFrom.Get();
 	const float InviteTime = PendingInviteTime;
@@ -381,9 +403,9 @@ void UMMOTradeComponent::ServerCancel_Implementation(uint64 SeenSessionId)
 	EndTradeServer(TEXT("Ticaret iptal edildi."));
 }
 
-void UMMOTradeComponent::ServerDeclineInvite_Implementation()
+void UMMOTradeComponent::ServerDeclineInvite_Implementation(uint64 SeenInviteId)
 {
-	if (!HasAuthorityInternal() || bTradeActive) return;
+	if (!HasAuthorityInternal() || bTradeActive || SeenInviteId == 0 || SeenInviteId != PendingInviteId) return;
 	PendingInviteFrom.Reset();
 	PendingInviteTime = -1.f;
 }

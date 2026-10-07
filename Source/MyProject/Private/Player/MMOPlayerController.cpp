@@ -38,6 +38,9 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Input/SEditableTextBox.h"
+#if !UE_BUILD_SHIPPING
+#include "Save/MMOCharacterSaveJson.h"
+#endif
 
 AMMOPlayerController::AMMOPlayerController()
 {
@@ -365,12 +368,92 @@ namespace
 }
 #endif
 
+#if !UE_BUILD_SHIPPING
+bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("trade chat requires server game world"); return false; }
+	AMMOPlayerController* PCs[3] = {}; AMMOCharacter* Pawns[3] = {}; UMMOTradeComponent* Trades[3] = {};
+	const bool Passed = [&]()
+	{
+		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		FMMOCharacterSaveData Before[3];
+		for (int32 I = 0; I < 3; ++I)
+		{
+			PCs[I] = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Params);
+			Pawns[I] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1500000 + I * 100, 1500000, 5000), FRotator::ZeroRotator, Params);
+			if (!PCs[I] || !Pawns[I] || !Pawns[I]->GetInventory() || !Pawns[I]->GetTradeComponent())
+			{ OutError = TEXT("trade chat fixture spawn"); return false; }
+			PCs[I]->Possess(Pawns[I]); PCs[I]->SetActorTickEnabled(false); Pawns[I]->SetActorTickEnabled(false);
+			Pawns[I]->SetActorEnableCollision(false);
+			Trades[I] = Pawns[I]->GetTradeComponent(); Pawns[I]->GetInventory()->FillSaveData(Before[I]);
+		}
+		auto Unchanged = [&]()
+		{
+			for (int32 I = 0; I < 3; ++I)
+			{
+				FMMOCharacterSaveData After; Pawns[I]->GetInventory()->FillSaveData(After);
+				TArray<FString> Differences; FMMOCharacterSaveJson::FindDifferences(Before[I], After, Differences);
+				if (!Differences.IsEmpty()) return false;
+			}
+			return true;
+		};
+		auto Check = [&](bool Value, const TCHAR* Label)
+		{
+			if (!Value) { OutError = FString::Printf(TEXT("%s (check=%d)"), Label, OutChecks + 1); return false; }
+			++OutChecks; return true;
+		};
+		auto Chat = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Invite, uint64 Session)
+		{
+			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session);
+		};
+		Trades[0]->RequestInviteNearest();
+		const uint64 Old = Trades[1]->PendingInviteId;
+		if (!Check(Old != 0 && !Trades[1]->bTradeActive && Unchanged(), TEXT("chat first real nearest invite"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/trade cancel")), ETextCommit::OnEnter);
+		Trades[2]->RequestInviteNearest(); // A different sender bypasses neither spam guard nor invite cooldown.
+		const uint64 Fresh = Trades[1]->PendingInviteId;
+		if (!Check(Fresh > Old && !Trades[1]->bTradeActive && Unchanged(), TEXT("chat committed decline then different sender invite"))) return false;
+		Chat(TEXT("/trade accept"), Pawns[1], Old, 0);
+		if (!Check(!Trades[1]->bTradeActive && Trades[1]->PendingInviteId == Fresh && Unchanged(), TEXT("chat stale accept preserves new invite"))) return false;
+		Chat(TEXT("/trade iptal"), Pawns[1], Old, 0);
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->Say(TEXT("/trade kabul"));
+		if (!Check(Trades[1]->bTradeActive && Trades[2]->bTradeActive && !Trades[0]->bTradeActive
+			&& Trades[1]->TradeSessionId == Trades[2]->TradeSessionId && Unchanged(), TEXT("chat stale decline preserved invite for fresh Say accept"))) return false;
+		const uint64 Active = Trades[1]->TradeSessionId;
+		Chat(TEXT("/trade cancel"), Pawns[1], Fresh, 0);
+		if (!Check(Trades[1]->bTradeActive && Trades[2]->bTradeActive && Trades[1]->TradeSessionId == Active && Unchanged(), TEXT("chat inactive intent cannot cancel active session"))) return false;
+		Chat(TEXT("/trade cancel"), Pawns[0], Fresh, Active);
+		if (!Check(Trades[1]->bTradeActive && Trades[2]->bTradeActive && Unchanged(), TEXT("chat wrong pawn context cannot cancel matching numeric session"))) return false;
+		Chat(TEXT("/trade cancel"), nullptr, Fresh, Active);
+		if (!Check(Trades[1]->bTradeActive && Trades[2]->bTradeActive && Unchanged(), TEXT("chat null context has no current-state fallback"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->Say(TEXT("/trade iptal"));
+		return Check(!Trades[1]->bTradeActive && !Trades[2]->bTradeActive && Unchanged(), TEXT("chat fresh Say active cancel cleans both/no transfer"));
+	}();
+	for (int32 I = 0; I < 3; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
+	return Passed;
+}
+#endif
+
 void AMMOPlayerController::Say(const FString& Message)
 {
-	ServerSendChat(Message);
+	SendChatWithContext(Message);
 }
 
-void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
+void AMMOPlayerController::SendChatWithContext(const FString& Message)
+{
+	AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn());
+	const UMMOTradeComponent* Trade = Me ? Me->GetTradeComponent() : nullptr;
+	ServerSendChat(Message, Me, Trade ? Trade->PendingInviteId : 0,
+		Trade && Trade->bTradeActive ? Trade->TradeSessionId : 0);
+}
+
+void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message, AMMOCharacter* SeenTradePawn,
+	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId)
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -484,11 +567,15 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message)
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
 		{
-			Trade->RequestAccept();
+			if (SeenTradePawn == GetPawn()) Trade->RequestAcceptSeen(SeenTradeInviteId);
 		}
 		else if (Sub.Equals(TEXT("iptal"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("cancel"), ESearchCase::IgnoreCase))
 		{
-			Trade->RequestCancel();
+			if (SeenTradePawn == GetPawn())
+			{
+				if (SeenActiveTradeSessionId != 0) Trade->RequestCancelSeen(SeenActiveTradeSessionId);
+				else Trade->RequestDeclineInviteSeen(SeenTradeInviteId);
+			}
 		}
 		else
 		{
@@ -799,7 +886,7 @@ void AMMOPlayerController::OnChatCommitted(const FText& Text, ETextCommit::Type 
 		const FString Msg = Text.ToString().TrimStartAndEnd();
 		if (!Msg.IsEmpty())
 		{
-			ServerSendChat(Msg);
+			SendChatWithContext(Msg);
 		}
 	}
 	// Enter, Esc (OnCleared) ya da odak kaybi: her durumda kutuyu kapat.

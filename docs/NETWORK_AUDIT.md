@@ -43,6 +43,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O19 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** aynı revizyonlu yeni takasta eski oturumun onayı kabul ediliyordu; onay artık sunucu oturum kimliği + görülen revizyonla doğrulanır | `UMMOTradeComponent::ServerConfirm/StartTradeServer`, `AMMOHUD::DrawTrade/HandleTradeClick` |
 | O20 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski teklif aksiyonunun altını yeni takasa yazılıyordu; add/remove/gold RPC'leri de görülen session/revision ile doğrulanır | `UMMOTradeComponent::IsSeenOfferCurrent/ServerSetGold/ServerAddItem/ServerRemoveItem`, `AMMOHUD::HandleTradeClick` |
 | O21 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski aktif takas iptali yeni takası sonlandırıyordu; cancel/X görülen session ile doğrulanır, inaktif davet reddi ayrı RPC'dir | `UMMOTradeComponent::ServerCancel/ServerDeclineInvite`, `AMMOHUD::HandleTradeClick/HandleWindowClick` |
+| O22 | ORTA | **Native UE'de yeniden üretildi ve sınırlı olarak düzeltildi, gerçek ağ/bildirim görünümü bekliyor (2026-10-07):** eski inaktif ret yeni daveti siliyordu; accept/decline davet generation'ı, sohbet ise gönderim pawn/kimlik/iptal niyetini taşır | `UMMOTradeComponent::ServerAccept/ServerDeclineInvite/SetPendingInviteServer`, `AMMOPlayerController::SendChatWithContext/ServerSendChat` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -554,7 +555,7 @@ atomik payload/token görünümü garantisi olarak yorumlanmaz.
 
 Bu §55 çalışmasında Cancel/X, add/remove ve gold RPC'leri session taşımıyordu;
 add/remove/gold sonraki O20/§56'da, aktif Cancel/X O21/§57'de düzeltildi.
-Bekleyen davet kimliği ve gerçek HUD/ağ doğrulaması açıktır. Reentrant inventory
+Görülen davet bildirimi/kimliği ve gerçek HUD/ağ doğrulaması açıktır. Reentrant inventory
 rollback, ortak kalıcı işlem, gerçek Server/Shipping ve PIE kontrolleri açık.
 Agency Unreal Multiplayer Architect/QA rehberi ve yerel UE5.7 UHT/RepLayout
 kaynak incelemesi kullanıldı. Son paket36/36 ve takas96 geçti; derleme/smoke/NetSmoke
@@ -592,7 +593,8 @@ paket geçti; 18 PCH'siz dosyada derleyici uyarısı0. Tam paket kaydı §56'da 
 Canvas/input/takas RPC taşıma çalıştırılmadı; NetSmoke bağlantı kontrolüdür.
 
 §56 sırasında Cancel/X açıktı; aktif iptal §57/O21'de session'a bağlandı.
-Bekleyen davet kabul/reddinin davet kimliği hâlâ açıktır. Genel replike
+Bekleyen davet kabul/reddine §58'de generation eklendi; görülen bildirimle ortak
+kimlik görünümü hâlâ açıktır. Genel replike
 payload/token atomikliği, reentrant rollback, ortak kalıcı işlem, Server/Shipping
 ve gerçek iki oyunculu PIE kanıtı bu sınırlı düzeltmeyle tamamlanmaz.
 
@@ -622,7 +624,39 @@ saat damgalarını, aktiflik ve timer durumunu karşılaştırır. Normal DLL ve
 182 testi geçti. Son tam paket kanıtı §57'de tutulur. Controller'sız/aynı frame;
 dünya saati değiştirilmez, gerçek RPC/Canvas veya kalıcı save kapısı çalıştırılmaz.
 
-Bekleyen davet kabul/reddi hâlâ davet nonce'u taşımaz: inaktifken gecikmiş ret
-daha yeni bekleyen daveti silebilir. Bu ayrı açık iştir. Gerçek owner-only teslim,
+§57 sırasında bekleyen davet nonce'u yoktu; §58/O22 accept/decline'a generation
+ve sohbet gönderim bağlamı ekledi. Eski görünür bildirimin yeni replike kimlikle
+kabul edilmesi ayrı açık iştir. Gerçek owner-only teslim,
 HUD input/pawn değişimi, bağlantının sürmesi, payload/token atomikliği, reentrant
 rollback, ortak kalıcı işlem ve gerçek Server/Shipping doğrulamaları açıktır.
+
+### O22 · ORTA · Bekleyen takas daveti ve sohbet bağlamı (2026-10-07)
+
+HEAD `e1cf40e` üzerinde parametresiz decline, yeniden kurulmuş pending daveti
+sildi: native FAIL165/check166, UE exit0/PS exit1. Gerçek gecikmiş paket veya
+uzak exploit çalıştırılmadı. Alıcı pawn ömründe artan owner-only uint64
+PendingInviteId tüketim/oturum temizliğinde korunur; MAX wrap reddedilir.
+Accept/decline authority/aktiflik/nonzero eşleşmesini pending temizliğinden önce
+denetler. Güncel daveti kabul ederken eski süre/canlılık/mesafe kapıları korunur.
+
+İki chat gönderimi (Say ve OnChatCommitted) artık pawn + latest inviteId +
+aktifse sessionId yakalar. ServerSendChat'in /trade accept/cancel dalları bu
+Seen değerlerini kullanır; güncel sunucu snapshot'ına fallback yapmaz. Session0
+inaktif decline niyetidir; aktif session ile iptal ayrı kalır. Seen pawn mevcut
+GetPawn ile eşleşmezse, yeni pawn'da sayısal ID aynı olsa da mutasyon olmaz.
+Sohbetin 200 karakter/0,7 sn kapısı sürer. RPC imzaları iki uçta aynı DLL ister;
+chat metadatasının ek bant maliyeti gerçek profiler ile ölçülmedi.
+
+218 native kontrol = önceki182 +28 invite +8 controller chat. Component retleri
+iki tarafın tüm offer/envanter/partner/pending/token/saat/timer snapshot'ını
+korur; iki yönde yeni generation, eski/0/ileri ret, fresh accept, duplicate,
+inaktif/aktif intent ve MAX sınırı çalıştırılır. Ayrı üç native PC+Pawn ile gerçek
+nearest invite, OnChatCommitted/Say, eski chat accept/decline, wrong/null pawn
+ve fresh cancel sınanır. Normal DLL ve doğrudan218 PASS; son tam paket §58'de.
+Slate/input, gerçek ownership/RPC/owner-only teslim veya kalıcı save kanıtı yok.
+
+Gönderimde alınan latest replicated ID, oyuncunun gördüğü eski sohbet satırının
+ID'si değildir. Davet metni ile kimlik farklı teslimlerde gelebilir; ID gelmeden
+0/eski ID reddi sonrası yeniden denemek gerekir. Eski satırı okuyup yeni ID
+replike olduktan sonra kabul yazma, bildirim ile kimliğin ortak görünümü, gerçek
+pawn replacement/ağ, reentrant rollback/ortak kalıcılık/Server/Shipping açıktır.

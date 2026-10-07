@@ -1,12 +1,12 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 7 Ekim 2026. Kaynak kod ve son tamamlanan test paketi esas alınmıştır.
-Önceki kod/test kanıtı: `ddea095`; onay ve add/remove/gold görülen session/revision'a
-bağlandı (§55/O19, §56/O20), 162 kontrol geçti. Yeni sınırlı düzeltme: eski aktif
-iptalin yeni takası bitirmesi (§57/O21). Cancel/X görülen session'ı taşır, inaktif
-davet reddi ayrı RPC'dir; teklif revizyonu aynı oturumdan çıkmayı engellemez.
-182 native kontrol geçti. Gerçek ağ/HUD, bekleyen davet kimliği ve kalıcı takas
-işlemi hâlâ açık.
+Önceki kod/test kanıtı: `e1cf40e`; aktif cancel/X görülen session'a bağlandı
+(§57/O21), 182 kontrol geçti. Yeni sınırlı düzeltme (§58/O22): accept/decline
+owner-only davet generation'ı taşır; chat gönderimde pawn/kimlik/iptal niyeti
+yakalar. Sunucu yeni pawn'a veya yeni davete eski mesajı yönlendirmez.
+218 native kontrol geçti. Gerçek ağ/HUD, eski görünür davet bildirimi ile
+güncel replike kimliğin tutarlılığı ve ortak kalıcı takas işlemi hâlâ açık.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -28,13 +28,13 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 79 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 51 arketip (13 elit), 29 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 51, Winter 34 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 53, Winter 31 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider kuralları; parti birleşmesinde lider onayı | Lider/rıza regresyonu: 10 kontrol | Çok pencerede birleşme/ayrılma, gerçek katkı ve XP paylaşımı |
-| Ticaret ve depo | Çift onay/teklif revizyonu; onay ve add/remove/gold görülen çiftle, aktif cancel/X görülen session ile doğrulanır; ayrı inaktif davet reddi; kimlikle eşya/kapasite/altın tavanı; NPC yakınlığında depo | 182 native kontrol: önceki162 +20 cancel; eski cancel yeni takasta önce FAIL145/check146; ret tam offer/envanter/partner/davet/damga/timer snapshot'ını korur | Gerçek davet/RPC/HUD; bekleyen davet nonce'u; reentrant rollback; ortak kalıcı işlem/çökme/yeniden giriş; gerçek depo RPC |
+| Ticaret ve depo | Görülen session/revision teklif/onay; session cancel/X; recipient invite generation accept/decline; chat gönderim pawn/kimlik/iptal niyeti; kimlik/kapasite/altın tavanı ve NPC depo | 218 native kontrol: önceki182 +28 invite +8 controller chat; eski decline önce FAIL165/check166; tam component ret snapshot'ı ve native Say/OnChatCommitted/endpoint kanıtı | Gerçek davet/RPC/HUD; bildirimle kimliğin ortak görünümü; reentrant rollback; ortak kalıcı işlem/çökme/yeniden giriş; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, arkadaş listesi, sohbet ve hız sınırları | Klan davetinde güncel lider yetkisi: 9 kontrol | Çevrimdışı üyelik/rıza, yeniden giriş ve çok oyunculu sosyal akış |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 370 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 376 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
@@ -72,7 +72,8 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `222fa92` | Mevcut revizyon/çift onay/ekonomik bütünlük kurallarını otomatik pakete alma; üretim kuralı değişmedi | 79 kontrol; revizyon koruması mutasyonunda FAIL12/check13; 36/36 paket, 18 PCH'siz dosya; gerçek ağ/kalıcı işlem açık |
 | `97b9f76` | Eski onayın yeni aynı-revizyon takasına taşınmasını reddetme; owner-only uint64 session ve çizilen HUD çifti | Önce FAIL80/check81, ardından96 native kontrol; normal DLL ve 36/36 paket geçti; 18 PCH'siz dosya, 0 derleyici uyarısı (§55); gerçek ağ/HUD açık |
 | `ddea095` | Add/remove/gold RPC'lerini görülen session/revision'a bağlama; çizilen gold delta'sı | Önce FAIL79/check80; DLL,162 kontrol ve 36/36 son paket geçti; 18 PCH'siz dosya/warning0 (§56); gerçek ağ/HUD açık; aktif cancel sonraki §57'de düzeltildi |
-| 7 Ekim aktif takas iptali (bu belgeyle aynı commit) | Cancel/X görülen session; teklif değişimi iptali engellemez; ayrı inaktif davet reddi | Önce FAIL145/check146; DLL,182 kontrol ve36/36 tam paket geçti; 18 PCH'siz dosya/warning0 (§57); gerçek ağ/HUD ve bekleyen davet nonce'u açık |
+| `e1cf40e` | Cancel/X görülen session; teklif değişimi iptali engellemez; ayrı inaktif davet reddi | Önce FAIL145/check146; DLL,182 kontrol ve36/36 tam paket geçti; 18 PCH'siz dosya/warning0 (§57); davet nonce'u sonraki §58'de eklendi; gerçek ağ/HUD açık |
+| 7 Ekim takas daveti/sohbet bağlamı (bu belgeyle aynı commit) | Recipient generation; gönderim pawn/kimlik/iptal niyeti; farklı pawn'a fallback yok | Önce FAIL165/check166; DLL/218 native ve36/36 tam paket geçti; 18 PCH'siz dosya/warning0 (§58); gerçek bildirim görünümü/ağ açık |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -96,15 +97,15 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 Normal Editor derlemesi ayrıca geçti. 18 dosyanın PCH olmadan /W4 derlemesinde
 derleyici uyarısı yok. Veri denetiminde Lv33+ beceri boşluğu uyarıları, StaticLint'te
 InitGameState override beyaz liste uyarısı açık. Yerel test edilen en yüksek gerçek
-kayıt seviyesi 6; 370 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
+kayıt seviyesi 6; 376 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
 Önceki stats-first fixture dahil beceri12, LLM25, skill17, temel saldırı21/8 olay,
-yeni cooldown89 ve test komutunun bayraksız reddi, takas182, parser312/312 ve tüm eski kontroller bu
-pakette geçti. Summer51/Winter34 smoke hata0; NetSmoke1join/1welcome, iki tarafta
+yeni cooldown89 ve test komutunun bayraksız reddi, takas218, parser312/312 ve tüm eski kontroller bu
+pakette geçti. Summer53/Winter31 smoke hata0; NetSmoke1join/1welcome, iki tarafta
 hata0. LLM fixture'i bellek helper'larını sınar; gerçek HTTP, dosya kalıcılığı,
 callback zamanlaması ve uzak istemci HUD'ı için kanıt değildir.
 Son parser sayısal/eksik alan korumaları da bu tam pakette geçti.
-Son paket logu `mmo_all_trade_cancel_final_20261007.log` (TEMP); NetSmoke logları
-`mmo_net_server_215329.log` / `mmo_net_client_215329.log`. Source/Scripts SHA256
+Son paket logu `mmo_all_trade_invite_final_20261007.log` (TEMP); NetSmoke logları
+`mmo_net_server_222021.log` / `mmo_net_client_222021.log`. Source/Scripts SHA256
 listesi paket öncesi/sonrası aynı; bu kaynak ve runner doğrulandı, editör kapalı.
 İlk eylemler sunucu controller ömrüne aittir; kalıcı karakterin
 ilk görevi/becerisi veya gerçek 20 dakika koşusu olarak yorumlanmaz.
@@ -132,8 +133,9 @@ başlatma bayrağı olmadan fixture oluşturmadan reddedilir. Bayrak yalnız ayr
 başlatılıp hemen kapanan test süreçleri içindir; normal editöre eklenmez,
 çünkü dünya saatini geri almak sentetik HUD yazılarını geri almaz.
 
-Takas fixture'ı iki controller'sız karakteri aynı frame içinde kullanır; gerçek
-sunucu gövdelerinde snapshot/ret ve alıcıya kimlik ayrılmasını sınar. İlk79 kontrolün
+Takas component fixture'ları iki controller'sız karakteri aynı frame içinde kullanır;
+§58 ayrıca üç native controller/pawn ile chat endpoint ve Say/OnChatCommitted'ı
+çalıştırır. Gerçek RPC taşıma/Slate input kanıtı değildir. İlk79 kontrolün
 aynasında adet/onay kontrolü vardır; §56 offer retlerinde iki taraftaki tüm
 `TheirOffer.Items` payload'ı da bağımsız snapshot karşılaştırmasına girer.
 Dünya saati değiştirilmez; kayıt yükleme ve kalıcı takas save kapısı açılmaz.
@@ -145,7 +147,11 @@ RequestConfirm ve offer wrapper'ları güncel yerel snapshot'ı, HUD ise son çi
 çifti taşır. Add/remove/gold RPC imzaları §56'da, cancel RPC imzası §57'de değişti.
 Aktif cancel/X yalnız çizilen session'ı taşır; aynı takastaki revizyon değişimi
 çıkışı engellemez. İnaktif davet reddi ayrı RPC ile aktif takastan ayrılır.
-Bekleyen davet kabul/reddi nonce taşımaz; gecikmiş ret yeni bekleyen daveti silebilir.
+§58 davet kabul/reddine generation ekledi. Chat gönderim pawn'ı mevcut sahip
+olunan pawn ile eşleşir; kimlik/iptal niyeti sunucuda yeniden seçilmez. Bildirim
+metni ile latest replicated ID birlikte atomik değildir; eski görünen satırı
+okuyup yeni ID geldikten sonra kabul yazma ayrı açık risktir. Ek chat metadata
+bant maliyeti ölçülmedi; ServerSendChat sözleşmesi de iki uçta aynı DLL gerektirir.
 
 - [Ayrıntılı düzeltme ve test kaydı](CHECKLIST_FIXES_2026-10-05.md)
 - [Oynanacak kontroller](PLAYTEST_CHECKLIST.md)
@@ -164,6 +170,11 @@ ajan kapatıldı. Parent tüm kod/test/derlemeyi yürüttü.
 §57 cancel işi için Boyle salt okunur incelemeye açıldı; kullanım sınırıyla hata
 verdi, inceleme üretemedi ve kapatıldı. Bağımsız ajan onayı yok; parent caller,
 native20 kontrol ve iki HUD dispatch dalını yerel olarak inceledi.
+§58'de Nietzsche salt okunur Unreal Multiplayer Architect/QA caller incelemesi
+yaptı: iki gönderim, iki server trade dalı, pawn replacement ve latest/drawn
+ayrımı uygulandı. Parent native controller testini ve kod/test/build'i yürüttü.
+Son inceleme count218 ve imza/dispatch'i doğruladı; iki test kapsam sınırı §58'de
+kaydedildi. Ajan build/test çalıştırmadı; kapatıldı.
 Son cooldown işinde Archimedes paralel ajanı Unreal Multiplayer Architect
 rolüyle ortak kapı/eşik/ret damgalarını salt okunur inceledi; sentetik HUD zamanı
 riski için disposable süreç başlatma koruması eklendi ve guard/PS tekrar incelendi.

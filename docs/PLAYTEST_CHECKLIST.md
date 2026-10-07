@@ -4261,7 +4261,8 @@ oyuncu kayıt kalıcılığı veya remote bağlantının sürmesini çalıştır
   MMOTradeGold güncel yerel snapshot semantiğini korumalı. Host ve uzak istemci
   aynı güncel teklifi görmeli. Owner-only gizlilik ve büyük uint64 taşımasını ölç.
 - [ ] Cancel düğmesi/X §57'de session'a bağlandı; aşağıdaki gerçek input/ağ adımlarını
-  çalıştır. Bekleyen davet kabul/reddi hâlâ davet kimliği taşımaz; ayrı araştırılmalı.
+  çalıştır. Bekleyen davet kabul/reddi §58'de gönderim kimliğine bağlandı;
+  aşağıdaki gerçek sohbet/bildirim kontrolleri ayrıca çalıştırılmalı.
   Crash/iki kayıt atomikliği/reentrant rollback önceki açık maddelerdir.
 
 ## 2026-10-07 — Aktif takas iptalini görülen oturuma bağlama (PIE açık)
@@ -4286,5 +4287,32 @@ Reliable taşıma/ownership, uzak bağlantı veya iki kalıcı kayıt kanıtı d
   geldikten sonra ulaşsın: bekleyen daveti silmemeli. Normal inaktif iptal yalnız
   kendi davetini reddetmeli; owner-only redraw iki tarafta kontrol edilmeli.
 - [ ] Daha yeni bekleyen davete gecikmiş inaktif ret/kabul ulaşmasını ayrıca
-  araştır: bekleyen davet nonce'u bu düzeltmede eklenmedi. Payload/token atomikliği,
+  araştır: davet generation'ı sonraki §58'de eklendi; gerçek ağ ve eski görünür
+  bildirim/yeni replike kimlik sınırı aşağıda açık. Payload/token atomikliği,
   gerçek RPC kayıp/gecikmesi ve kalıcı takas/rollback testleri açık kalır.
+
+## 2026-10-07 — Takas daveti ve sohbet gönderim kimliği (PIE açık)
+
+Native218 (önceki182 +28 invite +8 controller chat) ve normal Editor DLL geçti.
+Ek chat testleri üç native controller/pawn, aynı frame ile endpoint ve Say/
+OnChatCommitted gövdelerini çağırır. Slate klavye/Enter, gerçek remote RPC,
+owner-only teslim, paket sırası veya kalıcı oyuncu kaydı doğrulanmadı.
+
+- [ ] İki/üç oyuncu aynı DLL: ilk daveti reddet, farklı oyuncudan yeni davet al;
+  ilk kimlikle gecikmiş accept/decline gönder. Yeni davet ve iki tarafın envanteri
+  korunmalı. Güncel kimlikle kabul doğru davetçiyle tek takas açmalı; tekrar kabul
+  aktif takası değiştirmemeli. MMOTradeAccept/Cancel console ve chat Say/Enter yollarını dene.
+- [ ] /trade iptal inaktifken gönderilip aktif takas başladıktan sonra gelsin:
+  aktif takası bitirmemeli. Aktif iptal yoldayken takas bitip yeni davet gelsin:
+  daveti silmemeli. Güncel aktif session iptali iki pencereyi/timer'ı temizlemeli.
+- [ ] Sohbet gönderimi ile teslim arasına respawn/pawn replacement/bölge geçişi
+  koy. Yeni pawn aynı sayısal invite/session'a ulaşsa bile eski pawn bağlamı yeni
+  takası değiştirmemeli. Null/geçersiz pawn yeni snapshot'a fallback yapmamalı.
+  Native test yalnız farklı/null actor bağlamını kurar, gerçek possession geçişi değildir.
+- [ ] Bildirim metni inviteId replikasyonundan önce gelsin: eski/0 ID reddi sonrası
+  güncel kimlik gelince tekrar kabul çalışmalı; bağlantı sürmeli. Owner-only ID
+  yalnız alıcısına ulaşmalı. Yeni RPC alanlarının chat bant maliyetini profiler ile ölç.
+- [ ] Eski davet sohbet satırını açık tut, yeni ID replike olsun ve ardından kabul
+  yaz: gönderim latest snapshot'ı kullanır. Görülen eski satıra bağlanmış davet
+  kimliği bu düzeltmede yoktur; bu ayrı görünüm/UX riski açık kaydedilmeli.
+  Genel/parti/klan/fısıltı metni, 200 karakter ve 0,7 sn sınırlaması ayrıca doğrulanmalı.
