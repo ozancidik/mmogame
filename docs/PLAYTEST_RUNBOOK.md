@@ -158,3 +158,26 @@ Gerçek 20 dk koşu, uzak istemci reddi, hub, seamless travel ve reconnect PIE'd
 Geçersiz first marker saatleri gözlem süresine eklenmez; hata sayısı raporda
 kalır. Native test logları aynı parser ile who/saat/payload yönünden ayrıca
 doğrulanır. Sentetik bozuk log gerçek oyun koşusu sayılmaz.
+
+## İlk kabul edilen temel saldırı (7 Ekim 2026)
+
+`first_basic_attack` normal `AttackTarget` sunucu dalında bütün ölüm/cooldown/
+hedef/menzil/PvP/parti/klan/hub/doğum koruması kapılarından sonra, `ApplyDamage`
+öncesinde yazılır. Alanlar `target=mob|player targetid=<arketip|Player> tlv=<hedef
+seviyesi>`; `lv` saldıranın hasar ve XP öncesi seviyesidir. Oyuncu hedefinin adı
+yazılmaz. Bu kabul edilen saldırı ölçümüdür; ilk pozitif hasar, mouse tıklaması,
+animasyon başlangıcı veya beceri kullanımı değildir. Geçersiz/ölü hedefin mevcut
+en yakın canlı moba dönüşü başarılı olursa gerçek seçilen mob kaydedilir.
+
+Mevcut controller `sid/start/elapsed` kapsamında yalnız bir kez yazılır;
+pawn değişimi ve controller aktarımı sıfırlamaz, yeni controller yeni oturumdur.
+Kalıcı karakterin ilk vuruşu değildir. C++/debug üzerinden kabul edilen saldırı
+da sayılır; controllerless saldırı sayılmaz. Shipping'de bu yeni hook kapalıdır.
+Temel saldırı ve beceri birbirinden ayrı ilk olaylardır; kill/XP/altın/görev
+toplamını artırmazlar. Eski veya eksik logda `sure=?`; hiç saldırılmadığı sonucunu
+vermeyin. Dört sınıfın temel saldırısı halen mevcut ortak yakın vuruş yoludur;
+bu değişiklik okçu/büyücüye yeni menzil veya oyun kuralı eklemez.
+
+`TestFirstBasicAttack.ps1`: izole native dört sınıf, PvP, nearest fallback,
+öldürücü vuruş/XP öncesi seviye ve ret kapıları; log ayrıca ortak parser'dan geçer.
+Gerçek uzak RPC, kullanıcı giriş süresi, seamless travel ve 20 dk koşu PIE'de açık.

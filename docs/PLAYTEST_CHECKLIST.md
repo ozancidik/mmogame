@@ -4114,3 +4114,35 @@ yönünden de doğrulandı; sentetik parser testleri 150/150 geçti.
   ilk beceri. Gerçek süreyi 20 dk koşuda ölç, fixture sürelerini kullanma.
 - [ ] Eski logda eksik first_skill `sure=?`; parser `--who` ve tüm ilk eylemler
   gerçek logda eşleşmeli. Ayrı istemci loglarının yokluğu sunucu kanıtı değildir.
+
+## 2026-10-07 — İlk kabul edilen temel saldırı (PIE açık)
+
+`TestFirstBasicAttack.ps1`: 21 izole native UE kontrolü, sekiz controller/sekiz
+gerçek `first_basic_attack`. Dört sınıf, ilk başarılı native server çağrısı,
+pozitif hasar şartı olmayan sıfır hasarlı kabul, PvP, en yakın moba dönüş,
+öldürücü vuruşla tam 200 XP (Lv2, kalan XP100); on ret kapısı, tekrar vuruş/cooldown, controllerless
+saldırı kapsamı. Altı controller oturum kontrolü pawn/aktarım/yeni sid için
+genişletildi. Native loglar ortak parser'dan geçti; sentetik parser 312/312
+assert. Bunlar gerçek kullanıcı girdisi veya ağ RPC teslimi değildir. Sınıf
+kurulumu/sahiplenme statları yeniden hesapladığı için fixture sabit saldırı
+gücünü bundan sonra kurar; oyun denge hatası olarak yorumlanmaz.
+
+- [ ] Host ve uzak istemcide dört sınıfla normal saldır: sunucu onayında bir
+  `first_basic_attack`; target mob/player, gerçek arketip veya literal Player,
+  hedef seviyesi ve saldıranın XP öncesi seviyesi doğru olmalı. Client logu,
+  animasyon veya input zamanı sunucu kabul zamanı yerine kullanılmamalı.
+- [ ] Önce ölü/cooldown/hedefsiz/menzil dışı/hub reddini dene; ilk olay çıkmamalı.
+  Geçersiz veya ölü seçili hedef canlı en yakın moba dönerse kabul edilen gerçek
+  hedef ölçülmeli. Ret kapısı ilk olay süresini erkenden kaydetmemeli.
+- [ ] İki oyuncuda PvP kapalı, aynı parti/klan, hedef hub'da ve doğum koruması
+  durumlarını dene. Reddedilen vuruş ölçüm olmamalı; serbest PvP vuruşunda
+  `targetid=Player` olmalı, hedef oyuncunun görünen adı yazılmamalı.
+- [ ] İlk normal vuruş öldürücü olsun ve seviye artırsın: first_basic_attack
+  eski lv ile first_kill/kill/levelup öncesinde; sayaçlar iki katına çıkmamalı.
+  İlk beceri ayrı first_skill olmalı, basic_attack yerine geçmemeli.
+- [ ] Otomatik saldırı/uzun basma, gecikmeli çift RPC, respawn/pawn değişimi ve
+  gerçek Summer→Winter aktarımı: aynı controller sid'de yalnız ilk kayıt.
+  Reconnect/yeni controller'da yeni sid; eski karakterin ömürlük ilki sayılmaz.
+- [ ] 20 dk sınıf koşusunda gerçek süreyi ölç; eksik eski log `sure=?` olmalı.
+  Kabul edilen saldırı pozitif hasarı kanıtlamaz; görsel sayı, HP ve kullanıcı
+  girdisi gecikmesi ayrıca doğrulanmalı. Native süreler oyuncu süresi değildir.

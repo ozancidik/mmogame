@@ -1277,3 +1277,87 @@ Winter31 doğum smoke hata0; NetSmoke1join/1welcome, server/client hata0 (bağla
 Tüm eski regresyonlar da geçti. Kaynak bu son tam paket sırasında değiştirilmedi.
 Lv33+ beceri boşluğu ve InitGameState lint uyarısı, gerçek PIE/RPC ve kaynak
 motorla Server/Shipping hedefleri açık. Proje iskeleti ve runbook güncellendi.
+
+## 52. İlk kabul edilen temel saldırıyı hasar/XP öncesi ölçme (2026-10-07)
+
+Lv1–30 §3.1 telemetrisi: `AttackTarget` otorite dalında ölüm, cooldown,
+hedef/menzil, PvP, parti/klan, hub ve doğum koruması geçtikten sonra, hasar
+çağrısından önce `RecordFirstBasicAttackMetric` yazılır. `target=mob|player`,
+`targetid=<arketip|Player>`, `tlv=<hedef seviyesi>`; saldıranın `lv`si XP
+öncesidir. Hedef oyuncunun adı eklenmez. Kabul edilen temel saldırı ölçümüdür,
+pozitif hasar veya input/animasyon zamanı değildir. Null/ölü hedefin mevcut en
+yakın canlı moba dönüşü kabul edilirse gerçek mob yazılır. Shipping hook kapalı;
+yeni RPC, replike alan, kayıt şeması veya oyun kuralı değişmedi.
+
+Ortak controller GUID/start/tekillik kümesi kullanıldı. Pawn değişimi ve
+controller aktarımı ilk olayı tekrar üretmez, yeni controller yeni sid'dir.
+Wrapper payload ve canlı pawn doğrular, ortak katman authority/player-controlled
+pawn ister. Altı oturum kontrolü genişletildi: iki gerçek wrapper kaydı ve
+pawn/aktarım/yeni sid; bu wrapper testi saldırı kuralı veya gerçek travel değildir.
+
+`MMOTestFirstBasicAttack` / `TestFirstBasicAttack.ps1`: **21 kontrol PASS**,
+sekiz controller/sekiz gerçek hook olayı; dört sınıfın ortak normal yakın vuruşu,
+PvP, en yakın mob fallback'i ve ilk öldürücü vuruşta tam 200 XP (Lv2, kalan XP100). On ret kapısı
+olaydan önce sınandı: ölü, cooldown, hedefsiz, kendisi, uzak, PvP kapalı, parti,
+klan, doğum koruması ve saldıranın hub'da olması. Native ServerAttackTarget
+cooldown çağrısı hasarı tekrarlamadı; cooldown temizlendikten sonra ikinci gerçek
+vuruş hasar verdi ama ilk olay tekrar etmedi. Controllerless vuruş davranışı
+korundu ve ilk olay sayılmadı. PS metadata/sid/ret sonrası sıra, öldürücü olayın
+first_kill öncesi sırasını ve kill xp=200 payload'ını kontrol eder; sekiz gerçek log ve iki oturum logu ortak
+parser ile who/saat/payload yönünden kabul edilmek zorundadır.
+
+İlk fixture denemeleri sınıf kurulumu ve Possess'in türetilmiş saldırı gücünü
+yeniden hesaplaması nedeniyle checks10 ve checks16'da KALDI. Fixture sabit
+AttackPower=10'u bu kurulumlardan sonra ayarlar; üretim savaş kodu düzeltilmedi,
+denge veya PvP bug'ı olarak raporlanmaz. Tüm aktörler uzak alanda, çarpışma/AI
+kapalı, aynı frame içinde kurulur/yıkılır; controller önce unpossess, gerçek
+oyuncu dosyası ve gecikmiş load/save timer'ı kullanılmaz. PvP kuralı eski değerine
+geri alınır. Gerçek RPC/PIE veya gerçek sınıf öğrenme akışı kanıtı değildir.
+
+Negatif metadata deneyi: yalnız hook hedef seviyesi geçici +1 yapıldı, Editor
+DLL derlendi. Native bellek testi 20 PASS ve yedi olay olsa da PS **exit1** ile
+hatalı hedef seviyesini yakaladı. Exact bytes finally geri alındı, doğru DLL
+tekrar derlendi, aynı doğrudan test yedi parser kabulü/20 kontrolle PASS oldu.
+
+Agency QA rehberiyle Ptolemy paralel ajanı yalnız parser/test/yeni fixture/yeni
+log validator dosyalarını yazdı; parent Unreal Systems rehberiyle C++/PS/docs
+entegrasyonunu yürüttü. `FIRST_ACTIONS` yeni basic_attack türünü içerir;
+hedef türü, anonim Player kimliği ve sonlu pozitif tam sayı hedef seviyesi
+kontrolü vardır. Tekillik, eski logda bilinmeyen süre ve geçersiz ilk olayın
+seviye süresine etkisizliği korunur. 39 sentetik olay: 34 temel saldırı marker'ı,
+6 kabul/2 tekrar/26 geçersiz; dört sınıf, payload/clock/kimlik/CLI ve native
+validator negatifleri. Yerel UE Python **312/312 assert PASS**. Normal kill/XP/
+altın/görev toplamları artırılmaz. Gerçek 20 dk koşu, host/uzak input/RPC, hedefin
+hub'da olduğu gerçek PvP, görsel hasar, respawn/travel/reconnect açık kutularla
+PLAYTEST_CHECKLIST'e eklendi; runbook ve dikey dilim planı güncellendi.
+
+QA review'u hook/session hatası bulmadı; üç kanıt boşluğu giderildi. Öldürücü
+fixture artık yalnız Level>1 değil, Level2/Experience100 ve first_kill xp=200
+ister. Archer'ın ilk başarılı saldırısı native ServerAttackTarget implementation
+üzerinden gelir (gerçek ağ taşınması değildir). Sekizinci controller'da saldırı
+gücü0 ile saldırı kabul edilir, hedef HP değişmez ve ilk olay yine yazılmalıdır.
+İlk tamamlanan paket 34/34, 16 PCH'siz dosya0 uyarı, parser312/312 idi; bu ek
+kontrollerden sonra normal Editor DLL yeniden derlenip doğrudan 21 kontrol/
+sekiz parser kabulüyle PASS oldu. İlk kayıt öncesi controller aktarımı ayrıca
+sınanmadı; mevcut fixture aktarımı kayıt sonrasında sınar.
+
+Sıfır hasar negatif deneyi: hook geçici AttackPower>0 filtresiyle derlendi.
+Native 21 bellek kontrolü PASS olmasına rağmen yalnız yedi olay yazıldı; PS
+sekiz olay sözleşmesi nedeniyle exit1 verdi. Exact bytes finally geri alındı,
+doğru DLL yeniden derlendi, doğrudan21/sekiz olay PASS. Gerçek log kopyasında
+who silme ve elapsed=9999 da ortak parser validator'da exit1 verdi; oyuncu
+kayıtları bu negatiflerde değiştirilmedi. Ptolemy son C++/PS eklerini salt okunur
+inceledi, yeni bulgu bildirmedi. Final tam paket bu kaynakla yeniden çalıştırıldı.
+
+Son kaynakla `RunAllChecks.ps1 -SkipBuild -FullCompile`: **34/34 GECTI**,
+16 PCH'siz /W4 dosya ve compiler warning0. Normal Editor derlemesi ayrıca
+Succeeded. BasicAttack21/8 gerçek parser kabulü, oturum6/2 kabul, skill17/7 kabul,
+parser312/312 ve tüm eski regresyonlar geçti. JSON111 negatif; store322/loaded322,
+invalid0/loadFailed0/existsMismatch0/jsonMismatch0/maxLevel6; writeorder1,
+roundtrip equal1. Summer49/Winter32 mob doğumu smoke hata0; NetSmoke1join /
+1welcome, server/client hata0 (yalnız bağlantı). Kaynak bu son paket sırasında
+değişmedi. Gerçek logun xp200 pozitif kontrolüyle aynı PS metadata bloğu geçti;
+xp201 yapılan ayrı kopyada aynı blok false verdi. Kaynak ve oyuncu kayıtları
+bu log denemesinde değiştirilmedi. Lv33+ beceri boşlukları, InitGameState lint
+uyarısı, gerçek PIE/RPC ve kaynak motorla Server/Shipping hedefleri açık.
+Proje iskeleti tablosu son sonuçlarla güncellendi.

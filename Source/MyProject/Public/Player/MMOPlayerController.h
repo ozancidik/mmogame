@@ -64,6 +64,8 @@ public:
 	bool RecordFirstEquipMetric(FName ItemId, int32 InstanceId, int32 Slot);
 	// Accepted authoritative cast after mana payment, before effects; not first damage.
 	bool RecordFirstSkillMetric(FName SkillId);
+	// Accepted authoritative basic attack before damage/XP; not a damage or input counter.
+	bool RecordFirstBasicAttackMetric(FName TargetKind, FName TargetId, int32 TargetLevel);
 #if !UE_BUILD_SHIPPING
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif

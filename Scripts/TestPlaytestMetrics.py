@@ -20,6 +20,7 @@ LOOT_FIXTURE = os.path.join(HERE, "fixtures", "first_loot_metrics_sample.log")
 KILL_FIXTURE = os.path.join(HERE, "fixtures", "first_kill_metrics_sample.log")
 EQUIP_FIXTURE = os.path.join(HERE, "fixtures", "first_equip_metrics_sample.log")
 SKILL_FIXTURE = os.path.join(HERE, "fixtures", "first_skill_metrics_sample.log")
+BASIC_ATTACK_FIXTURE = os.path.join(HERE, "fixtures", "first_basic_attack_metrics_sample.log")
 
 failures = []
 assertions = 0
@@ -44,6 +45,24 @@ def run_main(mod, argv):
     with contextlib.redirect_stdout(buf):
         code = mod.main(argv)
     return code, buf.getvalue()
+
+
+def run_attack_validator(pm, raw, expected):
+    validator = load(os.path.join(HERE, "ValidateFirstBasicAttackLog.py"))
+    validator.metrics = pm
+    with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as fh:
+        fh.write(raw)
+        path = fh.name
+    previous_argv = sys.argv
+    buf = io.StringIO()
+    try:
+        sys.argv = ["ValidateFirstBasicAttackLog.py", path, "--events", str(expected)]
+        with contextlib.redirect_stdout(buf):
+            code = validator.main()
+        return code, buf.getvalue()
+    finally:
+        sys.argv = previous_argv
+        os.unlink(path)
 
 
 def main(argv):
@@ -318,6 +337,148 @@ def main(argv):
     check(code == 0 and "first_skill sure=?" in out and "first_* suresi bilinmiyor" in out
           and "Oyuncu: Ozan" not in out, "eski marker olmayan logda --who ve eksik first_skill suresi")
 
+    attack_events = pm.parse_log(BASIC_ATTACK_FIXTURE)
+    check(len(attack_events) == 39, "first basic attack fixture: 39 olay")
+    check("first_basic_attack" in pm.FIRST_ACTIONS, "first_basic_attack ilk eylemler listesinde olmali")
+    attacks = pm.build_stats(attack_events)
+    check(sorted(attacks) == ["Archer", "Bad", "Mage", "Priest", "Warrior"],
+          "attack fixture dort sinif ve bozuk payload oyuncusu")
+    attack_warrior = attacks["Warrior"]
+    first_attack = attack_warrior["first_actions"]["a" * 32]["first_basic_attack"]
+    check(first_attack == {"seconds": 8, "lv": 1, "target": "mob", "targetid": "Goblin", "tlv": 1},
+          "ilk mob attack payload/sure korunmali")
+    check(attack_warrior["first_duplicates"] == 1 and attack_warrior["first_invalid"] == 0,
+          "sid harf buyuklugu tekrar payload'unu degistirmemeli")
+    check(attack_warrior["first_actions"]["b" * 32]["first_basic_attack"] == {
+        "seconds": 5, "lv": 4, "target": "player", "targetid": "Player", "tlv": 20},
+          "yeni kontrolcu player hedefi anonim literal Player olmali")
+    check(attack_warrior["first_actions"]["a" * 32]["first_skill"]["skill"] == "War_PowerStrike",
+          "ayni oyuncu/sid skill ve basic attack birbirini engellememeli")
+    check(attacks["Archer"]["first_actions"]["a" * 32]["first_basic_attack"] == {
+        "seconds": 10, "lv": 5, "target": "mob", "targetid": "Future_RuntimeMob-42", "tlv": 9}
+          and attacks["Archer"]["first_duplicates"] == 1,
+          "ayni sid farkli oyuncu ve arbitrary mob ID kabul edilmeli; tekrar sayilmali")
+    check(attacks["Mage"]["first_actions"]["a" * 32]["first_basic_attack"]["target"] == "player"
+          and attacks["Priest"]["first_actions"]["a" * 32]["first_basic_attack"]["targetid"] == "Wolf",
+          "mage player ve priest mob hedefi kabul edilmeli")
+    check(attacks["Priest"]["first_actions"]["b" * 32]["first_basic_attack"]["seconds"] == 0,
+          "acik clock ile sifir elapsed gecerli olmali")
+    attack_samples = [a["first_basic_attack"] for p in attacks.values() for a in p["first_actions"].values()
+                      if "first_basic_attack" in a]
+    check(len(attack_samples) == 6 and {s["target"] for s in attack_samples} == {"mob", "player"},
+          "6 ilk basic attack, iki hedef tipi")
+    check(attacks["Bad"]["first_invalid"] == 26 and attacks["Bad"]["first_duplicates"] == 0
+          and attacks["Bad"]["first_actions"] == {} and not attacks["Bad"]["timing_started"]
+          and attacks["Bad"]["first_t"] == attacks["Bad"]["last_t"] == 0,
+          "26 bozuk attack payload/clock reddi gozlem saatini baslatmamali")
+    for index, bad_attack in enumerate(e for e in attack_events if e["who"] == "Bad"):
+        rejected = pm.build_stats([bad_attack])["Bad"]
+        check(rejected["first_invalid"] == 1 and rejected["first_actions"] == {}
+              and not rejected["timing_started"], "attack fixture bozuk satir #%d" % (index + 1))
+
+    attack_base = pm.build_stats([e for e in attack_events if e["ev"] not in pm.FIRST_ACTIONS])["Warrior"]
+    for key in ("level", "lv", "src", "mobs", "quests", "quest_start", "pending"):
+        check(attack_warrior[key] == attack_base[key], "first attack gameplay sayaclarini artirmamali: " + key)
+    for who in ("Archer", "Mage", "Priest", "Bad"):
+        check(attacks[who]["lv"] == {} and attacks[who]["quests"] == {} and attacks[who]["src"] == {}
+              and attacks[who]["mobs"] == {} and attacks[who]["level"] is None,
+              "yalniz attack marker gameplay sayaci olusturmamali: " + who)
+
+    valid_attack = next(e for e in attack_events if e["ev"] == "first_basic_attack")
+    malformed_attack = [
+        ("target", None), ("target", ""), ("target", "None"), ("target", "npc"), ("target", "Mob"),
+        ("targetid", None), ("targetid", ""), ("targetid", "None"),
+        ("tlv", None), ("tlv", ""), ("tlv", "0"), ("tlv", "-1"), ("tlv", "1.5"),
+        ("tlv", "NaN"), ("tlv", "Inf"), ("tlv", "-Inf"), ("tlv", "bad"),
+    ]
+    for field, value in malformed_common + malformed_attack:
+        bad_attack = dict(valid_attack)
+        if value is None:
+            bad_attack.pop(field)
+        else:
+            bad_attack[field] = value
+        rejected = pm.build_stats([bad_attack])["Warrior"]
+        check(rejected["first_invalid"] == 1 and rejected["first_actions"] == {}
+              and not rejected["timing_started"], "attack sid/scope/clock/level/payload reddi: %s=%s" % (field, value))
+        recovered = pm.build_stats([bad_attack, valid_attack])["Warrior"]
+        check(recovered["first_invalid"] == 1 and recovered["first_duplicates"] == 0
+              and recovered["first_actions"]["a" * 32]["first_basic_attack"] == first_attack,
+              "bozuk attack ilk gecerli attack'i engellememeli: %s=%s" % (field, value))
+    for identity in ("Display_Name", "Goblin", "player", "None", ""):
+        bad_player = dict(valid_attack, target="player", targetid=identity)
+        check(pm.build_stats([bad_player])["Warrior"]["first_invalid"] == 1,
+              "player hedefi display identity kabul etmemeli: " + identity)
+    for mob_id in ("Future_RuntimeMob-42", "Player", "Bilinmeyen_çete"):
+        probe = dict(valid_attack, targetid=mob_id, tlv="1000")
+        check(pm.build_stats([probe])["Warrior"]["first_actions"]["a" * 32]["first_basic_attack"]["targetid"] == mob_id,
+              "parser mob DB listesi veya display adi varsaymamali: " + mob_id)
+    for elapsed, accepted in (("8.009", True), ("8.011", False)):
+        probe = dict(valid_attack, elapsed=elapsed)
+        result = pm.build_stats([probe])["Warrior"]
+        check(bool(result["first_actions"]) == accepted, "attack inherited 0.01 clock toleransi: " + elapsed)
+
+    # Payload is invalid while the clock itself is consistent: it must never
+    # extend observation duration, whether it arrives before or after gameplay.
+    bad_clock_attack = dict(valid_attack, who="Clock", target="player", targetid="Display_Name",
+                            t="1000", start="0", elapsed="1000")
+    for sequence in ([bad_clock_attack] + clock_base, clock_base + [bad_clock_attack]):
+        result = pm.build_stats(sequence)["Clock"]
+        check(result["first_invalid"] == 1 and result["first_t"] == clock_reference["first_t"]
+              and result["last_t"] == clock_reference["last_t"] and result["dur"] == clock_reference["dur"],
+              "invalid basic attack payload must not affect inherited level duration")
+
+    code, out = run_main(pm, ["x", BASIC_ATTACK_FIXTURE, "--who", "Warrior"])
+    check(code == 0 and "Olay sayisi: 39 (levelup=0 kill=1 death=0 gold=1)" in out
+          and "quest_accept=1 quest_claim=1" in out, "attack CLI gameplay olay sayilari artmamali")
+    check("first_basic_attack sure=0:08 lv=1 target=mob targetid=Goblin tlv=1" in out
+          and "first_basic_attack sure=0:05 lv=4 target=player targetid=Player tlv=20" in out
+          and "gecersiz=0 tekrar=1" in out, "attack hedef/seviye/sure ve tekrar detay raporu")
+    check(all("Oyuncu: " + who not in out for who in ("Archer", "Mage", "Priest", "Bad")),
+          "attack --who filtresi")
+    code, out = run_main(pm, ["x", BASIC_ATTACK_FIXTURE, "--who", "Bad"])
+    check(code == 0 and "gecersiz=26 tekrar=0" in out and "first_basic_attack sure=?" in out,
+          "invalid/legacy clocks attack suresi bilinmez")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check(code == 0 and out.count("first_basic_attack sure=?") == 2,
+          "eski first-action logunun iki sid'sinde basic attack suresi bilinmez")
+    code, out = run_main(pm, ["x", FIXTURE, "--who", "Istemci"])
+    check(code == 0 and "first_basic_attack sure=?" in out and "first_* suresi bilinmiyor" in out,
+          "eski logda first basic attack clock uydurulmamali")
+
+    def marker(event):
+        return "[MMOMETRIC] " + " ".join("%s=%s" % item for item in event.items()) + "\n"
+
+    # Exercise the native validator's full-acceptance contract through the same parser.
+    accepted_events = []
+    seen = set()
+    for event in attack_events:
+        if event["ev"] != "first_basic_attack" or event["who"] == "Bad":
+            continue
+        key = (event["who"], event["sid"].lower())
+        if key not in seen:
+            accepted_events.append(event)
+            seen.add(key)
+    native_raw = "".join(marker(e) for e in accepted_events)
+    code, out = run_attack_validator(pm, native_raw, 6)
+    check(code == 0 and "PASS events=6 who/clock/payload accepted" in out,
+          "native validator full acceptance: 6 attack markers")
+    for label, raw, count in (
+        ("expected count", native_raw, 7),
+        ("duplicate", native_raw + marker(valid_attack), 7),
+        ("player display identity", marker(dict(valid_attack, target="player", targetid="Display_Name")), 1),
+        ("invalid clock", marker(dict(valid_attack, elapsed="7")), 1),
+        ("missing clocks", marker({k: v for k, v in valid_attack.items() if k not in ("t", "start", "elapsed")}), 1),
+        ("missing who", marker({k: v for k, v in valid_attack.items() if k != "who"}), 1),
+        ("empty who", marker(dict(valid_attack, who="")), 1),
+        ("None who", marker(dict(valid_attack, who="None")), 1),
+    ):
+        code, out = run_attack_validator(pm, raw, count)
+        check(code == 1 and "PARSER_TEST] FAIL" in out, "native validator rejects " + label)
+    reordered = {k: v for k, v in valid_attack.items() if k != "ev"}
+    reordered["ev"] = "first_basic_attack"
+    code, out = run_attack_validator(pm, marker(reordered), 1)
+    check(code == 0 and "PASS events=1" in out, "native raw count accepts event token at line end")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -334,7 +495,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay; skill: %d olay; asserts: %d/%d)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events), len(skill_events), assertions - len(failures), assertions))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay; skill: %d olay; basic_attack: %d olay; asserts: %d/%d)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events), len(skill_events), len(attack_events), assertions - len(failures), assertions))
     return 0
 
 

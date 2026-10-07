@@ -1,0 +1,41 @@
+# Synthetic basic attacks: all four classes, arbitrary mob IDs and anonymous Player targets.
+# Duplicate payloads must preserve the first event; invalid payloads/clocks never start observation timing.
+[MMOMETRIC] t=1 ev=kill who=Warrior lv=1 mob=Goblin mlv=1 xp=25 party=0 elite=0
+[MMOMETRIC] t=2 ev=gold who=Warrior src=loot amount=3 balance=3
+[MMOMETRIC] t=3 ev=quest_accept who=Warrior lv=1 quest=Q_Goblins
+[MMOMETRIC] t=4 ev=quest_claim who=Warrior lv=1 to=1 quest=Q_Goblins xp_reward=200 capped=0
+[MMOMETRIC] t=8 ev=first_basic_attack who=Warrior lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=15 ev=first_basic_attack who=Warrior lv=4 target=player targetid=Player tlv=20 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=12 ev=first_basic_attack who=Archer lv=5 target=mob targetid=Future_RuntimeMob-42 tlv=9 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=10
+[MMOMETRIC] t=20 ev=first_basic_attack who=Mage lv=3 target=player targetid=Player tlv=3 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=5 elapsed=15
+[MMOMETRIC] t=8 ev=first_basic_attack who=Priest lv=5 target=mob targetid=Wolf tlv=2 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=10 ev=first_basic_attack who=Priest lv=5 target=mob targetid=Goblin tlv=1 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=0
+[MMOMETRIC] t=9 ev=first_basic_attack who=Warrior lv=2 target=player targetid=Player tlv=30 scope=controller sid=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA start=0 elapsed=9
+[MMOMETRIC] t=14 ev=first_basic_attack who=Archer lv=5 target=mob targetid=Wolf tlv=2 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=12
+[MMOMETRIC] t=10 ev=first_skill who=Warrior lv=1 skill=War_PowerStrike effect=0 mana=8.000 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=10
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target= targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=None targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=npc targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid= tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=None tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=-1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1.5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=NaN scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=Inf scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=bad scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=character sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=gggggggggggggggggggggggggggggggg start=0 elapsed=8
+[MMOMETRIC] t=NaN ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=-1 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=7
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=9 elapsed=8
+[MMOMETRIC] t=Inf ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1.5 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=player targetid=Display_Name tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=player targetid=player tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_basic_attack who=Bad lv=1 target=player targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] ev=first_basic_attack who=Bad lv=1 target=mob targetid=Goblin tlv=1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee

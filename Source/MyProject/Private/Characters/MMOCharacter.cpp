@@ -56,6 +56,133 @@ DEFINE_LOG_CATEGORY_STATIC(LogMMOIdentityAudit, Log, All);
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
 
+bool AMMOCharacter::RunFirstBasicAttackSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	AMMOGameMode* GM = World ? World->GetAuthGameMode<AMMOGameMode>() : nullptr;
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client || !GM)
+	{ OutError = TEXT("MMO server game world required"); return false; }
+	const bool bOriginalPvP = GM->bAllowPvP;
+	TArray<AActor*> Fixtures; TArray<AMMOPlayerController*> Controllers;
+	const bool bPassed = [&]()
+	{
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{ if (!Condition) { OutError = Label; return false; } ++OutChecks; return true; };
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		auto MakeCharacter = [&](const FVector& Location, bool bPlayer) -> AMMOCharacter*
+		{
+			AMMOCharacter* C = World->SpawnActor<AMMOCharacter>(StaticClass(), Location, FRotator::ZeroRotator, Params);
+			if (!C) return nullptr;
+			Fixtures.Add(C); C->SetActorEnableCollision(false); C->SetActorTickEnabled(false);
+			C->Stats->MaxHealth = 10000.f; C->Stats->Health = 10000.f; C->Stats->Defense = 0.f;
+			C->Stats->AttackPower = 10.f; C->EndSpawnProtection();
+			if (bPlayer)
+			{
+				AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+				if (!PC) return nullptr;
+				Fixtures.Add(PC); Controllers.Add(PC); PC->Possess(C);
+			}
+			C->Stats->AttackPower = 10.f; // Possession can refresh equipment bonuses.
+			return C;
+		};
+		auto MakeMob = [&](const FVector& Location) -> AMMOMob*
+		{
+			const FTransform TM(FRotator::ZeroRotator, Location);
+			AMMOMob* M = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), TM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			if (!M) return nullptr;
+			Fixtures.Add(M); M->AutoPossessAI = EAutoPossessAI::Disabled; M->ArchetypeId = TEXT("Goblin");
+			M->SetActorEnableCollision(false); UGameplayStatics::FinishSpawningActor(M, TM); M->SetActorTickEnabled(false);
+			M->bHasHub = false; M->ItemDropChance = 0.f; M->EquipDropChance = 0.f;
+			M->MinGold = 0; M->MaxGold = 0; M->XPReward = 0;
+			M->Stats->MaxHealth = 10000.f; M->Stats->Health = 10000.f; M->Stats->Defense = 0.f;
+			return M;
+		};
+		const EMMOClass Classes[] = {EMMOClass::Warrior, EMMOClass::Archer, EMMOClass::Mage, EMMOClass::Priest};
+		for (int32 i = 0; i < UE_ARRAY_COUNT(Classes); ++i)
+		{
+			const FVector Location(1000000 + i * 5000, 1000000, 5000);
+			AMMOCharacter* C = MakeCharacter(Location, true);
+			AMMOMob* M = MakeMob(Location + FVector(100, 0, 0));
+			if (!C || !M) { OutError = TEXT("fixture spawn failed"); return false; }
+			C->SkillComponent->SetupForClass(Classes[i]);
+			C->Stats->AttackPower = 10.f; // Class setup recalculates derived stats; fixed damage fixture only.
+			if (i == 0)
+			{
+				AMMOCharacter* Other = MakeCharacter(Location + FVector(100, 0, 0), false);
+				if (!Other) { OutError = TEXT("player target spawn failed"); return false; }
+				auto Rejected = [&](AMMOCharacter* Target, const TCHAR* Label)
+				{
+					const float MobHealth = M->Stats->Health, OtherHealth = Other->Stats->Health;
+					C->AttackTarget(Target);
+					return Check(M->Stats->Health == MobHealth && Other->Stats->Health == OtherHealth, Label);
+				};
+				C->Stats->bIsDead = true;
+				if (!Rejected(M, TEXT("dead attacker damaged"))) return false;
+				C->Stats->bIsDead = false; C->LastMeleeTime = World->GetTimeSeconds();
+				if (!Rejected(M, TEXT("cooldown damaged"))) return false;
+				C->LastMeleeTime = -100.f; M->SetActorLocation(Location + FVector(1000, 0, 0));
+				if (!Rejected(nullptr, TEXT("missing target damaged"))) return false;
+				C->LastMeleeTime = -100.f;
+				if (!Rejected(C, TEXT("self target damaged"))) return false;
+				C->LastMeleeTime = -100.f;
+				if (!Rejected(M, TEXT("far target damaged"))) return false;
+				GM->SetPvPAllowed(false); C->LastMeleeTime = -100.f;
+				if (!Rejected(Other, TEXT("PvP off damaged"))) return false;
+				GM->SetPvPAllowed(true); C->PartyComponent->Members.Add(Other); C->LastMeleeTime = -100.f;
+				if (!Rejected(Other, TEXT("party damaged"))) return false;
+				C->PartyComponent->Members.Reset(); C->ClanComponent->ClanName = TEXT("Fixture"); Other->ClanComponent->ClanName = TEXT("Fixture"); C->LastMeleeTime = -100.f;
+				if (!Rejected(Other, TEXT("clan damaged"))) return false;
+				C->ClanComponent->ClanName.Reset(); Other->ClanComponent->ClanName.Reset(); Other->StartSpawnProtection(); C->LastMeleeTime = -100.f;
+				if (!Rejected(Other, TEXT("protected target damaged"))) return false;
+				Other->EndSpawnProtection();
+				TActorIterator<APlayerStart> Starts(World);
+				if (!Starts) { OutError = TEXT("hub fixture needs existing PlayerStart"); return false; }
+				C->SetActorLocation(Starts->GetActorLocation()); C->LastMeleeTime = -100.f;
+				if (!Rejected(M, TEXT("hub attack damaged"))) return false;
+				C->SetActorLocation(Location); M->SetActorLocation(Location + FVector(100, 0, 0));
+				UE_LOG(LogTemp, Display, TEXT("[MMO_FIRST_BASIC_ATTACK_GATES] rejected=10"));
+			}
+			C->LastMeleeTime = -100.f;
+			if (i == 1) C->ServerAttackTarget_Implementation(M); // First accepted native RPC entry, not network transport.
+			else C->AttackTarget(M);
+			if (!Check(M->Stats->Health == 9990.f && C->Stats->Level == 1, TEXT("class basic attack changed"))) return false;
+			if (i == 0)
+			{
+				C->ServerAttackTarget_Implementation(M); // Native call; not network delivery proof.
+				if (!Check(M->Stats->Health == 9990.f, TEXT("server cooldown damaged twice"))) return false;
+				C->LastMeleeTime = -100.f; C->AttackTarget(M);
+				if (!Check(M->Stats->Health == 9980.f && !Cast<AMMOPlayerController>(C->GetController())->RecordFirstBasicAttackMetric(TEXT("mob"), TEXT("Goblin"), 1), TEXT("repeat attack/session changed"))) return false;
+			}
+		}
+		GM->SetPvPAllowed(true);
+		for (int32 i = 0; i < 4; ++i)
+		{
+			const FVector Location(1040000 + i * 5000, 1000000, 5000);
+			AMMOCharacter* C = MakeCharacter(Location, true);
+			AMMOCharacter* Target = i == 0 ? MakeCharacter(Location + FVector(100, 0, 0), false) : MakeMob(Location + FVector(100, 0, 0));
+			if (!C || !Target) { OutError = TEXT("alternate fixture spawn failed"); return false; }
+			if (i == 0) Target->Stats->Level = 7;
+			if (i == 2) { Target->Stats->Health = 1.f; Cast<AMMOMob>(Target)->XPReward = 200; }
+			if (i == 3) C->Stats->AttackPower = 0.f; // Accepted attack can deal zero damage.
+			C->AttackTarget(i == 1 ? nullptr : Target);
+			const bool bCorrect = i == 2 ? Target->Stats->bIsDead && C->Stats->Level == 2 && C->Stats->Experience == 100
+				: Target->Stats->Health == (i == 3 ? 10000.f : 9990.f);
+			if (!Check(bCorrect, i == 0 ? TEXT("accepted PvP changed") : (i == 1 ? TEXT("nearest fallback changed")
+				: (i == 2 ? TEXT("lethal XP path changed") : TEXT("zero damage attack changed"))))) return false;
+		}
+		const FVector Location(1100000, 1000000, 5000);
+		AMMOCharacter* NPC = MakeCharacter(Location, false); AMMOMob* Mob = MakeMob(Location + FVector(100, 0, 0));
+		if (!NPC || !Mob) { OutError = TEXT("controllerless fixture spawn failed"); return false; }
+		NPC->AttackTarget(Mob);
+		return Check(Mob->Stats->Health == 9990.f, TEXT("controllerless attack changed"));
+	}();
+	GM->SetPvPAllowed(bOriginalPvP);
+	for (AMMOPlayerController* PC : Controllers) if (IsValid(PC)) PC->UnPossess();
+	for (AActor* A : Fixtures) if (IsValid(A)) A->Destroy();
+	return bPassed; // Synchronous frame; no save/load timers or real remote RPC/PIE assertion.
+}
+
 bool AMMOCharacter::RunConsumableBenefitSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0;
@@ -127,6 +254,19 @@ bool AMMOCharacter::RunConsumableBenefitSelfTest(UWorld* World, FString& OutErro
 
 namespace
 {
+	struct FMMOFirstBasicAttackTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstBasicAttack"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOCharacter::RunFirstBasicAttackSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_BASIC_ATTACK_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstBasicAttackTestExec GMMOFirstBasicAttackTestExec;
+
 	struct FMMOConsumableBenefitTestExec : public FSelfRegisteringExec
 	{
 		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
@@ -1429,6 +1569,17 @@ void AMMOCharacter::AttackTarget(AMMOCharacter* Target)
 	EndSpawnProtection();
 	// Uzak menzilden hasar almadan saldiran oyuncu da savastadir; sinif degistiremez.
 	Stats->MarkCombatActivity();
+
+	// All authoritative attack gates have passed. Capture level before a lethal hit can grant XP.
+#if !UE_BUILD_SHIPPING
+	if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController()))
+	{
+		const AMMOMob* MetricMob = Cast<AMMOMob>(Victim);
+		PC->RecordFirstBasicAttackMetric(MetricMob ? FName(TEXT("mob")) : FName(TEXT("player")),
+			MetricMob ? MetricMob->ArchetypeId : FName(TEXT("Player")),
+			MetricMob ? MetricMob->GetMobLevel() : Victim->GetStats()->Level);
+	}
+#endif
 
 	// Hedefe don ve vur.
 	const FVector Dir = (Victim->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
