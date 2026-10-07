@@ -1,0 +1,13 @@
+[MMOMETRIC] t=6 ev=gold who=Host src=loot amount=2 balance=2
+[MMOMETRIC] t=6 ev=first_loot who=Host lv=1 kind=gold item=Gold amount=2 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=6
+[MMOMETRIC] t=7 ev=first_loot who=Host lv=1 kind=item item=HealthPotion amount=1 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=7
+[MMOMETRIC] t=11 ev=first_loot who=Host lv=1 kind=item item=HealthPotion amount=1 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=1
+[MMOMETRIC] t=8 ev=first_loot who=Client lv=1 kind=equipment item=ShortSword amount=1 scope=controller sid=cccccccccccccccccccccccccccccccc start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=unknown item=Gold amount=2 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=gold item=Gold amount=0 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=item item=HealthPotion amount=-1 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=item item=HealthPotion amount=nan scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=item item=HealthPotion amount=1.5 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=item amount=1 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=equipment item=ShortSword amount=2 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_loot who=Bad lv=1 kind=gold item=HealthPotion amount=2 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=8

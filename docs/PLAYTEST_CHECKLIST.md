@@ -3961,3 +3961,28 @@ değişmedi. Fixture controllersizdir ve aynı çağrıda yok edilir.
 - [ ] Gecikmeli ağda teslimi tekrar tıkla; yalnız bir ödül ve tamamlanmış görev
   görünmeli. Reddedilen teslimden sonra kaydet/yeniden girip yer aç: hazır görev
   korunmalı. Gerçek dosya ve iki istemcili koşu henüz oynanmadı.
+
+## İlk gerçek ganimet ölçümü — 2026-10-07 (PIE açık)
+
+`TestFirstLoot.ps1` 6 UE kontrolü ve log doğrulaması: altın tavanında sıfır
+kazanç olay üretmez; 17 altından yalnız 2 sığınca amount=2, dolu iksir yığınında
+ret sonrası bir yer açınca amount=1 ve kalan yerde, dolu ekipman çantasında ret
+sonrası yer açınca amount=1. Üç controller/sid için toplam 3 ilk olay; tekrar
+toplama yeni olay üretmez. Mevcut 10 ölüm/tek toplama kontrolünde dirilme sonrası
+yalnız altın amount=17 olayı; 6 controller kontrolünde pawn/aktarım tekilliği de
+geçti. Fiziksel overlap, gerçek ağ ve disk kaydı bu fixture'larda çalıştırılmadı.
+
+- [ ] Host + uzak istemci normal av/ganimet: sunucuda controller sid başına
+  yalnız bir `first_loot`; kind/item/amount gerçek teslimi göstermeli. Başlangıç
+  paketi, görev ödülü, satın alma ve debug eşya verme ilk loot sayılmamalı.
+- [ ] Ölü/rezervasyona yetkisiz/dolu çanta veya yığında reddedilen pickup ilk
+  olay üretmemeli. Altın tavanında sıfır gerçek kazanç da üretmemeli; mevcut
+  altın tavanı/kırpma oyun kuralı değişmedi.
+- [ ] Kısmi iksir toplaması ilk olay olmalı; miktar yalnız sığan adet. Kalan
+  pickup'ta yer açıp yeniden toplama veya gecikmeli çift overlap yeni ilk olay
+  üretmemeli. İlk ekipman loot'u kuşanma olarak yorumlanmamalı.
+- [ ] Öl/diril ve gerçek Summer→Winter seamless geçişte sid/tekillik korunmalı;
+  yeniden bağlantı yeni controller/sid. Parser süreyi controller BeginPlay'den
+  göstermeli, first olayını altın/XP/görev toplamına tekrar eklememeli.
+- [ ] Eski logda ilk loot yoksa `sure=?`/bilinmiyor. İlk öldürme/kuşanma ve gerçek
+  20 dk sınıf/parti süreleri açık; sentetik fixture süreleri gerçek koşu değildir.

@@ -917,3 +917,58 @@ ekipman/stat/mastery/satici regresyonlari gecti. Summer 50 / Winter 28 mob
 dogumu, smoke hata=0; NetSmoke 1 join / 1 welcome, server/client hata=0.
 NetSmoke yalniz baglanti kanitidir. Lv33+ beceri bosluklari ve StaticLint
 InitGameState beyaz liste uyarisi acik; PIE ve dedicated Server isi kapanmadi.
+
+## 46. Kontrolcu oturumunda ilk gercek ganimet (2026-10-07)
+
+Lv1-30 ilk eylem olcumunun sinirli parcasi: `first_loot` yalniz
+AMMOLootPickup gercek pozitif grant sonrasi yazilir. Sarfta AddItem donen Added,
+altinda sonraki-onceki Gold, ekipmanda canta adet artisi kaynaktir. Kismi sarf
+toplamasi ilk olaydir (kalan yerde durur); kind/item/amount gercek teslimdir.
+Oluluk/rezervasyon/doluluk/tekrar kapilari aynen kalir; sifir gercek altin
+kazanci olay uretmez. Mevcut altin tavaninda kirpma/pickup yok olma kurali
+DEGISMEDI. Starter pack, gorev/satici/debug grant yoluna hook eklenmedi.
+
+Controller first alanlari FirstActionMetrics diye adlandirildi; gorev ve loot
+ayni sid/start/TSet kapsamindadir. Server-only ortak helper, whitelisted
+public C++ wrappers, client RPC yok. Payload turu/adet dogrulanir (pozitif
+adet, equipment=1, gold kimligi Gold). Pawn degisimi tekilligi sifirlamaz,
+SeamlessTravelTo ayni durumu yeni controller'a tasir. Yeni baglanti yeni sid;
+kalici karakterin ilk ganimeti degildir. Shipping wrapper'lari log/payload
+uretmeden false doner; alanlar/fixture derlenmez. Oyun ve kayit semasi degismedi.
+
+Normal UE Editor derlemesi gecti. Test kaniti:
+
+- Yeni `TestFirstLoot.ps1`: **PASS checks=6**, gercek TryCollect yolunda uc
+  bagimsiz sid'de gold=2, item=1, equipment=1. Sifir altin, full stack/full bag
+  denemeleri olay yok; kismi sarf ve sonraki tam toplama yalniz ilk olayi yazar.
+- Mevcut 10 loot life-state kontrolu MMO controller ile calisir: oluyken hic
+  olay yok, dirilme sonrasi yalniz amount=17 gold olayi; sarf/ekipman/tekrar
+  ikinci ilk olay yazmaz. Mevcut 6 controller kontrolu loot'u da kapsar:
+  bos pawn/gecersiz payload, farkli turde tekrar, yeni pawn, dogrudan controller
+  seamless aktarimi ve yeni sid. Toplam iki sid'de iki ilk loot.
+- Parser eski12 / quest14 / first-quest16 / first-loot13 olay fixture'lari
+  gecti. Loot fixture: uc gecerli ilk, bir tekrar, sekiz bozuk payload reddi;
+  --who, bilinmeyen sure ve altin/XP/gorevin cift sayilmamasi. Gercek UE fixture
+  logu parser ile okundu: +2 altin tek sayildi, sarf=1/ekipman=1 ayri sid'de.
+- Negatif kontrolde sarf telemetry Added yerine ItemCount yazdi: mutant
+  derlendi, C++ 6 oyun kontrolu gecerken script exit=1 ile yanlis amount=3'u
+  yakaladi (teslim=1). finally kaynak tam byte'lariyla restore edildi, DLL
+  tekrar derlendi ve hook testi PASS alindi. Mutant commit edilmedi.
+
+Izole aktorler ayni senkron karede yok edilir/controller unpossess edilir;
+oyuncu dosyasi okunmaz/yazilmaz. Fixture direkt TryCollect ve controller API'si
+kullanir; fiziksel overlap, gercek ServerTravel/RPC/HUD veya gercek av suresi
+kaniti degildir. PIE acik adimlar PLAYTEST_CHECKLIST'e, olcum anlami RUNBOOK
+ve Lv1-30 plana eklendi. Ilk oldurme/kuşanma ve gercek sinif/parti kosusu acik.
+Agency-agents Unreal Multiplayer Architect / Test Results Analyzer rol
+rehberleri uygulandi; bagimsiz paralel ajan yok.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **28/28 GECTI**, 15 dosya
+PCH'siz /W4, 0 derleyici uyarisi. JSON 111 negatif; 274 yerel yuva `loaded=274
+invalid=0 loadFailed=0 existsMismatch=0 json ok=274 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`. Gorev/ilk eylem/gecis/parti/callback/
+klan/loot/iksir/ekipman/stat/mastery/satici ve yeni ilk loot kontrolleri gecti.
+Summer 47 / Winter 28 mob dogumu, smoke hata=0; NetSmoke 1 join / 1 welcome,
+iki tarafta hata=0 (yalniz baglanti). Lv33+ beceri bosluklari ve StaticLint
+InitGameState beyaz liste uyarisi acik. Gercek sure, ag replikasyonu/oynanis ve
+dedicated Server bu paketle tamamlandi sayilmaz.

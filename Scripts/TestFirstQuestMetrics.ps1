@@ -17,9 +17,16 @@ $firstClaim = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=fir
 $sessions = @($firstAccept | ForEach-Object { if ($_.Line -match 'scope=controller sid=([a-fA-F0-9]{32}) ') { $Matches[1] } } | Select-Object -Unique)
 $metricOk = $firstAccept.Count -eq 2 -and $firstClaim.Count -eq 1 -and $sessions.Count -eq 2
 if ($metricOk) { $metricOk = $firstClaim[0].Line -match "scope=controller sid=$($sessions[0]) " }
+$firstLoot = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=first_loot ')
+$metricOk = $metricOk -and $firstLoot.Count -eq 2
+if ($metricOk) {
+    $metricOk = $firstLoot[0].Line -match "kind=gold item=Gold amount=2 scope=controller sid=$($sessions[0]) "
+    $metricOk = $metricOk -and $firstLoot[1].Line -match "kind=gold item=Gold amount=2 scope=controller sid=$($sessions[1]) "
+}
 if ($pass -and -not $fail -and $process.ExitCode -eq 0 -and $metricOk) {
     Write-Output $pass.Line
     Write-Output '[MMO_FIRST_QUEST_SESSION_TEST] PASS accepts=2 claims=1 sessions=2'
+    Write-Output '[MMO_FIRST_LOOT_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
     exit 0
 }
 Write-Output "First quest testi KALDI (exit=$($process.ExitCode) accepts=$($firstAccept.Count) claims=$($firstClaim.Count) sessions=$($sessions.Count))"

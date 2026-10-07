@@ -5,6 +5,7 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOStatsComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/MMOPlayerController.h"
 #include "Items/MMOItemDatabase.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -24,6 +25,91 @@
 #endif
 
 #if !UE_BUILD_SHIPPING
+bool AMMOLootPickup::RunFirstLootSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	TArray<AActor*> Fixtures;
+	TArray<AMMOPlayerController*> Controllers;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* Pawns[3] = {};
+		AMMOLootPickup* Loot[3] = {};
+		for (int32 Index = 0; Index < 3; ++Index)
+		{
+			const FVector Location(1000000 + Index * 5000, 1000000, 5000);
+			AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			Pawns[Index] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			Loot[Index] = World->SpawnActor<AMMOLootPickup>(AMMOLootPickup::StaticClass(), Location + FVector(2000, 0, 0), FRotator::ZeroRotator, Params);
+			if (PC) { Fixtures.Add(PC); Controllers.Add(PC); }
+			if (Pawns[Index]) Fixtures.Add(Pawns[Index]);
+			if (Loot[Index]) { Fixtures.Add(Loot[Index]); Loot[Index]->SetActorEnableCollision(false); }
+			if (!PC || !Pawns[Index] || !Loot[Index]) { OutError = TEXT("fixture spawn failed"); return false; }
+			PC->Possess(Pawns[Index]);
+		}
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks; return true;
+		};
+		UMMOInventoryComponent* GoldInv = Pawns[0]->GetInventory();
+		UMMOInventoryComponent* ItemInv = Pawns[1]->GetInventory();
+		UMMOInventoryComponent* EquipInv = Pawns[2]->GetInventory();
+		if (!GoldInv || !ItemInv || !EquipInv) { OutError = TEXT("fixture inventory missing"); return false; }
+		Loot[0]->SetupAsGold(17);
+		GoldInv->Gold = UMMOInventoryComponent::MaxGold;
+		Loot[0]->TryCollect(Pawns[0]);
+		if (!Check(GoldInv->Gold == UMMOInventoryComponent::MaxGold, TEXT("capped gold changed balance"))) return false;
+		AMMOLootPickup* SecondGold = World->SpawnActor<AMMOLootPickup>(AMMOLootPickup::StaticClass(), FVector(1020000, 1000000, 5000), FRotator::ZeroRotator, Params);
+		if (!SecondGold) { OutError = TEXT("second gold spawn failed"); return false; }
+		Fixtures.Add(SecondGold); SecondGold->SetActorEnableCollision(false); SecondGold->SetupAsGold(17);
+		GoldInv->Gold -= 2;
+		SecondGold->TryCollect(Pawns[0]); SecondGold->TryCollect(Pawns[0]);
+		if (!Check(GoldInv->Gold == UMMOInventoryComponent::MaxGold && SecondGold->bCollected, TEXT("delivered gold or duplicate incorrect"))) return false;
+		Loot[1]->SetupAsItem(TEXT("HealthPotion"), 3);
+		ItemInv->AddItem(TEXT("HealthPotion"), UMMOInventoryComponent::MaxStackSize);
+		Loot[1]->TryCollect(Pawns[1]);
+		if (!Check(!Loot[1]->bCollected && Loot[1]->ItemCount == 3, TEXT("full stack collected"))) return false;
+		ItemInv->RemoveItem(TEXT("HealthPotion"), 1);
+		Loot[1]->TryCollect(Pawns[1]);
+		const bool bPartialOK = !Loot[1]->bCollected && Loot[1]->ItemCount == 2 && ItemInv->GetItemCount(TEXT("HealthPotion")) == UMMOInventoryComponent::MaxStackSize;
+		Loot[1]->TryCollect(Pawns[1]); // No new room.
+		ItemInv->RemoveItem(TEXT("HealthPotion"), 2);
+		Loot[1]->TryCollect(Pawns[1]); Loot[1]->TryCollect(Pawns[1]);
+		if (!Check(bPartialOK && Loot[1]->bCollected && ItemInv->GetItemCount(TEXT("HealthPotion")) == UMMOInventoryComponent::MaxStackSize,
+			TEXT("partial pickup remainder or duplicate incorrect"))) return false;
+		Loot[2]->SetupAsEquipment(TEXT("ShortSword"), 0);
+		for (int32 Index = 0; Index < UMMOInventoryComponent::MaxBagSize; ++Index) EquipInv->AddEquipmentInstance(TEXT("ShortSword"));
+		Loot[2]->TryCollect(Pawns[2]);
+		if (!Check(!Loot[2]->bCollected && EquipInv->EquipmentBag.Num() == UMMOInventoryComponent::MaxBagSize, TEXT("full equipment bag collected"))) return false;
+		EquipInv->EquipmentBag.RemoveAt(0);
+		Loot[2]->TryCollect(Pawns[2]); Loot[2]->TryCollect(Pawns[2]);
+		return Check(Loot[2]->bCollected && EquipInv->EquipmentBag.Num() == UMMOInventoryComponent::MaxBagSize, TEXT("equipment grant or duplicate incorrect"));
+	}();
+	for (AMMOPlayerController* PC : Controllers) { if (IsValid(PC)) PC->UnPossess(); }
+	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
+	return bPassed; // Same frame: no player load timer/disk save or physical overlap.
+}
+
+namespace
+{
+	struct FMMOFirstLootTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstLoot"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOLootPickup::RunFirstLootSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_LOOT_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstLootTestExec GMMOFirstLootTestExec;
+}
+
 bool AMMOLootPickup::RunLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0;
@@ -34,14 +120,14 @@ bool AMMOLootPickup::RunLifeStateSelfTest(UWorld* World, FString& OutError, int3
 		return false;
 	}
 	TArray<AActor*> Fixtures;
-	APlayerController* Controller = nullptr;
+	AMMOPlayerController* Controller = nullptr;
 	const bool bPassed = [&]()
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		const FVector Location(1000000, 1000000, 5000);
 		AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
-		Controller = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+		Controller = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
 		if (Character) Fixtures.Add(Character);
 		if (Controller) Fixtures.Add(Controller);
 		if (!Character || !Controller) { OutError = TEXT("fixture spawn failed"); return false; }
@@ -399,6 +485,8 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 		const int32 Added = Inv->AddItem(ItemId, ItemCount);
 		if (Added > 0)
 		{
+			if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Char->GetController()))
+				PC->RecordFirstLootMetric(TEXT("item"), ItemId, Added);
 			MMONotify::ToOwner(Char, FString::Printf(TEXT("+%d %s"), Added, *ItemId.ToString()), FColor(60, 140, 255), 2.f);
 		}
 		if (Added < ItemCount)
@@ -423,13 +511,22 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 
 	if (bIsGold)
 	{
+		const int32 BeforeGold = Inv->Gold;
 		Inv->AddGoldFrom(GoldAmount, TEXT("loot"));
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Char->GetController()))
+			PC->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), Inv->Gold - BeforeGold);
 		// Yalniz toplayana (yerelde ekran, uzak istemcide sohbet satiri); kisa surede toplananlar tek mesaj.
 		QueueGoldNotify(Char, GoldAmount);
 	}
 	else if (bIsEquipment)
 	{
+		const int32 BeforeBag = Inv->EquipmentBag.Num();
 		Inv->AddEquipmentInstance(EquipItemId, EquipPlus, EquipRarity);
+		if (Inv->EquipmentBag.Num() > BeforeBag)
+		{
+			if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Char->GetController()))
+				PC->RecordFirstLootMetric(TEXT("equipment"), EquipItemId, Inv->EquipmentBag.Num() - BeforeBag);
+		}
 		const FLinearColor RC = FMMOItemDatabase::GetRarityColor(EquipRarity);
 		MMONotify::ToOwner(Char,
 			FString::Printf(TEXT("[%s] %s +%d dustu  (I ile envanteri ac)"),

@@ -16,6 +16,7 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   quest_accept who lv quest
   quest_claim  who lv to quest xp_reward capped (lv = odulden once; xp_reward = nominal odul)
   first_quest_accept / first_quest_claim who lv quest scope=controller sid start elapsed
+  first_loot who lv kind=gold|item|equipment item amount scope=controller sid start elapsed
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -26,6 +27,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot")
 
 
 def project_root():
@@ -90,16 +92,22 @@ def build_stats(events):
         })
         p["last_t"] = max(p["last_t"], t)
         ev = e["ev"]
-        if ev in ("first_quest_accept", "first_quest_claim"):
+        if ev in FIRST_ACTIONS:
             # Explicit controller lifetime, never guessed from first log time or player name.
             sid = e.get("sid", "")
             start = to_num(e.get("start"), float("nan"))
             elapsed = to_num(e.get("elapsed"), float("nan"))
             event_time = to_num(e.get("t"), float("nan"))
             level = to_num(e.get("lv"), float("nan"))
+            amount = to_num(e.get("amount"), float("nan"))
+            payload_valid = bool(e.get("quest")) if ev != "first_loot" else (
+                e.get("kind") in ("gold", "item", "equipment") and bool(e.get("item"))
+                and math.isfinite(amount) and amount > 0 and amount.is_integer()
+                and (e.get("kind") != "equipment" or amount == 1)
+                and (e.get("kind") != "gold" or e.get("item") == "Gold"))
             if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
                     or not all(math.isfinite(n) and n >= 0 for n in (start, elapsed, event_time))
-                    or not math.isfinite(level) or level < 1 or not level.is_integer() or not e.get("quest")
+                    or not math.isfinite(level) or level < 1 or not level.is_integer() or not payload_valid
                     or event_time < start or abs(event_time - start - elapsed) > 0.01):
                 p["first_invalid"] += 1
                 continue
@@ -107,7 +115,12 @@ def build_stats(events):
             if ev in session:
                 p["first_duplicates"] += 1
                 continue
-            session[ev] = {"seconds": elapsed, "lv": int(level), "quest": e["quest"]}
+            sample = {"seconds": elapsed, "lv": int(level)}
+            if ev == "first_loot":
+                sample.update(kind=e["kind"], item=e["item"], amount=int(amount))
+            else:
+                sample["quest"] = e["quest"]
+            session[ev] = sample
         elif ev == "levelup":
             frm = int(to_num(e.get("from")))
             to = int(to_num(e.get("to")))
@@ -231,17 +244,18 @@ def print_player(who, p):
     else:
         print("Gorev olayi yok: XP(quest)=0, eski loglarda gercek sifir kazanc kaniti degildir.")
     if p["first_actions"]:
-        print("Ilk gorev eylemleri (sunucu kontrolcu omru; kalici karakter ilerlemesi degil):")
+        print("Ilk eylemler (sunucu kontrolcu omru; kalici karakter ilerlemesi degil):")
         for sid, actions in sorted(p["first_actions"].items()):
-            for action in ("first_quest_accept", "first_quest_claim"):
+            for action in FIRST_ACTIONS:
                 sample = actions.get(action)
                 if sample:
-                    print("  sid=%s %s sure=%s lv=%d quest=%s" % (
-                        sid, action, fmt_time(sample["seconds"]), sample["lv"], sample["quest"]))
+                    detail = ("kind=%s item=%s amount=%d" % (sample["kind"], sample["item"], sample["amount"])) if action == "first_loot" else "quest=%s" % sample["quest"]
+                    print("  sid=%s %s sure=%s lv=%d %s" % (
+                        sid, action, fmt_time(sample["seconds"]), sample["lv"], detail))
                 else:
                     print("  sid=%s %s sure=? (bu logda olay yok)" % (sid, action))
     else:
-        print("Ilk gorev olayi yok: first_* suresi bilinmiyor; sifir sure veya basarisizlik kaniti degil.")
+        print("Ilk eylem olayi yok: first_* suresi bilinmiyor; sifir sure veya basarisizlik kaniti degil.")
     if p["first_invalid"] or p["first_duplicates"]:
         print("Ilk olay atlanan: gecersiz=%d tekrar=%d" % (p["first_invalid"], p["first_duplicates"]))
 

@@ -70,10 +70,10 @@ void AMMOPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	#if !UE_BUILD_SHIPPING
-	if (HasAuthority() && !FirstQuestMetricsSession.IsValid())
+	if (HasAuthority() && !FirstActionMetricsSession.IsValid())
 	{
-		FirstQuestMetricsSession = FGuid::NewGuid();
-		FirstQuestMetricsStart = MMOMetrics::Seconds();
+		FirstActionMetricsSession = FGuid::NewGuid();
+		FirstActionMetricsStart = MMOMetrics::Seconds();
 	}
 	#endif
 
@@ -128,13 +128,13 @@ void AMMOPlayerController::SeamlessTravelTo(APlayerController* NewPC)
 	CloseChatInput();
 	Super::SeamlessTravelTo(NewPC);
 #if !UE_BUILD_SHIPPING
-	if (HasAuthority() && FirstQuestMetricsSession.IsValid())
+	if (HasAuthority() && FirstActionMetricsSession.IsValid())
 	{
 		if (AMMOPlayerController* MMO = Cast<AMMOPlayerController>(NewPC))
 		{
-			MMO->FirstQuestMetricsSession = FirstQuestMetricsSession;
-			MMO->FirstQuestMetricsStart = FirstQuestMetricsStart;
-			MMO->RecordedFirstQuestMetrics = RecordedFirstQuestMetrics;
+			MMO->FirstActionMetricsSession = FirstActionMetricsSession;
+			MMO->FirstActionMetricsStart = FirstActionMetricsStart;
+			MMO->RecordedFirstActionMetrics = RecordedFirstActionMetrics;
 		}
 	}
 #endif
@@ -143,23 +143,44 @@ void AMMOPlayerController::SeamlessTravelTo(APlayerController* NewPC)
 bool AMMOPlayerController::RecordFirstQuestMetric(FName Action, FName QuestId)
 {
 #if !UE_BUILD_SHIPPING
+	if (QuestId.IsNone() || (Action != TEXT("quest_accept") && Action != TEXT("quest_claim"))) return false;
+	return RecordFirstActionMetric(Action, FString::Printf(TEXT("quest=%s"), *QuestId.ToString()));
+#else
+	static_cast<void>(Action); static_cast<void>(QuestId); return false;
+#endif
+}
+
+bool AMMOPlayerController::RecordFirstLootMetric(FName Kind, FName ItemId, int32 Amount)
+{
+#if !UE_BUILD_SHIPPING
+	if (ItemId.IsNone() || Amount <= 0 || (Kind != TEXT("gold") && Kind != TEXT("item") && Kind != TEXT("equipment"))
+		|| (Kind == TEXT("equipment") && Amount != 1) || (Kind == TEXT("gold") && ItemId != TEXT("Gold"))) return false;
+	return RecordFirstActionMetric(TEXT("loot"), FString::Printf(TEXT("kind=%s item=%s amount=%d"), *Kind.ToString(), *ItemId.ToString(), Amount));
+#else
+	static_cast<void>(Kind); static_cast<void>(ItemId); static_cast<void>(Amount); return false;
+#endif
+}
+
+bool AMMOPlayerController::RecordFirstActionMetric(FName Action, const FString& Payload)
+{
+#if !UE_BUILD_SHIPPING
 	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
 	if (!HasAuthority() || !MetricPawn || !MetricPawn->HasAuthority() || !MetricPawn->IsPlayerControlled()
-		|| !MetricPawn->GetStats() || !FirstQuestMetricsSession.IsValid() || FirstQuestMetricsStart < 0.0
-		|| QuestId.IsNone() || (Action != TEXT("quest_accept") && Action != TEXT("quest_claim"))
-		|| RecordedFirstQuestMetrics.Contains(Action))
+		|| !MetricPawn->GetStats() || !FirstActionMetricsSession.IsValid() || FirstActionMetricsStart < 0.0
+		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot"))
+		|| RecordedFirstActionMetrics.Contains(Action))
 	{
 		return false;
 	}
-	RecordedFirstQuestMetrics.Add(Action);
+	RecordedFirstActionMetrics.Add(Action);
 	const double Now = MMOMetrics::Seconds();
-	UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.3f ev=first_%s who=%s lv=%d quest=%s scope=controller sid=%s start=%.3f elapsed=%.3f"),
-		Now, *Action.ToString(), *MMOMetrics::WhoName(MetricPawn), MetricPawn->GetStats()->Level, *QuestId.ToString(),
-		*FirstQuestMetricsSession.ToString(EGuidFormats::Digits), FirstQuestMetricsStart, FMath::Max(0.0, Now - FirstQuestMetricsStart));
+	UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.3f ev=first_%s who=%s lv=%d %s scope=controller sid=%s start=%.3f elapsed=%.3f"),
+		Now, *Action.ToString(), *MMOMetrics::WhoName(MetricPawn), MetricPawn->GetStats()->Level, *Payload,
+		*FirstActionMetricsSession.ToString(EGuidFormats::Digits), FirstActionMetricsStart, FMath::Max(0.0, Now - FirstActionMetricsStart));
 	return true;
 #else
 	static_cast<void>(Action);
-	static_cast<void>(QuestId);
+	static_cast<void>(Payload);
 	return false;
 #endif
 }
@@ -198,20 +219,29 @@ bool AMMOPlayerController::RunFirstQuestMetricsSelfTest(UWorld* World, FString& 
 			++OutChecks; return true;
 		};
 		const FName Accept(TEXT("quest_accept")), Claim(TEXT("quest_claim")), Quest(TEXT("Q_Goblins"));
-		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest), TEXT("controller without pawn emitted"))) return false;
+		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest)
+			&& !PCs[0]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 2), TEXT("controller without pawn emitted"))) return false;
 		PCs[0]->Possess(Pawns[0]);
-		if (!Check(!PCs[0]->RecordFirstQuestMetric(TEXT("unknown"), Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, NAME_None), TEXT("invalid event emitted"))) return false;
-		if (!Check(PCs[0]->RecordFirstQuestMetric(Accept, Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, TEXT("Q_Cleanup")), TEXT("first acceptance not unique"))) return false;
+		if (!Check(!PCs[0]->RecordFirstQuestMetric(TEXT("unknown"), Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, NAME_None)
+			&& !PCs[0]->RecordFirstLootMetric(TEXT("unknown"), TEXT("Gold"), 1)
+			&& !PCs[0]->RecordFirstLootMetric(TEXT("gold"), NAME_None, 1)
+			&& !PCs[0]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 0), TEXT("invalid event emitted"))) return false;
+		if (!Check(PCs[0]->RecordFirstQuestMetric(Accept, Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, TEXT("Q_Cleanup"))
+			&& PCs[0]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 2)
+			&& !PCs[0]->RecordFirstLootMetric(TEXT("item"), TEXT("HealthPotion"), 1), TEXT("first action not unique"))) return false;
 		PCs[0]->Possess(Pawns[1]);
-		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest) && PCs[0]->RecordFirstQuestMetric(Claim, Quest), TEXT("pawn replacement reset first event"))) return false;
-		const FGuid OriginalSession = PCs[0]->FirstQuestMetricsSession;
-		const double OriginalStart = PCs[0]->FirstQuestMetricsStart;
+		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest) && PCs[0]->RecordFirstQuestMetric(Claim, Quest)
+			&& !PCs[0]->RecordFirstLootMetric(TEXT("item"), TEXT("HealthPotion"), 1), TEXT("pawn replacement reset first event"))) return false;
+		const FGuid OriginalSession = PCs[0]->FirstActionMetricsSession;
+		const double OriginalStart = PCs[0]->FirstActionMetricsStart;
 		PCs[0]->SeamlessTravelTo(PCs[1]);
 		PCs[1]->Possess(Pawns[2]);
-		if (!Check(PCs[1]->FirstQuestMetricsSession == OriginalSession && PCs[1]->FirstQuestMetricsStart == OriginalStart
-			&& !PCs[1]->RecordFirstQuestMetric(Accept, Quest) && !PCs[1]->RecordFirstQuestMetric(Claim, Quest), TEXT("controller transfer reset first event"))) return false;
+		if (!Check(PCs[1]->FirstActionMetricsSession == OriginalSession && PCs[1]->FirstActionMetricsStart == OriginalStart
+			&& !PCs[1]->RecordFirstQuestMetric(Accept, Quest) && !PCs[1]->RecordFirstQuestMetric(Claim, Quest)
+			&& !PCs[1]->RecordFirstLootMetric(TEXT("item"), TEXT("HealthPotion"), 1), TEXT("controller transfer reset first event"))) return false;
 		PCs[2]->Possess(Pawns[0]);
-		return Check(PCs[2]->FirstQuestMetricsSession != OriginalSession && PCs[2]->RecordFirstQuestMetric(Accept, Quest), TEXT("new controller did not start independent session"));
+		return Check(PCs[2]->FirstActionMetricsSession != OriginalSession && PCs[2]->RecordFirstQuestMetric(Accept, Quest)
+			&& PCs[2]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 2), TEXT("new controller did not start independent session"));
 	}();
 	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
 	return bPassed; // Same synchronous frame: no player load timer or disk save.

@@ -16,6 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURE = os.path.join(HERE, "fixtures", "playtest_metrics_sample.log")
 QUEST_FIXTURE = os.path.join(HERE, "fixtures", "quest_metrics_sample.log")
 FIRST_FIXTURE = os.path.join(HERE, "fixtures", "first_quest_metrics_sample.log")
+LOOT_FIXTURE = os.path.join(HERE, "fixtures", "first_loot_metrics_sample.log")
 
 failures = []
 
@@ -140,6 +141,25 @@ def main(argv):
     code, old_out = run_main(pm, ["x", FIXTURE])
     check("first_* suresi bilinmiyor" in old_out, "eski log ilk eylem olcumu yok uyarisini vermeli")
 
+    loot_events = pm.parse_log(LOOT_FIXTURE)
+    check(len(loot_events) == 13, "first loot fixture: 13 olay")
+    ls = pm.build_stats(loot_events)
+    check(ls["Host"]["first_actions"]["a" * 32]["first_loot"] == {
+        "seconds": 6, "lv": 1, "kind": "gold", "item": "Gold", "amount": 2}, "ilk gercek altin ve tekrar korumasi")
+    check(ls["Host"]["first_actions"]["b" * 32]["first_loot"]["amount"] == 1
+          and ls["Client"]["first_actions"]["c" * 32]["first_loot"]["kind"] == "equipment", "sarf/ekipman ve oturum ayrimi")
+    check(ls["Host"]["first_duplicates"] == 1 and ls["Bad"]["first_invalid"] == 8
+          and ls["Bad"]["first_actions"] == {}, "gecersiz loot payload reddi")
+    check(ls["Host"]["src"]["loot"] == [2, 0] and ls["Host"]["lv"][0]["gold_in"] == 2
+          and ls["Host"]["quests"] == {} and sum(x["xp"] for x in ls["Host"]["lv"].values()) == 0,
+          "ilk loot olayi altin/XP/gorev sayisini artirmamali")
+    code, out = run_main(pm, ["x", LOOT_FIXTURE, "--who", "Host"])
+    check(code == 0 and "first_loot sure=0:06 lv=1 kind=gold item=Gold amount=2" in out
+          and "first_loot sure=0:01 lv=1 kind=item item=HealthPotion amount=1" in out
+          and "Oyuncu: Client" not in out, "loot sure/payload raporu ve --who")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check("first_loot sure=?" in out, "eski gorev logundan loot suresi uydurulmamali")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -156,7 +176,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay)." % (len(events), len(quest_events), len(first_events)))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay)." % (len(events), len(quest_events), len(first_events), len(loot_events)))
     return 0
 
 

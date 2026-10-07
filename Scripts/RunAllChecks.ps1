@@ -156,6 +156,11 @@ Step "Saf iksir faydasi ve ortak bekleme suresi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Ilk ganimet gercek teslim miktari ve tekillik" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstLoot.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Kayittan ekipman seviye sarti ve kayipsiz kurtarma" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestSavedEquipmentLevel.ps1") | Out-Host
     $LASTEXITCODE -eq 0

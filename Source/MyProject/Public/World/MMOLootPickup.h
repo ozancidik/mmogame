@@ -67,6 +67,7 @@ public:
 
 #if !UE_BUILD_SHIPPING
 	static bool RunLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunFirstLootSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:

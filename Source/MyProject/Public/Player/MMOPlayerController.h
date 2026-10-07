@@ -56,19 +56,22 @@ public:
 
 	// Server telemetry only, after successful quest mutation. No client RPC or saved progress.
 	bool RecordFirstQuestMetric(FName Action, FName QuestId);
+	// After a real pickup grant; Amount is delivered count/gold, not requested amount.
+	bool RecordFirstLootMetric(FName Kind, FName ItemId, int32 Amount);
 #if !UE_BUILD_SHIPPING
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
+	bool RecordFirstActionMetric(FName Action, const FString& Payload);
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SeamlessTravelTo(APlayerController* NewPC) override;
 
 #if !UE_BUILD_SHIPPING
-	FGuid FirstQuestMetricsSession;
-	double FirstQuestMetricsStart = -1.0;
-	TSet<FName> RecordedFirstQuestMetrics;
+	FGuid FirstActionMetricsSession;
+	double FirstActionMetricsStart = -1.0;
+	TSet<FName> RecordedFirstActionMetrics;
 #endif
 
 	UFUNCTION(Server, Reliable)

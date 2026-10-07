@@ -59,6 +59,16 @@ Parser sid bazında ilk süreyi korur; tekrar/geçersiz kayıtları sayar. Eksik
 oyuncu adını filtreler, ad değiştiren oyuncunun farklı ad altındaki satırlarını
 birleştirmez. İlk olaylar görev adedi, XP ve altını tekrar toplamaz.
 
+**İlk gerçek ganimet:** `first_loot` aynı controller sid/start/elapsed kapsamını
+kullanır. Yalnız pickup'ın gerçekten verdiği ilk pozitif miktar kaydedilir:
+`kind=gold|item|equipment item=<id> amount=<teslim>`. Kısmi sarf toplaması ilk
+olaydır; kalan yerde olabilir. Dolu çanta/yığın, ölü/rezervasyona yetkisiz
+karakter ve sıfır altın kazancı ilk olay değildir. İlk altın mı, iksir mi,
+ekipman mı olduğundan bağımsız olarak sid başına tek loot olayı vardır.
+Başlangıç paketi/görev/satıcı/debug verme bu olayı tetiklemez. Ekipman loot'u
+kuşanma değildir; onun ölçümü açık. Eski logda eksik loot `sure=?`; first
+satırı normal `gold` akışını veya XP/görev sayısını yeniden toplamaz.
+
 Ölçüm satırları yalnız sunucuda (host) basılır. Logda hiç satır yoksa Kapı 3 **KALDI**: büyük olasılıkla istemci penceresinin logu okunuyor.
 
 ## Sonuç şablonu (kopyala, doldur, bana gönder)
