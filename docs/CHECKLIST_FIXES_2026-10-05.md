@@ -1095,3 +1095,55 @@ ve yeni kuşanma testi gecti. Summer52 / Winter31 mob dogumu, smoke hata=0;
 NetSmoke 1 join / 1 welcome, iki tarafta hata=0 (yalniz baglanti).
 Lv33+ beceri bosluklari ve StaticLint InitGameState beyaz liste uyarisi acik.
 Dedicated Server/Shipping ve gercek PIE sure/ag oynanisi tamamlanmadi.
+
+## 49. Kayitli ucretli beceriyi mastery butcesine katma (2026-10-07)
+
+UE'de dogrulanan kayit yukleme tutarsizligi: Skill ApplySaveData gecerli
+sinif/seviye LearnedSkills'i rutbe sifir olsa da koruyordu. Stats ApplySaveData
+yalniz kaynak MasteryRanks maliyetini kullandigi icin beceri + tam harcanmamis
+puan birlikte kalabiliyordu. Reproducer Lv10 War_ShatterBlow/Special0=0/bakiye18;
+normalde gereken rutbe4 ve kazanilabilir toplam18. Test **FAIL checks=0** verdi.
+Bu bozuk/elle degistirilmis sunucu kaydi kosuludur, uzak istemcinin dosya yazma
+veya beceri unlock RPC'sini atlama kaniti degildir.
+
+Ortak `SanitizeSavedMasteryRanks`: mevcut rutbeyi eski kuralla onarir, gecerli
+sinif/seviyedeki ogrenilmis ucretli becerilerden gereken minimum agac rutbesini
+max ile birlestirir, toplam seviye butcesini tekrar uygular. Ayni agactaki
+becerilerin maliyeti eski SkillPointCost toplami degil maksimum mastery rutbesi.
+GrantStarterSkill ile ayni sinifin en dusuk seviyeli Basic becerileri ucretsiz.
+Bu hem boş hem mevcut rutbeli legacy/corrupt kayitlarda kullanilir; gecersiz
+sinif/id/seviye maliyet uretmez. Basic→Special0..3 mevcut deterministik onarim
+onceligi korunur. Karsilanmayan beceri ve hotbar temizlenir; gecerli eski
+beceri butce icinde korunur, eksikler SyncLearnedFromMastery ile acilir.
+Bu onarim listeden yeni agac rutbesi turetebilir ve bakiyeyi kirpabilir;
+kayip/bozuk kayit icin eski dagilim uydurulmaz. Kalan bakiye artirilmaz.
+
+Stats ayni helper'i kaynak kayittan cagirir; runtime Skill alanina bagimli
+degildir. Stats once veya sonra yuklense ayni kalan puan. JSON/save semasi,
+owner-only replication, authority ve RPC kurallari degismedi; fixture Shipping
+disinda. Yeni helper ise normal sunucu yukleme dogrulamasinin parcasidir.
+
+`TestLearnedSkillBudget.ps1` **12 kontrol PASS**: paid cache0+18 -> rank4+14;
+duplicate maliyeti bir kez; ayni agac max maliyet; gecerli rutbe/bakiye korunur;
+asiri butce/ust seviye beceri ve slot reddi; legacy bos rutbe migration;
+bellekte FillSaveData/ApplySaveData idempotent; stats-first yol; dort sinif
+ucretsiz Basic; legacy Priest Smite slot1 tamamlama; invalid/foreign/ust
+seviye beceriden maliyet yok; class change yalniz earned18 iade. Mevcut
+mastery/iade 12 kontrol de gecti. Oyuncu diski bu fixture'da okunmaz/yazilmaz.
+Normal Editor derlemesi gecti; gercek kayit göcu/RPC/HUD PIE checklist'te acik.
+
+Agency-agents Unreal Systems Engineer ve Test Results Analyzer rehberleri
+uygulandi. Kepler paralel ajan salt okunur backend kontrolunde mevcut yerel
+senkron adaptor icin yeni HIGH/MEDIUM bulmadi; ardindan bu onarimin ortak
+helper/yukleme sirasi entegrasyonunu inceledi. Kod yazmadi veya UE calistirmadi.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **31/31 GECTI**, 15 dosya
+PCH'siz /W4 ve 0 derleyici uyarisi. JSON 111 negatif; store292/loaded292,
+invalid0/loadFailed0/existsMismatch0/jsonMismatch0/maxLevel6, writeorder1 ve
+roundtrip equal1. Summer51 / Winter31 smoke hata0; NetSmoke join1/welcome1,
+server/client hata0 (yalniz baglanti). Bu paketten sonra yalnız fixture'in
+stats-first adimi guclendirildi: once runtime rutbe0, Stats tek basina bakiye14,
+ardindan Skill rutbe4. Normal yeniden derleme, skill PCH'siz tek-dosya derleme
+ve 12 kontrol direct PASS; uretim helper'i degismedi. Tam paket tekrar kosulmadi.
+Lv33+ beceri bosluklari/InitGameState lint uyarisi acik. Gercek dosya göcu,
+istemci RPC/HUD, Server/Shipping hedefi ve 20 dk oyun sureleri acik.

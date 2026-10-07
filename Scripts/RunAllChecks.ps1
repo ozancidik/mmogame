@@ -191,6 +191,11 @@ Step "Satici ekonomi kapasite ve yetki kapilari" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Kayitli ogrenilmis becerilerin mastery butcesi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLearnedSkillBudget.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

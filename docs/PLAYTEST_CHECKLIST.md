@@ -4039,3 +4039,28 @@ oyuncu süresi değildir. Kuşanmanın mevcut ölüm/replication kuralları değ
 - [ ] Eski logda eksik first_equip `sure=?`; ilk loot ve ilk kuşanma ayrı
   sürelerdir. First satırı XP/altın/görev/kill toplamını artırmamalı. Gerçek
   20 dk dört sınıf solo/parti koşuları ve tüm ilk eylemler hâlâ açık.
+
+## Kayıtlı öğrenilmiş beceriler ve mastery bütçesi — 2026-10-07 (PIE açık)
+
+`TestLearnedSkillBudget.ps1`: **12 izole UE kontrolü**. Düzeltme öncesi ilk
+kontrol FAIL checks=0: Lv10 War_ShatterBlow öğrenilmiş, Special0=0, bakiye=18.
+Sonrasında Special0=4, bakiye=14; geçerli beceri/hotbar korunuyor. Aynı ağacın
+bütün becerileri ayrı ayrı ücretlendirilmez; maksimum gereken rütbe maliyettir.
+Legacy boş rütbe dizisi taşınır, ücretsiz dört sınıf starter'ı ve Priest'in
+Smite tamamlama yolu ücretsizdir. Aşırı rütbede Basic→Special0..3 önceliği
+korunur; bütçesiz beceri/hotbar kaldırılır. Roundtrip bellekte, gerçek .sav yok;
+stats-first ve skill-first yükleme aynı toplamı verir. Sınıf iadesi bütçeyi aşmaz.
+
+- [ ] Dosyayı yedekleyerek geçerli eski öğrenilmiş-beceri kaydıyla yeniden giriş:
+  ücretli beceriler yeterli bütçe içinde korunmalı, minimum ağaç rütbeleri ve
+  kalan puan doğru olmalı; yeniden kaydet/girişte ikinci kez puan kesilmemeli.
+- [ ] Host ve uzak istemci beceri kitabı, hotbar ve puan paneli aynı sonucu
+  göstermeli. Korunan beceri gerçek ServerUseSkill ile çalışmalı; budget repair
+  ile kaldırılan beceri RPC/hotbar üzerinden kullanılamamalı.
+- [ ] Bozuk kayıtta rütbe + öğrenilmiş beceri gereksinimleri bütçeyi aşarsa
+  deterministic Basic→Special0..3 onarımı uygulanmalı; kaldırılan slot boşalmalı.
+  Ücretsiz başlangıç becerileri korunmalı; bu, tüm eski kayıtların kayıpsız
+  göçüne dair kanıt değildir. Zaman damgalı cooldown davranışı da kontrol edilmeli.
+- [ ] Sınıf değişimi sonrası eski ücretli beceriler gitmeli, yalnız kazanılmış
+  skill bütçesi iade edilmeli. Kaydın kimliği/imzası ve iki taraflı ticaret
+  kalıcılığı ayrı açık işlerdir.

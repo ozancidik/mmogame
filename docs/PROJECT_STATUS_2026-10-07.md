@@ -1,8 +1,8 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 7 Ekim 2026. Kaynak kod ve son tamamlanan test paketi esas alınmıştır.
-Önceki kod/test kanıtı: `a81fda4`; ilk başarılı kuşanma isteği ölçümü ayrıca
-eklenmiştir (ayrıntı: düzeltme kaydı §48).
+Önceki kod/test kanıtı: `2ac517d`; kayıtlı ücretli becerilerin mastery
+bütçesine katılması ayrıca eklendi (ayrıntı: düzeltme kaydı §49).
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -17,19 +17,19 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | Editor hedefi derlendi; 15 kritik dosya PCH olmadan /W4 ile 0 uyarı | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
 | Karakter ve statlar | STR/DEX/INT/VIT, can/mana, XP/seviye, stat puanı, ölüm/diriliş; sunucu otoritesi | Kayıt stat/XP/puan bütçesi ve dört sınıf için 15 UE kontrolü; ölüm kuralları ayrı fixture'larda | Gerçek ölüm/respawn, kayıt sonrası istemci stat paneli ve uzun oturum |
 | Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi | Kod/derleme; GameState'te PvP aynası | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü |
-| Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; kayıtlı rütbe + bakiye ortak bütçesi, sınıf iadesinde fazla puan önleme | 81 beceri; yeni bütçe/iade regresyonu 12 UE kontrolü | Gerçek yatırım/kayıt/sınıf RPC ve HUD; LearnedSkills maliyet denetimi; sınıf dengesi, Lv33+ beceri boşlukları |
+| Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; rütbe + bakiye bütçesi; kayıtlı ücretli beceriyi minimum ağaç rütbesine taşıma | 81 beceri; 12 bütçe/iade + 12 yeni öğrenilmiş-beceri kontrolü; hata önce UE'de yeniden üretildi | Gerçek legacy dosya göçü, yatırım/kayıt/sınıf RPC ve HUD; sınıf dengesi, Lv33+ beceri boşlukları |
 | Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Veri/kod/derleme | İstemci efekt süresi ve Network Profiler bant ölçümü |
 | Ekipman ve envanter | 53 ekipman; InstanceId ile kuşanma/satış/yükseltme; çanta/yığın sınırları; nadirlik/+; ilk başarılı istek ölçümü | Kayıtlı ekipman seviye şartı: 11 kontrol; yeni kuşanma ölçümü: 8 kontrol, otomatik/restore hariç | Gecikmeli çift tıklama, uzak HUD, gerçek dosyadan yeniden giriş |
 | Satıcı ve ekonomi | Ekipman/iksir alış-satışı; yalnız teslim edilen adet kadar ücret; ölü/uzak işlem reddi | Yeni satıcı regresyonu: 14 kontrol geçti | Gelir/harcama dengesi, uzun oturum, gerçek RPC ve kayıt kalıcılığı |
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 79 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 51 arketip (13 elit), 29 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 52, Winter 31 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 51, Winter 31 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider kuralları; parti birleşmesinde lider onayı | Lider/rıza regresyonu: 10 kontrol | Çok pencerede birleşme/ayrılma, gerçek katkı ve XP paylaşımı |
 | Ticaret ve depo | Çift onay/teklif revizyonu, kimlikle eşya, kapasite/altın tavanı; NPC yakınlığında depo | Kod/derleme; satış kapasitesi yeni satıcı testinde | Ticaretin iki kaydı birlikte kalıcılaştırması; çökme/bağlantı kopması; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, arkadaş listesi, sohbet ve hız sınırları | Klan davetinde güncel lider yetkisi: 9 kontrol | Çevrimdışı üyelik/rıza, yeniden giriş ve çok oyunculu sosyal akış |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 286 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 292 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
@@ -58,7 +58,8 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `72419fa` | Mevcut yığın/çanta kapasitesi kurallarını regresyona alma; yer açıp tam ödül ve tekrar teslim | 10 UE kontrolü; kapasite koruması bozulunca test ilk kontrolde hatayı yakaladı; 27/27 paket; oynanış kuralı değişmedi |
 | `6b32ba9` | İlk gerçek pozitif loot teslimi; controller ömründe tek süre ve gerçek adet/altın | 6 yeni UE kontrolü; ölüm/oturum testleri genişletildi; yanlış miktar negatif testi yakalandı; parser 13 olay; 28/28 paket |
 | `a81fda4` | Mevcut ölüm akışında ilk kredi; fatal/contribution/party/fallback ve XP öncesi seviye | 10 yeni UE kontrolü; oturum tekilliği genişletildi; yanlış fallback etiketi negatif testte yakalandı; parser 17 olay; 29/29 paket |
-| 7 Ekim ilk kuşanma isteği (bu belgeyle aynı commit) | Başarılı oyuncu isteği; otomatik başlangıç/kayıt yükleme hariç, controller ömründe tek ölçüm | 8 yeni kontrol + 6 oturum kontrolü genişletildi; otomatik giriş negatif testi yakalandı; parser 17 olay ve gerçek UE logu geçti; 30/30 paket |
+| `2ac517d` | Başarılı oyuncu isteği; otomatik başlangıç/kayıt yükleme hariç, controller ömründe tek ölçüm | 8 yeni kontrol + 6 oturum kontrolü genişletildi; otomatik giriş negatif testi yakalandı; parser 17 olay ve gerçek UE logu geçti; 30/30 paket |
+| 7 Ekim öğrenilmiş beceri bütçesi (bu belgeyle aynı commit) | Ücretli kayıtlı beceriyi rütbe/bakiye bütçesine katma; ücretsiz starter ve geçerli legacy hotbar korunur | Önce FAIL checks=0, düzeltme sonrası 12 yeni UE kontrolü; stats-first/skill-first, roundtrip, max ağaç maliyeti ve iade; 31/31 paket |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -78,11 +79,13 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **30/30 geçti**.
+7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **31/31 geçti**.
 Normal Editor derlemesi ayrıca geçti. 15 dosyanın PCH olmadan /W4 derlemesinde
 derleyici uyarısı yok. Veri denetiminde Lv33+ beceri boşluğu uyarıları, StaticLint'te
 InitGameState override beyaz liste uyarısı açık. Yerel test edilen en yüksek gerçek
-kayıt seviyesi 6; 286 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
+kayıt seviyesi 6; 292 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
+Paketten sonra yalnız stats-first fixture kontrolü güçlendirildi; yeniden normal
+ve skill tek-dosya derlemesi ile 12 direct kontrol geçti. Tam paket tekrar edilmedi.
 Son parser sayısal/eksik alan korumaları da bu tam pakette geçti.
 İlk eylemler sunucu controller ömrüne aittir; kalıcı karakterin
 ilk görevi veya gerçek 20 dakika koşusu olarak yorumlanmaz.
@@ -101,6 +104,7 @@ ve katkıdan ayırır. XP hesaplanan ödüldür; tavanda gerçek artış ölçü
 - [Ağ / dedicated sınırları](NETWORK_AUDIT.md)
 - [Güvenlik ve hesap sınırları](SECURITY_AUDIT.md)
 
-Agency-agents rol belgeleri geliştirme/review rehberi olarak kullanılıyor. Bu
-oturumdaki kontrollerde bağımsız paralel ajan çalışmıyor; rol belgeleri ayrı bir
-çalışan ajan veya oyunun runtime AI bağımlılığı olarak sayılmamalıdır.
+Agency-agents rol belgeleri geliştirme/review rehberi olarak kullanılıyor.
+Bu son işte Kepler paralel ajanı salt okunur backend ve QA entegrasyon incelemesi
+yaptı; dosya yazmadı, derleme veya UE testi çalıştırmadı. Önceki işlerin rol
+belgeleri ayrı çalışan ajan veya oyunun runtime AI bağımlılığı değildir.

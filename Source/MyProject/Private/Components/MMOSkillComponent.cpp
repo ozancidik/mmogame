@@ -21,6 +21,74 @@
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
 
+bool UMMOSkillComponent::RunLearnedSkillBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1000000, 1000000, 5000), FRotator::ZeroRotator, Params);
+	if (!Character) { OutError = TEXT("fixture spawn failed"); return false; }
+	const bool bPassed = [&]()
+	{
+		UMMOStatsComponent* S = Character->GetStats(); UMMOSkillComponent* K = Character->GetSkillComponent();
+		if (!S || !K) { OutError = TEXT("fixture components missing"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{ if (!Condition) { OutError = Label; return false; } ++OutChecks; return true; };
+		auto Sum = [&]() { int32 Total = 0; for (int32 Rank : K->MasteryRankArray) Total += Rank; return Total; };
+		auto Load = [&](const FMMOCharacterSaveData& D) { K->ApplySaveData(D); S->ApplySaveData(D); };
+		FMMOCharacterSaveData Paid; Paid.Level = 10; Paid.MasteryRanks.Init(0, MasteryTreeCount);
+		Paid.UnspentSkillPoints = 18; Paid.LearnedSkills = {TEXT("War_PowerStrike"), TEXT("War_ShatterBlow")};
+		Paid.Hotbar.Init(NAME_None, HotbarSize); Paid.Hotbar[0] = TEXT("War_ShatterBlow");
+		Load(Paid);
+		if (!Check(K->IsLearned(TEXT("War_ShatterBlow")) && K->GetMasteryRank(EMMOSkillTree::Special0) == 4
+			&& Sum() == 4 && S->UnspentSkillPoints == 14 && K->Hotbar[0] == TEXT("War_ShatterBlow"), TEXT("paid cached skill retained with zero ranks and full unspent budget"))) return false;
+		FMMOCharacterSaveData D = Paid; D.LearnedSkills.Add(TEXT("War_ShatterBlow")); Load(D);
+		if (!Check(Sum() == 4 && S->UnspentSkillPoints == 14, TEXT("duplicate skill charged twice"))) return false;
+		D.LearnedSkills.Add(TEXT("War_Cleave")); D.LearnedSkills.Add(TEXT("War_MortalBlow")); Load(D);
+		if (!Check(Sum() == 4 && S->UnspentSkillPoints == 14 && K->IsLearned(TEXT("War_MortalBlow")), TEXT("same tree skills summed instead of max rank"))) return false;
+		D = Paid; D.MasteryRanks = {3, 4, 0, 0, 0}; D.UnspentSkillPoints = 11; Load(D);
+		if (!Check(K->MasteryRankArray == D.MasteryRanks && S->UnspentSkillPoints == 11, TEXT("valid mastery changed"))) return false;
+		D = Paid; D.Level = 5; D.MasteryRanks = {5, 5, MAX_int32, 0, 0}; D.UnspentSkillPoints = MAX_int32;
+		D.LearnedSkills.Add(TEXT("War_IronSkin")); D.Hotbar[0] = TEXT("War_IronSkin"); Load(D);
+		if (!Check(Sum() == 8 && S->UnspentSkillPoints == 0 && !K->IsLearned(TEXT("War_IronSkin"))
+			&& !K->IsLearned(TEXT("War_ShatterBlow")) && K->Hotbar[0].IsNone(), TEXT("unfunded or over-level skill survived repaired budget"))) return false;
+		D = Paid; D.MasteryRanks.Reset(); Load(D);
+		if (!Check(Sum() == 4 && S->UnspentSkillPoints == 14 && K->Hotbar[0] == TEXT("War_ShatterBlow"), TEXT("legacy paid skill lost or free"))) return false;
+		FMMOCharacterSaveData Roundtrip; K->FillSaveData(Roundtrip); S->FillSaveData(Roundtrip); Load(Roundtrip);
+		if (!Check(Sum() == 4 && S->UnspentSkillPoints == 14 && K->LearnedSkills == Roundtrip.LearnedSkills
+			&& K->Hotbar == Roundtrip.Hotbar, TEXT("paid skill migration not idempotent"))) return false;
+		D = Paid; D.LearnedSkills.Reset(); D.MasteryRanks.Reset(); Load(D); // Prior runtime ranks deliberately zero.
+		S->ApplySaveData(Paid); const bool bStatsIndependent = S->UnspentSkillPoints == 14;
+		K->ApplySaveData(Paid);
+		if (!Check(bStatsIndependent && Sum() == 4 && S->UnspentSkillPoints == 14, TEXT("stats-first load minted points"))) return false;
+		bool bStartersValid = true;
+		for (EMMOClass Class : {EMMOClass::Warrior, EMMOClass::Archer, EMMOClass::Mage, EMMOClass::Priest})
+		{
+			D = FMMOCharacterSaveData(); D.CharacterClass = Class; D.Level = 1; D.UnspentSkillPoints = MAX_int32;
+			D.MasteryRanks.Init(0, MasteryTreeCount);
+			for (const FMMOSkillDef& Def : FMMOSkillDatabase::GetAll())
+				if (Def.RequiredClass == Class && Def.Tree == EMMOSkillTree::Basic && Def.RequiredLevel == 1) D.LearnedSkills.Add(Def.SkillId);
+			Load(D);
+			bStartersValid = bStartersValid && Sum() == 0 && S->UnspentSkillPoints == 0;
+			for (FName Id : D.LearnedSkills) bStartersValid = bStartersValid && K->IsLearned(Id);
+		}
+		if (!Check(bStartersValid, TEXT("free class starters consumed points or disappeared"))) return false;
+		D = FMMOCharacterSaveData(); D.CharacterClass = EMMOClass::Priest; D.LearnedSkills = {TEXT("Pri_HolyLight")};
+		D.Hotbar.Init(NAME_None, HotbarSize); D.Hotbar[0] = TEXT("Pri_HolyLight"); Load(D);
+		if (!Check(K->IsLearned(TEXT("Pri_Smite")) && K->Hotbar[1] == TEXT("Pri_Smite")
+			&& Sum() == 0 && S->UnspentSkillPoints == 0, TEXT("legacy Priest starter repair charged points"))) return false;
+		D = Paid; D.Level = 2; D.LearnedSkills = {NAME_None, TEXT("UnknownSkill"), TEXT("Mag_Fireball"), TEXT("War_ShatterBlow"), TEXT("War_PowerStrike")}; Load(D);
+		if (!Check(Sum() == 0 && S->UnspentSkillPoints == 2 && K->LearnedSkills.Num() == 1
+			&& K->IsLearned(TEXT("War_PowerStrike")) && K->Hotbar[0].IsNone(), TEXT("invalid skill charged rank or survived"))) return false;
+		Load(Paid); K->ChangeClass(EMMOClass::Mage);
+		return Check(Sum() == 0 && S->UnspentSkillPoints == 18 && !K->IsLearned(TEXT("War_ShatterBlow")), TEXT("class refund exceeded earned skill budget"));
+	}();
+	Character->Destroy(); // No controller: no player save file read/write.
+	return bPassed;
+}
+
 bool UMMOSkillComponent::RunMasteryBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0;
@@ -108,11 +176,32 @@ namespace
 		}
 	};
 	FMMOMasteryBudgetTestExec GMMOMasteryBudgetTestExec;
+	struct FMMOLearnedSkillBudgetTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestLearnedSkillBudget"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMOSkillComponent::RunLearnedSkillBudgetSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_LEARNED_SKILL_BUDGET_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOLearnedSkillBudgetTestExec GMMOLearnedSkillBudgetTestExec;
 }
 #endif
 
 namespace
 {
+	int32 GetMMOMinBasicSkillLevel(EMMOClass Class)
+	{
+		int32 MinLevel = MAX_int32;
+		for (const FMMOSkillDef& Def : FMMOSkillDatabase::GetAll())
+			if (Def.RequiredClass == Class && Def.Tree == EMMOSkillTree::Basic)
+				MinLevel = FMath::Min(MinLevel, Def.RequiredLevel);
+		return MinLevel;
+	}
+
 	int64 GetUtcCooldownExpirySeconds(const FDateTime& UtcNow, float RemainingSeconds)
 	{
 		const FDateTime ExactExpiry = UtcNow + FTimespan::FromSeconds(RemainingSeconds);
@@ -826,6 +915,25 @@ int32 UMMOSkillComponent::SanitizeMasteryRanks(TArray<int32>& Ranks, int32 Level
 	return Budget - Remaining;
 }
 
+int32 UMMOSkillComponent::SanitizeSavedMasteryRanks(TArray<int32>& Ranks, const FMMOCharacterSaveData& In, int32 Level, int32 PointBudget)
+{
+	Ranks = In.MasteryRanks;
+	SanitizeMasteryRanks(Ranks, Level, PointBudget);
+	const EMMOClass Class = static_cast<uint8>(In.CharacterClass) <= static_cast<uint8>(EMMOClass::Priest)
+		? In.CharacterClass : EMMOClass::Warrior;
+	const int32 StarterLevel = GetMMOMinBasicSkillLevel(Class);
+	for (FName SkillId : In.LearnedSkills)
+	{
+		const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
+		if (!Def || Def->RequiredClass != Class || Def->RequiredLevel > Level
+			|| (Def->Tree == EMMOSkillTree::Basic && Def->RequiredLevel == StarterLevel)) continue;
+		const int32 TreeIndex = static_cast<int32>(Def->Tree);
+		if (Ranks.IsValidIndex(TreeIndex)) Ranks[TreeIndex] = FMath::Max(Ranks[TreeIndex], Def->RequiredMasteryRank);
+	}
+	// Same-tree unlocks share one rank cost, not the sum of the old per-skill costs.
+	return SanitizeMasteryRanks(Ranks, Level, PointBudget);
+}
+
 void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 {
 	if (!HasAuthorityInternal())
@@ -841,24 +949,24 @@ void UMMOSkillComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	{
 		Hotbar.SetNum(HotbarSize);
 	}
-	// Mastery rutbeleri: eski kayitlarda bu alan bos gelir (hepsi 0) — ogrenilmis skiller
-	// zaten LearnedSkills'ten dogrudan yuklendigi icin eski kayitlar bozulmaz.
-	MasteryRankArray = In.MasteryRanks;
+	// Old learned-only saves migrate to minimum paid tree ranks within the earned budget.
 	const AMMOCharacter* OwnerCharacter = Cast<AMMOCharacter>(GetOwner());
 	const UMMOStatsComponent* Stats = OwnerCharacter ? OwnerCharacter->GetStats() : nullptr;
 	const int32 SavedLevel = FMath::Clamp(In.Level, 1, Stats ? Stats->MaxLevel : 80);
 	const int32 PointBudget = GetMasteryPointBudget(SavedLevel, Stats ? Stats->SkillPointsPerLevel : 2);
-	SanitizeMasteryRanks(MasteryRankArray, SavedLevel, PointBudget);
+	SanitizeSavedMasteryRanks(MasteryRankArray, In, SavedLevel, PointBudget);
 	if (MasteryRankArray != In.MasteryRanks && !In.MasteryRanks.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: mastery ranks repaired within level %d / point budget %d"), SavedLevel, PointBudget);
 	}
-	// Eski kayitlarin gecerli skillerini, mastery rutbesi sifir olsa da koru.
-	// Ancak baska sinifa ait, bilinmeyen veya henuz seviyesi acilmamis skilleri yukleme.
-	LearnedSkills.RemoveAll([this, SavedLevel](const FName& SkillId)
+	// Keep valid legacy unlocks only when the repaired ranks fund them; starters remain free.
+	const int32 StarterLevel = GetMMOMinBasicSkillLevel(CharacterClass);
+	LearnedSkills.RemoveAll([this, SavedLevel, StarterLevel](const FName& SkillId)
 	{
 		const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
-		return !Def || Def->RequiredClass != CharacterClass || Def->RequiredLevel > SavedLevel;
+		if (!Def || Def->RequiredClass != CharacterClass || Def->RequiredLevel > SavedLevel) return true;
+		const bool bFreeStarter = Def->Tree == EMMOSkillTree::Basic && Def->RequiredLevel == StarterLevel;
+		return !bFreeStarter && Def->RequiredMasteryRank > GetMasteryRank(Def->Tree);
 	});
 	for (FName& SlotSkillId : Hotbar)
 	{

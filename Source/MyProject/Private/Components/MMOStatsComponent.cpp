@@ -963,8 +963,8 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 	const int32 PointsFromLevels = LevelsGained * FMath::Max(0, StatPointsPerLevel);
 	const int32 SkillPointBudget = UMMOSkillComponent::GetMasteryPointBudget(Level, SkillPointsPerLevel);
 	// Use the source save and the same repair rule, independent of component load order.
-	TArray<int32> SavedRanks = In.MasteryRanks;
-	const int32 SpentSkillPoints = UMMOSkillComponent::SanitizeMasteryRanks(SavedRanks, Level, SkillPointBudget);
+	TArray<int32> SavedRanks;
+	const int32 SpentSkillPoints = UMMOSkillComponent::SanitizeSavedMasteryRanks(SavedRanks, In, Level, SkillPointBudget);
 	UnspentSkillPoints = FMath::Clamp(In.UnspentSkillPoints, 0, SkillPointBudget - SpentSkillPoints);
 	// GUVENLIK (docs/SECURITY_AUDIT.md Y-2 + QA): ana statlar ve harcanmamis puan birlikte
 	// dogrulanir: (harcanmis statlar + harcanmamis puan) <= sinif tabani + (Level-1)*StatPointsPerLevel.

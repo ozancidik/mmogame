@@ -17,9 +17,22 @@ seviye bütçesine sığar. Sınıf değişimi tam seviye bütçesini iade eder;
 bakiye/harcama toplamını kullanmaz, taşma veya fazla puan üretmez. 12 izole UE
 kontrolü geçti (ayrıntı §43). Ön koşul sunucunun bozuk/değiştirilmiş kayıt
 yüklemesidir; uzaktan dosya yazma kanıtı değildir. Eski kayıt uyumluluğu için
-geçerli LearnedSkills korunur; bu listenin mastery maliyetine göre tam denetimi,
-kayıt imzası, hesap kimliği ve gerçek istemci PIE kontrolleri açıktır. Y-2 tümüyle
+geçerli LearnedSkills korunur; bu listenin mastery maliyeti sonraki §49
+düzeltmesinde bütçeye katıldı. Kayıt imzası, hesap kimliği ve gerçek istemci PIE
+kontrolleri açıktır. Y-2 tümüyle
 kapatılmadı.
+
+Ek güncelleme 2026-10-07 (§49): LearnedSkills listesinde ücretli beceri varken
+rütbeler sıfır ve harcanmamış puanlar tam bütçe olabiliyordu; UE testi önce
+FAIL checks=0 verdi. Ortak yükleme helper'ı geçerli öğrenilmiş becerilerden
+gereken minimum ağaç rütbesini çıkarır, kayıtlı rütbelerle birleştirip aynı seviye
+bütçesine sığdırır. Aynı ağaçta maksimum rütbe maliyeti kullanılır; ücretsiz
+Basic başlangıç becerileri hariçtir. Bütçesi karşılanmayan beceri/hotbar kaldırılır;
+geçerli eski ücretli beceriler bütçe içinde rütbelere taşınır. Skill ve stat
+yükleme yolları aynı kaynak kaydı hesaplar; yükleme sırası bağımsızdır. 12 yeni
+izole UE kontrolü geçti; gerçek dosya göçü ve uzak istemci PIE açık. Bu, sunucuya
+yüklenen bozuk/değiştirilmiş kayıt senaryosudur; uzaktan kayıt değiştirme kanıtı
+değildir. Hesap kimliği, imza ve atomik ticaret bu düzeltmeyle kapanmadı.
 
 Tarih: 2026-10-04. Yöntem: yalnızca statik inceleme (kod okuma, grep, git geçmişi taraması, motor kaynağı doğrulaması). Hiçbir dosya düzenlenmedi, derleme/commit/push yapılmadı, oyun çalıştırılmadı. Bu dosya tek yazma çıktısıdır.
 
