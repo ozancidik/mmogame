@@ -17,6 +17,7 @@
 #include "HAL/PlatformTime.h"
 #include "World/MMOQuestGiverNPC.h"
 #if !UE_BUILD_SHIPPING
+#include "Save/MMOCharacterSaveJson.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
@@ -24,6 +25,154 @@
 #endif
 
 #if !UE_BUILD_SHIPPING
+bool UMMOQuestComponent::RunRewardCapacitySelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	TArray<AActor*> Fixtures;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Origin(1000000, 1000000, 5000);
+		AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Origin, FRotator::ZeroRotator, Params);
+		AMMOCharacter* ExpectedCharacter = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Origin + FVector(5000, 0, 0), FRotator::ZeroRotator, Params);
+		AMMOQuestGiverNPC* Giver = World->SpawnActor<AMMOQuestGiverNPC>(AMMOQuestGiverNPC::StaticClass(), Origin, FRotator::ZeroRotator, Params);
+		if (Character) Fixtures.Add(Character);
+		if (ExpectedCharacter) Fixtures.Add(ExpectedCharacter);
+		if (Giver) Fixtures.Add(Giver);
+		if (!Character || !ExpectedCharacter || !Giver) { OutError = TEXT("fixture spawn failed"); return false; }
+		UMMOQuestComponent* Quests = Character->GetQuestComponent();
+		UMMOStatsComponent* Stats = Character->GetStats();
+		UMMOStatsComponent* ExpectedStats = ExpectedCharacter->GetStats();
+		UMMOInventoryComponent* Inv = Character->GetInventory();
+		const FMMOQuestDef* Consumable = FMMOQuestDatabase::Find(TEXT("Q_Goblins"));
+		const FMMOQuestDef* Equipment = FMMOQuestDatabase::Find(TEXT("Q_Boss"));
+		if (!Quests || !Stats || !ExpectedStats || !Inv || !Consumable || !Equipment
+			|| Consumable->RewardConsumableId.IsNone() || Consumable->RewardConsumableCount < 2
+			|| !Consumable->RewardEquipmentId.IsNone() || !FMMOItemDatabase::Find(Equipment->RewardEquipmentId)
+			|| !Equipment->RewardConsumableId.IsNone())
+		{ OutError = TEXT("fixture data unavailable"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		auto Prepare = [&](const FMMOQuestDef& Def)
+		{
+			FMMOCharacterSaveData Seed;
+			Seed.Level = FMath::Max(1, Def.RequiredLevel);
+			Stats->ApplySaveData(Seed);
+			ExpectedStats->ApplySaveData(Seed);
+			Inv->Items.Reset();
+			Inv->EquipmentBag.Reset();
+			Inv->Gold = 1000;
+			Quests->ActiveQuests.Reset();
+			Quests->CompletedQuests.Reset();
+			if (!Def.PrereqQuestId.IsNone()) Quests->CompletedQuests.Add(Def.PrereqQuestId);
+			FMMOQuestProgress Ready;
+			Ready.QuestId = Def.QuestId;
+			Ready.KillProgress = Def.TargetCount;
+			Quests->ActiveQuests.Add(Ready);
+		};
+		auto Snapshot = [&]()
+		{
+			FMMOCharacterSaveData Data;
+			Stats->FillSaveData(Data);
+			Inv->FillSaveData(Data);
+			Quests->FillSaveData(Data);
+			return Data;
+		};
+		auto UnchangedClaim = [&](const FMMOQuestDef& Def, const TCHAR* Label)
+		{
+			const FMMOCharacterSaveData Before = Snapshot();
+			const float Health = Stats->Health, Mana = Stats->Mana;
+			const bool bDead = Stats->bIsDead;
+			Quests->ClaimReward(Def.QuestId);
+			TArray<FString> Differences;
+			FMMOCharacterSaveJson::FindDifferences(Before, Snapshot(), Differences);
+			return Check(Differences.IsEmpty() && Stats->Health == Health && Stats->Mana == Mana
+				&& Stats->bIsDead == bDead, Label);
+		};
+		auto CompleteClaim = [&](const FMMOQuestDef& Def, int32 ExpectedItems, int32 ExpectedBagSize, const TCHAR* Label)
+		{
+			ExpectedStats->GainExperience(Def.RewardXP);
+			Quests->ClaimReward(Def.QuestId);
+			bool bRewardOK = Stats->Level == ExpectedStats->Level && Stats->Experience == ExpectedStats->Experience
+				&& Stats->UnspentStatPoints == ExpectedStats->UnspentStatPoints
+				&& Stats->UnspentSkillPoints == ExpectedStats->UnspentSkillPoints
+				&& Inv->Gold == 1000 + Def.RewardGold && Inv->EquipmentBag.Num() == ExpectedBagSize
+				&& Quests->IsCompleted(Def.QuestId) && !Quests->IsQuestActive(Def.QuestId);
+			if (!Def.RewardConsumableId.IsNone()) bRewardOK &= Inv->GetItemCount(Def.RewardConsumableId) == ExpectedItems;
+			if (!Def.RewardEquipmentId.IsNone() && !Inv->EquipmentBag.IsEmpty())
+			{
+				const FMMOEquipmentInstance& Granted = Inv->EquipmentBag.Last();
+				bRewardOK &= Granted.IsValidInstance() && Granted.ItemId == Def.RewardEquipmentId
+					&& Granted.Plus == 0 && Granted.Rarity == EMMOItemRarity::Common;
+			}
+			return Check(bRewardOK, Label);
+		};
+		auto FillStacks = [&](int32 Count)
+		{
+			for (int32 Index = 0; Index < Count; ++Index)
+				Inv->AddItem(FName(*FString::Printf(TEXT("QuestCapacityFixture%d"), Index)), 1);
+		};
+		// Hazir gorev bellekten kurulur; gercek av/kabul/RPC veya oyuncu dosyasi testi degildir.
+		Prepare(*Consumable);
+		Inv->AddItem(Consumable->RewardConsumableId, UMMOInventoryComponent::MaxStackSize);
+		if (!UnchangedClaim(*Consumable, TEXT("full stack changed reward or quest"))) return false;
+		Prepare(*Consumable);
+		Inv->AddItem(Consumable->RewardConsumableId, UMMOInventoryComponent::MaxStackSize - Consumable->RewardConsumableCount + 1);
+		if (!UnchangedClaim(*Consumable, TEXT("partial room granted partial reward"))) return false;
+		Inv->RemoveItem(Consumable->RewardConsumableId, 1);
+		if (!CompleteClaim(*Consumable, UMMOInventoryComponent::MaxStackSize, 0, TEXT("exact stack fit reward incomplete"))) return false;
+		if (!UnchangedClaim(*Consumable, TEXT("duplicate consumable reward changed state"))) return false;
+		Prepare(*Consumable);
+		FillStacks(UMMOInventoryComponent::MaxItemStacks);
+		if (!UnchangedClaim(*Consumable, TEXT("full stack list changed reward or quest"))) return false;
+		Inv->Items.RemoveAt(0);
+		if (!CompleteClaim(*Consumable, Consumable->RewardConsumableCount, 0, TEXT("freed stack slot reward incomplete"))) return false;
+		if (Inv->Items.Num() != UMMOInventoryComponent::MaxItemStacks) { OutError = TEXT("freed slot count incorrect"); return false; }
+		Prepare(*Consumable);
+		FillStacks(UMMOInventoryComponent::MaxItemStacks - 1);
+		Inv->AddItem(Consumable->RewardConsumableId, UMMOInventoryComponent::MaxStackSize - Consumable->RewardConsumableCount);
+		if (!CompleteClaim(*Consumable, UMMOInventoryComponent::MaxStackSize, 0, TEXT("existing stack in full list not rewarded"))) return false;
+		if (Inv->Items.Num() != UMMOInventoryComponent::MaxItemStacks) { OutError = TEXT("existing stack created extra slot"); return false; }
+		Prepare(*Equipment);
+		for (int32 Index = 0; Index < UMMOInventoryComponent::MaxBagSize; ++Index) Inv->AddEquipmentInstance(TEXT("ShortSword"));
+		if (!UnchangedClaim(*Equipment, TEXT("full equipment bag changed reward or quest"))) return false;
+		Inv->EquipmentBag.RemoveAt(0);
+		if (!CompleteClaim(*Equipment, 0, UMMOInventoryComponent::MaxBagSize, TEXT("freed equipment slot reward incomplete"))) return false;
+		return UnchangedClaim(*Equipment, TEXT("duplicate equipment reward changed state"));
+	}();
+	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
+	// Controllersiz ve tek senkron kare: AutoLoadDeferred/oyuncu kaydi calismaz.
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOQuestRewardCapacityTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestQuestRewardCapacity"))) return false;
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = UMMOQuestComponent::RunRewardCapacitySelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_QUEST_CAPACITY_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOQuestRewardCapacityTestExec GMMOQuestRewardCapacityTestExec;
+}
+
 bool UMMOQuestComponent::RunRewardLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0;

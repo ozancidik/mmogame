@@ -873,3 +873,47 @@ Summer 50 / Winter 27 mob dogumu, iki smoke'ta 0 hata; NetSmoke 1 join / 1
 welcome, iki tarafta 0 hata (yalniz baglanti). Lv33+ beceri bosluklari ve
 StaticLint InitGameState beyaz liste uyarisi acik. Gercek ilk eylem sureleri
 ve PIE ag/oynanis kaniti bu test paketinden cikarilmaz.
+
+## 45. Mevcut gorev odulu kapasite kurallarinin regresyonu (2026-10-07)
+
+ClaimReward zaten ekipman cantasi ve sarf yigin/listesi kapasitesini odulden
+ONCE dogruluyordu; bu calisma yeni exploit duzeltmesi veya kural degisikligi
+degildir. Non-Shipping `MMOTestQuestRewardCapacity` ve
+`TestQuestRewardCapacity.ps1` eklendi, RunAllChecks'e alindi. Fixture sunucu
+oyun dunyasinda controllersiz iki karakter ve yakin gorevli kurar; hazir
+Q_Goblins/Q_Boss gorevini bellekten tohumlar. Gercek av/kabul zinciri degildir.
+Ayni senkron cagrida aktorler yok edilir; oyuncu diski okunmaz/yazilmaz.
+
+10 kontrol: dolu 999 yigin reddi; 3 iksir icin yalniz 2 yer reddi; tam 3 yer
+acinca tam XP/altin/iksir; tekrar teslim; 64 tur listesinde yeni tur reddi;
+bir tur bosaltinca odul; 64 tur doluyken mevcut yigina tam sigma; 12 ekipman
+cantasi reddi; bir yer acinca tam XP/altin/GreatSword +0/Common; tekrar teslim.
+Ret/tekrarda Stats + Inventory + Quest FillSaveData alanlari yansima ile
+FindDifferences uzerinden esit, can/mana/oluluk ayrica esit. Bu karsilastirma
+esya InstanceId/NextInstanceId ve aktif/tamam gorev durumunu da kapsar.
+Basarili XP seviye/bakiye/puan etkisi ayri karakterin GainExperience yoluyla
+karsilastirilir. Test sentetik sarf turleri kullanir; gercek 64 tur icerigi
+veya HUD kaniti degildir. Otorite/replikasyon/oyuncu kayit semasi degismedi.
+
+Ilk derlemede testteki FMMOItemDatabase adinin F oneki eksikti; duzeltildi,
+normal Editor derlemesi ve **PASS checks=10** alindi. Negatif kontrolde yalniz
+uretim sarf kapasite on kosulu gecici olarak `< 0` yapildi; mutant derlendi,
+test **FAIL checks=0 reason=full stack changed reward or quest**, script exit=1
+ile hatayi yakaladi (motor normal exit=0; marker denetimi hatayi gordu).
+Kaynak tam eski byte'lariyla finally'de geri kondu, DLL yeniden derlendi ve
+**PASS checks=10** tekrar alindi. Mutant commit edilmedi. Shipping'de fixture
+ve console komutu yoktur. Agency-agents Unreal Multiplayer Architect ve
+Test Results Analyzer rol rehberleri kullanildi; bagimsiz paralel ajan yok.
+
+Gercek istemci RPC/HUD, ag gecikmesinde cift teslim, kaydet/yeniden giris ve
+av zinciri PIE'de OYNANMADI; PLAYTEST_CHECKLIST.md'ye acik adimlar eklendi.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **27/27 GECTI**. Normal Editor
+derlemesi ayrica gecti; 15 dosya PCH'siz /W4, 0 derleyici uyarisi. JSON 111
+negatif; 268 yerel yuva `loaded=268 invalid=0 loadFailed=0 existsMismatch=0
+json ok=268 mismatch=0 maxLevel=6`, `writeorder ok=1`, `roundtrip equal=1`.
+Yeni kapasite ve onceki gorev/ilk eylem/gecis/parti/callback/klan/loot/iksir/
+ekipman/stat/mastery/satici regresyonlari gecti. Summer 50 / Winter 28 mob
+dogumu, smoke hata=0; NetSmoke 1 join / 1 welcome, server/client hata=0.
+NetSmoke yalniz baglanti kanitidir. Lv33+ beceri bosluklari ve StaticLint
+InitGameState beyaz liste uyarisi acik; PIE ve dedicated Server isi kapanmadi.

@@ -3938,3 +3938,26 @@ durumu ve ödül kuralları değişmedi.
   Önceki oturumdaki aktif görevin ilk teslimi ilk kabulden önce gelebilir.
 - [ ] İlk olay olmayan/eski loglarda `?`/bilinmiyor; ilk öldürme/loot/ekipman ve
   gerçek 20 dk sınıf/parti süreleri ayrıca açık.
+
+## Görev ödülünde çanta/yığın kapasitesi — 2026-10-07 (PIE açık)
+
+`TestQuestRewardCapacity.ps1` 10 izole UE kontrolünde dolu 999'luk yığın,
+ödülden bir adet eksik yer, tam sığma, 64 farklı yığın sınırı, mevcut yığına
+ekleme, dolu 12 ekipmanlık çanta, yer açıp tekrar teslim ve çift teslimi sınadı.
+Ret/tekrarda Stats + Inventory + Quest kayıt alanları ve can/mana/ölülük aynı
+kalır. Hazır görev doğrudan bellekten kurulur; gerçek av/kabul, disk kaydı,
+uzak istemci RPC'si ve HUD doğrulaması değildir. Mevcut kapasite kuralları
+değişmedi. Fixture controllersizdir ve aynı çağrıda yok edilir.
+
+- [ ] Host ve uzak istemcide Q_Goblins hazırken can iksiri 999 veya 997 olsun:
+  teslim reddedilmeli, XP/altın/iksir ve görev durumu korunmalı; HUD nedeni
+  göstermeli. 996'ya düşürüp teslim et: 3 iksir ve tam XP/altın bir kez gelsin.
+- [ ] Sarf listesi 64 türle doluyken yeni ödül türü sığmamalı; yer açınca teslim
+  edilmeli. Aynı ödül türü zaten varsa yığın sınırına kadar eklenebilmeli.
+  Otomatik fixture sentetik türler kullanır; gerçek içerik/HUD kapasitesi ayrıca
+  doğrulanmalı, oyuncu kaydına sentetik test türleri eklenmemeli.
+- [ ] Q_Boss hazırken 12 ekipmanlık çanta: ret sonrası görev/XP/altın ve bütün
+  eşya kimlikleri kalmalı; bir yer açınca GreatSword +0/Common bir kez gelsin.
+- [ ] Gecikmeli ağda teslimi tekrar tıkla; yalnız bir ödül ve tamamlanmış görev
+  görünmeli. Reddedilen teslimden sonra kaydet/yeniden girip yer aç: hazır görev
+  korunmalı. Gerçek dosya ve iki istemcili koşu henüz oynanmadı.

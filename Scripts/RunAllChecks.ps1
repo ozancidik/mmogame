@@ -136,6 +136,11 @@ Step "Gorev odulunde oluluk ve tek sefer teslim" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Gorev odulunde yigin ve canta kapasitesi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestQuestRewardCapacity.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ilk gorev kontrolcu oturumu ve tekillik" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstQuestMetrics.ps1") | Out-Host
     $LASTEXITCODE -eq 0

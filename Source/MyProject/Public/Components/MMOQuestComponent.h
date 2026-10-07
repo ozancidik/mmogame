@@ -59,6 +59,7 @@ public:
 
 #if !UE_BUILD_SHIPPING
 	static bool RunRewardLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunRewardCapacitySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
