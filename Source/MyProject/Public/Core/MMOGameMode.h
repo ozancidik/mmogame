@@ -57,6 +57,10 @@ public:
 	UFUNCTION(Exec)
 	void MMOTestZoneTravelDeferredSaveFailure();
 
+	// Izole callback bariyeri: cift/gecikmis/yabanci sonuc ve ilk hata/ayrilma reddi.
+	UFUNCTION(Exec)
+	void MMOTestZoneTravelCallbacks();
+
 	// Listen server hostunun tum bagli oyunculari Summer/Winter arasinda tasimasi.
 	// Her karakter basariyla kaydedilmeden harita degismez.
 	bool RequestZoneTravel(APlayerController* Requester, FString& OutFailureReason);

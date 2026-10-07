@@ -3716,3 +3716,19 @@ oynanmadı. Dört oyunculu test gereklidir; iki oyuncu ile iki mevcut grup kurul
   aynı üyeleri ve davetçi liderini görmelidir; HUD güncellenmelidir.
 - [ ] Bir üyenin solo oyuncu daveti normal çalışmalı; eski lider korunmalıdır. Toplam
   dokuz kişiye taşma reddedilmeli; sekiz kişinin listesi simetrik kalmalıdır.
+
+## Bölge geçişi callback bütünlüğü — 2026-10-07
+
+Headless test gerçek GameMode callback girişini 9 senaryoda denetledi. Fixture pending
+karakter kümesini kurar; gerçek bulut mağazası, iki oyunculu gecikmiş callback veya
+motorun yükleme fazı oynanmadı. Başarı onayı sonrası ikinci hata aynı oyuncunun onayını
+geri almamalı; eski/yabancı/geç callback bariyere dokunmamalıdır.
+
+- [ ] Gecikmeli mağaza ile iki oyunculu PIE'de A başarı, A ikinci hata, B başarı sırasını
+  uygula: ikinci A sonucu kilidi açmamalı; B tamamlanınca tek geçiş başlamalıdır.
+- [ ] A'nın ilk sonucu hata olsun: herkes kaynak haritada kalmalı; kilit/zamanlayıcı
+  temizlenmeli, yeni geçiş isteği kabul edilmelidir.
+- [ ] İptal sonrası yeni isteği başlatırken eski isteğin sonucunu gönder; yeni bariyer
+  bozulmamalıdır. Ayrılmış pawn için gelen başarı da ilerleme olarak sayılmamalıdır.
+- [ ] Motor geçişi başlattıktan sonra aynı isteğin başarı/hata sonucunu tekrar gönder:
+  kaynak GameMode geçiş kilidi erken açılmamalı, ikinci ServerTravel başlamamalıdır.

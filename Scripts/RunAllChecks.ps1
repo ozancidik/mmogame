@@ -114,6 +114,11 @@ Step "Parti birlesme lider onayi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Bolge gecisi callback bariyeri" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravelCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

@@ -83,6 +83,111 @@ void AMMOGameMode::MMOTestZoneTravelDeferredSaveFailure()
 #endif
 }
 
+void AMMOGameMode::MMOTestZoneTravelCallbacks()
+{
+#if !UE_BUILD_SHIPPING
+	UWorld* World = GetWorld();
+	if (!World || !HasAuthority() || bZoneTravelInProgress || !PendingZoneTravelCharacters.IsEmpty()
+		|| !CompletedZoneTravelSaves.IsEmpty() || PendingZoneTravelSaves != 0
+		|| World->GetTimerManager().IsTimerActive(ZoneTravelSaveTimeoutHandle))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[MMO_ZONE_TRAVEL_CALLBACK_TEST] FAIL unavailable or active travel"));
+		return;
+	}
+	const FString OriginalAbortReason = LastZoneTravelAbortReason;
+	TArray<AMMOCharacter*> Actors;
+	int32 Checks = 0;
+	FString Error;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		for (int32 I = 0; I < 3; ++I)
+		{
+			AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
+			if (!Character) { Error = TEXT("fixture spawn failed"); return false; }
+			Actors.Add(Character);
+		}
+		const TWeakObjectPtr<AMMOCharacter> A(Actors[0]);
+		const TWeakObjectPtr<AMMOCharacter> B(Actors[1]);
+		const TWeakObjectPtr<AMMOCharacter> Foreign(Actors[2]);
+		auto BeginBarrier = [&]()
+		{
+			++ZoneTravelRequestSerial;
+			bZoneTravelInProgress = true;
+			PendingZoneTravelCharacters = { A, B };
+			CompletedZoneTravelSaves.Reset();
+			PendingZoneTravelSaves = 2;
+			PendingZoneTravelSourceMap = TEXT("CallbackTestSource");
+			PendingZoneTravelTargetMap = TEXT("CallbackTestTarget");
+			World->GetTimerManager().SetTimer(ZoneTravelSaveTimeoutHandle,
+				FTimerDelegate::CreateUObject(this, &AMMOGameMode::HandleZoneTravelSaveTimeout, ZoneTravelRequestSerial),
+				ZoneTravelSaveTimeoutSeconds, false);
+		};
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { Error = Label; return false; }
+			++Checks;
+			return true;
+		};
+		auto Waiting = [&](int32 Remaining, int32 Completed)
+		{
+			return bZoneTravelInProgress && PendingZoneTravelSaves == Remaining
+				&& CompletedZoneTravelSaves.Num() == Completed && PendingZoneTravelCharacters.Num() == 2
+				&& World->GetTimerManager().IsTimerActive(ZoneTravelSaveTimeoutHandle);
+		};
+		auto Aborted = [&]()
+		{
+			return !bZoneTravelInProgress && PendingZoneTravelSaves == 0 && PendingZoneTravelCharacters.IsEmpty()
+				&& CompletedZoneTravelSaves.IsEmpty() && PendingZoneTravelSourceMap.IsEmpty()
+				&& PendingZoneTravelTargetMap.IsEmpty() && !World->GetTimerManager().IsTimerActive(ZoneTravelSaveTimeoutHandle);
+		};
+		BeginBarrier();
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, Foreign, true);
+		if (!Check(Waiting(2, 0), TEXT("foreign success opened barrier"))) { return false; }
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, Foreign, false);
+		if (!Check(Waiting(2, 0), TEXT("foreign failure aborted"))) { return false; }
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial - 1, A, false);
+		if (!Check(Waiting(2, 0), TEXT("old request aborted"))) { return false; }
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, A, true);
+		if (!Check(Waiting(1, 1) && CompletedZoneTravelSaves.Contains(A), TEXT("first success not counted"))) { return false; }
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, A, true);
+		if (!Check(Waiting(1, 1), TEXT("duplicate success counted"))) { return false; }
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, A, false);
+		if (!Check(Waiting(1, 1), TEXT("duplicate failure revoked success"))) { return false; }
+		// FinishZoneTravel sonrasi fazi taklit et: travel kilidi acik, kayit bariyeri bos.
+		World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);
+		PendingZoneTravelCharacters.Reset();
+		CompletedZoneTravelSaves.Reset();
+		PendingZoneTravelSaves = 0;
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, A, true);
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, A, false);
+		if (!Check(bZoneTravelInProgress && PendingZoneTravelTargetMap == TEXT("CallbackTestTarget")
+			&& PendingZoneTravelSaves == 0 && CompletedZoneTravelSaves.IsEmpty(), TEXT("late callback changed travel phase"))) { return false; }
+		BeginBarrier();
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, B, false);
+		if (!Check(Aborted() && LastZoneTravelAbortReason == TEXT("Bir karakter kaydedilemedi; gecis iptal edildi"), TEXT("first failure not aborted"))) { return false; }
+		BeginBarrier();
+		Actors[0]->Destroy();
+		HandleZoneTravelSaveComplete(ZoneTravelRequestSerial, A, true);
+		if (!Check(Aborted() && LastZoneTravelAbortReason == TEXT("Bir oyuncu kayit sirasinda ayrildi; gecis iptal edildi"), TEXT("expired character success counted"))) { return false; }
+		return true;
+	}();
+	// Yalniz fixture bariyeri kurulmustur; canli oyunculara kayit veya ServerTravel uygulanmaz.
+	World->GetTimerManager().ClearTimer(ZoneTravelSaveTimeoutHandle);
+	bZoneTravelInProgress = false;
+	PendingZoneTravelSaves = 0;
+	PendingZoneTravelCharacters.Reset();
+	CompletedZoneTravelSaves.Reset();
+	PendingZoneTravelSourceMap.Reset();
+	PendingZoneTravelTargetMap.Reset();
+	LastZoneTravelAbortReason = OriginalAbortReason;
+	for (AMMOCharacter* Character : Actors) { if (IsValid(Character)) { Character->Destroy(); } }
+	UE_LOG(LogTemp, Display, TEXT("[MMO_ZONE_TRAVEL_CALLBACK_TEST] %s checks=%d reason=%s"),
+		bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+#endif
+}
+
 void AMMOGameMode::ScheduleZoneTravelTest(bool bExpectTimeout, bool bExpectStateChange, bool bExpectFlushFailure)
 {
 #if !UE_BUILD_SHIPPING
@@ -571,8 +676,17 @@ void AMMOGameMode::ClearZoneTravelTestHooks()
 
 void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, const TWeakObjectPtr<AMMOCharacter>& Character, bool bSuccess)
 {
-	if (!bZoneTravelInProgress || RequestSerial != ZoneTravelRequestSerial)
+	check(IsInGameThread()); // IMMOCharacterStore callback sozlesmesi; bariyer kilitsizdir.
+	if (!bZoneTravelInProgress || RequestSerial != ZoneTravelRequestSerial
+		|| !PendingZoneTravelCharacters.Contains(Character))
 	{
+		return;
+	}
+	// Ilk sonuc kesindir: yinelenen BASARISIZLIK da tamamlanmis oyuncunun onayini geri alamaz.
+	// Pending kumesi ServerTravel'dan sonra bosalir; eski callback'ler gecis kilidini acamaz.
+	if (CompletedZoneTravelSaves.Contains(Character))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Zone travel: duplicate save callback ignored"));
 		return;
 	}
 #if !UE_BUILD_SHIPPING
@@ -588,15 +702,12 @@ void AMMOGameMode::HandleZoneTravelSaveComplete(uint64 RequestSerial, const TWea
 		AbortZoneTravel(RequestSerial, TEXT("Bir karakter kaydedilemedi; gecis iptal edildi"));
 		return;
 	}
-	// Ayni karakter icin ikinci basari callback'i (bulut tekrar-deneme) sayilmaz: bariyer yalniz GERCEKTEN
-	// kaydi biten benzersiz karakterlerle acilir.
-	bool bAlreadyCompleted = false;
-	CompletedZoneTravelSaves.Add(Character, &bAlreadyCompleted);
-	if (bAlreadyCompleted)
+	if (!Character.IsValid())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Zone travel: duplicate save callback ignored"));
+		AbortZoneTravel(RequestSerial, TEXT("Bir oyuncu kayit sirasinda ayrildi; gecis iptal edildi"));
 		return;
 	}
+	CompletedZoneTravelSaves.Add(Character);
 	PendingZoneTravelSaves = FMath::Max(0, PendingZoneTravelCharacters.Num() - CompletedZoneTravelSaves.Num());
 	if (PendingZoneTravelSaves <= 0)
 	{

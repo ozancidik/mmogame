@@ -421,3 +421,34 @@ Agency-agents Unreal Multiplayer Architect ve Test Results Analyzer rol belgeler
 kullanildi; bagimsiz paralel ajan calistirilmadi. Siradaki yuksek etkili isler: O6
 snapshot-sonrasi ilerleme/yazim sirasi, iki-surecli admin/PvP dogrulamasi, mevcut
 Lv1-30 dikey dilim eksikleri. Bu tur yalniz parti birlesme yetkisini kapatti.
+
+## 33. O6: gecis kayit callback'lerini istek/karakter basina tek kez uygula (2026-10-07)
+
+`HandleZoneTravelSaveComplete` eskiden hata sonucunu completed denetiminden ONCE
+isliyordu. Basarili oyuncu icin sonradan gelen ikinci hata, diger oyuncular beklerken
+tum gecisi iptal edebiliyordu. `ServerTravel` basladiktan sonra ayni seri numarasinin
+gec sonucu da eski GameMode gecis kilidini temizleyebiliyordu. Simdi once seri numarasi,
+pending kumesi ve tamamlanmis karakter denetlenir; ikinci sonuc/yabanci karakter/gec
+sonuc bariyere dokunmaz. Ilk hata ve gecersizlesmis pending karakter iptal yoluna girer.
+Oyun is parcacigi sozlesmesi check ile denetlenir. Yerel magaza callback'i normalde
+tek/senkron gelir; bu sertlestirme gelecekteki gecikmeli magaza hazirligidir.
+
+Normal UE 5.7 editor derlemesi GECTI. `RunAllChecks.ps1 -SkipBuild -FullCompile`
+**16/16 GECTI**: 11 dosya PCH'siz /W4, 0 derleyici uyarisi; JSON 111 negatif;
+196 yerel yuva `loaded=196 invalid=0 loadFailed=0 json ok=196 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`; normal/timeout/durum/ertelenen hata gecisleri;
+parti 10 senaryo; yeni callback 9 senaryo; Summer 52 / Winter 31 mob dogumu, 0 hata;
+NetSmoke 1 server join / 1 client welcome, iki tarafta 0 hata. Lv33+ beceri boslugu
+ve StaticLint InitGameState beyaz liste uyarilari onceki gibi acik.
+
+`TestZoneTravelCallbacks.ps1`: `PASS checks=9`, iki beklenen iptal logu. Gercek GameMode
+callback girisi, uc controllersiz fixture karakterle denetlenir; pending bariyeri ve
+travel-basladi fazini test kodu kurar. Gercek bulut, iki oyunculu async callback ya da
+motor travel fazi testi DEGILDIR; PIE listesinde bekliyor. Normal travel ayri regresyon
+testinde basladi. Test komutunun Shipping govdesi bostur. Fixture oyuncu kaydi yazmaz.
+
+Agency-agents Backend Architect (idempotency/terminal sonuc) ve Unreal Multiplayer
+Architect rol belgelerinden yararlanildi; bagimsiz paralel ajan calistirilmadi.
+O6'nin depoda Revision/seri yazim/iptal ve snapshot-sonrasi XP/altin penceresi acik.
+Sonraki sinirli is secimi bu konularin veya iki-surecli admin/PvP dogrulamasinin
+mevcut kaynakta kanitlanabilen kismindan yapilacak; bu tur O6 tumden kapatilmadi.

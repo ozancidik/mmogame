@@ -226,6 +226,18 @@ davet ezmeme/aynı daveti yenilememe koruması zaten vardır.
   zorunlu kayıt temizler. `TestZoneTravelDeferredSave.ps1` iki ardışık flush hatasını
   enjekte edip iptali, işaretin korunmasını ve başarılı yeniden kayıtta temizliğini doğrular.
   Gerçek disk arızası, gecikmeli bulut mağazası ve iki oyunculu PIE doğrulanmadı.
+- **2026-10-07 callback bütünlüğü:** başarılı karakter kaydının ikinci hata sonucu artık
+  başarıyı geri alamaz. `HandleZoneTravelSaveComplete` önce istek seri numarası, pending
+  karakter üyeliği ve completed kümesini denetler; bariyer dışındaki sonuçlar yok sayılır.
+  `ServerTravel` başladıktan sonra boşalan pending kümesi, gecikmiş sonucun geçiş kilidini
+  sıfırlamasını önler. İlk gerçek kayıt hatası/ayrılmış karakter geçişi hâlâ iptal eder.
+  Oyun iş parçacığı sözleşmesi `check(IsInGameThread())` ile denetlenir. Yeni headless
+  `TestZoneTravelCallbacks.ps1`, doğrudan gerçek GameMode girişinde **9 senaryo geçti**:
+  yabancı başarı/hata, eski istek, ilk başarı, yinelenen başarı/hata, geçiş başladı fazında
+  geç sonuç, ilk hata ve geçersiz karakter. Test pending kümesini controllersiz fixture
+  karakterlerle kurar; gerçek iki oyunculu bulut callback'i/travel başlatmaz. Diğer normal
+  geçiş/timeout testleri ayrı kanıttır. Depoda yazım sırası/iptal ve XP/altın anlık görüntü
+  penceresi bu değişiklikle çözülmedi; O6'nın bu bölümleri açık kalır.
 - Seamless sonrası yeni pawn 0.6 sn boyunca varsayılan durumda (kayıt yüklenmedi; `bInitialLoadComplete=false` olduğu için kayıt yazılmıyor — iyi). Bu pencerede girilen `/klan`, `/arkadas`, ticaret komutları `ApplySaveData` ile ezilir (MMOClanComponent.cpp:567-640, MMOFriendsComponent.cpp:287-308) — zararsız ama komutlar "başarılı" görünür. İstersen `bInitialLoadComplete` olmadan RPC'leri reddet.
 - Bağlantı kopması: Trade ve Klan EndPlay'ı doğru; Friends `AnnouncePresence(false)` yalnız `Destroyed` + `!bTravelSaveCommitted` (MMOCharacter.cpp:399) — doğru. `static GAnnounced` (MMOFriendsComponent.cpp:250) süreç ömrü boyunca büyür, PIE'de sunucu/istemci aynı süreçte paylaşılır (D6).
 - Parti, bölge geçişinde dağılır (EndPlay `RequestLeave`, MMOCharacter.cpp:393-396); kalıcı değil — tasarım notu.
