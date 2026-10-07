@@ -3818,3 +3818,24 @@ gerçek uzak istemci, gecikme/HUD ve kayıt kalıcılığı PIE'de oynanmadı.
   ölümde ret ve normal can iksiri davranışı korunmalıdır.
 - [ ] Kaydet/yeniden giriş: reddedilen iksir adetleri korunmalı, geçerli kullanımın
   harcadığı tek adet kalıcı olmalıdır. Mana havuzu sıfır olan fixture'da mana harcanmamalı.
+
+## Kayıtlı ekipmanda seviye şartı ve kayıpsız kurtarma — 2026-10-07
+
+Bilinen kayıtlı ekipman, karakter seviyesi yetmiyorsa bonus vermeden çantaya veya
+depoya taşınır. UE izole testinde 11 kontrol geçti; FillSaveData/ApplySaveData turu
+bellekte yapıldı. Gerçek .sav/JSON yeniden giriş, RPC, HUD ve replikasyon oynanmadı.
+Denemelerde gerçek oyuncu kayıtları yerine ayrı test karakteri ve kayıt yedeği kullan.
+
+- [ ] Lv1 test kaydında kuşanılmış LongSword (Lv3) ve PlateArmor (Lv5) ile yeniden
+  gir: iki slot boş, saldırı/savunma bonusu yok; eşya kimliği, + seviyesi ve nadirliği
+  çantada korunmalıdır. Uzak istemci ile sunucu değerlerini karşılaştır.
+- [ ] Çanta doluyken aynı yükleme ekipmanı depoya taşımalı. Depo da doluysa mevcut
+  kayıpsız kurtarma politikası kapasiteyi aşabilir; eşya silinmemeli. Yeni depolama
+  kapasite kuralı korunmalı; kurtarılan eşyayı alıp kaydet/yeniden girerek karşılaştır.
+- [ ] Lv3 LongSword ve Lv5 PlateArmor yüklendiğinde normal kuşanım ve bonus çalışmalı;
+  düşük seviyede elle yeniden kuşanma RPC'si reddedilmeli. HUD güncellemelerini izle.
+- [ ] Yanlış slottaki bilinen ekipman geri taşınmalı. Veritabanında artık bulunmayan
+  eşyanın kimliği kayıtta korunmalı ve bonus üretmemeli; normal Lv1 LeatherArmor
+  davranışı korunmalıdır. Aynı InstanceId bulunan fixture'da kimlikler ayrılmalıdır.
+- [ ] Kurtarılan ekipmanı kaydet/çık/yeniden yükle: ikinci yükleme eşya çoğaltmamalı
+  veya silmemeli. Bu kontrol kayıt imzası/hesap doğrulaması sağlandığı anlamına gelmez.

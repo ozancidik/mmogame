@@ -1,5 +1,15 @@
 # Güvenlik Denetimi (Salt Okunur) - MyProject MMORPG
 
+Güncelleme 2026-10-07: Aşağıdaki bulgular 2026-10-04 tarihli denetimin tarihsel
+kaydıdır. Y-2'nin kayıtlı ekipmanda seviye şartı kısmı düzeltildi: stats yüklemesinden
+sonra bilinen eşyanın RequiredLevel ve slot şartı denetlenir. Uygunsuz ekipman bonus
+vermeden çantaya, çanta doluysa depoya taşınır. Mevcut kayıpsız yükleme politikası
+depo kapasitesinin aşılmasına izin verir; bilinmeyen eşya kimlikleri korunur ve
+bonus vermez. UE izole regresyonunda 11 kontrol geçti. Gerçek dosyadan yeniden giriş,
+sahip-istemci replikasyonu ve HUD PIE'de oynanmadı. Bu kısmi düzeltme Y-2'yi tümüyle
+kapatmaz; dosya imzası, hesap kimliği ve diğer doğrulama maddeleri için ayrı çalışma
+gerekir. Ayrıntı: CHECKLIST_FIXES_2026-10-05.md §39.
+
 Tarih: 2026-10-04. Yöntem: yalnızca statik inceleme (kod okuma, grep, git geçmişi taraması, motor kaynağı doğrulaması). Hiçbir dosya düzenlenmedi, derleme/commit/push yapılmadı, oyun çalıştırılmadı. Bu dosya tek yazma çıktısıdır.
 
 Kapsam: `Source/MyProject/**` (69 dosya, yaklaşık 15 bin satır .cpp), `Config/*.ini`, `Scripts/*`, `.claude/`, `.gitignore`, git geçmişi (236 commit), `Saved/SaveGames`, `Saved/Logs`.

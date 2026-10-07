@@ -35,6 +35,10 @@ class MYPROJECT_API UMMOInventoryComponent : public UActorComponent
 public:
 	UMMOInventoryComponent();
 
+#if !UE_BUILD_SHIPPING
+	static bool RunSavedEquipmentLevelSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(BlueprintAssignable, Category = "MMO|Inventory")

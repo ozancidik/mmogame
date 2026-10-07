@@ -18,8 +18,112 @@
 #include "Player/MMOPlayerController.h"
 #include "World/MMOVendorNPC.h"
 #include "World/MMOWarehouseNPC.h"
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+#endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOInventoryAudit, Log, All);
+
+#if !UE_BUILD_SHIPPING
+bool UMMOInventoryComponent::RunSavedEquipmentLevelSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1000000, 1000000, 5000), FRotator::ZeroRotator, Params);
+	if (!Character) { OutError = TEXT("fixture spawn failed"); return false; }
+	const bool bPassed = [&]()
+	{
+		UMMOInventoryComponent* Inv = Character->GetInventory();
+		UMMOStatsComponent* Stats = Character->GetStats();
+		if (!Inv || !Stats) { OutError = TEXT("fixture components missing"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		auto Instance = [](FName ItemId, int32 Id)
+		{
+			FMMOEquipmentInstance I;
+			I.ItemId = ItemId; I.InstanceId = Id; I.Plus = 1; I.Rarity = EMMOItemRarity::Rare;
+			return I;
+		};
+		const int32 Weapon = static_cast<int32>(EMMOEquipSlot::Weapon), Armor = static_cast<int32>(EMMOEquipSlot::Armor);
+		FMMOCharacterSaveData Data;
+		Data.bValid = true; Data.Level = 1;
+		Data.EquippedItems.SetNum(static_cast<int32>(EMMOEquipSlot::MAX));
+		Data.EquippedItems[Weapon] = Instance(TEXT("LongSword"), 101);
+		Data.EquippedItems[Armor] = Instance(TEXT("PlateArmor"), 102);
+		float BaseAttack = 0.f, BaseDefense = 0.f;
+		auto Apply = [&]()
+		{
+			Stats->SetEquipmentBonuses(0.f, 0.f);
+			Stats->ApplySaveData(Data);
+			BaseAttack = Stats->AttackPower; BaseDefense = Stats->Defense;
+			Inv->ApplySaveData(Data); // LoadCharacter: stats, sonra envanter.
+		};
+		Apply();
+		if (!Check(!Inv->EquippedItems[Weapon].IsValidInstance() && !Inv->EquippedItems[Armor].IsValidInstance(), TEXT("underlevel saved equipment remained equipped"))) return false;
+		if (!Check(Inv->EquipmentBag.Num() == 2 && Inv->EquipmentBag.ContainsByPredicate([](const FMMOEquipmentInstance& I) { return I.ItemId == FName(TEXT("LongSword")) && I.InstanceId == 101 && I.Plus == 1 && I.Rarity == EMMOItemRarity::Rare; }), TEXT("relocated equipment lost identity"))) return false;
+		if (!Check(Stats->AttackPower == BaseAttack && Stats->Defense == BaseDefense, TEXT("underlevel saved bonus active"))) return false;
+		Inv->EquipByInstanceId(101);
+		if (!Check(!Inv->EquippedItems[Weapon].IsValidInstance() && Inv->EquipmentBag.Num() == 2, TEXT("underlevel re-equip accepted"))) return false;
+		Data.Level = 3; Apply();
+		if (!Check(Inv->EquippedItems[Weapon].InstanceId == 101 && !Inv->EquippedItems[Armor].IsValidInstance() && Stats->AttackPower > BaseAttack, TEXT("exact required level rejected"))) return false;
+		Data.Level = 1;
+		Data.EquippedItems[Weapon] = Instance(TEXT("RemovedFutureItemFixture"), 103);
+		Data.EquippedItems[Armor] = Instance(TEXT("LeatherArmor"), 104);
+		Apply();
+		if (!Check(Inv->EquippedItems[Weapon].ItemId == FName(TEXT("RemovedFutureItemFixture")) && Inv->EquippedItems[Armor].InstanceId == 104 && Stats->AttackPower == BaseAttack && Stats->Defense > BaseDefense, TEXT("unknown preservation or legal armor changed"))) return false;
+		Data.Level = 3; Data.EquippedItems[Weapon] = FMMOEquipmentInstance();
+		Data.EquippedItems[Armor] = Instance(TEXT("LongSword"), 105); Apply();
+		if (!Check(!Inv->EquippedItems[Armor].IsValidInstance() && Inv->EquipmentBag.Num() == 1, TEXT("wrong slot accepted"))) return false;
+		Data.Level = 1; Data.EquippedItems[Armor] = FMMOEquipmentInstance();
+		Data.EquippedItems[Weapon] = Instance(TEXT("LongSword"), 101);
+		for (int32 Index = 0; Index < MaxBagSize; ++Index) Data.EquipmentBag.Add(Instance(TEXT("ShortSword"), 200 + Index));
+		Apply();
+		if (!Check(Inv->EquipmentBag.Num() == MaxBagSize && Inv->Warehouse.Num() == 1 && Inv->Warehouse[0].InstanceId == 101, TEXT("full bag lost relocated equipment"))) return false;
+		for (int32 Index = 0; Index < MaxWarehouseSize; ++Index) Data.Warehouse.Add(Instance(TEXT("ShortSword"), 400 + Index));
+		Apply();
+		if (!Check(Inv->EquipmentBag.Num() == MaxBagSize && Inv->Warehouse.Num() == MaxWarehouseSize + 1, TEXT("full warehouse lost equipment"))) return false;
+		FMMOCharacterSaveData Back;
+		Stats->FillSaveData(Back); Inv->FillSaveData(Back);
+		Stats->ApplySaveData(Back); Inv->ApplySaveData(Back);
+		if (!Check(!Inv->EquippedItems[Weapon].IsValidInstance() && Inv->EquipmentBag.Num() == MaxBagSize && Inv->Warehouse.Num() == MaxWarehouseSize + 1, TEXT("roundtrip changed recovery"))) return false;
+		Data.EquipmentBag.Reset(); Data.Warehouse.Reset();
+		Data.EquipmentBag.Add(Instance(TEXT("ShortSword"), 101)); Apply();
+		return Check(Inv->EquipmentBag.Num() == 2 && Inv->EquipmentBag[0].InstanceId != Inv->EquipmentBag[1].InstanceId, TEXT("relocation duplicate identity"));
+	}();
+	Character->Destroy(); // Controllersiz fixture; oyuncu diski yuklenmez/yazilmaz.
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOSavedEquipmentLevelTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestSavedEquipmentLevel"))) return false;
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = UMMOInventoryComponent::RunSavedEquipmentLevelSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_SAVED_EQUIPMENT_LEVEL_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOSavedEquipmentLevelTestExec GMMOSavedEquipmentLevelTestExec;
+}
+#endif
 
 namespace
 {
@@ -1043,8 +1147,10 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		}
 		Warehouse.Add(Overflow);
 	}
-	// Yanlis slota kusanilmis esya (ornegin silah "Zirh" slotunda) cantaya geri konur;
-	// normal EquipFromBag bunu zaten engeller, elle duzenlenmis kayit atlayabilirdi.
+	// Yukleme de normal kusanma gibi slot + seviye sartini denetler. Stats once
+	// yuklenir (LoadCharacter); bilinmeyen esya kimligini koruma politikasi aynidir.
+	const AMMOCharacter* OwnerCharacter = Cast<AMMOCharacter>(GetOwner());
+	const UMMOStatsComponent* OwnerStats = OwnerCharacter ? OwnerCharacter->GetStats() : nullptr;
 	for (int32 i = 0; i < MaxSlots; ++i)
 	{
 		if (!EquippedItems[i].IsValidInstance())
@@ -1052,17 +1158,17 @@ void UMMOInventoryComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 			continue;
 		}
 		const FMMOItemDef* Def = FMMOItemDatabase::Find(EquippedItems[i].ItemId);
-		if (Def && (int32)Def->Slot != i)
+		if (Def && ((int32)Def->Slot != i || !OwnerStats || OwnerStats->Level < Def->RequiredLevel))
 		{
 			// Yer varsa cantaya (12'yi asmaz); yoksa depoya. Depo kapasitesi yuklemede asilabilir (mevcut kural:
-			// bozuk/eski kayitta hicbir esya silinmez, yalniz yeni depolama reddedilir). Esya yanlis slotta KALMAZ.
+			// bozuk/eski kayitta hicbir esya silinmez, yalniz yeni depolama reddedilir). Bonus uygulanmaz.
 			if (EquipmentBag.Num() < MaxBagSize)
 			{
 				EquipmentBag.Add(EquippedItems[i]);
 			}
 			else
 			{
-				UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: yanlis slottaki esya (%s) canta dolu oldugu icin depoya tasindi (depo %d/%d)"),
+				UE_LOG(LogTemp, Warning, TEXT("ApplySaveData: kusanim kosulunu saglamayan esya (%s) canta dolu oldugu icin depoya tasindi (depo %d/%d)"),
 					*EquippedItems[i].ItemId.ToString(), Warehouse.Num() + 1, MaxWarehouseSize);
 				Warehouse.Add(EquippedItems[i]);
 			}

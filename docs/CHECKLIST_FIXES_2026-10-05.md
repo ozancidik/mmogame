@@ -623,3 +623,41 @@ Gercek sahip-istemci RPC/gecikme/HUD ve yeniden giris PIE'de OYNANMADI; adimlar
 `PLAYTEST_CHECKLIST.md`'ye eklendi. Agency-agents AppSec Engineer ve Test Results
 Analyzer rol belgeleri kullanildi; bagimsiz paralel ajan calistirilmadi. O6 kalan
 gecis penceresi, magaza yazim sirasi/iptal ve dedicated hazirligi acik kalir.
+
+## 39. Y-2 kismi: kayitli ekipmanda seviye sartini uygula (2026-10-07)
+
+Normal EquipByInstanceId seviye sartini denetlerken ApplySaveData yalniz slotu
+denetliyordu. Lv1 kaydinda kusanilmis LongSword (Lv3) / PlateArmor (Lv5), yuklemede
+bonus verebiliyordu. Stats once yuklenir; bilinen ekipmanin slot ve RequiredLevel
+sarti birlikte denetlenir. Uygunsuz esya canta, canta doluysa depoya tasinir; slot
+bosaltilip bonuslar yeniden hesaplanir. Mevcut kayipsiz yukleme politikasi depo
+kapasitesinin asilmasina izin verir. Bilinmeyen esya kimligi koruma politikasi,
+benzersiz InstanceId duzeltmesi ve normal kusanma kurali korunur. Stats bulunmazsa
+bilinen ekipman da geri tasinir. Kayit/replikasyon semasi degismez.
+
+Regresyon duzeltmesiz UE'de **FAIL checks=0 reason=underlevel saved equipment
+remained equipped** verdi (motor exit=0, script exit=1). Duzeltme sonrasi
+TestSavedEquipmentLevel.ps1 **PASS checks=11**: dusuk seviyede slot ve bonus reddi,
+kimlik/+ /nadirlik korunmasi, yeniden kusanma reddi, tam gereken seviye, bilinmeyen
+kimlik ve yasal zirh, yanlis slot, dolu canta/depo kurtarma, bellek roundtrip'i ve
+cakisan InstanceId ayrilmasi. Controllersiz izole karakter kullanilir, oyuncu
+diski yuklenmez/yazilmaz. Shipping'de test komutu yoktur. Fixture'in ilk derlemesinde
+protected bonus alanina erisim hatasi duzeltildi; test public turetilmis statlari
+karsilastirir. Son normal UE 5.7 editor derlemesi GECTI.
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **22/22 GECTI**: 14 dosya PCH'siz /W4,
+0 derleyici uyarisi; JSON 111 negatif; 232 yerel yuva `loaded=232 invalid=0
+loadFailed=0 existsMismatch=0 json ok=232 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`; gecis normal/timeout/durum/son yazim
+hatasi/ilerleme; parti 10, callback 9, klan 9, gorev 8, loot 10, iksir 11,
+kayitli ekipman 11 kontrol; Summer 53 / Winter 33 mob dogumu, 0 hata;
+NetSmoke 1 server join / 1 client welcome, iki tarafta 0 hata. NetSmoke yalniz
+baglanti kontroludur; ekipman gameplay/replikasyon testi degildir. Lv33+ beceri
+boslugu ve StaticLint InitGameState beyaz liste uyarilari onceki gibi acik.
+
+Gercek dosyadan yeniden giris, sahip-istemci RPC/HUD ve replikasyon PIE'de OYNANMADI;
+adimlar PLAYTEST_CHECKLIST.md'ye eklendi. Agency-agents AppSec Engineer, Backend
+Architect ve Test Results Analyzer rol belgeleri kullanildi; bagimsiz paralel ajan
+calistirilmadi. Bu tur Y-2'nin yalniz ekipman seviye sartini kapatir; imza/hesap
+kimligi, diger yukleme denetimleri, O6 kalan gecis penceresi, magaza yazim sirasi/
+iptal ve dedicated hazirligi ayri calisma olarak acik kalir.
