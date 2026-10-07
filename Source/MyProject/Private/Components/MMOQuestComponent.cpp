@@ -9,12 +9,14 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
 #include "Core/MMONotify.h"
+#include "Core/MMOMetrics.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "World/MMOQuestGiverNPC.h"
 #if !UE_BUILD_SHIPPING
+#include "GameFramework/PlayerController.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
@@ -43,6 +45,13 @@ bool UMMOQuestComponent::RunRewardLifeStateSelfTest(UWorld* World, FString& OutE
 		if (ExpectedCharacter) Fixtures.Add(ExpectedCharacter);
 		if (Giver) Fixtures.Add(Giver);
 		if (!Character || !ExpectedCharacter || !Giver) { OutError = TEXT("fixture spawn failed"); return false; }
+		// Tek senkron kare: gercek oyuncuya dokunmadan oyuncu telemetri yolunu da sinar.
+		// AutoLoadDeferred timer'i calismadan karakter yok edilir; ilk kayit yuklenmez.
+		APlayerController* Controller = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), TestLocation, FRotator::ZeroRotator, Params);
+		if (!Controller) { OutError = TEXT("fixture controller spawn failed"); return false; }
+		Fixtures.Add(Controller);
+		Controller->Possess(Character);
+		if (!Character->IsPlayerControlled()) { OutError = TEXT("fixture possession failed"); return false; }
 		UMMOQuestComponent* Quests = Character->GetQuestComponent();
 		UMMOStatsComponent* Stats = Character->GetStats();
 		UMMOInventoryComponent* Inv = Character->GetInventory();
@@ -96,7 +105,7 @@ bool UMMOQuestComponent::RunRewardLifeStateSelfTest(UWorld* World, FString& OutE
 			&& Stats->Level == AfterLevel && Stats->Experience == AfterXP, TEXT("distant reward granted"));
 	}();
 	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
-	// Controllersiz/ilk kaydi yuklenmemis karakterler: disk kaydi ve gercek oyuncu durumu degismez.
+	// Ilk kaydi yuklenmemis fixture'lar: disk kaydi ve gercek oyuncu durumu degismez.
 	return bPassed;
 }
 
@@ -311,6 +320,11 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 	P.QuestId = QuestId;
 	P.KillProgress = 0;
 	ActiveQuests.Add(P);
+	if (Owner->IsPlayerControlled())
+	{
+		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=quest_accept who=%s lv=%d quest=%s"),
+			MMOMetrics::Seconds(), *MMOMetrics::WhoName(Owner), Owner->GetStats()->Level, *QuestId.ToString());
+	}
 
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev alindi: %s"), *Def->Name), FColor(120, 200, 255), 2.5f);
 }
@@ -447,6 +461,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 			return;
 		}
 	}
+	const int32 RewardLevel = Owner->GetStats()->Level;
 	if (Owner)
 	{
 		if (Owner->GetStats() && Def->RewardXP > 0)
@@ -473,6 +488,14 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 
 	CompletedQuests.AddUnique(QuestId);
 	ActiveQuests.RemoveAll([QuestId](const FMMOQuestProgress& X) { return X.QuestId == QuestId; });
+	if (Owner->IsPlayerControlled())
+	{
+		// xp_reward veri tablosundaki nominal odul; seviye tavaninda kaybedilen XP dahil.
+		// Altin gercek bakiye degisimi olarak ev=gold'da zaten olculur (cift sayilmaz).
+		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=quest_claim who=%s lv=%d to=%d quest=%s xp_reward=%d capped=%d"),
+			MMOMetrics::Seconds(), *MMOMetrics::WhoName(Owner), RewardLevel, Owner->GetStats()->Level,
+			*QuestId.ToString(), FMath::Max(0, Def->RewardXP), Owner->GetStats()->Level >= Owner->GetStats()->MaxLevel ? 1 : 0);
+	}
 
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin)"), *Def->Name, Def->RewardXP, Def->RewardGold), FColor(120, 255, 120), 3.f);
 }

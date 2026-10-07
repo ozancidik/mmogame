@@ -1,5 +1,11 @@
 # Dikey dilim planı: Lv1–30 oynanabilir deneyim
 
+**2026-10-07 görev ölçüm eklemesi:** `quest_accept` ve `quest_claim` yalnız başarılı
+sunucu işlemlerinde, oyuncu karakterleri için loglanır. `PlaytestMetrics.py`
+nominal görev XP'sini teslim öncesi seviyeye yazar; kabul→teslim süresini ve
+eşleşmeyen teslimleri ayrı raporlar. Bu, §3.1'in görev olayları kısmını ilerletir;
+`first_*`, gerçek 20 dk PIE koşusu ve model karşılaştırması hâlâ açık.
+
 **2026-10-07 doğrulama eklemesi:** Satıcı ekonomi kuralları artık
 `Scripts/TestVendorEconomy.ps1` ile UE'de 14 izole kontrol içerir: doğru fiyat/teslim,
 çanta ve yığın tavanları, ölü/uzak karakter reddi ve aynı eşyanın tek satışı.
@@ -226,7 +232,7 @@ Görevli yolun sırası: `Q_Goblins` (5 öldürme) Lv1'de alınır, tesliminde L
 KO/Rise tarzı beklenen döngü (yalnız genel referans, doğrulanmadı): hub → kısa görev → bölge avı → parti → boss; ölümün bir bedeli; ekonomide anlamlı harcama; beceri/stat seçimleri. Maddeler bağımlılık sırasıyla. Boyut: S ≈ ≤1 gün, M ≈ 2–4 gün, L ≈ >1 hafta (tahmin `[VARSAYIM]`). Tüm sayısal hedefler `[PLACEHOLDER]`.
 
 ### 1. PIE telemetrisi + BalanceReport v2 — **M**
-- **Durum (2026-10-05): büyük kısmı yapıldı (master, PIE ölçümü yok).** `[MMOMETRIC]` `levelup`/`kill`/`death`/`gold` satırları ve `Scripts/PlaytestMetrics.py` özeti var; BalanceReport v2'nin işini `Scripts/ProgressionModel.py` (görevli, bölge sınırlı) görüyor. **Açık:** `quest_accept`/`quest_claim`/`first_*` olayları, (d) maddesinin karşılaştırması. Koşu adımları: `docs/PLAYTEST_RUNBOOK.md`.
+- **Durum (2026-10-07): büyük kısmı yapıldı (master, PIE ölçümü yok).** `[MMOMETRIC]` `levelup`/`kill`/`death`/`gold`/`quest_accept`/`quest_claim` satırları ve `Scripts/PlaytestMetrics.py` özeti var; görev XP sütunu nominal ödüldür, seviye tavanında kayıp düşülmez. BalanceReport v2'nin işini `Scripts/ProgressionModel.py` (görevli, bölge sınırlı) görüyor. **Açık:** `first_*` olayları, gerçek koşu ve (d) maddesinin karşılaştırması. Koşu adımları: `docs/PLAYTEST_RUNBOOK.md`.
 - **Oyuncu deneyimi:** Doğrudan yok; sonraki her ayarın ölçülebilir olması.
 - **Dosya kapsamı:** `MMOStatsComponent.cpp` (seviye atlama, ölüm cezası), `MMOMob.cpp` (öldürme, altın), `MMOInventoryComponent.cpp` (altın giriş/çıkış kaynağı: ganimet, satış, satın alma, yükseltme, iksir), `MMOQuestComponent.cpp` (kabul/teslim), `MMOPlayerController.cpp` (Şifacı), yeni `Scripts/PlaytestMetrics.py`, `Scripts/BalanceReport.py` v2 (bölge sınırlı + görev XP'si + senaryo seçeneği).
 - **Kabul ölçütü:** (a) 20 dk'lık PIE koşusunda sunucu logunda `[MMOMETRIC]` satırları: `levelup`, `kill`, `death`, `gold`, `quest_accept`, `quest_claim`, `first_*`; (b) tek komutla seviye başına süre/öldürme/ölüm/altın giriş-çıkış/XP kaynağı tablosu; (c) yalnız sunucu, oyun davranışı değişmez (derleme + `SmokeTest.ps1` geçer); (d) BalanceReport v2 çıktısı §1.5 tablosunu ±1 öldürmeyle yeniden üretir.

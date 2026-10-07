@@ -7,7 +7,7 @@
 | 0 | Derle + otomatik kontroller | `PR1_VERIFY.md` §1 | 10–20 dk | `Result: Succeeded` ve `RunAllChecks.ps1` hatasız |
 | 1 | PR #1 davranış testleri 1–18 | `PR1_VERIFY.md` §2 | ≈20 dk | 18 satırın hepsi "Beklenen" sütunuyla aynı |
 | 2 | İlk 7 oyun içi test | `PLAYTEST_PRIORITY.md` §2 (ayrıntılı adımlar `FIRST_PLAYTEST.md`) | ≈45 dk | 1–3 kesin geçmeli; 4–7'de veri kaybı/kopyalama yok |
-| 3 | `[MMOMETRIC]` ölçüm koşusu | aşağıda | 20 dk oyun + 2 dk | Dört olay türü de logda; özet tablo çıktı |
+| 3 | `[MMOMETRIC]` ölçüm koşusu | aşağıda | 20 dk oyun + 2 dk | Yapılan eylemlerin olayları logda; görev kabul/teslim ve özet tablo çıktı |
 
 ## Kapı 0: Derle
 
@@ -37,7 +37,15 @@ Derleme hatasında olası yerler `PR1_VERIFY.md` §1 tablosunda. Yeni dosya bulu
    ```powershell
    python Scripts\PlaytestMetrics.py Saved\Logs\MyProject.log
    ```
-4. Çıktıyı (seviye başına süre/öldürme/ölüm/altın) olduğu gibi sonuç şablonuna yapıştır. Model karşılaştırması: `python Scripts\ProgressionModel.py --max 30` (model, ölçüm değil).
+4. Çıktıyı (seviye başına süre/öldürme/ölüm/altın/nominal görev XP'si; görev kabul→teslim süresi) olduğu gibi sonuç şablonuna yapıştır. Model karşılaştırması: `python Scripts\ProgressionModel.py --max 30` (model, ölçüm değil).
+
+**7 Ekim görev ölçüm notu:** `quest_accept`/`quest_claim` yalnız başarılı sunucu
+işlemleridir. Reddedilen/tekrarlanan teslim olay üretmez. `XP(quest*)` veri
+tablosundaki nominal ödüldür; net XP bakiyesi veya seviye tavanındaki gerçek kazanç
+değildir. Altın ayrıca `ev=gold` ile sayılır. Kabul kaydı aynı log/süreç/oyuncu adı
+altında yoksa `ort_sure=?`; önceki oturumdan yüklenen görevin süresi tahmin edilmez.
+Eski loglarda görev sütununun 0 olması sıfır görev kazancı kanıtı değildir.
+Bu araç henüz kalıcı hesap kimliğiyle farklı oturumları birleştirmez.
 
 Ölçüm satırları yalnız sunucuda (host) basılır. Logda hiç satır yoksa Kapı 3 **KALDI**: büyük olasılıkla istemci penceresinin logu okunuyor.
 

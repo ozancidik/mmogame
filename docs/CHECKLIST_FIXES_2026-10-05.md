@@ -697,3 +697,47 @@ Sahip-istemci/HUD ve kaydet/yeniden giris PIE'de OYNANMADI; PLAYTEST_CHECKLIST.m
 adimlar eklendi. Agency-agents Unreal Multiplayer Architect ve Test Results Analyzer
 rol belgeleri kullanildi; bagimsiz paralel ajan calistirilmadi. O6 kalan gecis
 penceresi, hesap/imza, magaza yazim sirasi/iptal ve dedicated hazirligi acik kalir.
+## 41. Gorev kabul/teslim telemetrisi ve raporu (2026-10-07)
+
+Lv1-30 plani §3.1'in eksik `quest_accept` / `quest_claim` olaylari eklendi.
+Olaylar yalniz oyuncu karakterinin basarili sunucu islemlerinde basilir;
+otorite/oluluk/mesafe/on kosul/kapasite/tekrar teslim kontrolleri gecilmeden
+log yoktur. Oynanis kurallari, kayit semasi ve replike alanlar degismedi.
+
+`PlaytestMetrics.py` gorev kabul/teslim sayisi, kabulden teslimata ortalama sure,
+eslesmeyen teslim ve seviye tavanina ulasan teslim sayisini gosterir. Nominal
+`xp_reward`, teslim oncesi seviyeye ayri `XP(quest*)` sutunuyla yazilir.
+Seviye atlama loglari odulden once geldigi icin mevcut seviye geriye sarilmaz.
+Altin, zaten `ev=gold` ile olculur; gorev tesliminden tekrar sayilmaz.
+Bu sutun net XP bakiyesi degildir; tavandaki kayip dusulmez. Kabul ayni log/surec/
+oyuncu adi altinda yoksa sure `?` olur; oturumlar/hesaplar birlestirilmez.
+Eski logda gorev olayinin yoklugu sifir gorev kazanci olarak yorumlanmaz.
+
+Normal UE 5.7 editor derlemesi GECTI. TestQuestRewardLifeState.ps1 **PASS checks=8**
+ve **MMO_QUEST_METRICS_TEST PASS accepts=2 claims=1** verdi. Testin ilk log beklentisi
+200 XP odulunun Lv1->3 olmasiydi; gercek UE ciktisi ve fixture'in beklenen
+karakter karsilastirmasi Lv1->2 oldugunu gosterdi, yalniz test beklentisi duzeltildi.
+Gecici PlayerController ile ayni senkron karede possession yapilir; ilk kayit
+yukleme timer'i calismadan karakterler yok edilir (oyuncu diski okunmaz/yazilmaz).
+Controller/test komutu Shipping'de derlenmez. Oluluk, eksik ilerleme, menzil ve
+tekrar teslim retlerinde basarili olay satirinin yoklugu da sinanir.
+
+Parser fixture'i eski 12 olay/2 oyuncuyu korur; yeni 14 olay/3 oyuncuda gorev XP'si,
+coklu levelup, oyuncu ayrimi, bekleyen gorev, kabul kaydi olmayan teslim, ters saat
+ve tavan isareti sinanir. Gecici kopyada gorev XP toplamasini bozmak testi exit=1
+ile dusurdu. Gercek UE fixture logu parser'dan da gecirildi: Lv1 nominal 200 XP,
+Lv2 gercek +120 altin, 2 kabul/1 teslim. Bu sifir sureli senkron fixture,
+oynanis suresi olcumu degildir.
+
+PIE uzak istemci olay tekilligi/HUD, kayittan devam ve gercek solo/parti sureleri
+OYNANMADI; PLAYTEST_CHECKLIST.md ve PLAYTEST_RUNBOOK.md'ye eklendi. `first_*` ve
+modelle gercek kosu karsilastirmasi acik kalir. Agency-agents Unreal Multiplayer
+Architect / Test Results Analyzer rehberleri kullanildi; ayri paralel ajan yok.
+
+Son `RunAllChecks.ps1 -SkipBuild -FullCompile`: **23/23 GECTI**; 14 PCH'siz /W4
+dosyada 0 derleyici uyarisi; JSON 111 negatif; 244 yerel yuva `loaded=244
+invalid=0 loadFailed=0 existsMismatch=0 json ok=244 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`. Gecis/parti/callback/klan/gorev/loot/
+iksir/ekipman/satici testleri gecti. Summer 48 / Winter 30 mob dogumu, 0 hata;
+NetSmoke 1 join / 1 welcome, iki tarafta 0 hata (yalniz baglanti kaniti).
+Lv33+ beceri bosluklari ve StaticLint InitGameState beyaz liste uyarisi acik.

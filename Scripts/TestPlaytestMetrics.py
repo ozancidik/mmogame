@@ -14,6 +14,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURE = os.path.join(HERE, "fixtures", "playtest_metrics_sample.log")
+QUEST_FIXTURE = os.path.join(HERE, "fixtures", "quest_metrics_sample.log")
 
 failures = []
 
@@ -71,9 +72,45 @@ def main(argv):
     check(code == 0, "main cikis kodu 0 olmali: %s" % code)
     check("levelup=2 kill=5 death=1 gold=4" in out, "olay sayisi satiri yanlis:\n" + out)
     check("=== Oyuncu: Ozan ===" in out and "=== Oyuncu: Istemci ===" in out, "oyuncu basliklari eksik")
+    check("eski loglarda gercek sifir kazanc kaniti degildir" in out, "eski logda eksik gorev telemetrisi belirtilmeli")
 
     code, out = run_main(pm, ["x", FIXTURE, "--who", "Istemci"])
     check(code == 0 and "Ozan ===" not in out and "Istemci ===" in out, "--who filtresi calismiyor")
+
+    quest_events = pm.parse_log(QUEST_FIXTURE)
+    check(len(quest_events) == 14, "gorev fixture: 14 olay")
+    qs = pm.build_stats(quest_events)
+    host = qs["Host"]
+    check(host["level"] == 3 and host["open_level"] == 3, "odul sonrasi levelup geriye sarilmamali")
+    check(host["lv"][1]["quest_xp_reward"] == 200 and host["lv"][3]["quest_xp_reward"] == 400,
+          "nominal gorev XP'si teslim oncesi seviyede sayilmali")
+    check(host["lv"][1]["xp"] == 20, "kill ve gorev XP ayri sayilmali")
+    check(host["lv"][1]["gold_in"] == 10 and host["lv"][3]["gold_in"] == 120
+          and host["lv"][3]["gold_out"] == 5, "gorev altini cift sayilmamali / sonraki altin Lv3'te kalmali")
+    check(host["dur"].get(1) == 45 and host["dur"].get(2) == 0 and host["dur"].get(3) == 50,
+          "tek odulde coklu levelup ve acik seviye sureleri")
+    goblins = host["quests"]["Q_Goblins"]
+    check(goblins["accepts"] == 1 and goblins["claims"] == 1 and goblins["seconds"] == [40.0],
+          "gorev kabul/teslim ve 40 sn sure")
+    check(qs["Client"]["quests"]["Q_Goblins"]["seconds"] == [58.0], "oyuncu sureleri karismamali")
+    saved = host["quests"]["Q_Saved"]
+    check(saved["unmatched"] == 1 and saved["seconds"] == [], "logda kabul yoksa sure uydurulmamali")
+    check(host["quests"]["Q_Unfinished"]["claims"] == 0 and "Q_Unfinished" in host["quest_start"],
+          "bekleyen gorev teslim edilmis sayilmamali")
+    check(qs["Cap"]["quests"]["Q_Cap"]["capped"] == 1, "seviye tavani nominal odul uyarisi")
+    code, out = run_main(pm, ["x", QUEST_FIXTURE, "--who", "Host"])
+    check(code == 0 and "quest_accept=4 quest_claim=4" in out, "gorev olay sayilari")
+    check("XP(quest*)" in out and "Q_Goblins kabul=1 teslim=1 XP(odul)=200 ort_sure=0:40" in out,
+          "gorev tablosu ve sure raporu")
+    check("Q_Saved kabul=0 teslim=1 XP(odul)=400 ort_sure=? eslesmeyen=1" in out,
+          "bilinmeyen sure raporu")
+    check("Oyuncu: Client" not in out and "Oyuncu: Cap" not in out, "gorev raporu --who filtresi")
+    reversed_pair = pm.build_stats([
+        {"who": "Reversed", "ev": "quest_accept", "quest": "Q", "t": "20", "lv": "1"},
+        {"who": "Reversed", "ev": "quest_claim", "quest": "Q", "t": "10", "lv": "1", "xp_reward": "1"},
+    ])["Reversed"]["quests"]["Q"]
+    check(reversed_pair["seconds"] == [] and reversed_pair["unmatched"] == 1,
+          "ters saat farki sifir sure diye raporlanmamali")
 
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
@@ -91,7 +128,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (%d olay, 2 oyuncu)." % len(events))
+    print("PlaytestMetrics fixture testi gecti (eski log: %d olay, 2 oyuncu; gorev: %d olay, 3 oyuncu)." % (len(events), len(quest_events)))
     return 0
 
 

@@ -1,0 +1,14 @@
+LogTemp: Display: [MMOMETRIC] t=5 ev=gold who=Host src=loot amount=10 balance=10
+LogTemp: Display: [MMOMETRIC] t=10 ev=quest_accept who=Host lv=1 quest=Q_Goblins
+LogTemp: Display: [MMOMETRIC] t=12 ev=quest_accept who=Client lv=1 quest=Q_Goblins
+LogTemp: Display: [MMOMETRIC] t=30 ev=kill who=Host lv=1 mob=Goblin xp=20
+LogTemp: Display: [MMOMETRIC] t=50 ev=levelup who=Host from=1 to=2
+LogTemp: Display: [MMOMETRIC] t=50 ev=levelup who=Host from=2 to=3
+LogTemp: Display: [MMOMETRIC] t=50 ev=gold who=Host src=gorev amount=120 balance=130
+LogTemp: Display: [MMOMETRIC] t=50 ev=quest_claim who=Host lv=1 to=3 quest=Q_Goblins xp_reward=200 capped=0
+LogTemp: Display: [MMOMETRIC] t=70 ev=quest_claim who=Client lv=1 to=1 quest=Q_Goblins xp_reward=200 capped=0
+LogTemp: Display: [MMOMETRIC] t=80 ev=quest_claim who=Host lv=3 to=3 quest=Q_Saved xp_reward=400 capped=0
+LogTemp: Display: [MMOMETRIC] t=90 ev=quest_accept who=Host lv=3 quest=Q_Unfinished
+LogTemp: Display: [MMOMETRIC] t=100 ev=gold who=Host src=satin_alma amount=-5 balance=125
+LogTemp: Display: [MMOMETRIC] t=110 ev=quest_accept who=Cap lv=80 quest=Q_Cap
+LogTemp: Display: [MMOMETRIC] t=115 ev=quest_claim who=Cap lv=80 to=80 quest=Q_Cap xp_reward=350000 capped=1

@@ -13,6 +13,8 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   kill     who lv mob mlv xp party elite     (lv = XP verilmeden onceki oyuncu seviyesi)
   death    who lv x y z by xploss
   gold     who src amount balance            (amount: +kazanc / -harcama)
+  quest_accept who lv quest
+  quest_claim  who lv to quest xp_reward capped (lv = odulden once; xp_reward = nominal odul)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -78,6 +80,9 @@ def build_stats(events):
             "level": None, "enter": {}, "dur": {}, "lv": defaultdict(lambda: defaultdict(float)),
             "first_t": t, "last_t": t, "src": defaultdict(lambda: [0, 0]), "mobs": defaultdict(int),
             "pending": [],  # seviye henuz bilinmezken gelen altin olaylari (ilk bilinen seviyeye yazilir)
+            "quests": defaultdict(lambda: {"accepts": 0, "claims": 0, "xp_reward": 0,
+                                            "seconds": [], "unmatched": 0, "capped": 0}),
+            "quest_start": {},
         })
         p["last_t"] = max(p["last_t"], t)
         ev = e["ev"]
@@ -95,7 +100,7 @@ def build_stats(events):
             p["level"] = to
             p["lv"][to]  # seviye satiri olussun
             p["lv"][frm]
-        elif ev in ("kill", "death"):
+        elif ev in ("kill", "death", "quest_accept", "quest_claim"):
             lv = int(to_num(e.get("lv")))
             if p["level"] is None:
                 p["level"] = lv
@@ -105,9 +110,28 @@ def build_stats(events):
                 p["lv"][lv]["kills"] += 1
                 p["lv"][lv]["xp"] += to_num(e.get("xp"))
                 p["mobs"][e.get("mob", "?")] += 1
-            else:
+            elif ev == "death":
                 p["lv"][lv]["deaths"] += 1
                 p["lv"][lv]["xploss"] += to_num(e.get("xploss"))
+            else:
+                quest = e.get("quest", "?")
+                q = p["quests"][quest]
+                if ev == "quest_accept":
+                    q["accepts"] += 1
+                    p["quest_start"].setdefault(quest, t)
+                else:
+                    # levelup satirlari ClaimReward icinde once gelir: lv eski seviyedir.
+                    # Mevcut seviyeyi geriye sarma, altini tekrar sayma.
+                    xp = max(0, int(to_num(e.get("xp_reward"))))
+                    p["lv"][lv]["quest_xp_reward"] += xp
+                    q["claims"] += 1
+                    q["xp_reward"] += xp
+                    q["capped"] += int(to_num(e.get("capped"))) != 0
+                    start = p["quest_start"].pop(quest, None)
+                    if start is not None and t >= start:
+                        q["seconds"].append(t - start)
+                    else:
+                        q["unmatched"] += 1
         elif ev == "gold":
             amount = int(to_num(e.get("amount")))
             src = e.get("src", "diger")
@@ -138,11 +162,11 @@ def print_player(who, p):
     print("")
     print("=== Oyuncu: %s ===" % who)
     levels = sorted(set(p["lv"].keys()) | set(p["dur"].keys()))
-    header = "%-7s %-9s %-9s %-9s %-7s %-10s %-10s %-10s" % (
-        "Seviye", "Sure", "Oldurme", "XP(kill)", "Olum", "Altin+", "Altin-", "Net")
+    header = "%-7s %-9s %-9s %-9s %-10s %-7s %-10s %-10s %-10s" % (
+        "Seviye", "Sure", "Oldurme", "XP(kill)", "XP(quest*)", "Olum", "Altin+", "Altin-", "Net")
     print(header)
     print("-" * len(header))
-    tot_kills = tot_deaths = tot_in = tot_out = 0
+    tot_kills = tot_deaths = tot_in = tot_out = tot_quest_xp = 0
     for lv in levels:
         d = p["lv"][lv]
         dur = p["dur"].get(lv)
@@ -150,15 +174,16 @@ def print_player(who, p):
         if lv == p.get("open_level"):
             dur_txt += "*"
         gi, go = int(d["gold_in"]), int(d["gold_out"])
-        print("%-7s %-9s %-9d %-9d %-7d %-10d %-10d %-10d" % (
-            lv if lv else "?", dur_txt, d["kills"], d["xp"], d["deaths"], gi, go, gi - go))
+        print("%-7s %-9s %-9d %-9d %-10d %-7d %-10d %-10d %-10d" % (
+            lv if lv else "?", dur_txt, d["kills"], d["xp"], d["quest_xp_reward"], d["deaths"], gi, go, gi - go))
         tot_kills += d["kills"]
         tot_deaths += d["deaths"]
         tot_in += gi
         tot_out += go
+        tot_quest_xp += d["quest_xp_reward"]
     print("-" * len(header))
-    print("%-7s %-9s %-9d %-9s %-7d %-10d %-10d %-10d" % (
-        "Toplam", fmt_time(p["last_t"] - p["first_t"]), tot_kills, "", tot_deaths, tot_in, tot_out, tot_in - tot_out))
+    print("%-7s %-9s %-9d %-9s %-10d %-7d %-10d %-10d %-10d" % (
+        "Toplam", fmt_time(p["last_t"] - p["first_t"]), tot_kills, "", tot_quest_xp, tot_deaths, tot_in, tot_out, tot_in - tot_out))
     if any(str(l) for l in levels) and p.get("open_level") is not None:
         print("(*) devam eden seviye: sure son olay zamanina kadar")
     if tot_kills:
@@ -172,6 +197,17 @@ def print_player(who, p):
     if p["mobs"]:
         top = sorted(p["mobs"].items(), key=lambda kv: -kv[1])[:8]
         print("En cok oldurulen: " + ", ".join("%s x%d" % kv for kv in top))
+    if p["quests"]:
+        print("Gorevler (kabul -> teslim suresi; ayni surec/oyuncu adi):")
+        for quest, q in sorted(p["quests"].items()):
+            seconds = q["seconds"]
+            avg = fmt_time(sum(seconds) / len(seconds)) if seconds else "?"
+            print("  %s kabul=%d teslim=%d XP(odul)=%d ort_sure=%s eslesmeyen=%d tavana_ulasan=%d" % (
+                quest, q["accepts"], q["claims"], q["xp_reward"], avg, q["unmatched"], q["capped"]))
+        print("(*) XP(quest) nominal oduldur, teslim oncesi seviyeye yazilir; seviye tavanindaki kayip dusulmez.")
+        print("(?) Kabul bu logda yoksa (onceki oturum/kayit/ad degisimi) gorev suresi bilinmez.")
+    else:
+        print("Gorev olayi yok: XP(quest)=0, eski loglarda gercek sifir kazanc kaniti degildir.")
 
 
 def main(argv):
@@ -197,7 +233,7 @@ def main(argv):
     if not events:
         print("Log icinde [MMOMETRIC] satiri yok: %s" % path)
         print("Olcum satirlari yalniz sunucuda (listen server host / dedicated) basilir ve "
-              "seviye atlama, oldurme, olum ve altin degisiminde olusur.")
+              "seviye atlama, oldurme, olum, altin degisimi ve gorev kabul/tesliminde olusur.")
         return 0
 
     players = build_stats(events)
@@ -208,6 +244,9 @@ def main(argv):
         sum(1 for e in events if e["ev"] == "kill"),
         sum(1 for e in events if e["ev"] == "death"),
         sum(1 for e in events if e["ev"] == "gold")))
+    print("Gorev olaylari: quest_accept=%d quest_claim=%d" % (
+        sum(1 for e in events if e["ev"] == "quest_accept"),
+        sum(1 for e in events if e["ev"] == "quest_claim")))
     shown = 0
     for who in sorted(players):
         if only and who != only:

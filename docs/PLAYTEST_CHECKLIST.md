@@ -3856,3 +3856,23 @@ doğrudan çağırır; gerçek RPC, gecikmeli HUD ve kayıt/yeniden giriş oynan
   doldurulabilmeli. Yetersiz altın/bozuk tanım isteği altın veya eşya üretmemeli.
 - [ ] 200 ms gecikmeyle aynı ekipmanı hızlı iki kez satmayı dene: aynı InstanceId
   yalnız bir kez satılmalı. Kaydet/yeniden girişte bakiye ve çanta aynen korunmalı.
+
+## Görev kabul/teslim telemetrisi — 2026-10-07 (PIE açık)
+
+UE'de izole sunucu fixture'ı 8 görev kuralını ve 2 başarılı kabul / 1 teslim
+logunu kontrol etti; ölü, eksik, uzak ve tekrar teslimler olay üretmedi.
+Fixture geçici PlayerController ile aynı senkron karede çalışır; ilk kayıt
+yükleme timer'ı çalışmadan aktörler yok edilir, oyuncu kaydı okunmaz/yazılmaz.
+Bu kontrol gerçek istemci RPC'si, HUD veya Lv1–30 oynanış ölçümü değildir.
+
+- [ ] Listen server + uzak istemcide NPC'den görev al/teslim et: her başarılı
+  işlem sunucu logunda tek `quest_accept`/`quest_claim`; istemci logunda kopya yok.
+- [ ] Ölü, menzil dışı, tamamlanmamış veya zaten teslim edilmiş görevi dene:
+  görev/ödül korunmalı, başarılı işlem telemetrisi oluşmamalı.
+- [ ] `PlaytestMetrics.py <sunucu_logu> --who <ad>`: kabul→teslim süresi makul;
+  seviye atlatan ödül teslim öncesi seviyede, sonraki altın yeni seviyede;
+  görev altını iki kez sayılmıyor.
+- [ ] Önceki oturumdan aktif görev yükleyip teslim et: kabul satırı bu logda
+  yoksa süre `?`/eşleşmeyen; sıfır saniyelik görev diye gösterilmiyor.
+- [ ] Seviye tavanındaki teslim `capped=1`; nominal XP net bakiye diye
+  yorumlanmıyor. Gerçek 20 dk solo/parti ölçümü ve `first_*` olayları açık.
