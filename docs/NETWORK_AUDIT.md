@@ -36,6 +36,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O12 | ORTA | **Kapandı (yerel log; Shipping'de derlenmez, bkz. O12 bölümü):** takas/iptal, klan, yükseltme/yanma, satış, depo ve ad değişimi yapılandırılmış sunucu loguna yazılır | bölüm 1 |
 | O13 | ORTA | **Kod düzeltildi, PIE bekliyor (2026-10-07):** üye kabulü mevcut grubun tamamını lider izni olmadan birleştiriyordu; mevcut gruplar için lider yetkisi davet ve kabul anında denetleniyor | `UMMOPartyComponent::CanCombineParties/FormOrJoin` |
 | O14 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** eski/vekil liderin yetkisini kaybetmiş bekleyen klan daveti kabul ediliyordu; lider rolü kabul anında yeniden denetleniyor | `UMMOClanComponent::CmdAccept` |
+| O15 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter görevi teslim ederek XP ödülünü kaybediyordu; sunucuda kabul/teslim için canlılık denetlenir | `UMMOQuestComponent::AcceptQuest/ClaimReward` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -112,6 +113,24 @@ davetçi, geçersiz zaman damgası, kendi kendine davet, eksik ve yok edilmiş d
 Controllersiz fixture'lar kullanılır; pending ve rol değişimini test kodu kurar. Diskte
 oyuncu kaydı yazılmaz. Gerçek yeniden bağlantı/lider devri, sohbet RPC ve HUD/replikasyon
 PIE'de denenmedi. Bu bulgu O4 davet kapma ve O13 parti birleştirmeden ayrıdır.
+
+### O15 · ORTA · Ölüyken görev teslimi kalıcı XP kaybı — düzeltildi (2026-10-07)
+
+`ClaimReward` canlılık denetlemiyordu. `GainExperience` ölü oyuncuda erken döndüğü
+halde altın/sarf ödülü verilip görev aktif listeden çıkarılıyor ve tamamlanmış
+sayılıyordu; XP yeniden alınamıyordu. NPC yakınlığı ve RPC sahipliği bu durum için
+yeterli değildir. Kabul ve ödül kapıları artık sunucuda karakter/stat varlığını ve
+`!bIsDead` koşulunu denetler. Ölüyken görev ve bütün ödüller korunur; dirilişten sonra
+normal yakınlık/kapasite/tek sefer ödül kontrolleri uygulanır.
+
+`TestQuestRewardLifeState.ps1` düzeltme öncesi gerçek UE'de `FAIL checks=3 reason=dead
+claim consumed quest or granted partial reward` verdi (motor exit=0, script exit=1).
+Düzeltme sonrası **8 kontrol geçti**: canlı kabul, eksik ilerleme reddi, tamamlanmış
+görev hazırlığı, ölü teslim reddi/tüm ödüllerin korunması, ölü kabul reddi, `Revive`
+sonrası tam XP/altın/iksir ödülü, tekrar teslim reddi ve NPC'den uzak teslim reddi.
+İzole controllersiz karakterler ve NPC kullanılır; öldürme sayacı/`bIsDead` testte
+kurulur. Gerçek ölüm animasyonu, istemci RPC/HUD, kayıt ve yeniden giriş oynanmadı.
+Fixture'lar disk kaydı yazmaz; Shipping'de test komutu derlenmez.
 
 ### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
 - **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.

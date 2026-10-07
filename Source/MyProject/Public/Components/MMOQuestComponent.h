@@ -57,6 +57,10 @@ public:
 	void FillSaveData(struct FMMOCharacterSaveData& Out) const;
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);
 
+#if !UE_BUILD_SHIPPING
+	static bool RunRewardLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 protected:
 	FMMOQuestProgress* FindActive(FName QuestId);
 	const FMMOQuestProgress* FindActive(FName QuestId) const;

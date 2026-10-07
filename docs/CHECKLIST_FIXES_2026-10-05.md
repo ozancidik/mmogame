@@ -522,3 +522,37 @@ KAPANMADI. Iki oyunculu gercek PIE, hedef haritada deger yukleme, motor travel h
 ve dedicated dogrulamasi acik; adimlar `PLAYTEST_CHECKLIST.md`'ye eklendi.
 Agency-agents Backend Architect ve Unreal Multiplayer Architect rol belgeleri
 kullanildi; bagimsiz paralel ajan calistirilmadi. O6 tumden kapanmadi.
+
+## 36. O15: oluyken gorev tesliminde XP odulunun kaybolmasini onle (2026-10-07)
+
+`ClaimReward` olum bayragina bakmiyordu. `GainExperience` oluyken erken dondugu
+halde altin/sarf veriliyor, gorev tamamlanmis listeye tasiniyordu. Boylece XP odulu
+kalici kayboluyor ve bildirim tam odul alinmis gibi gorunuyordu. Kabul ve odul
+kapilarina otorite dalinda karakter/stat varligi ve `!bIsDead` denetimi eklendi.
+Oluyken gorev/oduller degismez; dirilince eski yakinlik, kapasite ve tek sefer teslim
+kurallariyla alinabilir. Kayit formati ve mevcut owner-only replikasyon korunur.
+
+Regresyon once duzeltmesiz UE'de calisti: `FAIL checks=3 reason=dead claim consumed
+quest or granted partial reward` (motor exit=0, script exit=1). Duzeltme sonrasi
+`TestQuestRewardLifeState.ps1` **PASS checks=8**: canli kabul; eksik ilerleme reddi;
+tamamlanmaya hazir fixture; olu teslimde gorev/XP/altin/iksir korunmasi; olu kabul
+reddi; Revive sonrasi tam XP/altin/iksir; yinelenen teslim reddi; uzak NPC teslim
+reddi. Beklenen XP, ayri bir stats fixture'ina odul verilerek seviye/esik dusumuyla
+karsilastirilir. Iki controllersiz karakter ve ayri NPC kullanilir; ilerleme ve
+`bIsDead` testte kurulur. Disk kaydi yazilmaz, gercek oyunculara dokunulmaz.
+Shipping'de test komutu derlenmez. Normal UE 5.7 editor derlemesi GECTI.
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **19/19 GECTI**: 13 dosya PCH'siz /W4,
+0 derleyici uyarisi (gorev bileseni listeye eklendi); JSON 111 negatif; 214 yerel yuva
+`loaded=214 invalid=0 loadFailed=0 json ok=214 mismatch=0 maxLevel=6`,
+`writeorder ok=1`, `roundtrip equal=1`; normal/timeout/durum/son yazim hatasi/ilerleme
+gecis regresyonlari; parti 10, callback 9, klan 9, gorev 8 kontrol; Summer 50 /
+Winter 32 mob dogumu, 0 hata; NetSmoke 1 server join / 1 client welcome, iki tarafta
+0 hata. NetSmoke yalniz baglanti kontroludur. Lv33+ beceri boslugu ve StaticLint
+InitGameState beyaz liste uyarilari onceki gibi acik.
+
+Gercek olum/respawn, sahip-istemci RPC/HUD ve kaydet/yeniden giris PIE'de OYNANMADI;
+adimlar `PLAYTEST_CHECKLIST.md`'ye eklendi. Agency-agents Unreal Multiplayer Architect
+ve Test Results Analyzer rol belgelerinden yararlanildi; bagimsiz paralel ajan
+calistirilmadi. O6 son snapshot-pawn yok olusu, magaza yazim sirasi/iptal ve dedicated
+hazirligi acik kalir. Bu tur yalniz gorev kabul/odul canlilik kuralini kapatti.

@@ -3766,3 +3766,19 @@ Gerçek gecikmeli mağaza ve iki oyunculu PIE oynanmadı.
   tekrar kayıt sonrasında güncel değerler korunmalıdır. Disk/bulut arızası oynanmadı.
 - [ ] Son yazım ile pawn yok oluşu arasındaki oynanışı ayrıca ölç: bu kalan pencere
   kapanmadı. Motor yükleme hatası, dedicated server ve bulut yazım sırası/iptal açık.
+
+## Ölüyken görev ödülü ve diriliş sonrası tek teslim — 2026-10-07
+
+Sunucu ölü karakterin görev kabul/teslimini reddeder. Tamamlanmaya hazır görev aktif
+kalır; XP/altın/iksir verilmez. Dirilişten sonra ödül bir kez ve bütün olarak alınır.
+UE izole testinde 8 kontrol geçti; ölüm bayrağı/ilerleme testte kuruldu. Gerçek ölüm,
+sahip-istemci RPC, HUD ve kalıcılık PIE'de oynanmadı.
+
+- [ ] Uzak istemci Q_Goblins'i bitirsin; ödülü almadan Doran yakınında ölsün. Ölüyken
+  teslim isteği reddedilmeli; görev aktif, XP/altın/iksir değişmeden kalmalıdır.
+- [ ] Dirilsin ve NPC'ye dönsün: 200 XP, 120 altın ve 3 can iksiri bir kez verilmeli;
+  tekrar teslim ek ödül vermemelidir. Seviye atlandıysa XP eşiği düşümünü hesaba kat.
+- [ ] Ölü istemcinin yeni görev kabulü de reddedilmeli; diriliş sonrası normal kabul
+  çalışmalıdır. NPC'den uzak teslim ve dolu çanta/yığın kontrolleri korunmalıdır.
+- [ ] Kaydet/yeniden giriş: ölü teslim denemesi görevi tüketmemeli; başarılı teslim
+  tamamlanmış listede kalmalı ve ödül tekrar alınamamalıdır. Host ve uzak HUD'u karşılaştır.

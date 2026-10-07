@@ -14,6 +14,109 @@
 #include "EngineUtils.h"
 #include "HAL/PlatformTime.h"
 #include "World/MMOQuestGiverNPC.h"
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+#endif
+
+#if !UE_BUILD_SHIPPING
+bool UMMOQuestComponent::RunRewardLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	TArray<AActor*> Fixtures;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector TestLocation(1000000, 1000000, 5000);
+		AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), TestLocation, FRotator::ZeroRotator, Params);
+		AMMOCharacter* ExpectedCharacter = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), TestLocation + FVector(5000, 0, 0), FRotator::ZeroRotator, Params);
+		AMMOQuestGiverNPC* Giver = World->SpawnActor<AMMOQuestGiverNPC>(AMMOQuestGiverNPC::StaticClass(), TestLocation, FRotator::ZeroRotator, Params);
+		if (Character) Fixtures.Add(Character);
+		if (ExpectedCharacter) Fixtures.Add(ExpectedCharacter);
+		if (Giver) Fixtures.Add(Giver);
+		if (!Character || !ExpectedCharacter || !Giver) { OutError = TEXT("fixture spawn failed"); return false; }
+		UMMOQuestComponent* Quests = Character->GetQuestComponent();
+		UMMOStatsComponent* Stats = Character->GetStats();
+		UMMOInventoryComponent* Inv = Character->GetInventory();
+		const FName QuestId(TEXT("Q_Goblins")), OtherId(TEXT("Q_Cleanup"));
+		const FMMOQuestDef* Def = FMMOQuestDatabase::Find(QuestId);
+		const FMMOQuestDef* OtherDef = FMMOQuestDatabase::Find(OtherId);
+		if (!Quests || !Stats || !Inv || !Def || !OtherDef || Def->RewardXP <= 0) { OutError = TEXT("fixture data unavailable"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		const int32 BeforeLevel = Stats->Level, BeforeXP = Stats->Experience, BeforeGold = Inv->Gold;
+		const int32 BeforeItems = Inv->GetItemCount(Def->RewardConsumableId);
+		auto NoReward = [&]()
+		{
+			return Stats->Level == BeforeLevel && Stats->Experience == BeforeXP && Inv->Gold == BeforeGold
+				&& Inv->GetItemCount(Def->RewardConsumableId) == BeforeItems;
+		};
+		Quests->AcceptQuest(QuestId);
+		if (!Check(Quests->IsQuestActive(QuestId), TEXT("alive acceptance failed"))) return false;
+		Quests->ClaimReward(QuestId);
+		if (!Check(Quests->IsQuestActive(QuestId) && !Quests->IsCompleted(QuestId) && NoReward(), TEXT("incomplete reward granted"))) return false;
+		Quests->FindActive(QuestId)->KillProgress = Def->TargetCount;
+		if (!Check(Quests->IsQuestComplete(*Def, *Quests->FindActive(QuestId)), TEXT("completed fixture not ready"))) return false;
+		Stats->bIsDead = true; // Gercek olum animasyonu/timer degil; sunucudaki oluluk kosulu.
+		Quests->ClaimReward(QuestId);
+		if (!Check(Quests->IsQuestActive(QuestId) && !Quests->IsCompleted(QuestId) && NoReward(), TEXT("dead claim consumed quest or granted partial reward"))) return false;
+		Quests->AcceptQuest(OtherId);
+		if (!Check(!Quests->IsQuestActive(OtherId) && NoReward(), TEXT("dead acceptance succeeded"))) return false;
+		Stats->Revive();
+		ExpectedCharacter->GetStats()->GainExperience(Def->RewardXP);
+		Quests->ClaimReward(QuestId);
+		if (!Check(Quests->IsCompleted(QuestId) && !Quests->IsQuestActive(QuestId)
+			&& Stats->Level == ExpectedCharacter->GetStats()->Level && Stats->Experience == ExpectedCharacter->GetStats()->Experience
+			&& Inv->Gold == BeforeGold + Def->RewardGold && Inv->GetItemCount(Def->RewardConsumableId) == BeforeItems + Def->RewardConsumableCount,
+			TEXT("revived reward incomplete"))) return false;
+		const int32 AfterLevel = Stats->Level, AfterXP = Stats->Experience, AfterGold = Inv->Gold;
+		const int32 AfterItems = Inv->GetItemCount(Def->RewardConsumableId);
+		Quests->ClaimReward(QuestId);
+		if (!Check(Stats->Level == AfterLevel && Stats->Experience == AfterXP && Inv->Gold == AfterGold
+			&& Inv->GetItemCount(Def->RewardConsumableId) == AfterItems, TEXT("duplicate reward granted"))) return false;
+		Quests->AcceptQuest(OtherId);
+		FMMOQuestProgress* OtherProgress = Quests->FindActive(OtherId);
+		if (!OtherProgress) { OutError = TEXT("distance fixture acceptance failed"); return false; }
+		OtherProgress->KillProgress = OtherDef->TargetCount;
+		Character->SetActorLocation(TestLocation + FVector(5000, 0, 0));
+		Quests->ClaimReward(OtherId);
+		return Check(Quests->IsQuestActive(OtherId) && !Quests->IsCompleted(OtherId) && Inv->Gold == AfterGold
+			&& Stats->Level == AfterLevel && Stats->Experience == AfterXP, TEXT("distant reward granted"));
+	}();
+	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
+	// Controllersiz/ilk kaydi yuklenmemis karakterler: disk kaydi ve gercek oyuncu durumu degismez.
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOQuestRewardLifeStateTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestQuestRewardLifeState"))) return false;
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = UMMOQuestComponent::RunRewardLifeStateSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_QUEST_LIFE_STATE_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOQuestRewardLifeStateTestExec GMMOQuestRewardLifeStateTestExec;
+}
+#endif
 
 UMMOQuestComponent::UMMOQuestComponent()
 {
@@ -168,6 +271,12 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 		ServerAcceptQuest(QuestId);
 		return;
 	}
+	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	if (!Owner || !Owner->GetStats() || Owner->GetStats()->bIsDead)
+	{
+		MMONotify::ToOwner(GetOwner(), TEXT("Olduyken gorev alamazsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
 
 	if (IsQuestActive(QuestId) || IsCompleted(QuestId))
 	{
@@ -192,7 +301,6 @@ void UMMOQuestComponent::AcceptQuest(FName QuestId)
 		return;
 	}
 
-	const AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	if (Owner && Owner->GetStats() && Owner->GetStats()->Level < Def->RequiredLevel)
 	{
 		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Level %d gerekli"), Def->RequiredLevel), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
@@ -281,6 +389,14 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		ServerClaimReward(QuestId);
 		return;
 	}
+	// GainExperience oluyken XP vermez. Gorevi burada tuketmek altin/esya verip XP'yi
+	// kalici kaybettirirdi: tum oduller ve gorev durumu, dirilene kadar oldugu gibi kalmali.
+	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
+	if (!Owner || !Owner->GetStats() || Owner->GetStats()->bIsDead)
+	{
+		ClientClaimRewardFailed(TEXT("Olduyken gorev odulu alamazsin. Dirilince tekrar dene."));
+		return;
+	}
 
 	// Zaten tamamlanmis gorevin odulu ikinci kez verilmez (bozuk kayit ayni gorevi hem aktif
 	// hem tamamlanmis listede tasiyabilirdi; ApplySaveData bunu da temizler, bu ikinci savunma).
@@ -302,7 +418,6 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		return;
 	}
 
-	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	// Tum odulleri vermeden once ekipman icin yer ayir; aksi halde XP/altin verilip
 	// gorev tamamlanirken AddEquipmentInstance dolu cantada sessizce basarisiz olur.
 	if (!Def->RewardEquipmentId.IsNone())
