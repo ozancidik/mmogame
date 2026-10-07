@@ -17,6 +17,7 @@ FIXTURE = os.path.join(HERE, "fixtures", "playtest_metrics_sample.log")
 QUEST_FIXTURE = os.path.join(HERE, "fixtures", "quest_metrics_sample.log")
 FIRST_FIXTURE = os.path.join(HERE, "fixtures", "first_quest_metrics_sample.log")
 LOOT_FIXTURE = os.path.join(HERE, "fixtures", "first_loot_metrics_sample.log")
+KILL_FIXTURE = os.path.join(HERE, "fixtures", "first_kill_metrics_sample.log")
 
 failures = []
 
@@ -160,6 +161,26 @@ def main(argv):
     code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
     check("first_loot sure=?" in out, "eski gorev logundan loot suresi uydurulmamali")
 
+    kill_events = pm.parse_log(KILL_FIXTURE)
+    check(len(kill_events) == 17, "first kill fixture: 17 olay")
+    ks = pm.build_stats(kill_events)
+    check(ks["Host"]["first_actions"]["a" * 32]["first_kill"] == {
+        "seconds": 8, "lv": 1, "mob": "Goblin", "mlv": 1, "xp": 25, "credit": "fatal", "elite": 0}, "ilk son vurus ve tekrar korumasi")
+    check(ks["Host"]["first_actions"]["b" * 32]["first_kill"]["credit"] == "party"
+          and ks["Client"]["first_actions"]["c" * 32]["first_kill"]["elite"] == 1
+          and ks["Fallback"]["first_actions"]["d" * 32]["first_kill"]["xp"] == 0, "parti/katki/elit/fallback ve sifir XP kredisi")
+    check(ks["Host"]["first_duplicates"] == 1 and ks["Bad"]["first_invalid"] == 10
+          and ks["Bad"]["first_actions"] == {}, "gecersiz kill payload reddi")
+    check(ks["Host"]["lv"][1]["kills"] == 1 and ks["Host"]["lv"][1]["xp"] == 25
+          and ks["Client"]["lv"][1]["kills"] == 1 and ks["Client"]["lv"][1]["xp"] == 12
+          and ks["Host"]["quests"] == {} and ks["Host"]["src"] == {}, "first kill sayi/XP/altin/gorev cift saymamali")
+    code, out = run_main(pm, ["x", KILL_FIXTURE, "--who", "Host"])
+    check(code == 0 and "first_kill sure=0:08 lv=1 mob=Goblin mlv=1 xp=25 credit=fatal elite=0" in out
+          and "first_kill sure=0:05 lv=2 mob=Wolf mlv=2 xp=0 credit=party elite=0" in out
+          and "Oyuncu: Client" not in out, "kill raporu ve --who filtresi")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check("first_kill sure=?" in out, "eski logdan ilk kill suresi uydurulmamali")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -176,7 +197,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay)." % (len(events), len(quest_events), len(first_events), len(loot_events)))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events)))
     return 0
 
 

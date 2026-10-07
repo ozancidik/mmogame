@@ -7,7 +7,8 @@ eşleşmeyen teslimleri ayrı raporlar. Bu, §3.1'in görev olayları kısmını
 `first_quest_accept` / `first_quest_claim` ayrıca sunucu controller oturumunda
 birer kez üretilir; başlangıç controller BeginPlay zamanıdır, kalıcı karakterin
 ilk görevi değildir. Pawn değişimi ve controller aktarımı tekillik testinde
-sınandı. Diğer `first_*` (öldürme/loot/ekipman), gerçek 20 dk PIE koşusu ve model
+sınandı. İlk loot ve öldürme kredisi de eklendi (güncel durum §3.1).
+Diğer `first_*` (kuşanma/hareket/saldırı vb.), gerçek 20 dk PIE koşusu ve model
 karşılaştırması hâlâ açık.
 
 **2026-10-07 doğrulama eklemesi:** Satıcı ekonomi kuralları artık
@@ -236,7 +237,7 @@ Görevli yolun sırası: `Q_Goblins` (5 öldürme) Lv1'de alınır, tesliminde L
 KO/Rise tarzı beklenen döngü (yalnız genel referans, doğrulanmadı): hub → kısa görev → bölge avı → parti → boss; ölümün bir bedeli; ekonomide anlamlı harcama; beceri/stat seçimleri. Maddeler bağımlılık sırasıyla. Boyut: S ≈ ≤1 gün, M ≈ 2–4 gün, L ≈ >1 hafta (tahmin `[VARSAYIM]`). Tüm sayısal hedefler `[PLACEHOLDER]`.
 
 ### 1. PIE telemetrisi + BalanceReport v2 — **M**
-- **Durum (2026-10-07): büyük kısmı yapıldı (master, PIE ölçümü yok).** `[MMOMETRIC]` `levelup`/`kill`/`death`/`gold`/`quest_accept`/`quest_claim` ve controller oturumu için `first_quest_accept`/`first_quest_claim`/`first_loot` satırları, `Scripts/PlaytestMetrics.py` özeti var; ilk loot yalnız gerçek pozitif pickup teslimi, kısmi toplamada teslim edilen miktardır. Görev XP sütunu nominal ödüldür, seviye tavanında kayıp düşülmez. BalanceReport v2'nin işini `Scripts/ProgressionModel.py` (görevli, bölge sınırlı) görüyor. **Açık:** ilk öldürme/kuşanma ve diğer ilk eylemler, gerçek koşu ve (d) maddesinin karşılaştırması. Koşu adımları: `docs/PLAYTEST_RUNBOOK.md`.
+- **Durum (2026-10-07): büyük kısmı yapıldı (master, PIE ölçümü yok).** `[MMOMETRIC]` `levelup`/`kill`/`death`/`gold`/`quest_accept`/`quest_claim` ve controller oturumu için `first_quest_accept`/`first_quest_claim`/`first_loot`/`first_kill` satırları, `Scripts/PlaytestMetrics.py` özeti var; ilk loot yalnız gerçek pozitif pickup teslimi, kısmi toplamada teslim edilen miktardır. İlk kill, mevcut sunucu ölüm akışında canlı oyuncuya verilen kredidir: `fatal`, `contribution`, `party`, `fallback` ayrı raporlanır; XP öncesi seviye ve o öldürmenin XP'si yazılır, sıfır XP kredisi de ilk olay olabilir. Görev XP sütunu nominal ödüldür, seviye tavanında kayıp düşülmez. BalanceReport v2'nin işini `Scripts/ProgressionModel.py` (görevli, bölge sınırlı) görüyor. **Açık:** ilk kuşanma ve diğer ilk eylemler, gerçek koşu ve (d) maddesinin karşılaştırması. Koşu adımları: `docs/PLAYTEST_RUNBOOK.md`.
 - **Oyuncu deneyimi:** Doğrudan yok; sonraki her ayarın ölçülebilir olması.
 - **Dosya kapsamı:** `MMOStatsComponent.cpp` (seviye atlama, ölüm cezası), `MMOMob.cpp` (öldürme, altın), `MMOInventoryComponent.cpp` (altın giriş/çıkış kaynağı: ganimet, satış, satın alma, yükseltme, iksir), `MMOQuestComponent.cpp` (kabul/teslim), `MMOPlayerController.cpp` (Şifacı), yeni `Scripts/PlaytestMetrics.py`, `Scripts/BalanceReport.py` v2 (bölge sınırlı + görev XP'si + senaryo seçeneği).
 - **Kabul ölçütü:** (a) 20 dk'lık PIE koşusunda sunucu logunda `[MMOMETRIC]` satırları: `levelup`, `kill`, `death`, `gold`, `quest_accept`, `quest_claim`, `first_*`; (b) tek komutla seviye başına süre/öldürme/ölüm/altın giriş-çıkış/XP kaynağı tablosu; (c) yalnız sunucu, oyun davranışı değişmez (derleme + `SmokeTest.ps1` geçer); (d) BalanceReport v2 çıktısı §1.5 tablosunu ±1 öldürmeyle yeniden üretir.

@@ -972,3 +972,63 @@ Summer 47 / Winter 28 mob dogumu, smoke hata=0; NetSmoke 1 join / 1 welcome,
 iki tarafta hata=0 (yalniz baglanti). Lv33+ beceri bosluklari ve StaticLint
 InitGameState beyaz liste uyarisi acik. Gercek sure, ag replikasyonu/oynanis ve
 dedicated Server bu paketle tamamlandi sayilmaz.
+
+## 47. Kontrolcu oturumunda ilk oldurme kredisi (2026-10-07)
+
+Lv1-30 olcumunun sinirli parcasi: `first_kill`, AMMOMob HandleDeath'in
+mevcut canli XP/gorev kredi alicisi dongusunde, GainExperience ONCESI yazilir.
+`lv` odul oncesi, `mob/mlv/xp/elite` normal kill olayi ile ayni anlamdadir.
+`xp` hesaplanan paydir, tavanda gercek bakiye artisi degildir. Credit turleri:
+fatal = secilen oldurenin gecerli karakter son vurusu; contribution = diger
+aliciya ait taze pozitif hasar; party = kendi hasari olmadan parti payi;
+fallback = son vurus kaynagi yok/gecersizken en yuksek taze katkiyla secilen
+yedek olduren. Parti/fallback son vurus olarak yorumlanmaz. Sifir XP kredisi
+de gecerli ilk olaydir. Mevcut XP, gorev, ganimet ve ag semasi degismedi.
+
+Server-only ortak sid/start/TSet helper, whitelisted C++ wrapper; client
+RPC yok. Wrapper bos mob/nonpositive mob seviyesi/negatif XP/gecersiz kredi,
+bos pawn ve olu karakteri reddeder. Shipping wrapper log/payload uretmez,
+fixture derlenmez. Pawn degisimi/seamless controller aktarimi tekilligi
+korur; yeni baglanti yeni sid. Kalici karakterin ilk oldurmesi degildir.
+
+Normal Editor derlemesi ve kaynak geri yukleme sonrasi yeniden derleme gecti.
+Kaniti:
+
+- `TestFirstKill.ps1` **PASS checks=10**, gercek TakeDamage -> Stats ApplyDamage
+  -> OnDeath -> HandleDeath -> GainExperience. 5 sid'de contribution XP2,
+  party XP2, fatal XP14, fallback XP20 ve dirilen oyuncu fatal XP20.
+  Sonuncu Lv1->2 yapar; first satiri lv=1. Olum oncesi vurusta kredi yok;
+  olu alici reddi, duplicate HandleDeath/fatal hit ve ikinci kill tekilligi;
+  katkısız cevre ve stale fallback kredi vermez. Parti uyeligi/stale katki
+  yalniz fixture'da seed edildi. AI auto-possession kapali, carpisma kapali;
+  kendi aktorleri/yeni fixture alani pickup'lari ayni karede temizlenir.
+- Mevcut 6 controller kontrolu kill icin bos pawn/gecersiz payload,
+  tekrar, pawn degisimi, dogrudan SeamlessTravelTo ve yeni sid'i de sinar.
+  Gorev 2 kabul/1 teslim ve loot 2 olayi korundu; kill 2 olay/2 sid.
+- Parser eski12 / quest14 / first-quest16 / first-loot13 / first-kill17
+  olay fixture'lari gecti. Kill fixture: 4 gecerli sid, 1 tekrar, 10 bozuk
+  payload reddi (eksik alan, negatif/NaN/kesirli sayi, kredi/elit); zero XP,
+  elit, --who, bilinmeyen sure ve kill/XP/gold/quest cift sayilmamasi.
+  Gercek UE logu raporda 6 normal kill / 78 XP, 5 first olay; artan seviye
+  kaydinda first lv1 kaldi. Sentetik sureler gercek av suresi degildir.
+- Negatif kontrolde fallback etiketi fatal yapildi. Mutant derlendi;
+  C++ 10 oyun kontrolu gecerken script yanlis etiketi **exit=1** ile yakaladi
+  (UE exit=0). finally kaynak tam byte'lariyla restore, DLL yeniden derleme,
+  direct hook testi PASS. Mutant commit edilmedi.
+
+Oyuncu dosyasi okunmaz/yazilmaz. Gercek davet/uzak istemci/ServerTravel,
+fiziksel av, gecikme ve tum parti/menzil kombinasyonlari fixture kaniti
+degildir. PIE adimlari acik olarak PLAYTEST_CHECKLIST'e, olcum anlami
+RUNBOOK ve Lv1-30 plana eklendi. Ilk kuşanma/diger eylemler ve 20 dk
+sinif/parti kosusu acik. Agency-agents Unreal Multiplayer Architect ve
+Test Results Analyzer rol rehberleri uygulandi; bagimsiz paralel ajan yok.
+
+Tam `RunAllChecks.ps1 -SkipBuild -FullCompile`: **29/29 GECTI**; 15 dosya
+PCH'siz /W4, 0 derleyici uyarisi. JSON 111 negatif; 280 yerel yuva
+`loaded=280 invalid=0 loadFailed=0 existsMismatch=0 json ok=280 mismatch=0
+maxLevel=6`, `writeorder ok=1`, `roundtrip equal=1`. Yeni first-kill ve tum
+onceki gorev/loot/gecis/parti/klan/iksir/ekipman/stat/mastery/satici kontrolleri
+gecti. Summer 49 / Winter 30 mob dogumu, smoke hata=0; NetSmoke 1 join /
+1 welcome ve iki tarafta hata=0 (yalniz baglanti kaniti). Lv33+ beceri
+bosluklari ve StaticLint InitGameState beyaz liste uyarisi acik.
+Dedicated Server/Shipping hedefi ve gercek PIE sure/ag oynanisi kapanmadi.

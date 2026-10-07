@@ -23,6 +23,10 @@ class MYPROJECT_API AMMOMob : public AMMOCharacter
 public:
 	AMMOMob();
 
+#if !UE_BUILD_SHIPPING
+	static bool RunFirstKillSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

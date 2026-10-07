@@ -69,6 +69,26 @@ Başlangıç paketi/görev/satıcı/debug verme bu olayı tetiklemez. Ekipman lo
 kuşanma değildir; onun ölçümü açık. Eski logda eksik loot `sure=?`; first
 satırı normal `gold` akışını veya XP/görev sayısını yeniden toplamaz.
 
+**İlk öldürme kredisi:** `first_kill` aynı controller sid/start/elapsed
+kapsamında, mevcut mob ölüm akışındaki canlı kredi alıcısına bir kez yazılır.
+`mob`, `mlv`, `xp`, `elite` ve XP verilmeden önceki `lv` kaydedilir.
+`xp` mevcut paylaşımın hesapladığı ödüldür; seviye tavanında gerçek XP
+artışı ölçümü değildir (normal `kill` satırıyla aynı anlam).
+
+| credit | Anlamı |
+| --- | --- |
+| fatal | Geçerli karakterin son vuruşu; kendi kredisi |
+| contribution | Son vuruşu yapmayan, geçerli kendi hasar katkısı olan alıcı |
+| party | Kendi hasar katkısı olmadan parti paylaşımı alan alıcı |
+| fallback | Son vuruş kaynağı geçersiz/oyuncu dışı; sunucunun taze katkılardan seçtiği yedek öldüren |
+
+Parti veya fallback olayı gerçek son vuruş olarak yorumlanmamalı. `xp=0`
+kredisi geçerlidir; ölçüm XP kazancı şartına bağlı değildir. Ölmeden yapılan
+vuruşlar ve ölü alıcılar olay üretmez; sonraki öldürmeler tekilliği sıfırlamaz.
+Olay normal kill/XP sayısını ikinci kez artırmaz. Eski logda eksik olayın
+süresi bilinmez. Pawn/gerçek seamless geçiş/reconnect ve uzaktaki istemci
+oynanışı PIE'de açık; fixture süreleri gerçek av süresi değildir.
+
 Ölçüm satırları yalnız sunucuda (host) basılır. Logda hiç satır yoksa Kapı 3 **KALDI**: büyük olasılıkla istemci penceresinin logu okunuyor.
 
 ## Sonuç şablonu (kopyala, doldur, bana gönder)

@@ -146,6 +146,11 @@ Step "Ilk gorev kontrolcu oturumu ve tekillik" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Ilk oldurme kredisi ve gercek olum akisi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstKill.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ganimet toplamada oluluk ve tek sefer grant" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLootLifeState.ps1") | Out-Host
     $LASTEXITCODE -eq 0

@@ -1,0 +1,17 @@
+[MMOMETRIC] t=8 ev=first_kill who=Host lv=1 mob=Goblin mlv=1 xp=25 credit=fatal elite=0 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=8 ev=kill who=Host lv=1 mob=Goblin mlv=1 xp=25 party=0 elite=0
+[MMOMETRIC] t=9 ev=first_kill who=Host lv=1 mob=Wolf mlv=2 xp=0 credit=party elite=0 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=9
+[MMOMETRIC] t=15 ev=first_kill who=Host lv=2 mob=Wolf mlv=2 xp=0 credit=party elite=0 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=12 ev=first_kill who=Client lv=1 mob=Goblin mlv=1 xp=12 credit=contribution elite=1 scope=controller sid=cccccccccccccccccccccccccccccccc start=2 elapsed=10
+[MMOMETRIC] t=12 ev=kill who=Client lv=1 mob=Goblin mlv=1 xp=12 party=1 elite=1
+[MMOMETRIC] t=20 ev=first_kill who=Fallback lv=1 mob=Goblin mlv=1 xp=0 credit=fallback elite=0 scope=controller sid=dddddddddddddddddddddddddddddddd start=0 elapsed=20
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mlv=1 xp=25 credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=0 xp=25 credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=nan xp=25 credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1 xp=-1 credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1 xp=nan credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1 xp=1.5 credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1 xp=25 credit=unknown elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1 xp=25 credit=fatal elite=2 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1 xp=25 elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_kill who=Bad lv=1 mob=Goblin mlv=1.5 xp=25 credit=fatal elite=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8

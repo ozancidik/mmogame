@@ -17,6 +17,7 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   quest_claim  who lv to quest xp_reward capped (lv = odulden once; xp_reward = nominal odul)
   first_quest_accept / first_quest_claim who lv quest scope=controller sid start elapsed
   first_loot who lv kind=gold|item|equipment item amount scope=controller sid start elapsed
+  first_kill who lv mob mlv xp credit=fatal|contribution|party|fallback elite scope=controller sid start elapsed
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -27,7 +28,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
-FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill")
 
 
 def project_root():
@@ -100,11 +101,21 @@ def build_stats(events):
             event_time = to_num(e.get("t"), float("nan"))
             level = to_num(e.get("lv"), float("nan"))
             amount = to_num(e.get("amount"), float("nan"))
-            payload_valid = bool(e.get("quest")) if ev != "first_loot" else (
-                e.get("kind") in ("gold", "item", "equipment") and bool(e.get("item"))
-                and math.isfinite(amount) and amount > 0 and amount.is_integer()
-                and (e.get("kind") != "equipment" or amount == 1)
-                and (e.get("kind") != "gold" or e.get("item") == "Gold"))
+            if ev == "first_loot":
+                payload_valid = (e.get("kind") in ("gold", "item", "equipment") and bool(e.get("item"))
+                                 and math.isfinite(amount) and amount > 0 and amount.is_integer()
+                                 and (e.get("kind") != "equipment" or amount == 1)
+                                 and (e.get("kind") != "gold" or e.get("item") == "Gold"))
+            elif ev == "first_kill":
+                mob_level = to_num(e.get("mlv"), float("nan"))
+                xp = to_num(e.get("xp"), float("nan"))
+                elite = to_num(e.get("elite"), float("nan"))
+                payload_valid = (bool(e.get("mob")) and e["mob"] != "None"
+                                 and math.isfinite(mob_level) and mob_level >= 1 and mob_level.is_integer()
+                                 and math.isfinite(xp) and xp >= 0 and xp.is_integer() and elite in (0, 1)
+                                 and e.get("credit") in ("fatal", "contribution", "party", "fallback"))
+            else:
+                payload_valid = bool(e.get("quest"))
             if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
                     or not all(math.isfinite(n) and n >= 0 for n in (start, elapsed, event_time))
                     or not math.isfinite(level) or level < 1 or not level.is_integer() or not payload_valid
@@ -118,6 +129,8 @@ def build_stats(events):
             sample = {"seconds": elapsed, "lv": int(level)}
             if ev == "first_loot":
                 sample.update(kind=e["kind"], item=e["item"], amount=int(amount))
+            elif ev == "first_kill":
+                sample.update(mob=e["mob"], mlv=int(mob_level), xp=int(xp), credit=e["credit"], elite=int(elite))
             else:
                 sample["quest"] = e["quest"]
             session[ev] = sample
@@ -249,7 +262,12 @@ def print_player(who, p):
             for action in FIRST_ACTIONS:
                 sample = actions.get(action)
                 if sample:
-                    detail = ("kind=%s item=%s amount=%d" % (sample["kind"], sample["item"], sample["amount"])) if action == "first_loot" else "quest=%s" % sample["quest"]
+                    if action == "first_loot":
+                        detail = "kind=%s item=%s amount=%d" % (sample["kind"], sample["item"], sample["amount"])
+                    elif action == "first_kill":
+                        detail = "mob=%s mlv=%d xp=%d credit=%s elite=%d" % (sample["mob"], sample["mlv"], sample["xp"], sample["credit"], sample["elite"])
+                    else:
+                        detail = "quest=%s" % sample["quest"]
                     print("  sid=%s %s sure=%s lv=%d %s" % (
                         sid, action, fmt_time(sample["seconds"]), sample["lv"], detail))
                 else:

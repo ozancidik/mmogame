@@ -3984,5 +3984,32 @@ geçti. Fiziksel overlap, gerçek ağ ve disk kaydı bu fixture'larda çalışt�
 - [ ] Öl/diril ve gerçek Summer→Winter seamless geçişte sid/tekillik korunmalı;
   yeniden bağlantı yeni controller/sid. Parser süreyi controller BeginPlay'den
   göstermeli, first olayını altın/XP/görev toplamına tekrar eklememeli.
-- [ ] Eski logda ilk loot yoksa `sure=?`/bilinmiyor. İlk öldürme/kuşanma ve gerçek
+- [ ] Eski logda ilk loot yoksa `sure=?`/bilinmiyor. İlk kuşanma ve gerçek
   20 dk sınıf/parti süreleri açık; sentetik fixture süreleri gerçek koşu değildir.
+
+## İlk öldürme kredisi ölçümü — 2026-10-07 (PIE açık)
+
+`TestFirstKill.ps1`: **10 UE kontrolü**, gerçek TakeDamage→ApplyDamage→OnDeath→
+HandleDeath→XP yolu; 5 sid'de ilk olaylar contribution=2 XP, party=2 XP,
+fatal=14 XP, fallback=20 XP ve dirilen oyuncunun fatal=20 XP kredisi. Sonuncu
+Lv1→2 yükseltir; ilk olay lv=1 kalır. Parti üyeliği ve stale katkı yalnız
+izole fixture'da seed edilir; gerçek davet, gecikme, hareket veya remote RPC
+oynanışı değildir. Ölü alıcı/ölümden önce vuruş/ikinci ölüm ve kill yeni ilk
+olay üretmez; katkısız çevre ölümü ve süresi geçmiş katkı kredi vermez.
+Mevcut 6 controller kontrolü kill için de pawn/aktarım tekilliğini sınar.
+
+- [ ] Host + uzak istemci gerçek mob avında sid başına yalnız bir first_kill
+  yazılmalı; mob/mlv/XP/elit doğru, lv ödül öncesi olmalı. Yalnız vuruş
+  yapmak olay üretmemeli; seviye yükselten son vuruş eski seviyede raporlanmalı.
+- [ ] İki bağımsız oyuncu hasarı paylaşsın: son vuruş fatal, diğer hasar sahibi
+  contribution; partiye katılıp hiç vurmayan yakındaki canlı üye party olsun.
+  Normal kill adedi ve XP first satırı nedeniyle iki kez sayılmamalı.
+- [ ] Katkı sahibi çıkış yaptıktan sonra DoT/çevre ölümü: sunucu gerçekten
+  yedek öldüren seçerse fallback; geçerli katkı yoksa ilk kredi olmamalı.
+  Ölü/menzil dışı veya katkısı süresi dolmuş oyuncunun gerçek davranışını
+  kontrol et; fixture mevcut paylaşım kurallarının tüm kombinasyonlarını kapsamaz.
+- [ ] Öl/diril, pawn değişimi ve Summer→Winter gerçek seamless geçişte aynı
+  controller oturumunun tekilliği korunmalı; yeni bağlantıda yeni sid.
+  Controller aktarımı fixture'ı gerçek ServerTravel kanıtı değildir.
+- [ ] Eski logda eksik first_kill `sure=?`; sıfır XP kredisi geçerli ama
+  son vuruşla aynı anlama gelmez. İlk kuşanma ve 20 dk solo/parti süreleri açık.

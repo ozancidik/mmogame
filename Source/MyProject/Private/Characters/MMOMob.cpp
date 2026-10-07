@@ -36,6 +36,125 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/PlayerController.h"
 
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+
+bool AMMOMob::RunFirstKillSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	TArray<AActor*> Fixtures;
+	TArray<AMMOPlayerController*> Controllers;
+	TSet<AMMOLootPickup*> ExistingLoot;
+	for (TActorIterator<AMMOLootPickup> It(World); It; ++It) ExistingLoot.Add(*It);
+	const FVector Location(1000000, 1000000, 5000);
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* Pawns[5] = {};
+		for (int32 Index = 0; Index < 5; ++Index)
+		{
+			AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			Pawns[Index] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(200 + Index * 100, 0, 0), FRotator::ZeroRotator, Params);
+			if (PC) { Controllers.Add(PC); Fixtures.Add(PC); }
+			if (Pawns[Index]) { Fixtures.Add(Pawns[Index]); Pawns[Index]->SetActorEnableCollision(false); }
+			if (!PC || !Pawns[Index] || !Pawns[Index]->GetStats()) { OutError = TEXT("fixture spawn failed"); return false; }
+			PC->Possess(Pawns[Index]);
+		}
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks; return true;
+		};
+		auto SpawnMob = [&]()
+		{
+			const FTransform TM(FRotator::ZeroRotator, Location);
+			AMMOMob* Mob = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), TM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			if (!Mob) { OutError = TEXT("mob fixture spawn failed"); return Mob; }
+			Fixtures.Add(Mob);
+			Mob->AutoPossessAI = EAutoPossessAI::Disabled;
+			Mob->ArchetypeId = TEXT("Goblin");
+			Mob->SetActorEnableCollision(false);
+			UGameplayStatics::FinishSpawningActor(Mob, TM);
+			Mob->SetActorTickEnabled(false);
+			Mob->bHasHub = false;
+			Mob->MobLevel = 1; Mob->XPReward = 20;
+			Mob->Stats->MaxHealth = 100.f; Mob->Stats->Health = 100.f; Mob->Stats->Defense = 0.f;
+			Mob->ItemDropChance = 0.f; Mob->EquipDropChance = 0.f;
+			return Mob;
+		};
+		auto Hit = [](AMMOMob* Mob, float Amount, AMMOCharacter* Attacker)
+		{
+			return Mob->TakeDamage(Amount, FDamageEvent(), Attacker ? Attacker->GetController() : nullptr, Attacker);
+		};
+		// Seed only the isolated party membership; damage/death/XP use production paths.
+		Pawns[0]->GetPartyComponent()->Members.Add(Pawns[2]);
+		Pawns[2]->GetPartyComponent()->Members.Add(Pawns[0]);
+		AMMOMob* Mob = SpawnMob(); if (!Mob) return false;
+		Hit(Mob, 20.f, Pawns[0]); Hit(Mob, 10.f, Pawns[3]);
+		if (!Check(!Mob->Stats->bIsDead && Mob->Stats->Health == 70.f
+			&& Pawns[0]->GetStats()->Experience == 0 && Pawns[3]->GetStats()->Experience == 0, TEXT("nonfatal hit granted XP"))) return false;
+		Pawns[3]->GetStats()->bIsDead = true;
+		if (!Check(!Controllers[3]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("fatal"), false), TEXT("dead controller emitted"))) return false;
+		Hit(Mob, 70.f, Pawns[1]);
+		if (!Check(Mob->Stats->bIsDead && Mob->bDeathHandled && Pawns[0]->GetStats()->Experience == 2
+			&& Pawns[1]->GetStats()->Experience == 14 && Pawns[2]->GetStats()->Experience == 2
+			&& Pawns[3]->GetStats()->Experience == 0, TEXT("death shares/dead exclusion incorrect"))) return false;
+		Mob->HandleDeath(); Hit(Mob, 100.f, Pawns[1]);
+		if (!Check(Pawns[0]->GetStats()->Experience == 2 && Pawns[1]->GetStats()->Experience == 14
+			&& Pawns[2]->GetStats()->Experience == 2, TEXT("duplicate death granted XP"))) return false;
+		AMMOMob* Repeat = SpawnMob(); if (!Repeat) return false;
+		Hit(Repeat, 100.f, Pawns[1]);
+		if (!Check(Repeat->Stats->bIsDead && Pawns[1]->GetStats()->Experience == 34, TEXT("second kill XP incorrect"))) return false;
+		AMMOMob* Fallback = SpawnMob(); if (!Fallback) return false;
+		Hit(Fallback, 25.f, Pawns[4]); Hit(Fallback, 75.f, nullptr);
+		if (!Check(Fallback->Stats->bIsDead && Pawns[4]->GetStats()->Experience == 20, TEXT("fallback credit missing"))) return false;
+		Fallback->HandleDeath();
+		if (!Check(Pawns[4]->GetStats()->Experience == 20, TEXT("duplicate fallback granted XP"))) return false;
+		AMMOMob* Unowned = SpawnMob(); if (!Unowned) return false;
+		Hit(Unowned, 100.f, nullptr);
+		if (!Check(Unowned->Stats->bIsDead && Pawns[4]->GetStats()->Experience == 20, TEXT("unowned death granted XP"))) return false;
+		AMMOMob* Stale = SpawnMob(); if (!Stale) return false;
+		Stale->DamageContributions.Add(Pawns[4], 10.f);
+		Stale->LastContributionTime.Add(Pawns[4], World->GetTimeSeconds() - Stale->ContributionExpirySeconds - 1.f);
+		Hit(Stale, 100.f, nullptr);
+		if (!Check(Stale->Stats->bIsDead && Pawns[4]->GetStats()->Experience == 20, TEXT("expired fallback granted XP"))) return false;
+		Pawns[3]->GetStats()->Revive();
+		Pawns[3]->GetStats()->Experience = Pawns[3]->GetStats()->ExperienceToNextLevel - 1;
+		AMMOMob* Revived = SpawnMob(); if (!Revived) return false;
+		Hit(Revived, 100.f, Pawns[3]);
+		return Check(Revived->Stats->bIsDead && Pawns[3]->GetStats()->Level == 2
+			&& Pawns[3]->GetStats()->Experience == 19, TEXT("revived level-up kill missing"));
+	}();
+	// Only pickups created at the fixture site in this synchronous frame are ours.
+	for (TActorIterator<AMMOLootPickup> It(World); It; ++It)
+		if (!ExistingLoot.Contains(*It) && FVector::DistSquared(It->GetActorLocation(), Location) < FMath::Square(1000.f)) Fixtures.Add(*It);
+	for (AMMOPlayerController* PC : Controllers) if (IsValid(PC)) PC->UnPossess();
+	for (AActor* Fixture : Fixtures) if (IsValid(Fixture)) Fixture->Destroy();
+	return bPassed; // No tick, player load/autosave, disk write, or live actor mutation.
+}
+
+namespace
+{
+	struct FMMOFirstKillTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstKill"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOMob::RunFirstKillSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_KILL_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstKillTestExec GMMOFirstKillTestExec;
+}
+#endif
+
 AMMOMob::AMMOMob()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -899,6 +1018,13 @@ void AMMOMob::HandleDeath()
 				}
 			}
 			// Olcum gunlugu: oldurme (seviye = XP verilmeden onceki seviye; party=1 -> son vurusu yapan degil).
+			if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(R->GetController()))
+			{
+				const float* OwnDamage = DamageContributions.Find(R);
+				const FName Credit = R == Killer ? (bFatalFromKiller ? TEXT("fatal") : TEXT("fallback"))
+					: (OwnDamage && *OwnDamage > 0.f ? TEXT("contribution") : TEXT("party"));
+				PC->RecordFirstKillMetric(ArchetypeId, MobLevel, ScaledXP, Credit, bIsElite);
+			}
 			UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=kill who=%s lv=%d mob=%s mlv=%d xp=%d party=%d elite=%d"),
 				MMOMetrics::Seconds(), *MMOMetrics::WhoName(R), R->GetStats()->Level, *ArchetypeId.ToString(),
 				MobLevel, ScaledXP, R != Killer ? 1 : 0, bIsElite ? 1 : 0);

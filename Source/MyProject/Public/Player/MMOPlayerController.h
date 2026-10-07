@@ -58,6 +58,8 @@ public:
 	bool RecordFirstQuestMetric(FName Action, FName QuestId);
 	// After a real pickup grant; Amount is delivered count/gold, not requested amount.
 	bool RecordFirstLootMetric(FName Kind, FName ItemId, int32 Amount);
+	// Ilk sunucu kill kredisi; fatal/contribution/party/fallback ayrimi, XP oncesi seviye.
+	bool RecordFirstKillMetric(FName MobId, int32 MobLevel, int32 XP, FName Credit, bool bElite);
 #if !UE_BUILD_SHIPPING
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
