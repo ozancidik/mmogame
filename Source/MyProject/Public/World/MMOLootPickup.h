@@ -65,6 +65,10 @@ public:
 	// Owners bos ise rezervasyon yok. Spawner'dan FinishSpawning'den ONCE cagrilmali (BeginPlay zamanlayiciyi kurar).
 	void SetReserved(const TArray<AMMOCharacter*>& Owners, float Seconds);
 
+#if !UE_BUILD_SHIPPING
+	static bool RunLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
+
 protected:
 	virtual void BeginPlay() override;
 

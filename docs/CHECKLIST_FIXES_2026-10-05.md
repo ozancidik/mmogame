@@ -556,3 +556,38 @@ adimlar `PLAYTEST_CHECKLIST.md`'ye eklendi. Agency-agents Unreal Multiplayer Arc
 ve Test Results Analyzer rol belgelerinden yararlanildi; bagimsiz paralel ajan
 calistirilmadi. O6 son snapshot-pawn yok olusu, magaza yazim sirasi/iptal ve dedicated
 hazirligi acik kalir. Bu tur yalniz gorev kabul/odul canlilik kuralini kapatti.
+
+## 37. O16: olu karakterin ganimet toplamasini engelle (2026-10-07)
+
+`AMMOLootPickup::TryCollect` oyuncu kontrolunu denetliyordu fakat olum bayragini
+denetlemiyordu. Ceset overlap'i ve rezervasyon bitiminde ayni kapi altin/sarf/ekipman
+verebiliyordu. Butun grant islemlerinden once sunucuda stats varligi ve `!bIsDead`
+denetimi eklendi. Reddedilen ganimet normal omru boyunca yerde kalir; canli toplamada
+mevcut rezervasyon, canta/yigin kapasitesi ve tek sefer guard'i uygulanir.
+Diriliste otomatik tekrar deneme veya ganimet omrunu uzatma eklenmedi.
+
+Test duzeltmesiz UE'de **FAIL checks=0 reason=dead gold collected** verdi (motor
+exit=0, script exit=1). Duzeltme sonrasi `TestLootLifeState.ps1` **PASS checks=10**:
+olu altin/sarf/ekipman reddi, bitmis rezervasyonda olu reddi; Revive sonrasi uc turun
+tam grant'i ve her tur icin yinelenen grant reddi. Sarf oluluk denemesi `OnOverlap`
+girisi uzerinden yapilir. Collision kapali izole loot fixture'lari, AMMOCharacter ve
+test PlayerController kullanilir. Bayrak ve rezervasyon zamani testte kurulur;
+gercek timer/overlap listesi oynanmaz. Ayni senkron cagrida unpossess/yok etme sayesinde
+ilk yukleme/autosave calismaz; oyuncu kaydi yazilmaz. Shipping'de test komutu yoktur.
+Normal UE 5.7 editor derlemesi GECTI. Loot dosyasi PCH'siz derleme listesine ve yeni
+regresyon tam kontrol paketine eklendi.
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **20/20 GECTI**: 14 dosya PCH'siz /W4,
+0 derleyici uyarisi; JSON 111 negatif; 220 yerel yuva `loaded=220 invalid=0
+loadFailed=0 json ok=220 mismatch=0 maxLevel=6`, `writeorder ok=1`,
+`roundtrip equal=1`; gecis normal/timeout/durum/son yazim hatasi/ilerleme;
+parti 10, callback 9, klan 9, gorev 8, loot 10 kontrol; Summer 51 / Winter 33
+mob dogumu, 0 hata; NetSmoke 1 server join / 1 client welcome, iki tarafta 0 hata.
+NetSmoke yalniz baglantidir; gercek ganimet replikasyonu/PIE degildir. Lv33+ beceri
+boslugu ve StaticLint InitGameState beyaz liste uyarilari onceki gibi acik.
+
+Gercek ceset/respawn, timer overlap listesi, uzak istemci replication/HUD ve kalicilik
+PIE'de OYNANMADI; adimlar `PLAYTEST_CHECKLIST.md`'ye eklendi. Agency-agents Unreal
+Multiplayer Architect ve Test Results Analyzer rol belgeleri kullanildi; bagimsiz
+paralel ajan calistirilmadi. O6 son snapshot-pawn yok olusu, magaza yazim sirasi/iptal
+ve dedicated hazirligi acik kalir. Bu tur O16 canlilik kuralini kapatti.

@@ -37,6 +37,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O13 | ORTA | **Kod düzeltildi, PIE bekliyor (2026-10-07):** üye kabulü mevcut grubun tamamını lider izni olmadan birleştiriyordu; mevcut gruplar için lider yetkisi davet ve kabul anında denetleniyor | `UMMOPartyComponent::CanCombineParties/FormOrJoin` |
 | O14 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** eski/vekil liderin yetkisini kaybetmiş bekleyen klan daveti kabul ediliyordu; lider rolü kabul anında yeniden denetleniyor | `UMMOClanComponent::CmdAccept` |
 | O15 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter görevi teslim ederek XP ödülünü kaybediyordu; sunucuda kabul/teslim için canlılık denetlenir | `UMMOQuestComponent::AcceptQuest/ClaimReward` |
+| O16 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter yerdeki altın/sarf/ekipmanı toplayabiliyordu; ortak sunucu toplama kapısı canlılık denetler | `AMMOLootPickup::TryCollect` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -131,6 +132,26 @@ sonrası tam XP/altın/iksir ödülü, tekrar teslim reddi ve NPC'den uzak tesli
 İzole controllersiz karakterler ve NPC kullanılır; öldürme sayacı/`bIsDead` testte
 kurulur. Gerçek ölüm animasyonu, istemci RPC/HUD, kayıt ve yeniden giriş oynanmadı.
 Fixture'lar disk kaydı yazmaz; Shipping'de test komutu derlenmez.
+
+### O16 · ORTA · Ölü karakterin ganimet toplaması — düzeltildi (2026-10-07)
+
+`TryCollect` sadece otorite/oyuncu kontrolünü denetliyordu. Ölü karakter altın,
+sarf ve ekipman alabiliyordu; rezervasyon zamanlayıcısı da aynı kapıyı kullanır.
+Sunucuda stat varlığı ve `!bIsDead` koşulu bütün grant işlemlerinden önce denetlenir.
+Reddedilen ganimet normal 30 saniyelik ömrü boyunca yerde kalır; dirilişte yeniden
+overlap oluşursa veya canlı oyuncu toplarsa mevcut rezervasyon/kapasite kuralları geçerlidir.
+Diriliş anında otomatik tekrar deneme veya ganimet ömrünü uzatma eklenmedi.
+
+`TestLootLifeState.ps1` düzeltme öncesi gerçek UE'de `FAIL checks=0 reason=dead gold
+collected` verdi (motor exit=0, script exit=1). Düzeltme sonrası **10 kontrol geçti**:
+ölü altın reddi, ölü sarf overlap reddi, ölü ekipman reddi, süresi bitmiş rezervasyon
+reddi; `Revive` sonrası üç türün tam grant'i ve her biri için tekrar grant reddi.
+İzole karakter/test PlayerController kullanılır, collision kapalıyken toplama/overlap
+girişleri senkron çağrılır; ölüm bayrağı ve bitmiş rezervasyon zamanı testte kurulur.
+Zamanlayıcının gerçek overlap listesi, fiziksel ceset, sahip-istemci replication/HUD,
+gerçek respawn ve yeniden giriş PIE'de oynanmadı. Fixture aynı çağrıda unpossess edilip
+yok edilir; ilk yükleme/autosave çalışmaz, oyuncu kaydı yazılmaz. Shipping'de test
+komutu derlenmez. Bu bulgu O15 görev ödülünden ayrıdır.
 
 ### O12 · ORTA · Denetim logu — kapandı (2026-10-06, yerel sunucu logu; Shipping sınırı aşağıda)
 - **Shipping sınırı (QA 2026-10-07 ORTA-4, araştırıldı, kodlanmadı):** `UE_LOG` Shipping'de derleme dışı kalır; bu loglar (`LogMMO*Audit`) Shipping/dedicated yayında ÜRETİLMEZ, yalnız Development/Editor ve listen-server geliştirme oturumlarında vardır. `bUseLoggingInShipping = true` Target.cs'e EKLENMEDİ: UBT'de `[RequiresUniqueBuildEnvironment]` işaretli (`TargetRules.cs`, `RequiresUniqueEnvironment` taban `UnrealGame`/`UnrealEditor` ile karşılaştırır), yani Game/Server hedefi `BuildEnvironment = Unique` olmak ve motoru kaynaktan derlemek zorunda; kurulu (Launcher) motorda doğrulanamaz ve Shipping derlemesi bu makinede denenmedi. Dedicated engeli 1 (kaynak motor + `MyProjectServer.Target.cs`) çözülürken `bUseLoggingInShipping = true` o dosyaya eklenmeli; alternatif: denetim olaylarını `UE_LOG`'dan bağımsız bir yazıcıya (dosya/HTTP) vermek. O zamana kadar "denetim logu" Shipping'de garanti değildir.

@@ -58,7 +58,7 @@ if ($FullCompile) {
         $files = @(
             "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
             "Components\MMOStatsComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
-            "Components\MMOQuestComponent.cpp",
+            "Components\MMOQuestComponent.cpp", "World\MMOLootPickup.cpp",
             "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
             "Characters\MMOMob.cpp"
         ) | ForEach-Object { Join-Path $src $_ }
@@ -133,6 +133,11 @@ Step "Klan daveti kabul aninda lider yetkisi" {
 
 Step "Gorev odulunde oluluk ve tek sefer teslim" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestQuestRewardLifeState.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Ganimet toplamada oluluk ve tek sefer grant" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLootLifeState.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 

@@ -3782,3 +3782,22 @@ sahip-istemci RPC, HUD ve kalıcılık PIE'de oynanmadı.
   çalışmalıdır. NPC'den uzak teslim ve dolu çanta/yığın kontrolleri korunmalıdır.
 - [ ] Kaydet/yeniden giriş: ölü teslim denemesi görevi tüketmemeli; başarılı teslim
   tamamlanmış listede kalmalı ve ödül tekrar alınamamalıdır. Host ve uzak HUD'u karşılaştır.
+
+## Ölüyken ganimet ve rezervasyon bitimi — 2026-10-07
+
+Sunucudaki ortak toplama kapısı ölü karakteri reddeder; altın/sarf/ekipman değişmez,
+ganimet normal ömrü boyunca yerde kalır. UE izole testinde 10 kontrol geçti; test
+ölüm bayrağını/bitmiş rezervasyonu kurar ve girişleri senkron çağırır. Gerçek fiziksel
+overlap listesi, rezervasyon timer'ı, sahip-istemci HUD ve kalıcılık oynanmadı.
+
+- [ ] Uzak oyuncu altın, iksir ve ekipman ganimetinin üzerinde/yakınında ölsün. Ceset
+  overlap'i envanteri değiştirmemeli ve ganimeti tüketmemelidir. Host ile karşılaştır.
+- [ ] Rezervasyon süresi ceset overlap alanındayken dolsun: zamanlayıcı ölü oyuncuya
+  grant vermemeli; alandaki canlı oyuncu süre sonunda mevcut kurallarla toplayabilmeli.
+- [ ] Ganimet ömrü bitmeden dirilip yeniden overlap oluştur: hak sahibi canlı oyuncu
+  üç türü tam ve bir kez almalı; yinelenen overlap ilave eşya/altın vermemelidir.
+  Dirilişte otomatik tekrar deneme eklenmedi; gerekirse alandan çıkıp yeniden gir.
+- [ ] Dolu ekipman çantası ve dolu/kısmen dolu iksir yığını ganimeti eski kurallarla
+  korumalıdır; rezervasyon bitmeden hak sahibi olmayan canlı oyuncu alamamalıdır.
+- [ ] Kaydet/yeniden giriş: ölü deneme bakiye/çanta/yığını artırmamalı, canlı toplama
+  sonrasındaki kazanım bir kez kalıcı olmalıdır. Normal ganimet ömrü uzatılmadı.

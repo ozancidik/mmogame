@@ -3,6 +3,8 @@
 #include "World/MMOLootPickup.h"
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Components/MMOStatsComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Items/MMOItemDatabase.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -15,6 +17,107 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Net/UnrealNetwork.h"
+#if !UE_BUILD_SHIPPING
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+#endif
+
+#if !UE_BUILD_SHIPPING
+bool AMMOLootPickup::RunLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0;
+	OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{
+		OutError = TEXT("server game world required");
+		return false;
+	}
+	TArray<AActor*> Fixtures;
+	APlayerController* Controller = nullptr;
+	const bool bPassed = [&]()
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Location(1000000, 1000000, 5000);
+		AMMOCharacter* Character = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
+		Controller = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+		if (Character) Fixtures.Add(Character);
+		if (Controller) Fixtures.Add(Controller);
+		if (!Character || !Controller) { OutError = TEXT("fixture spawn failed"); return false; }
+		Controller->Possess(Character);
+		UMMOStatsComponent* Stats = Character->GetStats();
+		UMMOInventoryComponent* Inv = Character->GetInventory();
+		if (!Stats || !Inv || !Character->IsPlayerControlled()) { OutError = TEXT("fixture possession failed"); return false; }
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{
+			if (!Condition) { OutError = Label; return false; }
+			++OutChecks;
+			return true;
+		};
+		auto SpawnLoot = [&]()
+		{
+			AMMOLootPickup* Loot = World->SpawnActor<AMMOLootPickup>(AMMOLootPickup::StaticClass(), Location + FVector(5000, 0, 0), FRotator::ZeroRotator, Params);
+			if (Loot) { Fixtures.Add(Loot); Loot->SetActorEnableCollision(false); }
+			return Loot;
+		};
+		AMMOLootPickup* Gold = SpawnLoot();
+		AMMOLootPickup* Item = SpawnLoot();
+		AMMOLootPickup* Equipment = SpawnLoot();
+		if (!Gold || !Item || !Equipment) { OutError = TEXT("loot fixture spawn failed"); return false; }
+		Gold->SetupAsGold(17);
+		Item->SetupAsItem(TEXT("HealthPotion"), 3);
+		Equipment->SetupAsEquipment(TEXT("ShortSword"), 0);
+		const int32 BeforeGold = Inv->Gold, BeforeItems = Inv->GetItemCount(TEXT("HealthPotion")), BeforeBag = Inv->EquipmentBag.Num();
+		Stats->bIsDead = true;
+		Gold->TryCollect(Character);
+		if (!Check(!Gold->bCollected && IsValid(Gold) && Inv->Gold == BeforeGold, TEXT("dead gold collected"))) return false;
+		Item->OnOverlap(nullptr, Character, nullptr, 0, false, FHitResult());
+		if (!Check(!Item->bCollected && Item->ItemCount == 3 && Inv->GetItemCount(TEXT("HealthPotion")) == BeforeItems, TEXT("dead item collected"))) return false;
+		Equipment->TryCollect(Character);
+		if (!Check(!Equipment->bCollected && Inv->EquipmentBag.Num() == BeforeBag, TEXT("dead equipment collected"))) return false;
+		// Rezervasyonu bitmis pickup da ayni toplama kapisindan gecer.
+		Gold->SetReserved({Character}, 1.f);
+		Gold->ReservedUntilTime = World->GetTimeSeconds() - 1.0;
+		Gold->TryCollect(Character);
+		if (!Check(!Gold->bCollected && Inv->Gold == BeforeGold, TEXT("dead expired reservation collected"))) return false;
+		Stats->Revive();
+		Gold->TryCollect(Character);
+		if (!Check(Gold->bCollected && Inv->Gold == BeforeGold + 17, TEXT("revived gold missing"))) return false;
+		Gold->TryCollect(Character);
+		if (!Check(Inv->Gold == BeforeGold + 17, TEXT("duplicate gold"))) return false;
+		Item->TryCollect(Character);
+		if (!Check(Item->bCollected && Inv->GetItemCount(TEXT("HealthPotion")) == BeforeItems + 3, TEXT("revived item missing"))) return false;
+		Item->TryCollect(Character);
+		if (!Check(Inv->GetItemCount(TEXT("HealthPotion")) == BeforeItems + 3, TEXT("duplicate item"))) return false;
+		Equipment->TryCollect(Character);
+		if (!Check(Equipment->bCollected && Inv->EquipmentBag.Num() == BeforeBag + 1, TEXT("revived equipment missing"))) return false;
+		Equipment->TryCollect(Character);
+		return Check(Inv->EquipmentBag.Num() == BeforeBag + 1, TEXT("duplicate equipment"));
+	}();
+	// Ayni senkron cagri icinde temizle: 0.6sn yukleme/60sn autosave timer'i calismaz.
+	if (IsValid(Controller)) Controller->UnPossess();
+	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
+	return bPassed;
+}
+
+namespace
+{
+	struct FMMOLootLifeStateTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestLootLifeState"))) return false;
+			FString Error;
+			int32 Checks = 0;
+			const bool bPassed = AMMOLootPickup::RunLifeStateSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_LOOT_LIFE_STATE_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOLootLifeStateTestExec GMMOLootLifeStateTestExec;
+}
+#endif
 
 namespace
 {
@@ -234,6 +337,13 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 
 	// Sadece oyuncu toplayabilir (moblar degil).
 	if (!Char || !Char->IsPlayerControlled())
+	{
+		return;
+	}
+	// Ceset overlap'i veya rezervasyon bitimi ganimet veremez. Tum loot turleri
+	// ayni sunucu kapisini kullanir; reddedilen pickup normal omru boyunca yerde kalir.
+	const UMMOStatsComponent* Stats = Char->GetStats();
+	if (!Stats || Stats->bIsDead)
 	{
 		return;
 	}
