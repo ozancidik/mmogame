@@ -24,6 +24,9 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
     (full-HP self heal / empty AoESelf still count; no damage/heal benefit required)
   first_basic_attack who lv target=mob|player targetid tlv scope=controller sid start elapsed
     (targetid is a nonempty mob identifier or the literal Player; tlv is an integer >=1)
+  first_death who lv by xploss scope=controller sid start elapsed
+    (after real server death and actual XP penalty; by is a mob archetype or lowercase none)
+    (xploss is the actual integer loss 0..2147483647; marker adds no gameplay counters)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -34,7 +37,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
-FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill", "first_basic_attack")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill", "first_basic_attack", "first_death")
 
 
 def project_root():
@@ -150,6 +153,13 @@ def build_stats(events):
                                  and (e["target"] != "player" or e["targetid"] == "Player")
                                  and math.isfinite(target_level) and target_level >= 1
                                  and target_level.is_integer())
+            elif ev == "first_death":
+                xp_loss = to_num(e.get("xploss"), float("nan"))
+                # Runtime identifies the killer and applies the penalty before emitting.
+                # Require integer text too: float rounding must not admit fractional XP.
+                payload_valid = (bool(e.get("by")) and e["by"] != "None"
+                                 and bool(re.fullmatch(r"[+-]?[0-9]+", e.get("xploss", "")))
+                                 and math.isfinite(xp_loss) and 0 <= xp_loss <= 2147483647)
             else:
                 payload_valid = bool(e.get("quest"))
             if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
@@ -174,6 +184,8 @@ def build_stats(events):
                 sample.update(skill=e["skill"], effect=int(effect), mana=mana)
             elif ev == "first_basic_attack":
                 sample.update(target=e["target"], targetid=e["targetid"], tlv=int(target_level))
+            elif ev == "first_death":
+                sample.update(by=e["by"], xploss=int(xp_loss))
             else:
                 sample["quest"] = e["quest"]
             session[ev] = sample
@@ -315,6 +327,8 @@ def print_player(who, p):
                         detail = "skill=%s effect=%d mana=%.3f" % (sample["skill"], sample["effect"], sample["mana"])
                     elif action == "first_basic_attack":
                         detail = "target=%s targetid=%s tlv=%d" % (sample["target"], sample["targetid"], sample["tlv"])
+                    elif action == "first_death":
+                        detail = "by=%s xploss=%d" % (sample["by"], sample["xploss"])
                     else:
                         detail = "quest=%s" % sample["quest"]
                     print("  sid=%s %s sure=%s lv=%d %s" % (
@@ -325,6 +339,7 @@ def print_player(who, p):
         print("Ilk eylem olayi yok: first_* suresi bilinmiyor; sifir sure veya basarisizlik kaniti degil.")
         print("  first_skill sure=? (bu logda olay yok)")
         print("  first_basic_attack sure=? (bu logda olay yok)")
+        print("  first_death sure=? (bu logda olay yok)")
     if p["first_invalid"] or p["first_duplicates"]:
         print("Ilk olay atlanan: gecersiz=%d tekrar=%d" % (p["first_invalid"], p["first_duplicates"]))
 

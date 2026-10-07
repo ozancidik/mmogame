@@ -222,13 +222,26 @@ bool AMMOPlayerController::RecordFirstBasicAttackMetric(FName TargetKind, FName 
 #endif
 }
 
+bool AMMOPlayerController::RecordFirstDeathMetric(FName KillerMobId, int32 XPLoss)
+{
+#if !UE_BUILD_SHIPPING
+	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
+	const UMMOStatsComponent* Stats = MetricPawn ? MetricPawn->GetStats() : nullptr;
+	if (!Stats || !Stats->bIsDead || !FMath::IsFinite(Stats->Health) || Stats->Health != 0.f || XPLoss < 0) return false;
+	return RecordFirstActionMetric(TEXT("death"), FString::Printf(TEXT("by=%s xploss=%d"),
+		KillerMobId.IsNone() ? TEXT("none") : *KillerMobId.ToString(), XPLoss));
+#else
+	static_cast<void>(KillerMobId); static_cast<void>(XPLoss); return false;
+#endif
+}
+
 bool AMMOPlayerController::RecordFirstActionMetric(FName Action, const FString& Payload)
 {
 #if !UE_BUILD_SHIPPING
 	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
 	if (!HasAuthority() || !MetricPawn || !MetricPawn->HasAuthority() || !MetricPawn->IsPlayerControlled()
 		|| !MetricPawn->GetStats() || !FirstActionMetricsSession.IsValid() || FirstActionMetricsStart < 0.0
-		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot") && Action != TEXT("kill") && Action != TEXT("equip") && Action != TEXT("skill") && Action != TEXT("basic_attack"))
+		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot") && Action != TEXT("kill") && Action != TEXT("equip") && Action != TEXT("skill") && Action != TEXT("basic_attack") && Action != TEXT("death"))
 		|| RecordedFirstActionMetrics.Contains(Action))
 	{
 		return false;
@@ -280,12 +293,22 @@ bool AMMOPlayerController::RunFirstQuestMetricsSelfTest(UWorld* World, FString& 
 			++OutChecks; return true;
 		};
 		const FName Accept(TEXT("quest_accept")), Claim(TEXT("quest_claim")), Quest(TEXT("Q_Goblins"));
+		auto DeathMetric = [](AMMOPlayerController* PC)
+		{
+			UMMOStatsComponent* S = Cast<AMMOCharacter>(PC->GetPawn())->GetStats();
+			const bool Dead = S->bIsDead; const float Health = S->Health;
+			S->bIsDead = true; S->Health = 0.f;
+			const bool Recorded = PC->RecordFirstDeathMetric(TEXT("Goblin"), 5);
+			S->bIsDead = Dead; S->Health = Health;
+			return Recorded;
+		};
 		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest)
 			&& !PCs[0]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 2)
 			&& !PCs[0]->RecordFirstEquipMetric(TEXT("ShortSword"), 101, 0)
 			&& !PCs[0]->RecordFirstSkillMetric(TEXT("War_PowerStrike"))
 			&& !PCs[0]->RecordFirstBasicAttackMetric(TEXT("mob"), TEXT("Goblin"), 1)
-			&& !PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("fatal"), false), TEXT("controller without pawn emitted"))) return false;
+			&& !PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("fatal"), false)
+			&& !PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), 5), TEXT("controller without pawn emitted"))) return false;
 		PCs[0]->Possess(Pawns[0]);
 		if (!Check(!PCs[0]->RecordFirstQuestMetric(TEXT("unknown"), Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, NAME_None)
 			&& !PCs[0]->RecordFirstLootMetric(TEXT("unknown"), TEXT("Gold"), 1)
@@ -307,7 +330,8 @@ bool AMMOPlayerController::RunFirstQuestMetricsSelfTest(UWorld* World, FString& 
 			&& !PCs[0]->RecordFirstKillMetric(NAME_None, 1, 20, TEXT("fatal"), false)
 			&& !PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 0, 20, TEXT("fatal"), false)
 			&& !PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 1, -1, TEXT("fatal"), false)
-			&& !PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("unknown"), false), TEXT("invalid event emitted"))) return false;
+			&& !PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("unknown"), false)
+			&& !PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), 5), TEXT("invalid event emitted"))) return false;
 		if (!Check(PCs[0]->RecordFirstQuestMetric(Accept, Quest) && !PCs[0]->RecordFirstQuestMetric(Accept, TEXT("Q_Cleanup"))
 			&& PCs[0]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 2)
 			&& !PCs[0]->RecordFirstLootMetric(TEXT("item"), TEXT("HealthPotion"), 1)
@@ -320,14 +344,16 @@ bool AMMOPlayerController::RunFirstQuestMetricsSelfTest(UWorld* World, FString& 
 			&& !PCs[0]->RecordFirstBasicAttackMetric(TEXT("mob"), TEXT("Goblin"), 1)
 			&& !PCs[0]->RecordFirstEquipMetric(TEXT("LeatherArmor"), 102, 1)
 			&& PCs[0]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("fatal"), false)
-			&& !PCs[0]->RecordFirstKillMetric(TEXT("Wolf"), 2, 40, TEXT("party"), false), TEXT("first action not unique"))) return false;
+			&& !PCs[0]->RecordFirstKillMetric(TEXT("Wolf"), 2, 40, TEXT("party"), false)
+			&& DeathMetric(PCs[0]) && !DeathMetric(PCs[0]), TEXT("first action not unique"))) return false;
 		PCs[0]->Possess(Pawns[1]);
 		if (!Check(!PCs[0]->RecordFirstQuestMetric(Accept, Quest) && PCs[0]->RecordFirstQuestMetric(Claim, Quest)
 			&& !PCs[0]->RecordFirstLootMetric(TEXT("item"), TEXT("HealthPotion"), 1)
 			&& !PCs[0]->RecordFirstSkillMetric(TEXT("War_PowerStrike"))
 			&& !PCs[0]->RecordFirstBasicAttackMetric(TEXT("mob"), TEXT("Goblin"), 1)
 			&& !PCs[0]->RecordFirstEquipMetric(TEXT("LeatherArmor"), 102, 1)
-			&& !PCs[0]->RecordFirstKillMetric(TEXT("Wolf"), 2, 40, TEXT("party"), false), TEXT("pawn replacement reset first event"))) return false;
+			&& !PCs[0]->RecordFirstKillMetric(TEXT("Wolf"), 2, 40, TEXT("party"), false)
+			&& !DeathMetric(PCs[0]), TEXT("pawn replacement reset first event"))) return false;
 		const FGuid OriginalSession = PCs[0]->FirstActionMetricsSession;
 		const double OriginalStart = PCs[0]->FirstActionMetricsStart;
 		PCs[0]->SeamlessTravelTo(PCs[1]);
@@ -338,14 +364,16 @@ bool AMMOPlayerController::RunFirstQuestMetricsSelfTest(UWorld* World, FString& 
 			&& !PCs[1]->RecordFirstSkillMetric(TEXT("War_PowerStrike"))
 			&& !PCs[1]->RecordFirstBasicAttackMetric(TEXT("mob"), TEXT("Goblin"), 1)
 			&& !PCs[1]->RecordFirstEquipMetric(TEXT("LeatherArmor"), 102, 1)
-			&& !PCs[1]->RecordFirstKillMetric(TEXT("Wolf"), 2, 40, TEXT("party"), false), TEXT("controller transfer reset first event"))) return false;
+			&& !PCs[1]->RecordFirstKillMetric(TEXT("Wolf"), 2, 40, TEXT("party"), false)
+			&& !DeathMetric(PCs[1]), TEXT("controller transfer reset first event"))) return false;
 		PCs[2]->Possess(Pawns[0]);
 		return Check(PCs[2]->FirstActionMetricsSession != OriginalSession && PCs[2]->RecordFirstQuestMetric(Accept, Quest)
 			&& PCs[2]->RecordFirstLootMetric(TEXT("gold"), TEXT("Gold"), 2)
 			&& PCs[2]->RecordFirstSkillMetric(TEXT("War_PowerStrike"))
 			&& PCs[2]->RecordFirstBasicAttackMetric(TEXT("mob"), TEXT("Goblin"), 1)
 			&& PCs[2]->RecordFirstEquipMetric(TEXT("ShortSword"), 101, 0)
-			&& PCs[2]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("fatal"), false), TEXT("new controller did not start independent session"));
+			&& PCs[2]->RecordFirstKillMetric(TEXT("Goblin"), 1, 20, TEXT("fatal"), false)
+			&& DeathMetric(PCs[2]), TEXT("new controller did not start independent session"));
 	}();
 	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
 	return bPassed; // Same synchronous frame: no player load timer or disk save.

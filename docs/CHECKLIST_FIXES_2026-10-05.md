@@ -1848,3 +1848,77 @@ kod/runner paket boyunca değişmedi. Sonraki belge güncellemeleri ayrıdır.
 Editör/UE süreçleri kapalı. Gerçek owner-only teslim/RPC gecikmesi/expiry/
 respawn/Slate, bildirimin görülen kimliği, kalıcı kayıt/hesap/dedicated ve eski
 leave/kick intent sınırları PLAYTEST_CHECKLIST'te açık; oynanmış sayılmadı.
+
+
+## 60. Controller ömründe ilk oyuncu ölümü — sınırlı Lv1–30 ölçümü
+
+2026-10-07: önceki HEAD dd9f354 ve temiz tracked durum incelendi; untracked
+.agents/.codex/AGENTS.md korundu. UE/UBT açık değildi. Önceki parti işinin
+commit edilmemiş kaynağı yoktu. Bu iş bir exploit düzeltmesi değil, §3.1/M9
+ilk ölüm ölçümünü ilerleten sınırlı eklemedir; oynanış/ceza dengesi değişmedi.
+
+AMMOPlayerController::RecordFirstDeathMetric yalnız non-Shipping'de, mevcut
+pawn stats dead=true/finite health=0 ve nonnegative gerçek xploss ile ortak
+server controller/pawn authority/session/tekillik kapısına girer. HandleDeath
+stats ApplyDeathPenalty dönüşünden sonra hook'u çağırır; PC'nin mevcut pawn'ı
+ölen karakterle eşleşmelidir. first_death payload by=mob arketipi veya none,
+xploss=gerçek kayıp; lv emit anındaki seviyedir. none bilinmeyen/non-mob
+anlamına gelir, PvP adı veya tam killer/DoT sahipliği değildir. BeginPlay
+başlangıcı ve controller sid kullanılır; pawn/aktarımda TSet korunur. Shipping
+stub false döner; yeni replike state/RPC, kalıcı kayıt veya gameplay mutation yok.
+
+TestFirstDeath.ps1 native14: living/positive health/negative loss/NaN ret,
+spawn protection ve nonlethal ret (gate6); mob öldürücü hasar/XP20→15/seviye1,
+movement disable ve respawn timer kurulumu; ölüye tekrar hasar, Revive ve ikinci
+ölüm XP15→10; aynı PC yeni pawn'ın ölümü; yeni PC sıfır loss; non-mob kaynağın
+XP2→0 clamp'i/seviye3; controllerless NPC ölümünde XP'nin değişmemesi. Gerçek
+TakeDamage/OnDeath/penalty gövdeleri aynı frame çalışır: 3 first ve5 normal death,
+3sid. PS payload5/0/2, gate öncesi sessizlik, who ve first→regular ordering'i sınar.
+Genel oturum6 testine sentetik dead/zerohealth ile first death eklendi; 2 first,
+pawn replacement/SeamlessTravelTo aktarımı/newcontroller tekilliği kontrol edilir.
+
+İlk normal derleme testte var olmayan TNumericLimits::QuietNaN yüzünden
+C2039/C3861 verdi; testte std::numeric_limits + açık <limits> ile giderildi.
+Yeni native14 ilk PASS20:00:25 UTC. Negatif kontrol: yalnız hook kaybı geçici
+Lost+1 yapıldı; normal DLL Succeeded, native14/PASS kalsa da PS payload kapısı
+exit1 verdi (3first/5death/3sid, UEexit0). Negatif log
+mmo_first_death_wrong_loss_20261007.log (TEMP). Gerçek ceza değişmedi; test yanlış
+ölçüm payload'ını yakaladı. Kaynak tam restore edildi, DLL Succeeded; native14
+20:03:06 UTC, genel oturum6 20:02:54 UTC ve shared parser doğrulaması geçti.
+Sonradan hook mevcut-pawn eşleşmesi güçlendirildi; son DLL/paket ayrıca aşağıda.
+
+Helmholtz yerel Unreal Multiplayer Architect TOML ve repo QA rehberiyle salt
+okunur inceleme yaptı; Agency paket kökeni doğrulanmadı. Native14/gate6,
+authority/Shipping/cleanup ve PS metadata kapılarını doğruladı, test çalıştırmadı.
+İnceleme sırasında Volta'nın parser testleri henüz yazılıyordu; final wiring
+beklendi. Native validator'ın değişen who altında aynı sid tekrarını kaçırması
+önerisi yazıcıya iletildi; ortak parser'ın (who,sid) tarihsel gruplaması ayrıdır.
+Death Blueprint/XP callback sonrası ownership/health değişimi incelenmiş bir
+runtime örnekle kanıtlanmadı; yeni pawn eşleşme kapısına rağmen callback testleri,
+gerçek respawn/timer, remote delivery, seamless travel, persistence ve input açık.
+
+Volta yalnız dört parser/test/fixture/validator dosyasını yazdı; mmo-developer
+rehberi kullanıldı. Test wiring tamamlandı: fixture41 parsed olay/27 invalid,
+malformed payload+clock/tekillik/geri kazanım/counter isolation/legacy/CLI.
+Loss integer metni de şarttır; float yuvarlama/underflow kesirli XP'yi kabul
+ettirmez. Native validator her raw marker'ın parse/accept edilmesini ve global
+normalized sid tekilliğini ister; missing/empty who, overwritten/repeated event,
+cross-who aynı sid negatifleri eklendi. Shared parser (who,sid) gruplaması
+korunur. 576/576 assert geçti; Source/Scripts freeze öncesi ajan kapatıldı.
+Parent C++/PS/docs ve tüm UE derleme/testlerini yürüttü; iki ajan da kapalı.
+
+Son pawn eşleşme guard'ıyla normal Editor DLL **Succeeded (4,83 sn)**;
+`RunAllChecks.ps1 -SkipBuild -FullCompile` **37/37 GECTI, exit0**. İlk ölüm14
+PASS20:11:39 UTC, genel oturum6 PASS20:11:30 UTC, parser576/576. Parti46,
+takas218 ve tüm eski regresyonlar geçti. 18 PCH'siz /W4 dosya, warning C0.
+ValidateData ve StaticLint temiz; bilinen Lv33+ beceri boşluğu/InitGameState
+whitelist uyarıları sürer. JSON schema2/negative111; store388 loaded388,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Bu kayıt adedi üretim oyuncu sayısı veya Lv1–30 testi değildir.
+Summer50/Winter27 mob doğumu, smoke exit0/error0; NetSmoke1join/1welcome,
+server/client error0 (TEMP mmo_net_server_231427.log / mmo_net_client_231427.log).
+Tam paket TEMP mmo_all_first_death_final_20261007.log. Paket öncesi/sonrası147
+Source/Scripts SHA256 listesi aynıdır; build/test boyunca kod/runner değişmedi.
+Son belge güncellemeleri ayrıdır. UE/UBT kapalı. Gerçek Blueprint callback,
+Shipping/Server paket, timer/respawn/DoT/PvP kaynak kimliği ve20dkPIE açık;
+PLAYTEST_CHECKLIST maddeleri işaretlenmedi.

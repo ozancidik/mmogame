@@ -52,6 +52,7 @@
 DEFINE_LOG_CATEGORY_STATIC(LogMMOIdentityAudit, Log, All);
 
 #if !UE_BUILD_SHIPPING
+#include <limits>
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
@@ -149,6 +150,96 @@ bool AMMOCharacter::RunMeleeCooldownSelfTest(UWorld* World, FString& OutError, i
 	if (IsValid(C)) C->Destroy();
 	if (IsValid(M)) M->Destroy();
 	return bPassed;
+}
+
+bool AMMOCharacter::RunFirstDeathSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	TArray<AActor*> Fixtures; TArray<AMMOPlayerController*> Controllers;
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FVector Location(1900000, 1900000, 5000);
+	const bool bPassed = [&]()
+	{
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{ if (!Condition) { OutError = Label; return false; } ++OutChecks; return true; };
+		auto MakePawn = [&](int32 Index) -> AMMOCharacter*
+		{
+			AMMOCharacter* C = World->SpawnActor<AMMOCharacter>(StaticClass(), Location + FVector(Index * 5000, 0, 0), FRotator::ZeroRotator, Params);
+			if (C) { Fixtures.Add(C); C->SetActorEnableCollision(false); C->SetActorTickEnabled(false); C->EndSpawnProtection(); }
+			return C;
+		};
+		AMMOPlayerController* PCs[3] = {}; AMMOCharacter* Pawns[3] = {};
+		for (int32 i = 0; i < 3; ++i)
+		{
+			PCs[i] = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			Pawns[i] = MakePawn(i);
+			if (PCs[i]) { Fixtures.Add(PCs[i]); Controllers.Add(PCs[i]); }
+			if (!PCs[i] || !Pawns[i]) { OutError = TEXT("fixture spawn failed"); return false; }
+			PCs[i]->Possess(Pawns[i]);
+			Pawns[i]->EndSpawnProtection();
+			Pawns[i]->Stats->Health = 100.f; Pawns[i]->Stats->MaxHealth = 100.f; Pawns[i]->Stats->Defense = 0.f;
+			Pawns[i]->Stats->Experience = i == 0 ? 20 : (i == 1 ? 0 : 2);
+			Pawns[i]->Stats->ExperienceToNextLevel = 100; Pawns[i]->Stats->DeathXPPenaltyPct = .05f;
+		}
+		const FTransform TM(FRotator::ZeroRotator, Location + FVector(100, 0, 0));
+		AMMOMob* Mob = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), TM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (!Mob) { OutError = TEXT("mob spawn failed"); return false; }
+		Fixtures.Add(Mob); Mob->AutoPossessAI = EAutoPossessAI::Disabled; Mob->ArchetypeId = TEXT("Goblin");
+		UGameplayStatics::FinishSpawningActor(Mob, TM); Mob->SetActorTickEnabled(false); Mob->SetActorEnableCollision(false);
+		// Emission gates must not consume the later real death. These edits are local fixture state only.
+		if (!Check(!PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), 5), TEXT("living pawn emitted"))) return false;
+		Pawns[0]->Stats->bIsDead = true;
+		if (!Check(!PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), 5), TEXT("positive health emitted"))) return false;
+		Pawns[0]->Stats->Health = 0.f;
+		if (!Check(!PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), -1), TEXT("negative loss emitted"))) return false;
+		Pawns[0]->Stats->Health = std::numeric_limits<float>::quiet_NaN();
+		if (!Check(!PCs[0]->RecordFirstDeathMetric(NAME_None, 0), TEXT("nonfinite health emitted"))) return false;
+		Pawns[0]->Stats->Health = 100.f; Pawns[0]->Stats->bIsDead = false;
+		FDamageEvent Event;
+		Pawns[0]->StartSpawnProtection();
+		if (!Check(Pawns[0]->TakeDamage(1000.f, Event, nullptr, Mob) == 0.f && !Pawns[0]->Stats->bIsDead, TEXT("protected death changed"))) return false;
+		Pawns[0]->EndSpawnProtection();
+		if (!Check(Pawns[0]->TakeDamage(10.f, Event, nullptr, Mob) == 10.f && Pawns[0]->Stats->Health == 90.f
+			&& Pawns[0]->Stats->Experience == 20 && !Pawns[0]->Stats->bIsDead, TEXT("nonlethal damage changed"))) return false;
+		UE_LOG(LogTemp, Display, TEXT("[MMO_FIRST_DEATH_GATES] rejected=6"));
+		if (!Check(Pawns[0]->TakeDamage(1000.f, Event, nullptr, Mob) == 90.f && Pawns[0]->Stats->bIsDead
+			&& Pawns[0]->Stats->Health == 0.f && Pawns[0]->Stats->Experience == 15 && Pawns[0]->Stats->Level == 1
+			&& Pawns[0]->GetCharacterMovement()->MovementMode == MOVE_None && Pawns[0]->GetRespawnTimeRemaining() > 0.f
+			&& !PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), 5), TEXT("first mob death hook/penalty/respawn changed"))) return false;
+		if (!Check(Pawns[0]->TakeDamage(1000.f, Event, nullptr, Mob) == 0.f && Pawns[0]->Stats->Experience == 15, TEXT("dead damage repeated penalty"))) return false;
+		Pawns[0]->Stats->Revive();
+		if (!Check(!Pawns[0]->Stats->bIsDead && Pawns[0]->Stats->Health > 0.f && Pawns[0]->GetRespawnTimeRemaining() == 0.f
+			&& !PCs[0]->RecordFirstDeathMetric(NAME_None, 0), TEXT("revive reset marker or emitted while living"))) return false;
+		Pawns[0]->EndSpawnProtection();
+		Pawns[0]->TakeDamage(1000.f, Event, nullptr, nullptr);
+		if (!Check(Pawns[0]->Stats->bIsDead && Pawns[0]->Stats->Experience == 10 && !PCs[0]->RecordFirstDeathMetric(NAME_None, 5), TEXT("repeat death changed"))) return false;
+		AMMOCharacter* Replacement = MakePawn(4);
+		if (!Replacement) { OutError = TEXT("replacement spawn failed"); return false; }
+		PCs[0]->Possess(Replacement); Replacement->EndSpawnProtection(); Replacement->Stats->Defense = 0.f;
+		Replacement->Stats->Experience = 0;
+		Replacement->TakeDamage(100000.f, Event, nullptr, Mob);
+		if (!Check(Replacement->Stats->bIsDead && Replacement->Stats->Experience == 0 && !PCs[0]->RecordFirstDeathMetric(TEXT("Goblin"), 0), TEXT("pawn replacement reset death"))) return false;
+		Pawns[1]->TakeDamage(1000.f, Event, nullptr, nullptr);
+		if (!Check(Pawns[1]->Stats->bIsDead && Pawns[1]->Stats->Experience == 0 && !PCs[1]->RecordFirstDeathMetric(NAME_None, 0), TEXT("zero loss death missing"))) return false;
+		// Non-mob cause stays anonymous/unknown; this is not a PvP attribution fixture.
+		AActor* OtherCause = World->SpawnActor<AActor>(AActor::StaticClass(), Location, FRotator::ZeroRotator, Params);
+		if (!OtherCause) { OutError = TEXT("unknown source spawn failed"); return false; } Fixtures.Add(OtherCause);
+		Pawns[2]->Stats->Level = 3;
+		Pawns[2]->TakeDamage(1000.f, Event, nullptr, OtherCause);
+		if (!Check(Pawns[2]->Stats->bIsDead && Pawns[2]->Stats->Experience == 0 && Pawns[2]->Stats->Level == 3
+			&& !PCs[2]->RecordFirstDeathMetric(NAME_None, 2), TEXT("clamped XP/non-mob death changed"))) return false;
+		AMMOCharacter* NPC = MakePawn(5);
+		if (!NPC) { OutError = TEXT("NPC spawn failed"); return false; }
+		NPC->Stats->Experience = 20; NPC->Stats->Defense = 0.f;
+		NPC->TakeDamage(100000.f, Event, nullptr, Mob);
+		return Check(NPC->Stats->bIsDead && NPC->Stats->Experience == 20 && !NPC->IsPlayerControlled(), TEXT("controllerless death changed"));
+	}();
+	for (AMMOPlayerController* PC : Controllers) if (IsValid(PC)) PC->UnPossess();
+	for (AActor* A : Fixtures) if (IsValid(A)) A->Destroy();
+	return bPassed; // Same frame only: no timers run, save/load, remote delivery or PIE input.
 }
 
 bool AMMOCharacter::RunFirstBasicAttackSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
@@ -363,6 +454,19 @@ namespace
 		}
 	};
 	FMMOMeleeCooldownTestExec GMMOMeleeCooldownTestExec;
+
+	struct FMMOFirstDeathTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstDeath"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOCharacter::RunFirstDeathSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_DEATH_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstDeathTestExec GMMOFirstDeathTestExec;
 
 	struct FMMOFirstBasicAttackTestExec : public FSelfRegisteringExec
 	{
@@ -1459,6 +1563,10 @@ void AMMOCharacter::HandleDeath()
 
 				// Olcum gunlugu: oyuncu olumu (by = son hasar veren mob arketipi, yoksa none).
 				const AMMOMob* KillerMob = Cast<AMMOMob>(LastDamageInstigator.Get());
+				if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController()); PC && PC->GetPawn() == this)
+				{
+					PC->RecordFirstDeathMetric(KillerMob ? KillerMob->ArchetypeId : NAME_None, Lost);
+				}
 				const FVector DeathLoc = GetActorLocation();
 				UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=death who=%s lv=%d x=%.0f y=%.0f z=%.0f by=%s xploss=%d"),
 					MMOMetrics::Seconds(), *MMOMetrics::WhoName(this), Stats->Level, DeathLoc.X, DeathLoc.Y, DeathLoc.Z,

@@ -32,6 +32,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	static bool RunConsumableBenefitSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstBasicAttackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunFirstDeathSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunMeleeCooldownSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 

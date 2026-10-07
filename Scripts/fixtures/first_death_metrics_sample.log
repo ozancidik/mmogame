@@ -1,0 +1,45 @@
+# Synthetic server deaths: mob archetypes, unknown/non-mob none, and actual XP losses.
+# Ordinary death owns gameplay counters; first_death is controller lifetime telemetry.
+LogTemp: first_death text without a metric marker is not telemetry.
+[MMOMETRIC] t=1 ev=kill who=Warrior lv=1 mob=Goblin mlv=1 xp=25 party=0 elite=0
+[MMOMETRIC] t=2 ev=gold who=Warrior src=loot amount=3 balance=3
+[MMOMETRIC] t=3 ev=quest_accept who=Warrior lv=1 quest=Q_Goblins
+[MMOMETRIC] t=4 ev=quest_claim who=Warrior lv=1 to=1 quest=Q_Goblins xp_reward=200 capped=0
+[MMOMETRIC] t=8 ev=death who=Warrior lv=1 by=Goblin xploss=5 x=1 y=2 z=3
+[MMOMETRIC] t=8 ev=first_death who=Warrior lv=1 by=Goblin xploss=5 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=15 ev=first_death who=Warrior lv=4 by=none xploss=0 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=12 ev=first_death who=Archer lv=5 by=Future_RuntimeMob-42 xploss=2147483647 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=10
+[MMOMETRIC] t=20 ev=first_death who=Mage lv=3 by=Wolf xploss=17 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=5 elapsed=15
+[MMOMETRIC] t=8 ev=first_death who=Priest lv=5 by=none xploss=0 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=10 ev=first_death who=Priest lv=5 by=none xploss=0 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=0
+[MMOMETRIC] t=9 ev=first_death who=Warrior lv=2 by=Wolf xploss=50 scope=controller sid=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA start=0 elapsed=9
+[MMOMETRIC] t=14 ev=first_death who=Archer lv=5 by=Goblin xploss=0 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=12
+[MMOMETRIC] t=10 ev=first_skill who=Warrior lv=1 skill=War_PowerStrike effect=0 mana=8.000 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=10
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by= xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=None xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss= scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=-1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=2147483648 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=1.5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=NaN scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=Inf scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=-Inf scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=bad scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=1e1 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=2147483647.0000001 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=1e-400 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=character sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=gggggggggggggggggggggggggggggggg start=0 elapsed=8
+[MMOMETRIC] t=NaN ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=-1 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=7
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=9 elapsed=8
+[MMOMETRIC] t=Inf ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1.5 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=-1
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=1 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=Inf elapsed=8
+[MMOMETRIC] t=8 ev=first_death who=Bad lv=0 by=Goblin xploss=5 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_death lv=1 by=none xploss=0 scope=controller sid=ffffffffffffffffffffffffffffffff start=0 elapsed=8

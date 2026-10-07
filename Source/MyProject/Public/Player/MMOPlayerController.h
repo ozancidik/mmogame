@@ -66,6 +66,8 @@ public:
 	bool RecordFirstSkillMetric(FName SkillId);
 	// Accepted authoritative basic attack before damage/XP; not a damage or input counter.
 	bool RecordFirstBasicAttackMetric(FName TargetKind, FName TargetId, int32 TargetLevel);
+	// Observed server death after XP penalty; None means unknown/non-mob source, not PvP attribution.
+	bool RecordFirstDeathMetric(FName KillerMobId, int32 XPLoss);
 #if !UE_BUILD_SHIPPING
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	// Native controller chat bodies/owning pawn context; no network transport or Slate input.

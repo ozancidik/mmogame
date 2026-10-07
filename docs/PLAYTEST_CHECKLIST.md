@@ -4341,3 +4341,33 @@ Reliable taşıma/ownership/owner-only replikasyon veya gerçek kayıt kanıtı 
   görünümü bu değişiklikte çözülmedi. Mevcut lider/rıza/sekiz kişi ve süre/mesafe
   kapıları ile yeni ret/generation davranışını beraber dene; leave/kick eski
   protokolü kullanır ve ayrı stale oturum incelemesi açık kalır.
+
+
+## 2026-10-07 — İlk oyuncu ölümü ölçümü (PIE açık)
+
+Native14 aynı frame içinde TakeDamage → stats OnDeath → HandleDeath → gerçek XP
+cezasını sınar; 3 first_death/5 death, 6 ret ve 3 controller. Genel oturum6 testi
+sentetik dead/health durumu, native pawn değişimi ve doğrudan SeamlessTravelTo
+aktarımı kullanır. Timer tick, gerçek seamless travel, save/load, Blueprint death
+callback'i, remote ağ/ownership veya Slate/input oynanmış sayılmadı.
+
+- [ ] Host ve uzak istemciyi mob öldürsün: sunucu logunda controller sid için tek
+  first_death, aynı ölümün by/gerçek xploss ve lv bilgisi doğru olmalı. İstemci
+  aynı ölçümü üretmemeli. XP=0 iken xploss=0 da ilk olay sayılmalı; XP ceza
+  miktarından azsa gerçek mevcut XP kadar yazılmalı. Yeni marker ölüm veya
+  XP kaybını raporda iki kez saymamalı; normal death satırları toplamları taşır.
+- [ ] Gerçek respawn/sifacı dirilişi sonrası tekrar öl: aynı sid'de yeni first_death
+  olmamalı, her gerçek ölümün regular death/XP cezası devam etmeli. Canlanma
+  koruması ve ölümcül olmayan hasar ilk olayı tüketmemeli. Yeni controller
+  oturumunda yeniden ilk ölüm ölçülmeli; kalıcı karakterin ilk ölümü değildir.
+- [ ] Native pawn replacement ve aktarımın gerçek uzak respawn/seamless karşılığını
+  dene: sid/start/tekillik korunmalı. Death Blueprint'i veya XP callback'i
+  ownership/health değiştiriyorsa ayrıca logu incele; hook mevcut pawn eşleşmesini
+  ve helper ölü/finite sıfır health'i şart koşar, bu callback senaryosu native
+  fixture'da yürütülmedi, olay atlanması/etiket değişimi doğrulanmadı.
+- [ ] PvP/DoT/çevresel hasar ile ölümde by yorumunu kontrol et: mob hasar kaynağı
+  biliniyorsa arketip, diğer/bilinmeyen kaynak none'dır; PvP oyuncu kimliği veya
+  tam killer attribution iddiası yok. DoT sahibi, kaynak yok edilmesi ve Blueprint
+  reentrancy bu fixture'ın kanıtı değildir. Eski logda first_death sure=? olmalı;
+  sıradan death zamanından first elapsed türetilmemeli. Dört sınıf/20 dk koşusu
+  ve gerçek Shipping/Server paket derlemesi açık kalır.

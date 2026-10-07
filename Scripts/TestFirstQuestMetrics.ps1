@@ -47,7 +47,15 @@ if ($metricOk) {
     $metricOk = $firstBasic[0].Line -match "target=mob targetid=Goblin tlv=1 scope=controller sid=$($sessions[0]) "
     $metricOk = $metricOk -and $firstBasic[1].Line -match "target=mob targetid=Goblin tlv=1 scope=controller sid=$($sessions[1]) "
 }
+$firstDeath = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=first_death ')
+$metricOk = $metricOk -and $firstDeath.Count -eq 2
+if ($metricOk) {
+    $metricOk = $firstDeath[0].Line -match "by=Goblin xploss=5 scope=controller sid=$($sessions[0]) "
+    $metricOk = $metricOk -and $firstDeath[1].Line -match "by=Goblin xploss=5 scope=controller sid=$($sessions[1]) "
+}
 if ($pass -and -not $fail -and $process.ExitCode -eq 0 -and $metricOk) {
+    & 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\Python3\Win64\python.exe' (Join-Path $PSScriptRoot 'ValidateFirstDeathLog.py') $log --events 2
+    if ($LASTEXITCODE -ne 0) { exit 1 }
     & 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\Python3\Win64\python.exe' (Join-Path $PSScriptRoot 'ValidateFirstSkillLog.py') $log --events 2
     if ($LASTEXITCODE -ne 0) { exit 1 }
     & 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\Python3\Win64\python.exe' (Join-Path $PSScriptRoot 'ValidateFirstBasicAttackLog.py') $log --events 2
@@ -59,6 +67,7 @@ if ($pass -and -not $fail -and $process.ExitCode -eq 0 -and $metricOk) {
     Write-Output '[MMO_FIRST_EQUIP_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
     Write-Output '[MMO_FIRST_SKILL_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
     Write-Output '[MMO_FIRST_BASIC_ATTACK_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
+    Write-Output '[MMO_FIRST_DEATH_SESSION_TEST] PASS events=2 sessions=2 (synthetic dead state; pawn/transfer uniqueness)'
     exit 0
 }
 Write-Output "First quest testi KALDI (exit=$($process.ExitCode) accepts=$($firstAccept.Count) claims=$($firstClaim.Count) sessions=$($sessions.Count))"

@@ -21,6 +21,7 @@ KILL_FIXTURE = os.path.join(HERE, "fixtures", "first_kill_metrics_sample.log")
 EQUIP_FIXTURE = os.path.join(HERE, "fixtures", "first_equip_metrics_sample.log")
 SKILL_FIXTURE = os.path.join(HERE, "fixtures", "first_skill_metrics_sample.log")
 BASIC_ATTACK_FIXTURE = os.path.join(HERE, "fixtures", "first_basic_attack_metrics_sample.log")
+DEATH_FIXTURE = os.path.join(HERE, "fixtures", "first_death_metrics_sample.log")
 
 failures = []
 assertions = 0
@@ -57,6 +58,24 @@ def run_attack_validator(pm, raw, expected):
     buf = io.StringIO()
     try:
         sys.argv = ["ValidateFirstBasicAttackLog.py", path, "--events", str(expected)]
+        with contextlib.redirect_stdout(buf):
+            code = validator.main()
+        return code, buf.getvalue()
+    finally:
+        sys.argv = previous_argv
+        os.unlink(path)
+
+
+def run_death_validator(pm, raw, expected):
+    validator = load(os.path.join(HERE, "ValidateFirstDeathLog.py"))
+    validator.metrics = pm
+    with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as fh:
+        fh.write(raw)
+        path = fh.name
+    previous_argv = sys.argv
+    buf = io.StringIO()
+    try:
+        sys.argv = ["ValidateFirstDeathLog.py", path, "--events", str(expected)]
         with contextlib.redirect_stdout(buf):
             code = validator.main()
         return code, buf.getvalue()
@@ -479,6 +498,194 @@ def main(argv):
     code, out = run_attack_validator(pm, marker(reordered), 1)
     check(code == 0 and "PASS events=1" in out, "native raw count accepts event token at line end")
 
+    death_events = pm.parse_log(DEATH_FIXTURE)
+    check(len(death_events) == 41, "first death fixture: 41 parsed events; raw missing who skipped")
+    check("first_death" in pm.FIRST_ACTIONS, "first_death belongs to controller first actions")
+    deaths = pm.build_stats(death_events)
+    check(sorted(deaths) == ["Archer", "Bad", "Mage", "Priest", "Warrior"],
+          "death fixture four classes and malformed records")
+    death_warrior = deaths["Warrior"]
+    first_death = death_warrior["first_actions"]["a" * 32]["first_death"]
+    check(first_death == {"seconds": 8, "lv": 1, "by": "Goblin", "xploss": 5},
+          "first death preserves elapsed, level, mob archetype and actual XP penalty")
+    check(death_warrior["first_duplicates"] == 1 and death_warrior["first_invalid"] == 0,
+          "case-insensitive sid duplicate preserves first death payload")
+    check(death_warrior["first_actions"]["b" * 32]["first_death"] == {
+        "seconds": 5, "lv": 4, "by": "none", "xploss": 0},
+          "new controller session accepts unknown/non-mob killer and zero actual loss")
+    check(death_warrior["first_actions"]["a" * 32]["first_skill"]["skill"] == "War_PowerStrike",
+          "same player/sid different first events remain independent")
+    check(deaths["Archer"]["first_actions"]["a" * 32]["first_death"] == {
+        "seconds": 10, "lv": 5, "by": "Future_RuntimeMob-42", "xploss": 2147483647}
+          and deaths["Archer"]["first_duplicates"] == 1,
+          "same sid different who accepts arbitrary archetype and maximum integer loss")
+    check(deaths["Mage"]["first_actions"]["a" * 32]["first_death"] == {
+        "seconds": 15, "lv": 3, "by": "Wolf", "xploss": 17}, "independent mage death payload")
+    check(deaths["Priest"]["first_actions"]["b" * 32]["first_death"] == {
+        "seconds": 0, "lv": 5, "by": "none", "xploss": 0},
+          "explicit controller clock permits zero elapsed and zero penalty together")
+    death_samples = [a["first_death"] for p in deaths.values() for a in p["first_actions"].values()
+                     if "first_death" in a]
+    check(len(death_samples) == 6, "six unique controller first deaths")
+    check(deaths["Bad"]["first_invalid"] == 27 and deaths["Bad"]["first_duplicates"] == 0
+          and deaths["Bad"]["first_actions"] == {} and not deaths["Bad"]["timing_started"]
+          and deaths["Bad"]["first_t"] == deaths["Bad"]["last_t"] == 0,
+          "27 invalid death payloads/common clocks neither consume first nor start timing")
+    for index, bad_death in enumerate(e for e in death_events if e["who"] == "Bad"):
+        rejected = pm.build_stats([bad_death])["Bad"]
+        check(rejected["first_invalid"] == 1 and rejected["first_actions"] == {}
+              and not rejected["timing_started"], "independent death fixture rejection #%d" % (index + 1))
+
+    death_base = pm.build_stats([e for e in death_events if e["ev"] not in pm.FIRST_ACTIONS])["Warrior"]
+    for key in ("level", "lv", "src", "mobs", "quests", "quest_start", "pending"):
+        check(death_warrior[key] == death_base[key], "first death must not alter gameplay counters: " + key)
+    check(death_warrior["lv"][1]["deaths"] == 1 and death_warrior["lv"][1]["xploss"] == 5
+          and death_warrior["lv"][1]["kills"] == 1 and death_warrior["lv"][1]["xp"] == 25
+          and death_warrior["lv"][1]["gold_in"] == 3
+          and death_warrior["lv"][1]["quest_xp_reward"] == 200,
+          "ordinary death alone owns death count/XP loss; telemetry adds no gameplay totals")
+    for who in ("Archer", "Mage", "Priest", "Bad"):
+        check(deaths[who]["lv"] == {} and deaths[who]["quests"] == {} and deaths[who]["src"] == {}
+              and deaths[who]["mobs"] == {} and deaths[who]["level"] is None,
+              "death-only marker creates no gameplay counters: " + who)
+
+    valid_death = next(e for e in death_events if e["ev"] == "first_death")
+    malformed_death = [
+        ("by", None), ("by", ""), ("by", "None"),
+        ("xploss", None), ("xploss", ""), ("xploss", "-1"), ("xploss", "2147483648"),
+        ("xploss", "1.5"), ("xploss", "NaN"), ("xploss", "Inf"), ("xploss", "-Inf"),
+        ("xploss", "bad"), ("xploss", "1e1"), ("xploss", "2147483647.0000001"),
+        ("xploss", "1e-400"), ("xploss", "0.00000000000000000001"),
+    ]
+    death_common = malformed_common + [
+        ("scope", ""), ("scope", "Controller"), ("sid", ""), ("sid", "a" * 33),
+        ("t", ""), ("t", "-Inf"), ("t", "bad"),
+        ("start", ""), ("start", "-Inf"), ("start", "bad"),
+        ("elapsed", ""), ("elapsed", "-Inf"), ("elapsed", "bad"),
+        ("lv", ""), ("lv", "-Inf"), ("lv", "bad"),
+    ]
+    for field, value in death_common + malformed_death:
+        bad_death = dict(valid_death)
+        if value is None:
+            bad_death.pop(field)
+        else:
+            bad_death[field] = value
+        rejected = pm.build_stats([bad_death])["Warrior"]
+        check(rejected["first_invalid"] == 1 and rejected["first_actions"] == {}
+              and not rejected["timing_started"], "death common clock/payload rejection: %s=%s" % (field, value))
+        recovered = pm.build_stats([bad_death, valid_death])["Warrior"]
+        check(recovered["first_invalid"] == 1 and recovered["first_duplicates"] == 0
+              and recovered["first_actions"]["a" * 32]["first_death"] == first_death
+              and recovered["first_t"] == recovered["last_t"] == 8,
+              "invalid death cannot consume first or clocks before recovery: %s=%s" % (field, value))
+        code, out = run_death_validator(pm, marker(bad_death), 1)
+        check(code == 1 and "MMO_FIRST_DEATH_PARSER_TEST] FAIL" in out,
+              "native validator rejects malformed death: %s=%s" % (field, value))
+    for archetype in ("none", "Future_RuntimeMob-42", "Bilinmeyen_çete"):
+        probe = dict(valid_death, by=archetype, xploss="0")
+        check(pm.build_stats([probe])["Warrior"]["first_actions"]["a" * 32]["first_death"]["by"] == archetype,
+              "death parser accepts runtime archetypes without inferring DB identity: " + archetype)
+    for timestamp in ("0", "10"):
+        probe = dict(valid_death, t=timestamp, start=timestamp, elapsed="0", xploss="0")
+        check(pm.build_stats([probe])["Warrior"]["first_actions"]["a" * 32]["first_death"] == {
+            "seconds": 0, "lv": 1, "by": "Goblin", "xploss": 0}, "zero elapsed/loss at clock " + timestamp)
+    for elapsed, accepted in (("8.009", True), ("8.011", False)):
+        probe = dict(valid_death, elapsed=elapsed)
+        check(bool(pm.build_stats([probe])["Warrior"]["first_actions"]) == accepted,
+              "death inherits 0.01 clock consistency tolerance: " + elapsed)
+
+    # A valid clock on a bad payload must not expand observation/level duration.
+    for timestamp in ("0", "1000"):
+        bad_clock_death = dict(valid_death, who="Clock", by="None", t=timestamp, start="0", elapsed=timestamp)
+        for sequence in ([bad_clock_death] + clock_base, clock_base + [bad_clock_death]):
+            result = pm.build_stats(sequence)["Clock"]
+            check(result["first_invalid"] == 1 and result["first_t"] == clock_reference["first_t"]
+                  and result["last_t"] == clock_reference["last_t"] and result["dur"] == clock_reference["dur"],
+                  "invalid death payload must not move inherited observation clock: " + timestamp)
+    invalid_after_first = dict(valid_death, by="None", t="1000", elapsed="1000")
+    result = pm.build_stats([valid_death, invalid_after_first])["Warrior"]
+    check(result["first_invalid"] == 1 and result["first_duplicates"] == 0
+          and result["last_t"] == 8 and result["first_actions"]["a" * 32]["first_death"] == first_death,
+          "invalid death after accepted first is invalid, preserves first payload and clock")
+
+    code, out = run_main(pm, ["x", DEATH_FIXTURE, "--who", "Warrior"])
+    check(code == 0 and "Olay sayisi: 41 (levelup=0 kill=1 death=1 gold=1)" in out
+          and "quest_accept=1 quest_claim=1" in out, "death CLI gameplay event counts are not doubled")
+    check("first_death sure=0:08 lv=1 by=Goblin xploss=5" in out
+          and "first_death sure=0:05 lv=4 by=none xploss=0" in out and "gecersiz=0 tekrar=1" in out,
+          "death report shows actual payload, elapsed, new session and duplicates")
+    check(all("Oyuncu: " + who not in out for who in ("Archer", "Mage", "Priest", "Bad")), "death --who filter")
+    code, out = run_main(pm, ["x", DEATH_FIXTURE, "--who", "Priest"])
+    check(code == 0 and "first_death sure=0:00 lv=5 by=none xploss=0" in out, "zero death elapsed displayed explicitly")
+    code, out = run_main(pm, ["x", DEATH_FIXTURE, "--who", "Bad"])
+    check(code == 0 and "gecersiz=27 tekrar=0" in out and "first_death sure=?" in out,
+          "invalid death report shows unknown time")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check(code == 0 and out.count("first_death sure=?") == 2,
+          "old first-action log reports unknown death for each controller session")
+    code, out = run_main(pm, ["x", FIXTURE, "--who", "Ozan"])
+    check(code == 0 and "first_death sure=?" in out and "first_* suresi bilinmiyor" in out
+          and players["Ozan"]["first_actions"] == {} and players["Ozan"]["lv"][2]["deaths"] == 1,
+          "old ordinary death never implies a first death or controller clock")
+
+    accepted_deaths = []
+    seen = set()
+    for event in death_events:
+        if event["ev"] != "first_death" or event["who"] == "Bad":
+            continue
+        key = (event["who"], event["sid"].lower(), event["ev"])
+        if key not in seen:
+            accepted_deaths.append(event)
+            seen.add(key)
+    # Native fixture controllers have globally distinct SIDs in a single process.
+    # Keep the parser fixture above exercising its separate who/sid grouping policy.
+    native_deaths = [dict(e, sid="%032x" % (index + 1)) for index, e in enumerate(accepted_deaths)]
+    death_raw = "".join(marker(e) for e in native_deaths)
+    ordinary_raw = "".join(marker(e) for e in death_events if e["ev"] != "first_death")
+    code, out = run_death_validator(pm, ordinary_raw + death_raw, 6)
+    check(code == 0 and "PASS events=6 who/clock/payload accepted" in out,
+          "native validator accepts every one of six first deaths alongside ordinary gameplay/other telemetry")
+    code, out = run_death_validator(pm, "".join(marker(e) for e in native_deaths[:3]), 3)
+    check(code == 0 and "PASS events=3" in out, "native three-controller fixture has independent sessions")
+    cross_who_death = dict(valid_death, who="Other", sid="A" * 32)
+    cross_who_players = pm.build_stats([valid_death, cross_who_death])
+    check(all(p["first_duplicates"] == p["first_invalid"] == 0
+              and p["first_actions"]["a" * 32]["first_death"] == first_death
+              for p in cross_who_players.values()) and len(cross_who_players) == 2,
+          "shared parser accepts same normalized sid across different who; native-only uniqueness must not leak")
+    missing_who = marker({k: v for k, v in valid_death.items() if k != "who"})
+    for label, raw, count in (
+        ("expected count", death_raw, 7),
+        ("duplicate", death_raw + marker(native_deaths[0]), 7),
+        ("case-insensitive duplicate", marker(valid_death) + marker(dict(valid_death, sid="A" * 32)), 2),
+        ("same sid different who", marker(valid_death) + marker(dict(valid_death, who="Other")), 2),
+        ("normalized same sid different who", marker(valid_death) + marker(cross_who_death), 2),
+        ("missing who", missing_who, 1),
+        ("missing who after valid markers", death_raw + missing_who, 7),
+        ("unparsed extra marker with expected accepted count", death_raw + missing_who, 6),
+        ("empty who", marker(dict(valid_death, who="")), 1),
+        ("None who", marker(dict(valid_death, who="None")), 1),
+        ("missing clocks", marker({k: v for k, v in valid_death.items() if k not in ("t", "start", "elapsed")}), 1),
+        ("overwritten event", marker(valid_death).rstrip() + " ev=death\n", 1),
+        ("repeated raw event token", marker(valid_death).rstrip() + " ev=first_death\n", 1),
+        ("old ordinary death", ordinary_raw, 1),
+    ):
+        code, out = run_death_validator(pm, raw, count)
+        check(code == 1 and "MMO_FIRST_DEATH_PARSER_TEST] FAIL" in out, "native death validator rejects " + label)
+        if label in ("same sid different who", "normalized same sid different who"):
+            check("raw=2 parsed=2 accepted=2 invalid=0 duplicates=0 sessions=1" in out,
+                  "native cross-who rejection comes only from global normalized SID uniqueness: " + label)
+    reordered_death = {k: v for k, v in valid_death.items() if k != "ev"}
+    reordered_death["ev"] = "first_death"
+    code, out = run_death_validator(pm, marker(reordered_death).rstrip(), 1)
+    check(code == 0 and "PASS events=1" in out, "native death event token at EOF without newline")
+    code, out = run_death_validator(pm, "LogTemp: ev=first_death\n" + death_raw, 6)
+    check(code == 0 and "PASS events=6" in out, "nonmetric death text cannot add raw event count")
+    with open(DEATH_FIXTURE, encoding="utf-8") as fh:
+        code, out = run_death_validator(pm, fh.read(), 36)
+    check(code == 1 and "raw=36 parsed=35 accepted=6 invalid=27 duplicates=2" in out,
+          "full adversarial fixture validator rejects raw missing-who, malformed and duplicate markers")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -495,7 +702,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay; skill: %d olay; basic_attack: %d olay; asserts: %d/%d)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events), len(skill_events), len(attack_events), assertions - len(failures), assertions))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay; skill: %d olay; basic_attack: %d olay; death: %d olay; asserts: %d/%d)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events), len(skill_events), len(attack_events), len(death_events), assertions - len(failures), assertions))
     return 0
 
 
