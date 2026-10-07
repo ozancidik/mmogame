@@ -1496,3 +1496,64 @@ bu tur gerçek istemci exploit'i olarak kanıtlanmadı. Extraction/delivery roll
 dalında synchronous delegate mutasyonuyla fault injection yapılmadı; allocator
 ve bildirim davranışı açık. PLAYTEST_CHECKLIST ve NETWORK_AUDIT sınırları içerir.
 Gerçek Server/Shipping derlemesi ve Lv1–30 oynanış ölçümü hâlâ açık.
+
+## 55. Takas onayında oturum kimliği ve çizilen revizyon (2026-10-07)
+
+Başlangıç HEAD `222fa92`, temiz tracked Git ağacı; korunacak `.agents/`,
+`.codex/`, `AGENTS.md` untracked. Paralel yazan ajan yoktu. Agency Unreal
+Multiplayer Architect/QA rehberleriyle salt okunur Pasteur yan incelemesi;
+yerel UE5.7 UHT/RepLayout kaynaklarında native uint64 desteği kontrol edildi.
+
+Eski kaynakla gerçek UE reproducer: teklif25 altın/revizyon1 → iptal → yeni
+aynı teklif/revizyon1 → önceki onayı yolla. Yeni takasın kendi onay bayrağı true
+oldu: **FAIL checks=80, previous session confirmation accepted (check=81)**.
+UE exit0/PS exit1. Hata native sunucu kabulüdür; eski kodla gerçek remote paket,
+oyuncu ekonomik kaybı veya kalıcı dosya exploit'i gösterilmedi.
+
+Sunucu TradeSessionId = max(iki pawn'ın önceki kimliği)+1 üretir, her iki tarafa
+aynı uint64, owner-only ReplicatedUsing OnRep_Trade. Reset/iptal/tamamlama sayacı
+korur. MAX'tan sonra fail-closed; global hesap/kalıcı kimlik değildir. Start için
+authority/inactive/farklı bileşen/aynı world kapıları; iki state delegelerden önce
+kurulur. Confirm RPC `(SeenSessionId, SeenRevision)`; reciprocal partner/session/
+revision/görülen çift, onay ve LastConfirmTime mutasyonundan önce doğrulanır.
+RPC imzası değişti; iki uç aynı yeni derlemeyi kullanmalı. Save şeması değişmedi.
+
+HUD son DrawTrade'ın weak component ve session/revision çiftini tutar; onayda
+RequestConfirmSeen bunları aynen iletir. Başarısız/skipped draw ve DrawHUD'ın
+tüm erken çıkışları öncesi cache temizlenir. Sonradan replike edilen yeni değer
+click'te eski görülen teklif yerine kullanılmaz. Console/C++ RequestConfirm
+bilinçli olarak güncel yerel snapshot'ı onaylar. HUD'ın render/input davranışı
+native fixture'da çalıştırılmadı; kaynak + derleme kanıtı, gerçek PIE açıktır.
+
+Takas testi **96 native kontrol**: önceki79 +17. Aynı revizyon/yeni ortak session;
+eski/sıfır/ileri session reddi; aynı session stale revision; partner session ve
+revision uyuşmazlığının reddi; reddin caller cooldown/approval/envanteri değiştirmemesi;
+fresh onay çiftiyle tam tek aktarım; peer önce onaylıyken eski onayla tamamlanmama;
+farklı geçmişler, ters sıra ve ilk argümandaki max; active session'ı değiştirmeme;
+MAX-1→MAX ve tekrar başlangıç reddi. Kimlikler/alanlar bazı fixture'larda doğrudan
+kurulur; büyük kimliğin gerçek RPC/replication ile taşınması test edilmedi.
+
+İlk düzeltme DLL'i normal derlendi; doğrudan94 PASS ve ilk full paket36/36,
+18 PCH'siz dosya/warning0, Store346/maxLevel6, Summer49/Winter30, Net1join/1welcome
+hata0 (`mmo_net_server_180031.log`, client180031). Son QA üç madde buldu:
+DrawHUD erken return cache'i, partner revision testi ve yüksek history'nin ilk
+argüman testi. Hepsi giderildi; DLL yeniden Succeeded, doğrudan96 PASS.
+Son kaynakla `RunAllChecks.ps1 -SkipBuild -FullCompile` tekrar çalıştırıldı:
+**36/36 GECTI, PS exit0**. Takas96 PASS, 18 PCH'siz /W4 dosya ve 0 derleyici
+uyarısı; parser312/312, JSON111, lint negatif15/veri negatif14 ve eski regresyonlar
+geçti. Store352 loaded352 invalid0/loadFailed0/existsMismatch0/jsonMismatch0,
+maxLevel6, writeorder1 ve roundtrip equal1. Summer48/Winter30 mob doğumu,
+smoke exit0/hata0; NetSmoke1join/1welcome, server/client hata0
+(`mmo_net_server_181112.log`, `mmo_net_client_181112.log`, TEMP).
+Paket logu `mmo_all_trade_session_final_20261007.log` (TEMP). Source/Scripts SHA256
+listesi paket öncesi/sonrası aynı; kod/test/runner paket boyunca değişmedi.
+Belge düzenlemeleri ayrıdır. Son salt okunur Pasteur incelemesi üç düzeltmeyi
+doğruladı, kapsam içinde yeni engel bulmadı; ajan kapatıldı. Editör kapalı.
+Bilinen Lv33+ beceri boşluğu ve InitGameState whitelist lint uyarıları sürüyor.
+
+Controller'sız/tek-frame fixture, dünya saati değişmez, fixture'ın disk/save kapısı açılmaz.
+Gerçek ownership/RPC, owner-only teslim, payload/token atomikliği, Canvas/input,
+pawn replacement ve delayed-client ekonomik erişim doğrulanmadı. Cancel/X,
+add/remove/gold session taşımaz; ayrı açık eski aksiyon riski. Reentrant envanter
+rollback ve iki kaydın ortak kalıcı işlemi, gerçek Server/Shipping/Lv1–30 akış
+kanıtı açık. PLAYTEST_CHECKLIST ve O19 bu sınırlara göre güncellendi.

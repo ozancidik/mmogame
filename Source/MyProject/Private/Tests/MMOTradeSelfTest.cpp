@@ -79,7 +79,7 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 			{ Trade->LastTradeChangeTime = World->GetTimeSeconds() - 2.f; Trade->LastConfirmTime = World->GetTimeSeconds() - 2.f; }
 		};
 		auto Complete = [&]()
-		{ AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->OfferRevision); Trades[1]->ServerConfirm_Implementation(Trades[1]->OfferRevision); };
+		{ AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision); Trades[1]->ServerConfirm_Implementation(Trades[1]->TradeSessionId, Trades[1]->OfferRevision); };
 		auto Ended = [&]()
 		{
 			for (UMMOTradeComponent* Trade : Trades)
@@ -110,12 +110,12 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		Gold(0, -1);
 		if (!Check(Trades[0]->MyOffer.Gold == 0 && Trades[0]->OfferRevision == 3, TEXT("negative gold clamp"))) return false;
 		AgeConfirm(); Trades[0]->LastTradeChangeTime = World->GetTimeSeconds();
-		Trades[0]->ServerConfirm_Implementation(Trades[0]->OfferRevision);
+		Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision);
 		if (!Check(!Trades[0]->MyOffer.bConfirmed, TEXT("confirmation lock"))) return false;
 		AgeConfirm(); Trades[0]->LastConfirmTime = World->GetTimeSeconds();
-		Trades[0]->ServerConfirm_Implementation(Trades[0]->OfferRevision);
+		Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision);
 		if (!Check(!Trades[0]->MyOffer.bConfirmed, TEXT("confirmation throttle"))) return false;
-		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->OfferRevision);
+		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision);
 		if (!Check(Trades[0]->MyOffer.bConfirmed && Trades[1]->TheirOffer.bConfirmed && !Trades[1]->MyOffer.bConfirmed
 			&& BothUnchanged(InitialA, InitialB), TEXT("first confirmation must not transfer"))) return false;
 		const int32 OldRevision = Trades[0]->OfferRevision;
@@ -123,7 +123,7 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 		if (!Check(Trades[0]->OfferRevision == OldRevision + 1 && Trades[1]->OfferRevision == OldRevision + 1
 			&& !Trades[0]->MyOffer.bConfirmed && !Trades[0]->TheirOffer.bConfirmed && !Trades[1]->MyOffer.bConfirmed && !Trades[1]->TheirOffer.bConfirmed,
 			TEXT("offer change must clear both approvals/mirrors"))) return false;
-		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(OldRevision);
+		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, OldRevision);
 		if (!Check(!Trades[0]->MyOffer.bConfirmed && BothUnchanged(InitialA, InitialB), TEXT("stale revision confirmation"))) return false;
 		Trades[0]->LastOfferChangeTime = World->GetTimeSeconds() - 2.f;
 		Trades[0]->ServerRemoveItem_Implementation(Inventories[0]->EquipmentBag[0].InstanceId);
@@ -145,10 +145,10 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 			{ Incoming.InstanceId = Expected[Side].NextInstanceId++; Expected[Side].EquipmentBag.Add(Incoming); }
 			Expected[Side].Gold += Offers[1 - Side].Gold - Offers[Side].Gold;
 		}
-		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->OfferRevision);
-		Trades[0]->ServerConfirm_Implementation(Trades[0]->OfferRevision);
+		AgeConfirm(); Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision);
+		Trades[0]->ServerConfirm_Implementation(Trades[0]->TradeSessionId, Trades[0]->OfferRevision);
 		if (!Check(Inventories[0]->Gold == 1000 && Inventories[1]->Gold == 1000 && Trades[0]->bTradeActive, TEXT("duplicate first approval"))) return false;
-		Trades[1]->ServerConfirm_Implementation(Trades[1]->OfferRevision);
+		Trades[1]->ServerConfirm_Implementation(Trades[1]->TradeSessionId, Trades[1]->OfferRevision);
 		if (!Check(Ended(), TEXT("completed state/timer cleanup"))) return false;
 		if (!Check(BothUnchanged(Expected[0], Expected[1]) && static_cast<int64>(Inventories[0]->Gold) + Inventories[1]->Gold == 2000,
 			TEXT("exact exchange payload/recipient IDs/gold/collateral"))) return false;
@@ -219,6 +219,70 @@ bool UMMOTradeComponent::RunTradeSelfTest(UWorld* World, FString& OutError, int3
 			if (!Check(Scenario == 3 ? Trades[0]->bTradeActive && Trades[1]->bTradeActive : Ended(), TEXT("validation tick/boundary"))
 				|| !Check(BothUnchanged(A, B), TEXT("validation tick changed inventory"))) return false;
 		}
+		// An old confirmation must not approve a different session with the same numeric revision.
+		Reset(); Gold(0, 25);
+		const int32 PreviousSessionRevision = Trades[0]->OfferRevision;
+		const uint64 PreviousSessionId = Trades[0]->TradeSessionId;
+		Trades[0]->EndTradeServer(TEXT("fixture cancel old session"));
+		StartTradeServer(Pawns[0], Pawns[1]); Gold(0, 25); AgeConfirm();
+		const uint64 CurrentSessionId = Trades[0]->TradeSessionId;
+		if (!Check(Trades[0]->OfferRevision == PreviousSessionRevision && CurrentSessionId > PreviousSessionId
+			&& Trades[1]->TradeSessionId == CurrentSessionId, TEXT("same revision/new shared session fixture"))) return false;
+		FMMOCharacterSaveData SessionA = Snapshot(Inventories[0]), SessionB = Snapshot(Inventories[1]);
+		const float BeforeInvalidConfirm = Trades[0]->LastConfirmTime;
+		auto RejectedUnchanged = [&]()
+		{ return !Trades[0]->MyOffer.bConfirmed && !Trades[1]->TheirOffer.bConfirmed
+			&& Trades[0]->LastConfirmTime == BeforeInvalidConfirm && BothUnchanged(SessionA, SessionB); };
+		Trades[0]->RequestConfirmSeen(PreviousSessionId, PreviousSessionRevision);
+		if (!Check(RejectedUnchanged(),
+			TEXT("previous session confirmation accepted"))) return false;
+		Trades[0]->RequestConfirmSeen(0, PreviousSessionRevision);
+		if (!Check(RejectedUnchanged(), TEXT("zero session confirmation"))) return false;
+		Trades[0]->RequestConfirmSeen(CurrentSessionId + 1, PreviousSessionRevision);
+		if (!Check(RejectedUnchanged(), TEXT("future session confirmation"))) return false;
+		Trades[0]->RequestConfirmSeen(CurrentSessionId, PreviousSessionRevision - 1);
+		if (!Check(RejectedUnchanged(), TEXT("current session stale revision"))) return false;
+		++Trades[1]->TradeSessionId;
+		Trades[0]->RequestConfirmSeen(CurrentSessionId, PreviousSessionRevision);
+		Trades[1]->TradeSessionId = CurrentSessionId;
+		if (!Check(RejectedUnchanged(), TEXT("mismatched partner session"))) return false;
+		++Trades[1]->OfferRevision;
+		Trades[0]->RequestConfirmSeen(CurrentSessionId, PreviousSessionRevision);
+		Trades[1]->OfferRevision = PreviousSessionRevision;
+		if (!Check(RejectedUnchanged(), TEXT("mismatched partner revision"))) return false;
+		Trades[0]->RequestConfirmSeen(CurrentSessionId, PreviousSessionRevision);
+		if (!Check(Trades[0]->MyOffer.bConfirmed && Trades[1]->TheirOffer.bConfirmed && BothUnchanged(SessionA, SessionB), TEXT("current seen session first approval"))) return false;
+		Trades[1]->RequestConfirm(); // Console/C++ path intentionally uses current server snapshot.
+		SessionA.Gold -= 25; SessionB.Gold += 25;
+		if (!Check(Ended() && BothUnchanged(SessionA, SessionB), TEXT("current session exact completion"))) return false;
+		StartTradeServer(Pawns[0], Pawns[1]); Gold(0, 25); AgeConfirm();
+		Trades[1]->RequestConfirm();
+		if (!Check(Trades[1]->MyOffer.bConfirmed && !Trades[0]->MyOffer.bConfirmed && BothUnchanged(SessionA, SessionB), TEXT("new session peer approved first"))) return false;
+		Trades[0]->RequestConfirmSeen(CurrentSessionId, PreviousSessionRevision);
+		if (!Check(Trades[0]->bTradeActive && Trades[1]->MyOffer.bConfirmed && !Trades[0]->MyOffer.bConfirmed
+			&& BothUnchanged(SessionA, SessionB), TEXT("stale session must not complete peer-approved exchange"))) return false;
+		Trades[0]->EndTradeServer(TEXT("fixture peer-first cleanup"));
+		Trades[0]->TradeSessionId = 5; Trades[1]->TradeSessionId = 100;
+		StartTradeServer(Pawns[0], Pawns[1]);
+		if (!Check(Trades[0]->TradeSessionId == 101 && Trades[1]->TradeSessionId == 101, TEXT("advance beyond both participant generations"))) return false;
+		StartTradeServer(Pawns[1], Pawns[0]);
+		if (!Check(Trades[0]->TradeSessionId == 101 && Trades[1]->TradeSessionId == 101 && Trades[0]->GetValidPartnerComp() == Trades[1], TEXT("active session cannot be replaced"))) return false;
+		Trades[0]->EndTradeServer(TEXT("fixture reversed histories"));
+		Trades[0]->TradeSessionId = 200; Trades[1]->TradeSessionId = 5;
+		StartTradeServer(Pawns[1], Pawns[0]);
+		if (!Check(Trades[0]->TradeSessionId == 201 && Trades[1]->TradeSessionId == 201, TEXT("reversed participant histories"))) return false;
+		Trades[0]->EndTradeServer(TEXT("fixture first participant maximum"));
+		Trades[0]->TradeSessionId = 300; Trades[1]->TradeSessionId = 5;
+		StartTradeServer(Pawns[0], Pawns[1]);
+		if (!Check(Trades[0]->TradeSessionId == 301 && Trades[1]->TradeSessionId == 301, TEXT("first argument maximum generation"))) return false;
+		Trades[0]->EndTradeServer(TEXT("fixture last session generation"));
+		Trades[0]->TradeSessionId = MAX_uint64 - 1;
+		StartTradeServer(Pawns[0], Pawns[1]);
+		if (!Check(Trades[0]->TradeSessionId == MAX_uint64 && Trades[1]->TradeSessionId == MAX_uint64 && Trades[0]->GetValidPartnerComp() == Trades[1], TEXT("last session generation must not truncate"))) return false;
+		Trades[0]->EndTradeServer(TEXT("fixture session overflow"));
+		StartTradeServer(Pawns[0], Pawns[1]);
+		if (!Check(Ended() && Trades[0]->TradeSessionId == MAX_uint64 && Trades[1]->TradeSessionId == MAX_uint64
+			&& BothUnchanged(SessionA, SessionB), TEXT("session overflow must not wrap/reopen"))) return false;
 		return true;
 	}();
 	for (AMMOCharacter* Fixture : Fixtures)

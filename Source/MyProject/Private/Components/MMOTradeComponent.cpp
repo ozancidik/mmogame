@@ -94,6 +94,7 @@ void UMMOTradeComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, MyOffer, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, TheirOffer, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UMMOTradeComponent, OfferRevision, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOTradeComponent, TradeSessionId, COND_OwnerOnly);
 }
 
 void UMMOTradeComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -217,7 +218,13 @@ void UMMOTradeComponent::RequestSetGold(int32 NewGold)
 
 void UMMOTradeComponent::RequestConfirm()
 {
-	if (HasAuthorityInternal()) { ServerConfirm_Implementation(OfferRevision); } else { ServerConfirm(OfferRevision); }
+	RequestConfirmSeen(TradeSessionId, OfferRevision); // Console/C++ intent: current state.
+}
+
+void UMMOTradeComponent::RequestConfirmSeen(uint64 SeenSessionId, int32 SeenRevision)
+{
+	if (HasAuthorityInternal()) { ServerConfirm_Implementation(SeenSessionId, SeenRevision); }
+	else { ServerConfirm(SeenSessionId, SeenRevision); }
 }
 
 // ----------------------------------------------------------------------
@@ -429,8 +436,9 @@ void UMMOTradeComponent::ServerSetGold_Implementation(int32 NewGold)
 	OnMyOfferChanged();
 }
 
-void UMMOTradeComponent::ServerConfirm_Implementation(int32 SeenRevision)
+void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int32 SeenRevision)
 {
+	if (!HasAuthorityInternal()) return;
 	UMMOTradeComponent* PC = GetValidPartnerComp();
 	if (!PC || MyOffer.bConfirmed)
 	{
@@ -438,7 +446,8 @@ void UMMOTradeComponent::ServerConfirm_Implementation(int32 SeenRevision)
 	}
 
 	// Onay, oyuncunun GORDUGU teklife baglidir: arada teklif degistiyse reddet.
-	if (SeenRevision != OfferRevision)
+	if (SeenSessionId == 0 || SeenSessionId != TradeSessionId || PC->TradeSessionId != TradeSessionId
+		|| PC->OfferRevision != OfferRevision || SeenRevision != OfferRevision)
 	{
 		NotifyOwner(TEXT("Teklif degisti; yeni teklifi gorup tekrar onayla."));
 		return;
@@ -481,13 +490,19 @@ void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 {
 	UMMOTradeComponent* CA = A ? A->GetTradeComponent() : nullptr;
 	UMMOTradeComponent* CB = B ? B->GetTradeComponent() : nullptr;
-	if (!CA || !CB || CA == CB)
+	if (!CA || !CB || CA == CB || !CA->HasAuthorityInternal() || !CB->HasAuthorityInternal()
+		|| CA->bTradeActive || CB->bTradeActive || CA->GetWorld() != CB->GetWorld())
 	{
 		return;
 	}
 
-	auto Begin = [](UMMOTradeComponent* Self, AMMOCharacter* Other)
+	// Every participant advances beyond its own last generation, including when partners change.
+	const uint64 PreviousSession = FMath::Max(CA->TradeSessionId, CB->TradeSessionId);
+	if (PreviousSession == MAX_uint64) return; // Fail closed rather than reuse a generation after wrap.
+	const uint64 NewSession = PreviousSession + 1;
+	auto Begin = [NewSession](UMMOTradeComponent* Self, AMMOCharacter* Other)
 	{
+		Self->TradeSessionId = NewSession;
 		Self->Partner = Other;
 		Self->bTradeActive = true;
 		Self->PartnerName = TradeNameOf(Other);
@@ -501,11 +516,14 @@ void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 		{
 			World->GetTimerManager().SetTimer(Self->ValidateTimerHandle, Self, &UMMOTradeComponent::ValidateTick, 0.25f, true);
 		}
-		Self->OnTradeChanged.Broadcast();
-		Self->NotifyOwner(FString::Printf(TEXT("%s ile ticaret basladi."), *Self->PartnerName));
 	};
 	Begin(CA, B);
 	Begin(CB, A);
+	// Both reciprocal states and generations exist before synchronous observers can read them.
+	CA->OnTradeChanged.Broadcast();
+	CB->OnTradeChanged.Broadcast();
+	CA->NotifyOwner(FString::Printf(TEXT("%s ile ticaret basladi."), *CA->PartnerName));
+	CB->NotifyOwner(FString::Printf(TEXT("%s ile ticaret basladi."), *CB->PartnerName));
 }
 
 void UMMOTradeComponent::ResetLocalState()
@@ -515,6 +533,7 @@ void UMMOTradeComponent::ResetLocalState()
 	MyOffer = FMMOTradeOffer();
 	TheirOffer = FMMOTradeOffer();
 	Partner.Reset();
+	// Keep TradeSessionId: the next session must never reuse this pawn's generation.
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(ValidateTimerHandle);

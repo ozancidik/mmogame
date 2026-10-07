@@ -53,6 +53,8 @@ void AMMOHUD::DrawStatBar(float X, float Y, float Width, float Height, float Per
 
 void AMMOHUD::DrawHUD()
 {
+	// A failed/skipped render must not leave an old confirmation region actionable.
+	DrawnTradeComponent.Reset(); DrawnTradeSessionId = 0; DrawnTradeRevision = INDEX_NONE;
 	Super::DrawHUD();
 
 	if (!Canvas)
@@ -170,6 +172,10 @@ void AMMOHUD::DrawHUD()
 	if (IsTradeOpen())
 	{
 		DrawTrade(MMOChar);
+	}
+	else
+	{
+		DrawnTradeComponent.Reset(); DrawnTradeSessionId = 0; DrawnTradeRevision = INDEX_NONE;
 	}
 	if (bStatWindowOpen)
 	{
@@ -1791,6 +1797,7 @@ bool AMMOHUD::IsTradeOpen() const
 
 void AMMOHUD::DrawTrade(AMMOCharacter* PlayerChar)
 {
+	DrawnTradeComponent.Reset(); DrawnTradeSessionId = 0; DrawnTradeRevision = INDEX_NONE;
 	TradeBagRegions.Reset();
 	TradeOfferRegions.Reset();
 	TradeGoldRegions.Reset();
@@ -1915,6 +1922,9 @@ void AMMOHUD::DrawTrade(AMMOCharacter* PlayerChar)
 	TradeCancelRect = FBox2D(FVector2D(X3, BtnY), FVector2D(X3 + 200.f, BtnY + 34.f));
 	DrawRect(FLinearColor(0.45f, 0.12f, 0.12f, 0.95f), X3, BtnY, 200.f, 34.f);
 	DrawText(TEXT("IPTAL"), FLinearColor::White, X3 + 72.f, BtnY + 8.f, nullptr, 1.05f);
+	DrawnTradeComponent = Trade;
+	DrawnTradeSessionId = Trade->TradeSessionId;
+	DrawnTradeRevision = Trade->OfferRevision;
 }
 
 bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
@@ -1927,7 +1937,8 @@ bool AMMOHUD::HandleTradeClick(const FVector2D& Pos)
 	}
 	if (TradeConfirmRect.IsInside(Pos))
 	{
-		Trade->RequestConfirm();
+		if (DrawnTradeComponent.Get() == Trade && DrawnTradeSessionId != 0 && DrawnTradeRevision != INDEX_NONE)
+			Trade->RequestConfirmSeen(DrawnTradeSessionId, DrawnTradeRevision);
 		return true;
 	}
 	if (TradeCancelRect.IsInside(Pos))

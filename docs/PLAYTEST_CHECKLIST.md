@@ -4198,9 +4198,41 @@ eşzamanlı iki TestTrade süreci doğrulanmadı.
   iki pencere, envanter ve timer/partner kilitleri temizlenmeli.
 - [ ] Eski takası iptal edip aynı revizyon sayısına ulaşan yeni takas aç; eski
   HUD/onay olayının yeni oturuma taşınmasını araştır. Başlangıç revizyonu 0'a
-  döner; oturum kimliği eksikliği kaynakta görüldü, gerçek istemci erişimi doğrulanmadı.
+  döner; eksik oturum kimliği §55'te giderildi ve eski onay kabulü native UE'de
+  yeniden üretildi. Gerçek istemci teslimi/HUD doğrulanmadı.
 - [ ] Takasın iki ayrı kayıt çağrısı arasında hata/çökme, ardından iki oyuncuda
   yeniden giriş: duplikasyon/kayıp kontrolü. Native test bunu çalıştırmaz; mevcut
   iki Save çağrısı ortak kalıcı işlem sağlamaz. Synchronous envanter delegate'i
   sırasında mutasyonla savunma amaçlı extraction/delivery rollback dallarını
   ayrıca sınamak gerekir; yeni fixture bu dallara fault injection yapmaz.
+
+## 2026-10-07 — Takas onayını oturum ve görülen revizyona bağlama (PIE açık)
+
+Takas testi şimdi 96 native kontrol: önceki79 +17 oturum kontrolü. Eski takasın
+revizyon1 onayı yeni revizyon1 takası onaylıyordu; düzeltme öncesi FAIL80/check81.
+Sunucu pawn ömrü içinde artan uint64 oturum kimliği üretir; onay her iki tarafın
+session/revision eşliğiyle doğrulanır. HUD son çizdiği weak component/session/revision
+çiftini gönderir. Native test bunun sunucu wrapper/gövdesini çalıştırır; Canvas,
+fare tıklaması, RPC taşıma, owner-only replication veya gerçek oyuncu kaydı yok.
+
+- [ ] Her iki uçta aynı yeni DLL ile iki PIE oyuncusu: takas aç/iptal/aç,
+  yeni takasta eski oturumun aynı revizyonlu onayını gecikmeli gönder. Karşı
+  taraf önce onaylı olsa bile eski onay aktarım/tamamlama yapmamalı; yeni çifti
+  yeniden görüp onaylayınca takas bir kez tamamlanmalı.
+- [ ] Teklif çizildikten sonra, click'ten önce replication güncellensin: HUD
+  click'i çizilen eski çifti göndermeli; sunucu reddetmeli. Yeniden çizim sonrası
+  fresh onay çalışmalı. 1 sn teklif kilidi ve mevcut onay hız sınırı korunmalı.
+- [ ] HUD yaşarken pawn değişsin/respawn/bölge geçişi olsun; yeni pawn'ın sayıları
+  eski cache ile çakışsa bile weak component kontrolü eski onayı kullanmamalı.
+  Trade draw atlanınca/eski pencere kapalıyken cache temizliğini kontrol et.
+  Canvas/pawn/stats eksikliğiyle DrawHUD erken çıkarsa da eski onay cache'i
+  kullanılmamalı; bu render/input dalı native fixture'da çalıştırılmadı.
+- [ ] Owner-only session/revizyon/teklif her iki sahibine ulaşmalı, üçüncü istemci
+  özel takas verisi görmemeli. Paket kaybında cancel/restart birleşebilir; yeni
+  session OnRep_Trade bildirimi redraw sağlamalı. İki owner görünümünün aynı
+  karede/atomik güncellendiği varsayılmamalı.
+- [ ] Console `MMOTradeConfirm` en son yerel snapshot'ı onaylar; HUD draw cache'ini
+  kullanmaz. Host ve uzak console davranışını bu semantikle karşılaştır.
+- [ ] Eski cancel/X/add/remove/gold tıklamalarının yeni takası etkilemesini ayrı
+  dene; bu RPC'ler session taşımıyor, bu düzeltmenin kapsamı dışında kaldı.
+  Reentrant rollback ve iki kaydın ortak kalıcılık/çökme kontrolleri de açık.

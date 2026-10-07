@@ -65,6 +65,11 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "MMO|Trade")
 	int32 OfferRevision = 0;
 
+	// Owner-only, server-generated generation; kept after cancellation to reject old-session approvals.
+	// uint64 is deliberately C++ only (not exposed as a Blueprint numeric property).
+	UPROPERTY(ReplicatedUsing = OnRep_Trade)
+	uint64 TradeSessionId = 0;
+
 	UPROPERTY(ReplicatedUsing = OnRep_Trade, BlueprintReadOnly, Category = "MMO|Trade")
 	FMMOTradeOffer TheirOffer;
 
@@ -83,6 +88,8 @@ public:
 	void RequestRemoveItem(int32 InstanceId);
 	void RequestSetGold(int32 NewGold);
 	void RequestConfirm();
+	// HUD supplies the last rendered offer's identity, not newer state received before the click.
+	void RequestConfirmSeen(uint64 SeenSessionId, int32 SeenRevision);
 
 #if !UE_BUILD_SHIPPING
 	// Same-frame, controllerless server fixtures; no RPC transport or durable save proof.
@@ -116,7 +123,7 @@ protected:
 	void ServerSetGold(int32 NewGold);
 
 	UFUNCTION(Server, Reliable)
-	void ServerConfirm(int32 SeenRevision);
+	void ServerConfirm(uint64 SeenSessionId, int32 SeenRevision);
 
 	// --- Sunucu durumu (replike degil) ---
 	TWeakObjectPtr<AMMOCharacter> Partner;

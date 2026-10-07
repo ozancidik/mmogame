@@ -40,6 +40,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O16 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** ölü karakter yerdeki altın/sarf/ekipmanı toplayabiliyordu; ortak sunucu toplama kapısı canlılık denetler | `AMMOLootPickup::TryCollect` |
 | O17 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** dolu can/mana saf iksiri ve ortak kullanım beklemesini harcıyordu; ihtiyaç yoksa tüketim öncesi reddedilir | `AMMOCharacter::UseConsumable` |
 | O18 | ORTA | **UE'de yeniden üretildi ve düzeltildi, PIE bekliyor (2026-10-07):** temel saldırı RPC'si sentetik zaman damgasından sonra ikinci cooldown kapısında geçerli vuruşu reddediyordu | `AMMOCharacter::AttackTargetInternal/ServerAttackTarget_Implementation` |
+| O19 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** aynı revizyonlu yeni takasta eski oturumun onayı kabul ediliyordu; onay artık sunucu oturum kimliği + görülen revizyonla doğrulanır | `UMMOTradeComponent::ServerConfirm/StartTradeServer`, `AMMOHUD::DrawTrade/HandleTradeClick` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -501,9 +502,10 @@ QA son kaynak/runner incelemesinde engelleyici sorun bildirmedi.
 
 İncelemede kalanlar (doğrulanmış yeni exploit olarak sınıflandırılmadı):
 
-- StartTradeServer revizyonu 0'a döndürür; confirm yalnız görülen revizyonu taşır.
-  Eski oturumdan aynı sayılı onayın yeni oturuma erişimi gerçek istemcide
-  araştırılmalı. Aynı oturumda eski revizyon reddi test edildi.
+- §54 sırasında StartTradeServer revizyonu 0'a döndürüyordu ve confirm yalnız
+  revizyon taşıyordu. Sonraki O19/§55 turunda aynı revizyonlu yeni oturumda eski
+  onay kabulü native UE'de yeniden üretildi; sunucu oturum kimliği eklenerek
+  giderildi. Gerçek istemci taşıma/HUD kontrolü hâlâ açık.
 - Extraction-failure dalı çıkardıklarını ReceiveTradedEquipment ile geri verir
   (yeni kimlik); delivery-failure çantaları geri alırken allocation sayacını
   ve envanter bildirimi durumunu aynı şekilde geri almaz. Ön doğrulama sonrası
@@ -511,3 +513,46 @@ QA son kaynak/runner incelemesinde engelleyici sorun bildirmedi.
 - İki SaveCharacter çağrısı ortak kalıcı işlem değildir; başarısızlık/çökme
   ve yeniden girişte ekonomik bütünlük hâlâ açık. Development denetim logu
   Shipping/dedicated log garantisi sağlamaz (O12 sınırı sürer).
+
+### O19 · ORTA · Eski takas onayının yeni oturumda kabulü (2026-10-07)
+
+Eski kodla native fixture: 25 altın teklifli oturumu iptal et, yeni oturumda
+yine revizyon1'e ulaş, eski revizyon1 onayını gönder. Yeni takasta kendi onay
+bayrağı true oldu: **FAIL checks=80, previous session confirmation accepted
+(check=81)**, UE exit0/PS exit1. Eski kodda uzaktan ekonomik exploit/oyuncu kaybı
+ve gerçek gecikmeli paket yürütülmedi; kanıt native sunucu kabulüdür.
+
+Sunucu `TradeSessionId` üretir: iki tarafın önceki kimliğinin max'ı +1, her iki
+tarafa aynı değer, reset/iptal/tamamlama sonrası korunur. MAX_uint64 sonrası
+başlatma reddedilir; wrap/reuse yok. Başlatma iki farklı, inactive, authority
+bileşen ve aynı world ister; iki reciprocal durum delegelerden önce kurulur.
+Kimlik pawn ömründedir; global/kalıcı hesap kimliği veya gizli yetki token'ı değildir.
+
+Owner-only `uint64`, C++ ReplicatedUsing OnRep_Trade; Blueprint numeric alanı
+değildir. Reliable confirm RPC `(SeenSessionId, SeenRevision)` alır; authority,
+reciprocal partner, iki tarafın session/revision eşliği ve görülen çift, onay
+bayrağı/cooldown değişmeden denetlenir. Aynı oturumdaki 1 sn lock ve 0,5 sn
+confirm throttle korunur. İki uç yeni RPC imzasını içeren aynı derlemeyi kullanmalı.
+
+HUD son başarılı DrawTrade'ın weak component kimliğini ve session/revision'unu
+tutar; tıklama bu çifti `RequestConfirmSeen` üzerinden aynen gönderir. Skip/başarısız
+draw cache'i temizler, pawn/bileşen değişimi eski cache'i kullanamaz. Console/C++
+`RequestConfirm()` ise bilinçli olarak en son yerel snapshot'ı onaylar; her kullanıcı
+onayının çizilen teklife bağlı olduğu iddia edilmez.
+
+Takas native testi **96 PASS**: önceki79 +17 session kontrolü. Eski/sıfır/ileri
+session, stale revision, partner mismatch, cooldown/ekonomi değişmezliği, fresh
+pair ile bir kez tamamlama, peer önce onaylıyken eski onayla tamamlanmama,
+farklı geçmişler/ters sıra/ilk argümandaki max, partner revision uyuşmazlığı,
+active session'ı yeniden açmama, MAX-1→MAX→ret. Son QA'da DrawHUD erken çıkış
+cache'i de girişte temizlenerek giderildi; Canvas/input native testte çalışmadı.
+Render/input, replacement pawn HUD, gerçek RPC transport ve owner-only teslim
+native fixture'da çalıştırılmadı. Ayrı replike alanlar bütün ağ koşullarında
+atomik payload/token görünümü garantisi olarak yorumlanmaz.
+
+Cancel/X, add/remove ve gold RPC'leri session taşımaz; eski aksiyonun yeni takası
+etkilemesi ayrı açık risktir. Bu tur bu yolları değiştirmedi. Reentrant inventory
+rollback, ortak kalıcı işlem, gerçek Server/Shipping ve PIE kontrolleri açık.
+Agency Unreal Multiplayer Architect/QA rehberi ve yerel UE5.7 UHT/RepLayout
+kaynak incelemesi kullanıldı. Son paket36/36 ve takas96 geçti; derleme/smoke/NetSmoke
+sonuçları düzeltme kaydı §55'te. Bu bağlantı testi takas RPC/HUD oynanış kanıtı değildir.

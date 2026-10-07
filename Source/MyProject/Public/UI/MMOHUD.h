@@ -247,6 +247,9 @@ protected:
 	FBox2D TradeCloseRect = FBox2D(ForceInit);
 	FBox2D TradeConfirmRect = FBox2D(ForceInit);
 	FBox2D TradeCancelRect = FBox2D(ForceInit);
+	TWeakObjectPtr<class UMMOTradeComponent> DrawnTradeComponent;
+	uint64 DrawnTradeSessionId = 0;
+	int32 DrawnTradeRevision = INDEX_NONE;
 	TArray<FMMOClickRegion> TradeBagRegions;
 	TArray<FMMOClickRegion> TradeOfferRegions;
 	TArray<FMMOClickRegion> TradeGoldRegions;
