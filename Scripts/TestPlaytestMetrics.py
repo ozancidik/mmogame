@@ -19,11 +19,15 @@ FIRST_FIXTURE = os.path.join(HERE, "fixtures", "first_quest_metrics_sample.log")
 LOOT_FIXTURE = os.path.join(HERE, "fixtures", "first_loot_metrics_sample.log")
 KILL_FIXTURE = os.path.join(HERE, "fixtures", "first_kill_metrics_sample.log")
 EQUIP_FIXTURE = os.path.join(HERE, "fixtures", "first_equip_metrics_sample.log")
+SKILL_FIXTURE = os.path.join(HERE, "fixtures", "first_skill_metrics_sample.log")
 
 failures = []
+assertions = 0
 
 
 def check(cond, msg):
+    global assertions
+    assertions += 1
     if not cond:
         failures.append(msg)
 
@@ -202,6 +206,118 @@ def main(argv):
     code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
     check("first_equip sure=?" in out, "eski logdan ilk kusanma suresi uydurulmamali")
 
+    skill_events = pm.parse_log(SKILL_FIXTURE)
+    check(len(skill_events) == 26, "first skill fixture: 26 olay")
+    check("first_skill" in pm.FIRST_ACTIONS, "first_skill ilk eylemler listesinde olmali")
+    ss = pm.build_stats(skill_events)
+    check(sorted(ss) == ["Archer", "Bad", "Mage", "Priest", "Warrior"], "skill fixture dort sinif ve bozuk payload oyuncusu")
+    warrior = ss["Warrior"]
+    skill = warrior["first_actions"]["a" * 32]["first_skill"]
+    check(skill == {"seconds": 8, "lv": 1, "skill": "War_PowerStrike", "effect": 0, "mana": 8.0},
+          "ilk kabul edilen cast/pre-effect seviye, tekrar ilk payload'u degistirmemeli")
+    check(warrior["first_duplicates"] == 1 and warrior["first_invalid"] == 0,
+          "buyuk/kucuk harf sid ayni oyuncu+oturum+action icin tek ilk cast")
+    check(warrior["first_actions"]["b" * 32]["first_skill"] == {
+        "seconds": 5, "lv": 4, "skill": "War_BloodDrain", "effect": 4, "mana": 0.0},
+          "yeni kontrolcude sifir mana/full-HP self heal, fayda alani gerektirmeden kabul edilmeli")
+    check(warrior["first_actions"]["c" * 32]["first_skill"]["effect"] == 5,
+          "buff cast ilk skill sayilmali")
+    check(warrior["first_actions"]["a" * 32]["first_equip"]["item"] == "ShortSword",
+          "ayni oyuncu/sid farkli action birbirini engellememeli")
+    check(ss["Archer"]["first_actions"]["a" * 32]["first_skill"]["effect"] == 3
+          and ss["Archer"]["first_actions"]["b" * 32]["first_skill"]["effect"] == 1,
+          "ayni sid farkli oyuncu ve yeni oturum birbirinden bagimsiz olmali")
+    check(ss["Mage"]["first_actions"]["a" * 32]["first_skill"] == {
+        "seconds": 15, "lv": 3, "skill": "Mag_FrostNova", "effect": 2, "mana": 0.125},
+          "kesirli mana/empty AoESelf, hasar faydasi gerektirmeden kabul edilmeli")
+    check(ss["Priest"]["first_actions"]["a" * 32]["first_skill"]["effect"] == 6,
+          "HealTarget effect ust siniri 6 kabul edilmeli")
+    samples = [actions["first_skill"] for p in ss.values() for actions in p["first_actions"].values()
+               if "first_skill" in actions]
+    check(len(samples) == 7 and {s["effect"] for s in samples} == set(range(7)),
+          "7 ilk cast ve tum 0..6 effect degerleri")
+    check(ss["Bad"]["first_invalid"] == 13 and ss["Bad"]["first_duplicates"] == 0
+          and ss["Bad"]["first_actions"] == {}, "13 bozuk skill/mana/effect payload reddedilmeli")
+    for index, bad_event in enumerate(e for e in skill_events if e["who"] == "Bad"):
+        rejected = pm.build_stats([bad_event])["Bad"]
+        check(rejected["first_invalid"] == 1 and rejected["first_actions"] == {},
+              "skill bozuk payload #%d ayri ayri reddedilmeli: %s" % (index + 1, bad_event))
+
+    base_events = [e for e in skill_events if e["ev"] not in pm.FIRST_ACTIONS]
+    # Invalid first markers must not move a player's observation clock, even when
+    # they appear before the first legitimate event or after the last one.
+    clock_base = [{"who": "Clock", "ev": "kill", "t": "10", "lv": "1", "xp": "25", "mob": "Goblin"}]
+    clock_bad = dict(next(e for e in skill_events if e["ev"] == "first_skill"), who="Clock", mana="NaN", t="1000")
+    clock_reference = pm.build_stats(clock_base)["Clock"]
+    for sequence in ([clock_bad] + clock_base, clock_base + [clock_bad]):
+        clock_result = pm.build_stats(sequence)["Clock"]
+        check(clock_result["first_invalid"] == 1, "invalid marker retained in diagnostics")
+        check(clock_result["first_t"] == clock_reference["first_t"]
+              and clock_result["last_t"] == clock_reference["last_t"]
+              and clock_result["dur"] == clock_reference["dur"], "invalid marker must not extend level duration")
+    for action in pm.FIRST_ACTIONS:
+        invalid = dict(clock_bad, ev=action, scope="invalid")
+        clock_result = pm.build_stats([invalid] + clock_base + [invalid])["Clock"]
+        check(clock_result["first_invalid"] == 2 and clock_result["first_t"] == 10 and clock_result["last_t"] == 10
+              and clock_result["dur"] == clock_reference["dur"], "invalid first marker clock isolation: " + action)
+    baseline = pm.build_stats(base_events)["Warrior"]
+    for key in ("level", "lv", "src", "mobs", "quests", "quest_start", "pending"):
+        check(warrior[key] == baseline[key], "first skill ekonomi/ilerleme toplamini degistirmemeli: " + key)
+    check(warrior["lv"][1]["kills"] == 1 and warrior["lv"][1]["xp"] == 25
+          and warrior["lv"][1]["gold_in"] == 3 and warrior["lv"][1]["gold_out"] == 0
+          and warrior["lv"][1]["quest_xp_reward"] == 200
+          and warrior["quests"]["Q_Goblins"]["accepts"] == 1
+          and warrior["quests"]["Q_Goblins"]["claims"] == 1, "skill log toplamlarinda XP/altin/kill/gorev artmamali")
+    for who in ("Archer", "Mage", "Priest", "Bad"):
+        check(ss[who]["lv"] == {} and ss[who]["quests"] == {} and ss[who]["src"] == {}
+              and ss[who]["mobs"] == {} and ss[who]["level"] is None,
+              "yalniz skill marker ekonomi/seviye/kill/gorev olusturmamali: " + who)
+
+    valid_cast = next(e for e in skill_events if e["ev"] == "first_skill")
+    malformed_common = [
+        ("scope", "character"), ("scope", None), ("sid", "a" * 31), ("sid", "g" * 32), ("sid", None),
+        ("t", "NaN"), ("t", "Inf"), ("t", "-1"), ("t", None),
+        ("start", "NaN"), ("start", "Inf"), ("start", "-1"), ("start", None), ("start", "9"),
+        ("elapsed", "NaN"), ("elapsed", "Inf"), ("elapsed", "-1"), ("elapsed", None), ("elapsed", "7"),
+        ("lv", "0"), ("lv", "-1"), ("lv", "1.5"), ("lv", "NaN"), ("lv", "Inf"), ("lv", None),
+    ]
+    for field, value in malformed_common:
+        bad_event = dict(valid_cast)
+        if value is None:
+            bad_event.pop(field)
+        else:
+            bad_event[field] = value
+        rejected = pm.build_stats([bad_event])["Warrior"]
+        check(rejected["first_invalid"] == 1 and rejected["first_actions"] == {},
+              "skill ortak sid/scope/saat/seviye reddi: %s=%s" % (field, value))
+    accepted_after_bad = pm.build_stats([bad_event, valid_cast])["Warrior"]
+    check(accepted_after_bad["first_invalid"] == 1 and accepted_after_bad["first_duplicates"] == 0
+          and accepted_after_bad["first_actions"]["a" * 32]["first_skill"] == skill,
+          "gecersiz marker sonra gelen ilk gecerli cast'i engellememeli")
+    unknown_id = dict(valid_cast, skill="Future_RuntimeSkill")
+    check(pm.build_stats([unknown_id])["Warrior"]["first_actions"]["a" * 32]["first_skill"]["skill"]
+          == "Future_RuntimeSkill", "parser runtime DB skill listesi varsaymamali")
+
+    code, out = run_main(pm, ["x", SKILL_FIXTURE, "--who", "Warrior"])
+    check(code == 0 and "Olay sayisi: 26 (levelup=0 kill=1 death=0 gold=1)" in out
+          and "quest_accept=1 quest_claim=1" in out, "skill log CLI olay sayilari artmamali")
+    check("first_skill sure=0:08 lv=1 skill=War_PowerStrike effect=0 mana=8.000" in out
+          and "first_skill sure=0:05 lv=4 skill=War_BloodDrain effect=4 mana=0.000" in out
+          and "gecersiz=0 tekrar=1" in out, "skill detay/sure/pre-effect seviye/3dp mana raporu")
+    check(all("Oyuncu: " + who not in out for who in ("Archer", "Mage", "Priest", "Bad")), "skill --who filtresi")
+    code, out = run_main(pm, ["x", SKILL_FIXTURE, "--who", "Mage"])
+    check(code == 0 and "first_skill sure=0:15 lv=3 skill=Mag_FrostNova effect=2 mana=0.125" in out,
+          "kesirli mana raporda korunmali")
+    code, out = run_main(pm, ["x", SKILL_FIXTURE, "--who", "Bad"])
+    check(code == 0 and "gecersiz=13 tekrar=0" in out and "first_skill sure=?" in out,
+          "bozuk skill logu sure uydurmadan raporlanmali")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check(code == 0 and out.count("first_skill sure=?") == 2,
+          "eski first-action logunun iki sid'sinde eksik skill suresi bilinmez")
+    code, out = run_main(pm, ["x", FIXTURE, "--who", "Istemci"])
+    check(code == 0 and "first_skill sure=?" in out and "first_* suresi bilinmiyor" in out
+          and "Oyuncu: Ozan" not in out, "eski marker olmayan logda --who ve eksik first_skill suresi")
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 
@@ -218,7 +334,7 @@ def main(argv):
         for f in failures:
             print("KALDI:", f)
         return 1
-    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events)))
+    print("PlaytestMetrics fixture testi gecti (eski: %d olay; gorev: %d olay; first: %d olay; loot: %d olay; kill: %d olay; equip: %d olay; skill: %d olay; asserts: %d/%d)." % (len(events), len(quest_events), len(first_events), len(loot_events), len(kill_events), len(equip_events), len(skill_events), assertions - len(failures), assertions))
     return 0
 
 

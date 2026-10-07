@@ -19,6 +19,9 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   first_loot who lv kind=gold|item|equipment item amount scope=controller sid start elapsed
   first_kill who lv mob mlv xp credit=fatal|contribution|party|fallback elite scope=controller sid start elapsed
   first_equip who lv item instance slot=0..3 scope=controller sid start elapsed (successful player equip request)
+  first_skill who lv skill effect=0..6 mana scope=controller sid start elapsed
+    (first authoritative accepted cast after ConsumeMana, before ExecuteSkill; lv is pre-effect)
+    (full-HP self heal / empty AoESelf still count; no damage/heal benefit required)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -29,7 +32,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
-FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill")
 
 
 def project_root():
@@ -79,21 +82,30 @@ def flush_pending(p):
 
 def build_stats(events):
     """Oyuncu -> seviye -> toplamlar. Seviye girisi levelup ile belirlenir; ilk seviye ilk olaydan baslar."""
+    def record_time(player, timestamp):
+        if not player["timing_started"]:
+            player["first_t"] = player["last_t"] = timestamp
+            player["timing_started"] = True
+        else:
+            player["last_t"] = max(player["last_t"], timestamp)
+
     players = {}
     for e in events:
         who = e["who"]
         t = to_num(e.get("t"))
         p = players.setdefault(who, {
             "level": None, "enter": {}, "dur": {}, "lv": defaultdict(lambda: defaultdict(float)),
-            "first_t": t, "last_t": t, "src": defaultdict(lambda: [0, 0]), "mobs": defaultdict(int),
+            "first_t": 0, "last_t": 0, "timing_started": False,
+            "src": defaultdict(lambda: [0, 0]), "mobs": defaultdict(int),
             "pending": [],  # seviye henuz bilinmezken gelen altin olaylari (ilk bilinen seviyeye yazilir)
             "quests": defaultdict(lambda: {"accepts": 0, "claims": 0, "xp_reward": 0,
                                             "seconds": [], "unmatched": 0, "capped": 0}),
             "quest_start": {},
             "first_actions": {}, "first_invalid": 0, "first_duplicates": 0,
         })
-        p["last_t"] = max(p["last_t"], t)
         ev = e["ev"]
+        if ev not in FIRST_ACTIONS:
+            record_time(p, t)
         if ev in FIRST_ACTIONS:
             # Explicit controller lifetime, never guessed from first log time or player name.
             sid = e.get("sid", "")
@@ -121,6 +133,13 @@ def build_stats(events):
                 payload_valid = (bool(e.get("item")) and e["item"] != "None"
                                  and math.isfinite(instance) and 0 < instance <= 2147483647 and instance.is_integer()
                                  and math.isfinite(slot) and 0 <= slot <= 3 and slot.is_integer())
+            elif ev == "first_skill":
+                effect = to_num(e.get("effect"), float("nan"))
+                mana = to_num(e.get("mana"), float("nan"))
+                # Runtime DB validity belongs to the emitter; this parser validates the payload.
+                payload_valid = (bool(e.get("skill")) and e["skill"] != "None"
+                                 and math.isfinite(effect) and 0 <= effect <= 6 and effect.is_integer()
+                                 and math.isfinite(mana) and mana >= 0)
             else:
                 payload_valid = bool(e.get("quest"))
             if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
@@ -129,6 +148,7 @@ def build_stats(events):
                     or event_time < start or abs(event_time - start - elapsed) > 0.01):
                 p["first_invalid"] += 1
                 continue
+            record_time(p, event_time)
             session = p["first_actions"].setdefault(sid.lower(), {})
             if ev in session:
                 p["first_duplicates"] += 1
@@ -140,6 +160,8 @@ def build_stats(events):
                 sample.update(mob=e["mob"], mlv=int(mob_level), xp=int(xp), credit=e["credit"], elite=int(elite))
             elif ev == "first_equip":
                 sample.update(item=e["item"], instance=int(instance), slot=int(slot))
+            elif ev == "first_skill":
+                sample.update(skill=e["skill"], effect=int(effect), mana=mana)
             else:
                 sample["quest"] = e["quest"]
             session[ev] = sample
@@ -277,6 +299,8 @@ def print_player(who, p):
                         detail = "mob=%s mlv=%d xp=%d credit=%s elite=%d" % (sample["mob"], sample["mlv"], sample["xp"], sample["credit"], sample["elite"])
                     elif action == "first_equip":
                         detail = "item=%s instance=%d slot=%d" % (sample["item"], sample["instance"], sample["slot"])
+                    elif action == "first_skill":
+                        detail = "skill=%s effect=%d mana=%.3f" % (sample["skill"], sample["effect"], sample["mana"])
                     else:
                         detail = "quest=%s" % sample["quest"]
                     print("  sid=%s %s sure=%s lv=%d %s" % (
@@ -285,6 +309,7 @@ def print_player(who, p):
                     print("  sid=%s %s sure=? (bu logda olay yok)" % (sid, action))
     else:
         print("Ilk eylem olayi yok: first_* suresi bilinmiyor; sifir sure veya basarisizlik kaniti degil.")
+        print("  first_skill sure=? (bu logda olay yok)")
     if p["first_invalid"] or p["first_duplicates"]:
         print("Ilk olay atlanan: gecersiz=%d tekrar=%d" % (p["first_invalid"], p["first_duplicates"]))
 

@@ -1,8 +1,8 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 7 Ekim 2026. Kaynak kod ve son tamamlanan test paketi esas alınmıştır.
-Önceki kod/test kanıtı: `6b5630f`; NPC oyuncu kota tablosunda kapasite
-reddi ve 25 bellek kontrolü ayrıca eklendi (ayrıntı: düzeltme kaydı §50).
+Önceki kod/test kanıtı: `dfa39de`; ilk kabul edilen beceri kullanımı da
+sunucu controller oturumunda ölçülüyor (ayrıntı: düzeltme kaydı §51).
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -24,18 +24,18 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 79 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 51 arketip (13 elit), 29 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 51, Winter 34 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 50, Winter 31 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider kuralları; parti birleşmesinde lider onayı | Lider/rıza regresyonu: 10 kontrol | Çok pencerede birleşme/ayrılma, gerçek katkı ve XP paylaşımı |
 | Ticaret ve depo | Çift onay/teklif revizyonu, kimlikle eşya, kapasite/altın tavanı; NPC yakınlığında depo | Kod/derleme; satış kapasitesi yeni satıcı testinde | Ticaretin iki kaydı birlikte kalıcılaştırması; çökme/bağlantı kopması; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, arkadaş listesi, sohbet ve hız sınırları | Klan davetinde güncel lider yetkisi: 9 kontrol | Çevrimdışı üyelik/rıza, yeniden giriş ve çok oyunculu sosyal akış |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 298 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 310 yuva okundu; JSON eşleşmesi ve seçilen kayıt roundtrip'i geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
 | Dedicated / backend | Admin kapısı merkezileştirildi; kayıt arayüzü ve GameState hazırlığı mevcut | Editor hedefinde derleniyor | Kaynak UE 5.7, Server hedefi/paketleme, hesap servisi, gerçek asenkron depolama |
-| Telemetri ve denge | Kill/death/levelup/gold, görev XP/süre; controller oturumunda ilk görev/loot/öldürme kredisi/kuşanma isteği; otomatik başlangıç kuşanması hariç | 6 oturum + 6 loot + 10 ölüm + 8 kuşanma kontrolü; parser equip 17 olay; otomatik kuşanma yanlış saydırılınca test yakaladı | Diğer ilk eylemler; gerçek solo/parti süreleri, model karşılaştırması ve ardından denge ayarı |
+| Telemetri ve denge | Kill/death/levelup/gold, görev XP/süre; controller oturumunda ilk görev/loot/öldürme kredisi/kuşanma isteği/kabul edilen beceri; otomatik başlangıç kuşanması hariç | 6 oturum + 6 loot + 10 ölüm + 8 kuşanma kontrolü; yeni beceri 17 UE kontrolü, 7 tür/olay; parser 150/150 assert; yanlış mana metadata'sı negatif testte yakalandı | Diğer ilk eylemler; gerçek solo/parti süreleri, model karşılaştırması ve ardından denge ayarı |
 
 **Test sınırı:** Bir satırdaki fixture sonucu yalnız belirtilen senaryoları kapsar.
 NetSmoke bağlantıyı kontrol eder. Smoke harita yüklenmesi ve doğuş loglarını kontrol
@@ -61,7 +61,8 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `a81fda4` | Mevcut ölüm akışında ilk kredi; fatal/contribution/party/fallback ve XP öncesi seviye | 10 yeni UE kontrolü; oturum tekilliği genişletildi; yanlış fallback etiketi negatif testte yakalandı; parser 17 olay; 29/29 paket |
 | `2ac517d` | Başarılı oyuncu isteği; otomatik başlangıç/kayıt yükleme hariç, controller ömründe tek ölçüm | 8 yeni kontrol + 6 oturum kontrolü genişletildi; otomatik giriş negatif testi yakalandı; parser 17 olay ve gerçek UE logu geçti; 30/30 paket |
 | `6b5630f` | Ücretli kayıtlı beceriyi rütbe/bakiye bütçesine katma; ücretsiz starter ve geçerli legacy hotbar korunur | Önce FAIL checks=0, düzeltme sonrası 12 yeni UE kontrolü; stats-first/skill-first, roundtrip, max ağaç maliyeti ve iade; 31/31 paket |
-| 7 Ekim NPC kota kapasitesi (bu belgeyle aynı commit) | Tablo doluyken yeni anahtarın oyuncu kotasını atlamasını reddetme; mevcut oyuncular devam eder | Önce UE FAIL11, ardından 25 kontrol PASS; 32/32 tam paket; HTTP/disk/callback testleri açık |
+| `dfa39de` | Tablo doluyken yeni anahtarın oyuncu kotasını atlamasını reddetme; mevcut oyuncular devam eder | Önce UE FAIL11, ardından 25 kontrol PASS; 32/32 tam paket; HTTP/disk/callback testleri açık |
+| 7 Ekim ilk beceri (bu belgeyle aynı commit) | Mana ödemesinden sonra etki/XP öncesi ilk kabul; skill/effect/mana ve controller tekilliği | 17 yeni UE kontrolü, 7 tür/olay; 6 oturum kontrolü genişletildi; parser 150/150 assert; yanlış log saat etkisi düzeltildi; 33/33 son paket; gerçek RPC/PIE açık |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -81,18 +82,18 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **32/32 geçti**.
+7 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **33/33 geçti**.
 Normal Editor derlemesi ayrıca geçti. 16 dosyanın PCH olmadan /W4 derlemesinde
 derleyici uyarısı yok. Veri denetiminde Lv33+ beceri boşluğu uyarıları, StaticLint'te
 InitGameState override beyaz liste uyarısı açık. Yerel test edilen en yüksek gerçek
-kayıt seviyesi 6; 298 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
-Önceki stats-first fixture dahil beceri12, yeni LLM25 ve tüm eski kontroller bu
-pakette geçti. Summer51/Winter34 smoke hata0; NetSmoke1join/1welcome, iki tarafta
+kayıt seviyesi 6; 310 kaydın okunması oyuncu sayısı veya Lv1–30 test tamamlanması değildir.
+Önceki stats-first fixture dahil beceri12, LLM25, yeni skill17/parser150 ve tüm eski kontroller bu
+pakette geçti. Summer50/Winter31 smoke hata0; NetSmoke1join/1welcome, iki tarafta
 hata0. LLM fixture'i bellek helper'larını sınar; gerçek HTTP, dosya kalıcılığı,
 callback zamanlaması ve uzak istemci HUD'ı için kanıt değildir.
 Son parser sayısal/eksik alan korumaları da bu tam pakette geçti.
 İlk eylemler sunucu controller ömrüne aittir; kalıcı karakterin
-ilk görevi veya gerçek 20 dakika koşusu olarak yorumlanmaz.
+ilk görevi/becerisi veya gerçek 20 dakika koşusu olarak yorumlanmaz.
 İlk loot yalnız pozitif pickup teslimidir; kısmi sarf toplamayı içerir,
 ekipman kuşanma veya bütün ilk eylemler planının bitmesi anlamına gelmez.
 İlk kill, mevcut ölüm akışındaki kredidir; `credit` alanı son vuruşu parti
@@ -100,6 +101,10 @@ ve katkıdan ayırır. XP hesaplanan ödüldür; tavanda gerçek artış ölçü
 İlk equip başarılı kuşanma isteğidir; otomatik başlangıç ve kayıt yükleme
 ölçüme dahil değildir. Fixture tüm başlangıç dalını veya gerçek RPC/HUD'ı
 çalıştırmaz; debug/C++ üzerinden aynı public istek de sayılır.
+
+İlk skill kabul edilen sunucu kullanımının zamanıdır, ilk hasar/faydalı şifa
+değildir; tam can şifası ve boş AoESelf dahil. Mana DB maliyetidir; buff sonrası
+bakiye ölçümü değildir. Genel beceri sayacı veya öğrenme zamanını kapsamaz.
 
 - [Ayrıntılı düzeltme ve test kaydı](CHECKLIST_FIXES_2026-10-05.md)
 - [Oynanacak kontroller](PLAYTEST_CHECKLIST.md)
@@ -109,6 +114,7 @@ ve katkıdan ayırır. XP hesaplanan ödüldür; tavanda gerçek artış ölçü
 - [Güvenlik ve hesap sınırları](SECURITY_AUDIT.md)
 
 Agency-agents rol belgeleri geliştirme/review rehberi olarak kullanılıyor.
-Bu son işte Sartre paralel ajanı salt okunur kota sınır matrisi ve entegrasyon
-incelemesi yaptı; dosya yazmadı, derleme veya UE testi çalıştırmadı. Önceki işlerin rol
+Bu son işte Cicero paralel ajanı parser/test/fixture dosyalarını yazıp UE Python
+assertlerini çalıştırdı; son C++/PS entegrasyonunu ayrıca salt okunur inceledi.
+Unreal/QA rol rehberleri kullanıldı; C++/PS/derleme parent tarafından yürütüldü. Önceki işlerin rol
 belgeleri ayrı çalışan ajan veya oyunun runtime AI bağımlılığı değildir.

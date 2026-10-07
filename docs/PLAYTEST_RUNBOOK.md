@@ -124,3 +124,37 @@ Genel his (hız, zorluk, kafa karıştıran yer):
 Bulgular `PLAYTEST_PRIORITY.md` §3'e işlenir; geçen maddeler `PLAYTEST_CHECKLIST.md`'de `[x]` yapılır.
 
 Kapı 3 çıktısı, `docs/DECISIONS_NEEDED.md`'deki 7 kararın (XP hızı, ölüm cezası, altın sink'i, hız hedefi vb.) her birinin "Gereken veri" satırını besler; karar vermeden önce o sayfaya bak.
+
+## İlk kabul edilen beceri (7 Ekim 2026)
+
+`first_skill` mana ödemesinden sonra, `ExecuteSkill` etkilerinden önce sunucuda
+üretilir; alanlar `skill=<DB id> effect=<0..6> mana=<maliyet, 3 ondalık>` ve
+etki öncesi `lv`dir. Mana alanı o becerinin ödenen DB maliyetidir; buff sonrası
+mana bakiyesi, toplam tüketim veya hasar/şifa faydası ölçümü değildir.
+
+| effect | Beceri türü |
+| --- | --- |
+| 0 | Yakın hasar |
+| 1 | Uzak hasar |
+| 2 | Kendinin çevresine alan hasarı |
+| 3 | Hedefin çevresine alan hasarı |
+| 4 | Kendine şifa |
+| 5 | Kendine buff |
+| 6 | Hedefe şifa (mevcut kendine dönüş kuralı dahil) |
+
+Tam canla şifa ve boş hedef alanında AoESelf mevcut kurala göre kabul edilir;
+ikisi de ilk kullanım olabilir. Bilinmeyen/öğrenilmemiş/başka sınıf veya düşük
+seviye becerisi, ölüm, mana/cooldown reddi ve hedef gerektiren beceride hedef
+yokluğu olay değildir. İstemcinin iyimser cooldown'u sunucu kabulü sayılmaz.
+C++/debug yolundan kabul edilen kullanım da sayılır; HUD'a basılma ölçümü değildir.
+
+Aynı controller sid/start/elapsed kapsamında yalnız ilk beceri yazılır;
+pawn değişimi ve controller aktarımı tekilliği korur, yeni controller yeni
+oturumdur. Kalıcı karakterin ilk becerisi veya öğrenme zamanı ölçülmez.
+`first_skill` normal kill/XP/altın/görev toplamlarını artırmaz. Eski/eksik olay
+`sure=?`; hasar vermemiş veya hiç beceri kullanmamış olduğu çıkarılmaz.
+Gerçek 20 dk koşu, uzak istemci reddi, hub, seamless travel ve reconnect PIE'de açık.
+
+Geçersiz first marker saatleri gözlem süresine eklenmez; hata sayısı raporda
+kalır. Native test logları aynı parser ile who/saat/payload yönünden ayrıca
+doğrulanır. Sentetik bozuk log gerçek oyun koşusu sayılmaz.

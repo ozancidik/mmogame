@@ -1,0 +1,28 @@
+# Synthetic accepted casts use runtime DB IDs; mana also probes zero/fractional schema values.
+# No damage/heal benefit fields: full-HP HealSelf and empty AoESelf remain accepted casts.
+[MMOMETRIC] t=1 ev=kill who=Warrior lv=1 mob=Goblin mlv=1 xp=25 party=0 elite=0
+[MMOMETRIC] t=2 ev=gold who=Warrior src=loot amount=3 balance=3
+[MMOMETRIC] t=3 ev=quest_accept who=Warrior lv=1 quest=Q_Goblins
+[MMOMETRIC] t=4 ev=quest_claim who=Warrior lv=1 to=1 quest=Q_Goblins xp_reward=200 capped=0
+[MMOMETRIC] t=8 ev=first_skill who=Warrior lv=1 skill=War_PowerStrike effect=0 mana=8.000 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=9 ev=first_skill who=Warrior lv=2 skill=War_ShieldBash effect=0 mana=6.000 scope=controller sid=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA start=0 elapsed=9
+[MMOMETRIC] t=15 ev=first_skill who=Warrior lv=4 skill=War_BloodDrain effect=4 mana=0.000 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=20 ev=first_skill who=Warrior lv=3 skill=War_BattleShout effect=5 mana=15.000 scope=controller sid=cccccccccccccccccccccccccccccccc start=5 elapsed=15
+[MMOMETRIC] t=10 ev=first_equip who=Warrior lv=1 item=ShortSword instance=4 slot=0 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=10
+[MMOMETRIC] t=12 ev=first_skill who=Archer lv=5 skill=Arc_ArrowRain effect=3 mana=22.000 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=10
+[MMOMETRIC] t=15 ev=first_skill who=Archer lv=1 skill=Arc_QuickShot effect=1 mana=6.000 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=20 ev=first_skill who=Mage lv=3 skill=Mag_FrostNova effect=2 mana=0.125 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=5 elapsed=15
+[MMOMETRIC] t=8 ev=first_skill who=Priest lv=5 skill=Pri_GreaterHeal effect=6 mana=40.000 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 effect=0 mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=None effect=0 mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill= effect=0 mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=0 mana=-0.001 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=0 mana=NaN scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=0 mana=Inf scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=0 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=-1 mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=7 mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=1.5 mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=NaN mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8
+[MMOMETRIC] t=8 ev=first_skill who=Bad lv=1 skill=War_PowerStrike effect=Inf mana=8.000 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=8

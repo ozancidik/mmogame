@@ -35,12 +35,21 @@ if ($metricOk) {
     $metricOk = $firstEquip[0].Line -match "item=ShortSword instance=101 slot=0 scope=controller sid=$($sessions[0]) "
     $metricOk = $metricOk -and $firstEquip[1].Line -match "item=ShortSword instance=101 slot=0 scope=controller sid=$($sessions[1]) "
 }
+$firstSkill = @(Select-String -LiteralPath $log -Pattern '\[MMOMETRIC\].* ev=first_skill ')
+$metricOk = $metricOk -and $firstSkill.Count -eq 2
+if ($metricOk) {
+    $metricOk = $firstSkill[0].Line -match "skill=War_PowerStrike effect=0 mana=8.000 scope=controller sid=$($sessions[0]) "
+    $metricOk = $metricOk -and $firstSkill[1].Line -match "skill=War_PowerStrike effect=0 mana=8.000 scope=controller sid=$($sessions[1]) "
+}
 if ($pass -and -not $fail -and $process.ExitCode -eq 0 -and $metricOk) {
+    & 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\Python3\Win64\python.exe' (Join-Path $PSScriptRoot 'ValidateFirstSkillLog.py') $log --events 2
+    if ($LASTEXITCODE -ne 0) { exit 1 }
     Write-Output $pass.Line
     Write-Output '[MMO_FIRST_QUEST_SESSION_TEST] PASS accepts=2 claims=1 sessions=2'
     Write-Output '[MMO_FIRST_LOOT_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
     Write-Output '[MMO_FIRST_KILL_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
     Write-Output '[MMO_FIRST_EQUIP_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
+    Write-Output '[MMO_FIRST_SKILL_SESSION_TEST] PASS events=2 sessions=2 (pawn/transfer uniqueness)'
     exit 0
 }
 Write-Output "First quest testi KALDI (exit=$($process.ExitCode) accepts=$($firstAccept.Count) claims=$($firstClaim.Count) sessions=$($sessions.Count))"

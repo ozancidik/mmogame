@@ -1208,3 +1208,72 @@ bu tam pakette de PASS. Summer51 / Winter34 smoke hata0; NetSmoke1join /
 1welcome, server/client hata0 (yalniz baglanti). Lv33+ beceri bosluklari,
 InitGameState lint uyarisi, gercek HTTP/PIE ve Server/Shipping hedefi acik.
 Bu testte duzeltme sonrasi uretim kodu veya fixture degistirilmedi.
+
+## 51. İlk kabul edilen beceri kullanımını sunucu oturumunda ölçme (2026-10-07)
+
+Lv1–30 §3.1 kapsamında sınırlı telemetri artışı. `UseSkill` otorite dalında
+`ConsumeMana` başarılı olduktan ve combat işaretinden sonra, `ExecuteSkill`
+öncesinde controller'a `RecordFirstSkillMetric` çağrısı eklendi. DB kimliği,
+tür 0..6 ve mana maliyeti yazılır; seviye etki/XP öncesidir. Shipping wrapper
+false döner; yeni RPC, replike alan, kayıt şeması veya oyun kuralı yok.
+Mana/cooldown/sınıf/seviye/öğrenme/ölüm/hedef kuralları korunur. Tam canla şifa,
+boş AoESelf ve HealTarget kendine dönüşü kabul olabilir; bu ilk hasar veya
+faydalı şifa değildir. Debug/native başarılı kullanım da sayılır.
+
+Mevcut controller GUID/start/tekillik kümesi kullanılır. Wrapper DB, öğrenme,
+sınıf/seviye ve canlılık doğrular; ortak katman otorite/player-controlled pawn
+ister. Pawn değişimi/controller aktarımı tekilliği korur, yeni controller yeni
+sid'dir. `RunFirstQuestMetricsSelfTest`in 6 kontrolü skill için de genişletildi;
+PS beklenen iki session/iki skill metadata'sını kontrol eder.
+
+`MMOTestFirstSkill` / `TestFirstSkill.ps1`: **17 kontrol PASS**, yedi ayrı
+controller/yedi first_skill/tüm 0..6 türleri. Bilinmeyen, öğrenilmemiş, yabancı
+sınıf, düşük seviye, ölü, manasız, cooldown ve hedef yokluğu retleri; aynı-frame
+native ServerUseSkill cooldown reddi; cooldown temizleyip ikinci başarılı
+kullanımda tekillik; tam can şifası, boş self AoE, buff ve controllerless şifa.
+Test ilk olayın sekiz ret kapısından sonra yazıldığını da kontrol eder.
+Sınıf/seviye/öğrenme testte kurulmuştur; gerçek yatırım/öğrenme veya ağ RPC'si
+kanıtı değildir. Moblar üç hasar türünde gerçekten hasar alır ama öldürülmez;
+öldürücü vuruşta seviye atlama PIE kontrolü açık. Oyuncu dosyası yazılmaz.
+
+Negatif test: üretim wrapper'ında mana metadata'sı geçici +1 yapıldı. UE bellek
+kontrolleri PASS olsa da log doğrulayıcı **PS exit1** ile yedi olayın yanlış
+metadata'sını yakaladı. Dosya exact bytes geri alındı, DLL yeniden derlendi,
+doğru metadata ile test tekrar PASS. İlk fixture kurulumunda yapay MaxMana=500
+buff stat yeniden hesaplamasıyla değiştiği için checks14'te KALDI; fixture gerçek
+primary/level türetilmiş maksimumlarıyla kurularak düzeltildi. Oyun bug'ı olarak
+raporlanmaz. İlk normal derlemedeki Pawn üye gölgelemesi de MetricPawn ile giderildi.
+
+Parser FIRST_ACTIONS'a first_skill eklendi; effect tam sayı 0..6, mana sonlu ve
+>=0, skill boş/None değil; ortak scope/GUID/saat/seviye validasyonu korunur.
+Oyuncu/sid/action başına ilk değer korunur; XP/kill/gold/quest tekrar toplanmaz,
+eski logda süre ?. Cicero paralel ajanı yalnız parser/test/yeni fixture'ı yazdı,
+Agency QA rehberini kullandı; 26 olaylı fixture ve **140/140 assert** yerel UE
+Python'unda geçti. Parent Unreal Systems rehberiyle C++/PS/entegrasyonu yürüttü.
+Gerçek host/uzak HUD, RPC, hub, öldürme-seviye atlama, seamless travel/reconnect
+ve dört sınıf 20 dk PIE ölçümü PLAYTEST_CHECKLIST'te açık.
+
+Son QA review'u üretim hook hatası bulmadı; iki ölçüm noktası kapatıldı:
+1. Native PS logları artık `ValidateFirstSkillLog.py` ile aynı gerçek parser'dan
+   geçer; who/t/start/elapsed/payload uyumu ve yedi (oturum testinde iki) kabul
+   zorunludur. Geçici gerçek log kopyasında who silme ve elapsed=9999 negatifleri
+   exit1 verdi; PS'nin salt substring kontrolünün kaçıracağı durumlar yakalandı.
+2. Önceden geçersiz first_* marker, reddedilmeden önce seviye gözlem saatini
+   uzatıyordu. Artık first_t/last_t yalnız doğrulanmış first marker veya normal
+   olayda ilerler; geçersiz marker sayısı diagnostic'te kalır. İlk normal olaydan
+   önce/sonra bozuk marker ve altı first türü için 10 assert eklendi (**150/150**).
+   Eski erken saat güncellemesini geçici parser kopyasına koymak 8 duration/clock
+   kontrolünde KALDI. Hiç production dosyası veya oyuncu kaydı bu negatifte yazılmadı.
+   Normal olayların saat davranışı değişmedi; geçerli tekrar first marker mevcut
+   davranışla gözlem saatini ilerletebilir, ilk beceri süresini değiştirmez.
+
+İlk tam paket 33/33, 16 PCH'siz dosya 0 uyarı ile geçti. Bu sırada bulunan parser
+ve PS ek doğrulaması sonrası normal Editor derlemesi yeniden geçti. Son kaynakla
+ikinci `RunAllChecks.ps1 -SkipBuild -FullCompile`: **33/33 GECTI**, 16 PCH'siz /W4
+dosya ve compiler warning0. Parser150/150, skill17/yedi gerçek payload ve oturum6/
+iki parser payload; JSON111 negatif; store310/loaded310, invalid0/loadFailed0/
+existsMismatch0/jsonMismatch0/maxLevel6, writeorder1, roundtrip equal1. Summer50 /
+Winter31 doğum smoke hata0; NetSmoke1join/1welcome, server/client hata0 (bağlantı).
+Tüm eski regresyonlar da geçti. Kaynak bu son tam paket sırasında değiştirilmedi.
+Lv33+ beceri boşluğu ve InitGameState lint uyarısı, gerçek PIE/RPC ve kaynak
+motorla Server/Shipping hedefleri açık. Proje iskeleti ve runbook güncellendi.

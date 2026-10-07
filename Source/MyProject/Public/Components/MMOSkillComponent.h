@@ -114,6 +114,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	static bool RunMasteryBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunLearnedSkillBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunFirstSkillSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	// Each rank costs one point; saved ranks and unspent points share this budget.

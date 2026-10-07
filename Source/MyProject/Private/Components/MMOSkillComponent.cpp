@@ -21,6 +21,91 @@
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
 
+bool UMMOSkillComponent::RunFirstSkillSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("server game world required"); return false; }
+	TArray<AActor*> Fixtures; TArray<AMMOPlayerController*> Controllers;
+	const bool bPassed = [&]()
+	{
+		auto Check = [&](bool Condition, const TCHAR* Label)
+		{ if (!Condition) { OutError = Label; return false; } ++OutChecks; return true; };
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FName Ids[] = {TEXT("War_PowerStrike"), TEXT("Arc_QuickShot"), TEXT("War_Cleave"),
+			TEXT("Mag_Meteor"), TEXT("Pri_HolyLight"), TEXT("War_BattleShout"), TEXT("Pri_GreaterHeal")};
+		for (int32 i = 0; i < UE_ARRAY_COUNT(Ids); ++i)
+		{
+			const FVector Location(1000000 + i * 5000, 1000000, 5000);
+			AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			AMMOCharacter* C = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			if (PC) { Fixtures.Add(PC); Controllers.Add(PC); } if (C) Fixtures.Add(C);
+			if (!PC || !C) { OutError = TEXT("fixture spawn failed"); return false; }
+			C->SetActorEnableCollision(false); C->SetActorTickEnabled(false); PC->Possess(C);
+			UMMOSkillComponent* K = C->GetSkillComponent(); UMMOStatsComponent* S = C->GetStats();
+			const FMMOSkillDef* Def = FMMOSkillDatabase::Find(Ids[i]);
+			if (!K || !S || !Def) { OutError = TEXT("fixture components or skill missing"); return false; }
+			K->SetupForClass(Def->RequiredClass); K->LearnedSkills.AddUnique(Ids[i]);
+			S->Level = 20; S->InitializePrimaryStats(S->Strength, S->Dexterity, S->Intelligence, S->Vitality);
+			const float FullMana = S->Mana, FullHealth = S->Health;
+			if (i == 0)
+			{
+				if (!Check(!K->UseSkill(NAME_None) && !K->UseSkill(TEXT("UnknownSkill")), TEXT("invalid skill accepted"))) return false;
+				if (!Check(!K->UseSkill(TEXT("War_MortalBlow")), TEXT("unlearned accepted"))) return false;
+				K->LearnedSkills.Add(TEXT("Pri_Smite"));
+				if (!Check(!K->UseSkill(TEXT("Pri_Smite")), TEXT("foreign class accepted"))) return false;
+				K->LearnedSkills.Add(TEXT("War_MortalBlow")); S->Level = 1;
+				if (!Check(!K->UseSkill(TEXT("War_MortalBlow")), TEXT("under-level accepted"))) return false;
+				S->Level = 20; S->bIsDead = true;
+				if (!Check(!K->UseSkill(Ids[i]), TEXT("dead accepted"))) return false;
+				S->bIsDead = false; S->Mana = 0.f;
+				if (!Check(!K->UseSkill(Ids[i]) && S->Mana == 0.f, TEXT("no mana accepted"))) return false;
+				S->Mana = FullMana; K->CooldownEndTimes.Add(Ids[i], World->GetTimeSeconds() + 60.f);
+				if (!Check(!K->UseSkill(Ids[i]) && S->Mana == FullMana, TEXT("cooldown accepted"))) return false;
+				K->CooldownEndTimes.Reset();
+				if (!Check(!K->UseSkill(Ids[i]) && S->Mana == FullMana && K->GetCooldownRemaining(Ids[i]) == 0.f, TEXT("missing target charged mana"))) return false;
+				UE_LOG(LogTemp, Display, TEXT("[MMO_FIRST_SKILL_GATES] rejected=8"));
+			}
+			AMMOMob* Mob = nullptr;
+			if (i == 0 || i == 1 || i == 3)
+			{
+				const FTransform TM(FRotator::ZeroRotator, Location + FVector(100, 0, 0));
+				Mob = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), TM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+				if (!Mob) { OutError = TEXT("mob spawn failed"); return false; }
+				Fixtures.Add(Mob); Mob->AutoPossessAI = EAutoPossessAI::Disabled; Mob->ArchetypeId = TEXT("Goblin");
+				Mob->SetActorEnableCollision(false); UGameplayStatics::FinishSpawningActor(Mob, TM); Mob->SetActorTickEnabled(false);
+				Mob->bHasHub = false; Mob->ItemDropChance = 0.f; Mob->EquipDropChance = 0.f;
+				Mob->GetStats()->MaxHealth = 10000.f; Mob->GetStats()->Health = 10000.f; Mob->GetStats()->Defense = 0.f;
+				K->RequestedTargetForCast = Mob;
+			}
+			const bool bCast = K->UseSkill(Ids[i]); K->RequestedTargetForCast.Reset();
+			if (!Check(bCast && FMath::IsNearlyEqual(S->Mana, FullMana - Def->ManaCost)
+				&& K->GetCooldownRemaining(Ids[i]) > 0.f && S->Level == 20
+				&& (!Mob || Mob->GetStats()->Health < 10000.f)
+				&& ((i != 4 && i != 6) || S->Health == FullHealth), TEXT("accepted cast mana/cooldown/effect incorrect"))) return false;
+			if (i == 0)
+			{
+				const float Mana = S->Mana;
+				K->ServerUseSkill_Implementation(Ids[i], Mob); // Native server implementation; no network claim.
+				K->CooldownEndTimes.Reset(); K->RequestedTargetForCast = Mob;
+				const bool bSecond = K->UseSkill(Ids[i]); K->RequestedTargetForCast.Reset();
+				if (!Check(bSecond && FMath::IsNearlyEqual(S->Mana, Mana - Def->ManaCost)
+					&& !PC->RecordFirstSkillMetric(Ids[i]), TEXT("duplicate cast/session incorrect"))) return false;
+			}
+		}
+		// A controllerless actor can cast a heal, but must never emit a player first event.
+		AMMOCharacter* NPC = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1100000, 1000000, 5000), FRotator::ZeroRotator, Params);
+		if (!NPC) { OutError = TEXT("NPC fixture spawn failed"); return false; }
+		Fixtures.Add(NPC); NPC->GetSkillComponent()->SetupForClass(EMMOClass::Priest);
+		NPC->GetStats()->Mana = 100.f;
+		return Check(NPC->GetSkillComponent()->UseSkill(TEXT("Pri_HolyLight")), TEXT("controllerless heal changed"));
+	}();
+	for (AMMOPlayerController* PC : Controllers) if (IsValid(PC)) PC->UnPossess();
+	for (AActor* A : Fixtures) if (IsValid(A)) A->Destroy();
+	return bPassed; // Synchronous frame, no player save load/write; no real RPC/PIE assertion.
+}
+
 bool UMMOSkillComponent::RunLearnedSkillBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0; OutError.Reset();
@@ -188,6 +273,18 @@ namespace
 		}
 	};
 	FMMOLearnedSkillBudgetTestExec GMMOLearnedSkillBudgetTestExec;
+	struct FMMOFirstSkillTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFirstSkill"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMOSkillComponent::RunFirstSkillSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FIRST_SKILL_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFirstSkillTestExec GMMOFirstSkillTestExec;
 }
 #endif
 
@@ -811,6 +908,10 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 		Owner->GetStats()->MarkCombatActivity();
 	}
 
+	// Accepted server cast, including full-health heals / empty self AoE. Effects may
+	// award XP, so capture this cast's level before executing them.
+	if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Owner->GetController()))
+		PC->RecordFirstSkillMetric(Def->SkillId);
 	ExecuteSkill(Owner, *Def);
 	CooldownEndTimes.Add(SkillId, Now + Def->Cooldown);
 

@@ -4086,3 +4086,31 @@ dolunca yeni anahtar icin oyuncu kotasinin uygulanmamasi duzeltildi.
   dosya kurtarmasi: yeni gunun sayaci iade nedeniyle dusmemeli, kalicilik
   kurallari korunmali. Oyuncu adini degistirme hesap kotasi degildir; coklu
   host ayni Saved dizinini paylasirsa merkezi toplam garanti edilmez.
+
+## 2026-10-07 — İlk kabul edilen sunucu becerisi (PIE açık)
+
+Otomatik `TestFirstSkill.ps1`: 17 izole UE kontrolü ve yedi ayrı controller'da
+0..6 türündeki yedi gerçek `UseSkill` çağrısı geçti. Sekiz ret kapısı sonrası
+ilk log sırası, metadata, ikinci kullanım, native server cooldown reddi ve
+controllerless şifa kontrol edildi. Oturum fixture'ının 6 kontrolü skill için
+pawn/aktarım/yeni controller tekilliğini de sınar. Bunlar gerçek ağ RPC testi
+değildir; sınıf/seviye/öğrenme fixture'da kurulur, gerçek öğrenme akışı sınanmaz.
+Üretilen yedi kullanım ve iki aktarım kaydı ortak parser ile who/saat/payload
+yönünden de doğrulandı; sentetik parser testleri 150/150 geçti.
+
+- [ ] Dört sınıfı host + uzak istemcide gerçek hotbar ile kullan: sunucu kabul
+  edince sid başına tek `first_skill`; skill/effect/mana DB ve etki öncesi lv ile
+  eşleşmeli. İstemcinin iyimser cooldown'u veya ClientSkillRejected olayı sayılmamalı.
+- [ ] Önce mana yetersizliği, cooldown, ölü karakter, yanlış/öğrenilmemiş beceri,
+  düşük seviye, hub güvenliği ve hedefsiz tek-hedef/alan-hedef reddini dene.
+  İlk başarılı kullanımın süresi erken reddedilen istekten başlamamalı.
+- [ ] Tam canla şifa ve boş alanda kendine AoE mevcut kabul kuralına göre ilk
+  beceri olabilir; HealTarget'ın kendine dönüşü de kabul olabilir. Hasar veya
+  şifa faydası şartı yok; bunu oyuncu faydası metriği olarak yorumlama.
+- [ ] Öldürücü beceriyle seviye atla: first_skill etki öncesi seviyeyi taşımalı;
+  kill/first_kill/levelup ayrı olaylar olmalı, parser toplamları iki katına çıkarmamalı.
+- [ ] Respawn/pawn değişimi, gerçek Summer→Winter seamless travel, controller
+  değişimi ve reconnect: mevcut sid korunurken tekrar yok; yeni sid için yeni
+  ilk beceri. Gerçek süreyi 20 dk koşuda ölç, fixture sürelerini kullanma.
+- [ ] Eski logda eksik first_skill `sure=?`; parser `--who` ve tüm ilk eylemler
+  gerçek logda eşleşmeli. Ayrı istemci loglarının yokluğu sunucu kanıtı değildir.

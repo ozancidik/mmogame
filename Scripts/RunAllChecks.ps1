@@ -156,6 +156,11 @@ Step "Ilk kusanma istegi ve otomatik kurulum ayrimi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Ilk kabul edilen sunucu becerisi ve ret kapilari" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstSkill.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ganimet toplamada oluluk ve tek sefer grant" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLootLifeState.ps1") | Out-Host
     $LASTEXITCODE -eq 0
