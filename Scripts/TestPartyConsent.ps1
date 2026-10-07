@@ -1,5 +1,5 @@
-# Gercek UE sunucu dunyasinda izole karakterlerle parti birlesme yetkisini denetler.
-# Controllersiz fixture'lar karakter kaydi yazmaz; owning-client RPC/replication PIE'de dogrulanmali.
+# Gercek UE dunyasinda parti lider rizasi, davet kimligi ve native chat baglamini denetler.
+# Component fixture'lari controllersiz, chat fixture'lari native PC'li; gercek RPC/Slate/replication PIE'de dogrulanmali.
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'MyProject.uproject'
 $exe = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
@@ -15,7 +15,7 @@ if (-not $process.WaitForExit(60000)) {
     exit 2
 }
 if (-not (Test-Path -LiteralPath $log)) { Write-Output 'Parti testi logu bulunamadi'; exit 1 }
-$pass = Select-String -LiteralPath $log -Pattern '\[MMO_PARTY_CONSENT_TEST\] PASS checks=10\b'
+$pass = Select-String -LiteralPath $log -Pattern '\[MMO_PARTY_CONSENT_TEST\] PASS checks=46\b'
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_PARTY_CONSENT_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 if ($pass -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $pass.Line

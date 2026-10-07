@@ -4316,3 +4316,28 @@ owner-only teslim, paket sırası veya kalıcı oyuncu kaydı doğrulanmadı.
   yaz: gönderim latest snapshot'ı kullanır. Görülen eski satıra bağlanmış davet
   kimliği bu düzeltmede yoktur; bu ayrı görünüm/UX riski açık kaydedilmeli.
   Genel/parti/klan/fısıltı metni, 200 karakter ve 0,7 sn sınırlaması ayrıca doğrulanmalı.
+
+## 2026-10-07 — Parti daveti ve chat kimliği (PIE açık)
+
+Native46 (eski10 lider rızası +28 component +8 native controller chat) ve normal
+Editor DLL geçti. Endpoint/OnChatCommitted/Say aynı frame çağrılır; Slate/Enter,
+Reliable taşıma/ownership/owner-only replikasyon veya gerçek kayıt kanıtı yoktur.
+
+- [ ] Üç oyuncu aynı yeni DLL: ilk parti davetini reddet, farklı oyuncudan yenisini
+  al; ilk kimlikle gecikmiş accept/decline gönder. Yeni pending, bütün üyelik/lider
+  ve envanter korunmalı. Güncel kabul yalnız doğru davetçiyle parti kurmalı;
+  duplicate kabul tekrar birleştirmemeli. MMOPartyAccept/Decline ve /parti kabul/ret
+  Say/Enter yollarını host ve uzak istemcide dene.
+- [ ] Chat gönderimi ile teslim arasına respawn/possession/bölge geçişi koy: eski
+  pawn bağlamı, yeni pawn aynı sayısal ID'ye sahip olsa da daveti değiştirmemeli.
+  Null/yanlış pawn veya eski/0/ileri ID güncel pending'e fallback yapmamalı;
+  istemcinin bağlantısı sürmeli. Native test possession değiştirip aynı nonce kurar; gerçek remote respawn/yükleme yapmaz.
+- [ ] Davet yazısı ID replikasyonundan önce gelsin: eski/0 ret sonrası güncel ID
+  gelince tekrar deneme çalışmalı. ID yalnız alıcıya replike olmalı; bütün chatteki
+  ek parti kimliği maliyeti profiler ile ölçülmeli. 200 karakter/0,7 sn kontrolü,
+  genel/party/clan/whisper ve önceki trade komutları ayrıca doğrulanmalı.
+- [ ] Eski görünür parti bildirimi dururken yeni latest ID replike olsun: kabul
+  güncel snapshot'ı kullanır, eski metnin kimliğine bağlanmaz. Bildirim/ID ortak
+  görünümü bu değişiklikte çözülmedi. Mevcut lider/rıza/sekiz kişi ve süre/mesafe
+  kapıları ile yeni ret/generation davranışını beraber dene; leave/kick eski
+  protokolü kullanır ve ayrı stale oturum incelemesi açık kalır.

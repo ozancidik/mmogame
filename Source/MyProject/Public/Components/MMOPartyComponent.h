@@ -51,21 +51,26 @@ public:
 	// --- Sahip istemciden cagrilir (sunucuya yonlenir) ---
 	void RequestInviteNearest();
 	void RequestAccept();
+	void RequestAcceptSeen(uint64 SeenInviteId);
 	void RequestLeave();
 	// Gelen parti davetini reddeder (davetciye bildirim gider).
 	void RequestDecline();
+	void RequestDeclineSeen(uint64 SeenInviteId);
 	// Bir uyeyi partiden cikarir (sunucu sadece lider cagirdiysa uygular).
 	void RequestKick(AMMOCharacter* Target);
 
 	// Bekleyen daveti (sadece sunucu) ve daveti gonderen.
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
+	// Recipient generation survives consumption. Only this pawn's owner receives it.
+	UPROPERTY(Replicated)
+	uint64 PendingInviteId = 0;
 
 	// Davetin gonderildigi zaman (sunucu World time) — kabul aninda susre/mesafe
 	// dogrulamasi icin (davet edenin cok uzaklasmis veya cok eski bir davet olmasi).
 	float PendingInviteTime = -1.f;
 
 #if !UE_BUILD_SHIPPING
-	// Izole, controllersiz karakterlerle sunucu tarafindaki birlesme yetkisini denetler.
+	// Controllersiz component + native controller chat fixtures; no transport/Slate/durable save proof.
 	static bool RunMergeConsentSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -81,6 +86,7 @@ protected:
 
 	AMMOCharacter* GetOwnerCharacter() const;
 	AMMOCharacter* FindNearestOtherPlayer(float MaxRange) const;
+	bool SetPendingInviteServer(AMMOCharacter* Inviter);
 
 	// Davet spam korumasi (sunucu-otoriter): art arda MMOInvite cagrisinin hedefin
 	// ekranini bildirimle doldurmasini engeller.
@@ -112,10 +118,10 @@ protected:
 	void ServerInviteNearest();
 
 	UFUNCTION(Server, Reliable)
-	void ServerAccept();
+	void ServerAccept(uint64 SeenInviteId);
 
 	UFUNCTION(Server, Reliable)
-	void ServerDecline();
+	void ServerDecline(uint64 SeenInviteId);
 
 	UFUNCTION(Server, Reliable)
 	void ServerLeave();

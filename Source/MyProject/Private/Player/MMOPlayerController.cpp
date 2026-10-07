@@ -406,7 +406,7 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 		auto Chat = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Invite, uint64 Session)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session);
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0);
 		};
 		Trades[0]->RequestInviteNearest();
 		const uint64 Old = Trades[1]->PendingInviteId;
@@ -439,6 +439,93 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 }
 #endif
 
+#if !UE_BUILD_SHIPPING
+bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	{ OutError = TEXT("party chat requires server game world"); return false; }
+	AMMOPlayerController* PCs[3] = {}; AMMOCharacter* Pawns[3] = {}; UMMOPartyComponent* Parties[3] = {};
+	const bool Passed = [&]()
+	{
+		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		FMMOCharacterSaveData Before[3];
+		for (int32 I = 0; I < 3; ++I)
+		{
+			PCs[I] = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Params);
+			Pawns[I] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1800000 + I * 100, 1800000, 5000), FRotator::ZeroRotator, Params);
+			if (!PCs[I] || !Pawns[I] || !Pawns[I]->GetInventory() || !Pawns[I]->GetPartyComponent())
+			{ OutError = TEXT("party chat fixture spawn"); return false; }
+			PCs[I]->Possess(Pawns[I]); PCs[I]->SetActorTickEnabled(false); Pawns[I]->SetActorTickEnabled(false);
+			Pawns[I]->SetActorEnableCollision(false);
+			Parties[I] = Pawns[I]->GetPartyComponent(); Pawns[I]->GetInventory()->FillSaveData(Before[I]);
+		}
+		auto InventoryUnchanged = [&]()
+		{
+			for (int32 I = 0; I < 3; ++I)
+			{
+				FMMOCharacterSaveData After; Pawns[I]->GetInventory()->FillSaveData(After);
+				TArray<FString> Differences; FMMOCharacterSaveJson::FindDifferences(Before[I], After, Differences);
+				if (!Differences.IsEmpty()) return false;
+			}
+			return true;
+		};
+		auto Check = [&](bool Value, const TCHAR* Label)
+		{
+			if (!Value) { OutError = FString::Printf(TEXT("%s (check=%d)"), Label, OutChecks + 1); return false; }
+			++OutChecks; return true;
+		};
+		auto RejectedUnchanged = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Id)
+		{
+			TArray<TObjectPtr<AMMOCharacter>> Members[3]; TObjectPtr<AMMOCharacter> Leaders[3];
+			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3];
+			for (int32 I = 0; I < 3; ++I)
+			{
+				Members[I] = Parties[I]->Members; Leaders[I] = Parties[I]->Leader;
+				Pending[I] = Parties[I]->PendingInviteFrom; Ids[I] = Parties[I]->PendingInviteId; Times[I] = Parties[I]->PendingInviteTime;
+			}
+			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id);
+			for (int32 I = 0; I < 3; ++I)
+			{
+				if (Parties[I]->Members != Members[I] || Parties[I]->Leader != Leaders[I]
+					|| Parties[I]->PendingInviteFrom != Pending[I] || Parties[I]->PendingInviteId != Ids[I]
+					|| Parties[I]->PendingInviteTime != Times[I]) return false;
+			}
+			return InventoryUnchanged();
+		};
+		Parties[0]->RequestInviteNearest(); const uint64 Old = Parties[1]->PendingInviteId;
+		if (!Check(Old != 0 && Parties[1]->PendingInviteFrom.Get() == Pawns[0] && InventoryUnchanged(), TEXT("party chat first nearest invite"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/parti ret")), ETextCommit::OnEnter);
+		Parties[2]->RequestInviteNearest(); const uint64 Fresh = Parties[1]->PendingInviteId;
+		if (!Check(Fresh > Old && Parties[1]->PendingInviteFrom.Get() == Pawns[2] && InventoryUnchanged(), TEXT("party committed decline then new sender"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti accept"), Pawns[1], Old), TEXT("party chat stale accept"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti decline"), Pawns[1], Old), TEXT("party chat stale decline"))) return false;
+		// Real native possession switch; matching numeric generation is deliberately seeded in the new pawn.
+		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[0]);
+		Parties[0]->PendingInviteId = Fresh; Parties[0]->PendingInviteFrom = Pawns[2];
+		Parties[0]->PendingInviteTime = World->GetTimeSeconds();
+		const bool ReplacementRejected = PCs[1]->GetPawn() == Pawns[0]
+			&& RejectedUnchanged(TEXT("/parti kabul"), Pawns[1], Fresh);
+		PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[1]); PCs[0]->Possess(Pawns[0]);
+		Parties[0]->PendingInviteFrom.Reset(); Parties[0]->PendingInviteTime = -1.f;
+		if (!Check(ReplacementRejected, TEXT("party chat replaced pawn matching generation"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti ret"), nullptr, Fresh), TEXT("party chat null context no fallback"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/parti kabul"));
+		if (!Check(Parties[1]->Members.Num() == 1 && Parties[1]->Members.Contains(Pawns[2]) && Parties[1]->Leader == Pawns[2]
+			&& Parties[2]->Members.Num() == 1 && Parties[2]->Members.Contains(Pawns[1]) && Parties[2]->Leader == Pawns[2]
+			&& !Parties[0]->IsInParty() && !Parties[1]->PendingInviteFrom.IsValid() && InventoryUnchanged(), TEXT("party fresh Say correct sender"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/parti leave")), ETextCommit::OnEnter);
+		return Check(!Parties[1]->IsInParty() && !Parties[2]->IsInParty() && Parties[1]->Leader == nullptr
+			&& Parties[2]->Leader == nullptr && InventoryUnchanged(), TEXT("party current leave unchanged"));
+	}();
+	for (int32 I = 0; I < 3; ++I) { if (Parties[I]) Parties[I]->RequestLeave(); }
+	for (int32 I = 0; I < 3; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
+	return Passed;
+}
+#endif
+
 void AMMOPlayerController::Say(const FString& Message)
 {
 	SendChatWithContext(Message);
@@ -448,12 +535,13 @@ void AMMOPlayerController::SendChatWithContext(const FString& Message)
 {
 	AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn());
 	const UMMOTradeComponent* Trade = Me ? Me->GetTradeComponent() : nullptr;
+	const UMMOPartyComponent* Party = Me ? Me->GetPartyComponent() : nullptr;
 	ServerSendChat(Message, Me, Trade ? Trade->PendingInviteId : 0,
-		Trade && Trade->bTradeActive ? Trade->TradeSessionId : 0);
+		Trade && Trade->bTradeActive ? Trade->TradeSessionId : 0, Party ? Party->PendingInviteId : 0);
 }
 
-void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message, AMMOCharacter* SeenTradePawn,
-	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId)
+void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message, AMMOCharacter* SeenCommandPawn,
+	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId)
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -532,11 +620,11 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
 		{
-			Party->RequestAccept();
+			if (SeenCommandPawn == GetPawn()) Party->RequestAcceptSeen(SeenPartyInviteId);
 		}
 		else if (Sub.Equals(TEXT("ret"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("decline"), ESearchCase::IgnoreCase))
 		{
-			Party->RequestDecline();
+			if (SeenCommandPawn == GetPawn()) Party->RequestDeclineSeen(SeenPartyInviteId);
 		}
 		else if (Sub.Equals(TEXT("ayril"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("leave"), ESearchCase::IgnoreCase))
 		{
@@ -567,11 +655,11 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
 		{
-			if (SeenTradePawn == GetPawn()) Trade->RequestAcceptSeen(SeenTradeInviteId);
+			if (SeenCommandPawn == GetPawn()) Trade->RequestAcceptSeen(SeenTradeInviteId);
 		}
 		else if (Sub.Equals(TEXT("iptal"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("cancel"), ESearchCase::IgnoreCase))
 		{
-			if (SeenTradePawn == GetPawn())
+			if (SeenCommandPawn == GetPawn())
 			{
 				if (SeenActiveTradeSessionId != 0) Trade->RequestCancelSeen(SeenActiveTradeSessionId);
 				else Trade->RequestDeclineInviteSeen(SeenTradeInviteId);

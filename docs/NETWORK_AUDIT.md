@@ -44,6 +44,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O20 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski teklif aksiyonunun altını yeni takasa yazılıyordu; add/remove/gold RPC'leri de görülen session/revision ile doğrulanır | `UMMOTradeComponent::IsSeenOfferCurrent/ServerSetGold/ServerAddItem/ServerRemoveItem`, `AMMOHUD::HandleTradeClick` |
 | O21 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski aktif takas iptali yeni takası sonlandırıyordu; cancel/X görülen session ile doğrulanır, inaktif davet reddi ayrı RPC'dir | `UMMOTradeComponent::ServerCancel/ServerDeclineInvite`, `AMMOHUD::HandleTradeClick/HandleWindowClick` |
 | O22 | ORTA | **Native UE'de yeniden üretildi ve sınırlı olarak düzeltildi, gerçek ağ/bildirim görünümü bekliyor (2026-10-07):** eski inaktif ret yeni daveti siliyordu; accept/decline davet generation'ı, sohbet ise gönderim pawn/kimlik/iptal niyetini taşır | `UMMOTradeComponent::ServerAccept/ServerDeclineInvite/SetPendingInviteServer`, `AMMOPlayerController::SendChatWithContext/ServerSendChat` |
+| O23 | ORTA | **Native UE'de yeniden üretildi ve sınırlı düzeltildi, gerçek ağ/bildirim görünümü bekliyor (2026-10-07):** parametresiz eski parti reddi yeni daveti siliyordu; accept/decline recipient generation, chat gönderim pawn/ID bağlamı kullanır | `UMMOPartyComponent::ServerAccept/ServerDecline/SetPendingInviteServer`, `AMMOPlayerController::SendChatWithContext/ServerSendChat` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -660,3 +661,30 @@ ID'si değildir. Davet metni ile kimlik farklı teslimlerde gelebilir; ID gelmed
 0/eski ID reddi sonrası yeniden denemek gerekir. Eski satırı okuyup yeni ID
 replike olduktan sonra kabul yazma, bildirim ile kimliğin ortak görünümü, gerçek
 pawn replacement/ağ, reentrant rollback/ortak kalıcılık/Server/Shipping açıktır.
+
+### O23 · ORTA · Eski parti kabul/reddinin yeni davete taşınması — sınırlı düzeltildi
+
+O13 lider rızası güncel lideri denetler; davetin hangi generation olduğu ayrı bir
+sınırdır. Önceki parametresiz ServerDecline, replacement pending alanını temizledi:
+UE FAIL10 (19:27:17 UTC), script1/UE0. Yeni owner-only uint64 PendingInviteId alıcı
+pawn ömründe artar, tüketim/leave sonrası kalır, MAX'ta wrap reddedilir. Kabul/ret
+nonzero Seen eşleşmesini pending temizliğinden önce denetler. Gerçek nearest yolu
+mevcut cooldown/duplicate/takeover/lider kapıları sonrası generation helper kullanır.
+Süre/mesafe/lider rızası/sekiz kişi kontrolü korunur; mevcut leave/kick değiştirilmedi.
+
+Chat /parti kabul ve ret, Say/OnChatCommitted gönderim anında alınan pawn/ID'yi
+kullanır; eski controller mesajı yeni pawn'a sayısal ID çakışmasıyla yönlenmez.
+Trade aynı dispatch'i kullanır; ek parti metadata'sı bütün chat trafiğinde taşınır,
+bant ölçülmedi. ClientNotifyInvited metniyle ID replikasyonu atomik değildir;
+latest ID'ye dayanır. Eski görünen bildirimden yeni daveti kabul etme UX riski,
+kimlik gelmeden eski/0 ret ve gerçek bağlantının sürmesi PIE'de açık.
+
+46 native kontrol: eski10 birleşme,28 component ID/ret snapshot/MAX,8 controller
+chat. Component retlerinde dokuz tarafın tam Members/Leader/pending/ID/saatler ve
+envanter korunur. Controller testlerinde üç native PC+Pawn gerçek nearest daveti,
+Say/OnChatCommitted ve ham endpoint'i çalıştırır; gerçek klavye/Slate/ağ/remote
+ownership/owner-only teslim kanıtı değildir. Native PC possession değişimi/matching nonce fixture'ı da ret snapshot'ına dahildir;
+gerçek remote respawn/yükleme değildir. Normal DLL/doğrudan46 geçti; son
+negatif ve tam paket kanıtı CHECKLIST_FIXES §59'dadır. Party RPC ve chat sözleşmeleri
+iki uçta aynı yeni DLL ister. Kayıt/hesap/dedicated/kick/leave oturum kimliği bu
+sınırlı değişiklikle tamamlanmış sayılmaz.

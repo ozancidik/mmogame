@@ -1766,3 +1766,85 @@ Belge güncellemeleri ayrıdır. Editör/UE süreçleri kapalı. Gerçek remote 
 RPC/owner-only teslim, bağlantının sürmesi, Slate input/pawn replacement ve
 bildirim ile kimliğin ortak görünümü PLAYTEST_CHECKLIST'te açık. Ortak kalıcı
 işlem/reentrant rollback/Server/Shipping/Lv1–30 oynanış ölçümü tamamlanmadı.
+
+## 59. Parti daveti kimliği ve sohbet gönderim bağlamı (2026-10-07)
+
+Başlangıç HEAD `c4effd1`; tracked temiz, .agents/.codex/AGENTS.md korundu;
+aktif UE süreci yoktu. QA ajanı yalnız okudu, dosya yazmadı. Önce eski üretim
+koduyla replacement pending fixture eklendi: normal DLL Succeeded, UE testinde
+**FAIL checks=10 reason=old decline cleared replacement party invite**
+(19:27:17 UTC), UE exit0 / script exit1. Parametresiz ret yeni daveti siliyordu;
+gerçek gecikmeli Reliable paket veya uzak istemci exploit'i çalıştırılmadı.
+
+Recipient pawn ömründe artan uint64 PendingInviteId owner-only replike olur.
+Gerçek nearest davet yolu mevcut cooldown/aynı daveti yenilememe/davet kapma/
+lider rızası kontrollerinden sonra SetPendingInviteServer ile kimlik atar.
+Helper authority, aynı dünya, farklı geçerli inviter ve MAX taşmasını denetler.
+Tüketim ve parti ayrılmasında kimlik korunur; MAX'ta wrap/yeni kimlik verilmez.
+Accept/decline nonzero SeenInviteId eşleşmesini pending alanlarını silmeden önce
+sunucuda denetler. Geçerli kabulün süre/mesafe/lider rızası/kapasite kapıları sürer.
+Character Exec/current wrapper yerel güncel kimliği taşır; eski uçlar aynı yeni
+DLL'e yükseltilmelidir. Kayıt şeması ve parti leave/kick protokolü değiştirilmedi.
+
+Say ve OnChatCommitted'dan ortak SendChatWithContext artık parti davet kimliğini
+de yakalar. ServerSendChat'te /parti kabul/ret gönderim anındaki pawn ve kimliği
+kullanır; sunucunun güncel davetine fallback yoktur. Önceki trade dispatch aynı
+kalır; pawn parametresi SeenCommandPawn olarak adlandırıldı. Tüm sohbetlerde ek
+uint64 metadata taşınır; gerçek bant maliyeti ölçülmedi. 200 karakter/0,7 sn sohbet
+kontrolü değişmedi. Bir davetin metni ile replike ID atomik görünüm sağlamaz;
+eski görünür bildirim/yeni latest ID sınırı açık, kimlik önce gelmezse yeniden
+denemek gerekir. Bu değişiklik yalnız yoldaki eski accept/decline niyetini ayırır.
+
+Native46 = önceki10 lider/birleşme +28 component davet +8 native controller chat.
+Önceki10 fixture daveti gerçek generation helper ile kurar; tüm issuance dönüşleri
+kontrol edilir. İki recipient yönde (birinde aynı inviter reissue, diğerinde farklı sender):
+fresh generation/decline/retention/replacement; eski/0/ileri ID için accept ve
+ret (6), fresh Seen/current accept doğru inviter, duplicate accept, leave sonrası
+ID retention, current decline (2*13). Son2 MAX-1->MAX/overflow fail-closed; pending pointer/ID/zaman korunur.
+Ret snapshot'ı dokuz karakterin sıralı Members/Leader, pending pointer/zaman/ID,
+LastInviteTime ve tüm inventory save payload'ını karşılaştırır. Duplicate accept
+boş pending ile idempotence kanıtıdır; ID guard'ın tek başına varlığını kanıtlamaz.
+
+Chat8: üç native PC+Pawn, gerçek nearest ilk davet; OnChatCommitted ret sonrası
+farklı inviter; eski accept/decline tam party/pending/envanter korunması; geçerli
+ID ile native possession değiştirilmiş/null pawn ret; Say güncel kabul doğru iki üyeyi birleştirir;
+OnChatCommitted mevcut leave yolu iki kişiyi solo temizler. Snapshot chat throttle
+ve component LastInviteTime alanını kapsamaz; component ret fixture'ı LastInviteTime
+kapsar. Aynı frame; saat/timer/Slate input/ownership/gerçek RPC taşıması çalışmaz.
+Pawn replacement testinde PC0/PC1 unpossess edilir; PC1 Pawn0'ı possess eder,
+aynı sayısal nonce ve geçerli pending fixture'da kurulur. Eski Pawn1 bağlamının
+reddi tam snapshot ile ölçülür; possession geri alınır. Bu native possession
+testidir, gerçek remote respawn/yeniden bağlantı değildir. Controller'lar pawn'dan
+ayrılarak yok edilir; fixture karakter kaydı yüklemez.
+
+İlk yeni normal DLL Succeeded; doğrudan TestPartyConsent **PASS checks=46 / exit0**
+(19:30:26 UTC). Kimlik kapısını kasıtlı bozma ve son restore/paket kanıtı aşağıda.
+
+Negatif kanıt: accept'in yalnız SeenInviteId nonzero/eşleşme kapısı geçici
+kaldırıldı (authority kaldı), normal DLL Succeeded; test **FAIL checks=13
+reason=stale/zero/future party accept mutated state** (19:31:02 UTC), UE0/PS1.
+Eski kimlik aksi halde geçerli replacement daveti birleştiriyordu; yeni snapshot
+bunu yakaladı. Kapı restore edildi; negatif DLL/kod commit edilmez. QA'nın dört
+fixture boşluğu (issuance dönüşü, aynı inviter, native possession, MAX zaman)
+count46 korunarak giderildi. Restore/son güçlendirmeyle normal DLL Succeeded.
+
+Son doğrudan TestPartyConsent **PASS46 / exit0 (19:33:39 UTC)**. Arendt salt
+okunur son incelemede guard restore/caller/46 count ve dört güçlendirmeyi doğruladı;
+yeni engel bulmadı, native testleri çalıştırmadı. Yerel Unreal Multiplayer Architect
+TOML ve repo QA rehberi kullanıldı; Agency kökeni doğrulanmadı. Ajan kapatıldı.
+Parent son kaynak/runner ile RunAllChecks -SkipBuild -FullCompile'ı başlattı.
+
+Son aynı kaynak/runner ile `RunAllChecks.ps1 -SkipBuild -FullCompile`: **36/36
+GECTI, exit0**. 18 PCH'siz /W4 dosya, compiler warning C0. Native Party46 ve
+Trade218 geçti. ValidateData/StaticLint temiz; bilinen Lv33+ beceri boşluğu ve
+InitGameState override whitelist uyarıları sürer. Negatif lint15/veri14,
+parser312/312, JSON schema2/negative111 ve eski regresyonlar geçti.
+Store382 loaded382 invalid0/loadFailed0/existsMismatch0/jsonMismatch0, maxLevel6,
+writeorder1, roundtrip equal1. Summer49/Winter31 mob doğumu, smoke exit0/hata0.
+NetSmoke1join/1welcome, server/client hata0 (`mmo_net_server_224246.log`,
+`mmo_net_client_224246.log`, TEMP). Paket logu `mmo_all_party_invite_final_20261007.log`
+(TEMP). Source/Scripts SHA256 listesi paket öncesi ve tüm testler sonrası aynı;
+kod/runner paket boyunca değişmedi. Sonraki belge güncellemeleri ayrıdır.
+Editör/UE süreçleri kapalı. Gerçek owner-only teslim/RPC gecikmesi/expiry/
+respawn/Slate, bildirimin görülen kimliği, kalıcı kayıt/hesap/dedicated ve eski
+leave/kick intent sınırları PLAYTEST_CHECKLIST'te açık; oynanmış sayılmadı.

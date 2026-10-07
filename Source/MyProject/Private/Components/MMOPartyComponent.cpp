@@ -9,6 +9,9 @@
 #include "Core/MMONotify.h"
 #include "GameFramework/PlayerState.h"
 #if !UE_BUILD_SHIPPING
+#include "Components/MMOInventoryComponent.h"
+#include "Player/MMOPlayerController.h"
+#include "Save/MMOCharacterSaveJson.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
@@ -40,6 +43,7 @@ void UMMOPartyComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UMMOPartyComponent, Members);
 	DOREPLIFETIME(UMMOPartyComponent, Leader);
+	DOREPLIFETIME_CONDITION(UMMOPartyComponent, PendingInviteId, COND_OwnerOnly);
 }
 
 bool UMMOPartyComponent::HasAuthorityInternal() const
@@ -141,25 +145,35 @@ void UMMOPartyComponent::RequestInviteNearest()
 
 void UMMOPartyComponent::RequestAccept()
 {
+	RequestAcceptSeen(PendingInviteId);
+}
+
+void UMMOPartyComponent::RequestAcceptSeen(uint64 SeenInviteId)
+{
 	if (HasAuthorityInternal())
 	{
-		ServerAccept_Implementation();
+		ServerAccept_Implementation(SeenInviteId);
 	}
 	else
 	{
-		ServerAccept();
+		ServerAccept(SeenInviteId);
 	}
 }
 
 void UMMOPartyComponent::RequestDecline()
 {
+	RequestDeclineSeen(PendingInviteId);
+}
+
+void UMMOPartyComponent::RequestDeclineSeen(uint64 SeenInviteId)
+{
 	if (HasAuthorityInternal())
 	{
-		ServerDecline_Implementation();
+		ServerDecline_Implementation(SeenInviteId);
 	}
 	else
 	{
-		ServerDecline();
+		ServerDecline(SeenInviteId);
 	}
 }
 
@@ -245,15 +259,27 @@ void UMMOPartyComponent::ServerInviteNearest_Implementation()
 		return;
 	}
 
-	TP->PendingInviteFrom = Inviter;
-	TP->PendingInviteTime = Now;
+	if (!TP->SetPendingInviteServer(Inviter)) return;
 	TP->ClientNotifyInvited(Inviter);
 
 	MMONotify::ToOwner(Inviter, TEXT("Parti daveti gonderildi"), FColor(120, 220, 120), 2.f, MMONotify::EMMONotifyKind::Hint);
 }
 
-void UMMOPartyComponent::ServerDecline_Implementation()
+bool UMMOPartyComponent::SetPendingInviteServer(AMMOCharacter* Inviter)
 {
+	const AMMOCharacter* Self = GetOwnerCharacter();
+	const UWorld* World = GetWorld();
+	if (!HasAuthorityInternal() || !Self || !World || !Inviter || Inviter == Self
+		|| !Inviter->HasAuthority() || Inviter->GetWorld() != World || PendingInviteId == MAX_uint64) return false;
+	++PendingInviteId; // Do not reuse a consumed invitation during this pawn's lifetime.
+	PendingInviteFrom = Inviter;
+	PendingInviteTime = World->GetTimeSeconds();
+	return true;
+}
+
+void UMMOPartyComponent::ServerDecline_Implementation(uint64 SeenInviteId)
+{
+	if (!HasAuthorityInternal() || SeenInviteId == 0 || SeenInviteId != PendingInviteId) return;
 	AMMOCharacter* Self = GetOwnerCharacter();
 	AMMOCharacter* Inviter = PendingInviteFrom.Get();
 	const float InviteTime = PendingInviteTime;
@@ -276,8 +302,9 @@ void UMMOPartyComponent::ServerDecline_Implementation()
 	MMONotify::ToOwner(Inviter, FString::Printf(TEXT("%s parti davetini reddetti."), *PartyNameOf(Self)), FColor(255, 170, 120), 3.f);
 }
 
-void UMMOPartyComponent::ServerAccept_Implementation()
+void UMMOPartyComponent::ServerAccept_Implementation(uint64 SeenInviteId)
 {
+	if (!HasAuthorityInternal() || SeenInviteId == 0 || SeenInviteId != PendingInviteId) return;
 	AMMOCharacter* Invitee = GetOwnerCharacter();
 	AMMOCharacter* Inviter = PendingInviteFrom.Get();
 	const float InviteTime = PendingInviteTime;
@@ -555,9 +582,9 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		auto Accept = [&](int32 From, int32 To)
 		{
 			UMMOPartyComponent* Target = Actors[To]->GetPartyComponent();
-			Target->PendingInviteFrom = Actors[From];
-			Target->PendingInviteTime = World->GetTimeSeconds();
+			if (!Target->SetPendingInviteServer(Actors[From])) { OutError = TEXT("consent fixture invite issuance"); return false; }
 			Target->RequestAccept();
+			return true;
 		};
 		auto Matches = [&](const TArray<AMMOCharacter*>& Set, AMMOCharacter* ExpectedLeader)
 		{
@@ -583,40 +610,103 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		};
 		const TArray<AMMOCharacter*> A { Actors[0], Actors[1] };
 		const TArray<AMMOCharacter*> B { Actors[2], Actors[3] };
-		Accept(0, 1);
-		Accept(2, 3);
+		if (!Accept(0, 1) || !Accept(2, 3)) return false;
 		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[2]), TEXT("solo formation"))) { return false; }
-		Accept(0, 3);
+		if (!Accept(0, 3)) return false;
 		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[2]), TEXT("invitee member moved group"))) { return false; }
-		Accept(1, 2);
+		if (!Accept(1, 2)) return false;
 		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[2]), TEXT("inviter member merged group"))) { return false; }
 		// Davet yetkiliyken gonderilir; lider kabul gelmeden ayrilir/liderlik degisir.
 		UMMOPartyComponent* Target = Actors[2]->GetPartyComponent();
-		Target->PendingInviteFrom = Actors[0];
-		Target->PendingInviteTime = World->GetTimeSeconds();
+		if (!Target->SetPendingInviteServer(Actors[0])) { OutError = TEXT("inviter leadership invite issuance"); return false; }
 		ApplyPartySet(A, Actors[1]);
 		Target->RequestAccept();
 		if (!Check(Matches(A, Actors[1]) && Matches(B, Actors[2]) && !Target->PendingInviteFrom.IsValid(), TEXT("stale inviter leadership"))) { return false; }
 		ApplyPartySet(A, Actors[0]);
-		Target->PendingInviteFrom = Actors[0];
-		Target->PendingInviteTime = World->GetTimeSeconds();
+		if (!Target->SetPendingInviteServer(Actors[0])) { OutError = TEXT("invitee leadership invite issuance"); return false; }
 		ApplyPartySet(B, Actors[3]);
 		Target->RequestAccept();
 		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[3]), TEXT("stale invitee leadership"))) { return false; }
 		ApplyPartySet(B, Actors[2]);
-		Accept(1, 0);
+		if (!Accept(1, 0)) return false;
 		if (!Check(Matches(A, Actors[0]), TEXT("same group changed leader"))) { return false; }
-		Accept(0, 2);
+		if (!Accept(0, 2)) return false;
 		TArray<AMMOCharacter*> Merged { Actors[0], Actors[1], Actors[2], Actors[3] };
 		if (!Check(Matches(Merged, Actors[0]), TEXT("leader consent merge"))) { return false; }
-		Accept(1, 4); // Siradan uyenin partisiz oyuncu davet etmesi halen desteklenir.
+		if (!Accept(1, 4)) return false; // Siradan uyenin partisiz oyuncu davet etmesi halen desteklenir.
 		Merged.Add(Actors[4]);
 		if (!Check(Matches(Merged, Actors[0]), TEXT("member solo invitation"))) { return false; }
-		for (int32 I = 5; I < 8; ++I) { Accept(0, I); Merged.Add(Actors[I]); }
+		for (int32 I = 5; I < 8; ++I) { if (!Accept(0, I)) return false; Merged.Add(Actors[I]); }
 		if (!Check(Matches(Merged, Actors[0]), TEXT("eight members"))) { return false; }
-		Accept(0, 8);
+		if (!Accept(0, 8)) return false;
 		if (!Check(Matches(Merged, Actors[0]) && !Actors[8]->GetPartyComponent()->IsInParty() && Actors[8]->GetPartyComponent()->Leader == nullptr, TEXT("capacity overflow mutated groups"))) { return false; }
-		return true;
+		struct FPartySnapshot
+		{
+			TArray<TObjectPtr<AMMOCharacter>> Members;
+			TObjectPtr<AMMOCharacter> Leader;
+			TWeakObjectPtr<AMMOCharacter> Pending;
+			uint64 Id;
+			float Time, LastInvite;
+			FMMOCharacterSaveData Inventory;
+		};
+		auto RejectedUnchanged = [&](uint64 Seen, bool Decline)
+		{
+			TArray<FPartySnapshot> Before;
+			for (AMMOCharacter* Character : Actors)
+			{
+				const UMMOPartyComponent* P = Character->GetPartyComponent();
+				FPartySnapshot& S = Before.AddDefaulted_GetRef();
+				S.Members = P->Members; S.Leader = P->Leader; S.Pending = P->PendingInviteFrom;
+				S.Id = P->PendingInviteId; S.Time = P->PendingInviteTime; S.LastInvite = P->LastInviteTime;
+				Character->GetInventory()->FillSaveData(S.Inventory);
+			}
+			if (Decline) Target->RequestDeclineSeen(Seen); else Target->RequestAcceptSeen(Seen);
+			for (int32 I = 0; I < Actors.Num(); ++I)
+			{
+				const UMMOPartyComponent* P = Actors[I]->GetPartyComponent(); const FPartySnapshot& S = Before[I];
+				FMMOCharacterSaveData After; Actors[I]->GetInventory()->FillSaveData(After);
+				TArray<FString> Differences; FMMOCharacterSaveJson::FindDifferences(S.Inventory, After, Differences);
+				if (P->Members != S.Members || P->Leader != S.Leader || P->PendingInviteFrom != S.Pending
+					|| P->PendingInviteId != S.Id || P->PendingInviteTime != S.Time || P->LastInviteTime != S.LastInvite
+					|| !Differences.IsEmpty()) return false;
+			}
+			return true;
+		};
+		for (int32 Side = 0; Side < 2; ++Side)
+		{
+			for (AMMOCharacter* Character : Actors) Character->GetPartyComponent()->RequestLeave();
+			AMMOCharacter* Recipient = Actors[Side == 0 ? 0 : 8]; Target = Recipient->GetPartyComponent();
+			const uint64 BeforeId = Target->PendingInviteId;
+			if (!Check(Target->SetPendingInviteServer(Actors[1]) && Target->PendingInviteId > BeforeId, TEXT("party invite generation"))) return false;
+			const uint64 Old = Target->PendingInviteId;
+			Target->RequestDeclineSeen(Old);
+			if (!Check(!Target->PendingInviteFrom.IsValid() && Target->PendingInviteTime == -1.f
+				&& Target->PendingInviteId == Old && !Target->IsInParty(), TEXT("fresh party decline retains generation"))) return false;
+			AMMOCharacter* FreshInviter = Actors[Side == 0 ? 1 : 2]; // Same sender reissue and different sender replacement.
+			if (!Check(Target->SetPendingInviteServer(FreshInviter) && Target->PendingInviteId > Old, TEXT("replacement party invite"))) return false;
+			const uint64 Fresh = Target->PendingInviteId;
+			for (uint64 Seen : { Old, uint64(0), Fresh + 1 })
+			{
+				if (!Check(RejectedUnchanged(Seen, false), TEXT("stale/zero/future party accept mutated state"))) return false;
+				if (!Check(RejectedUnchanged(Seen, true), TEXT("old decline cleared replacement party invite"))) return false;
+			}
+			if (Side == 0) Target->RequestAcceptSeen(Fresh); else Target->RequestAccept();
+			const TArray<AMMOCharacter*> Pair { FreshInviter, Recipient };
+			if (!Check(Matches(Pair, FreshInviter) && !Actors[Side == 0 ? 2 : 1]->GetPartyComponent()->IsInParty()
+				&& !Target->PendingInviteFrom.IsValid() && Target->PendingInviteId == Fresh, TEXT("fresh party accept correct sender"))) return false;
+			if (!Check(RejectedUnchanged(Fresh, false), TEXT("duplicate party accept mutated state"))) return false;
+			Target->RequestLeave();
+			if (!Check(!Target->IsInParty() && Target->Leader == nullptr && Target->PendingInviteId == Fresh, TEXT("party leave retains invite generation"))) return false;
+			if (!Target->SetPendingInviteServer(Actors[1])) return false;
+			const uint64 Declined = Target->PendingInviteId; Target->RequestDecline();
+			if (!Check(!Target->PendingInviteFrom.IsValid() && Target->PendingInviteId == Declined, TEXT("current party decline wrapper"))) return false;
+		}
+		Target->PendingInviteId = MAX_uint64 - 1;
+		if (!Check(Target->SetPendingInviteServer(Actors[1]) && Target->PendingInviteId == MAX_uint64, TEXT("party invite max generation"))) return false;
+		const float MaxInviteTime = Target->PendingInviteTime;
+		if (!Check(!Target->SetPendingInviteServer(Actors[2]) && Target->PendingInviteFrom.Get() == Actors[1]
+			&& Target->PendingInviteId == MAX_uint64 && Target->PendingInviteTime == MaxInviteTime, TEXT("party invite overflow fail closed"))) return false;
+		return AMMOPlayerController::RunPartyChatContextSelfTest(World, OutError, OutChecks);
 	}();
 	// Controllersiz fixture'lar EndPlay'de oyuncu kaydi yazmaz; grup referanslarini da temizle.
 	for (AMMOCharacter* Character : Actors) { Character->GetPartyComponent()->RequestLeave(); }
