@@ -3,6 +3,8 @@
 #include "Components/MMOClanComponent.h"
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOStatsComponent.h"
+#include "Components/MMOInventoryComponent.h"
+#include "Save/MMOCharacterSaveJson.h"
 #include "Player/MMOPlayerController.h"
 #include "Save/MMOSaveGame.h"
 #include "Save/MMOCharacterStoreSubsystem.h"
@@ -51,9 +53,7 @@ bool UMMOClanComponent::RunInviteAuthoritySelfTest(UWorld* World, FString& OutEr
 		Inviter->bIsLeader = true;
 		auto SetInvite = [&]()
 		{
-			Target->PendingInviteFrom = Actors[0];
-			Target->PendingInviteClan = FixtureClan;
-			Target->PendingInviteTime = World->GetTimeSeconds();
+			return Target->SetPendingInviteServer(Actors[0]);
 		};
 		auto Consumed = [&]()
 		{
@@ -65,48 +65,136 @@ bool UMMOClanComponent::RunInviteAuthoritySelfTest(UWorld* World, FString& OutEr
 			++OutChecks;
 			return true;
 		};
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Inviter->bIsLeader = false; // Liderligi kaybetti ama ayni klanda uye olarak kaldi.
 		Target->CmdAccept();
 		if (!Check(!Target->IsInClan() && Consumed(), TEXT("demoted inviter accepted"))) { return false; }
 		Inviter->bIsLeader = true;
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Target->CmdAccept();
 		if (!Check(Target->ClanName == FixtureClan && !Target->bIsLeader && Consumed(), TEXT("valid leader rejected"))) { return false; }
 		Target->ClanName.Reset();
 		Inviter->bActingLeader = true;
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Target->CmdAccept();
 		if (!Check(Target->ClanName == FixtureClan && !Target->bIsLeader && Consumed(), TEXT("valid acting leader rejected"))) { return false; }
 		Inviter->bActingLeader = false;
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Target->CmdAccept();
 		if (!Check(Target->ClanName == FixtureClan && Consumed(), TEXT("existing membership changed"))) { return false; }
 		Target->ClanName.Reset();
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Inviter->ClanName.Reset();
 		Target->CmdAccept();
 		if (!Check(!Target->IsInClan() && Consumed(), TEXT("departed inviter accepted"))) { return false; }
 		Inviter->ClanName = FixtureClan;
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Target->PendingInviteTime -= InviteExpirySeconds + 1.f;
 		Target->CmdAccept();
 		if (!Check(!Target->IsInClan() && Consumed(), TEXT("invalid invite timestamp accepted"))) { return false; }
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Target->PendingInviteFrom = Actors[1];
 		Target->CmdAccept();
 		if (!Check(!Target->IsInClan() && Consumed(), TEXT("self invitation accepted"))) { return false; }
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Target->PendingInviteFrom.Reset();
 		Target->CmdAccept();
 		if (!Check(!Target->IsInClan() && Consumed(), TEXT("missing inviter accepted"))) { return false; }
-		SetInvite();
+		if (!SetInvite()) { OutError = TEXT("authority fixture invite issuance"); return false; }
 		Inviter->bIsLeader = false; // Fixture'in EndPlay'i gercek oyuncular icin lider secmemeli.
 		Inviter->ClanName.Reset();
 		Actors[0]->Destroy();
 		Target->CmdAccept();
 		if (!Check(!Target->IsInClan() && Consumed(), TEXT("destroyed inviter accepted"))) { return false; }
-		return true;
+		AMMOCharacter* GenerationActors[3] = {};
+		for (int32 I = 0; I < 3; ++I)
+		{
+			GenerationActors[I] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1700000 + I * 100, 1700000, 5000), FRotator::ZeroRotator, Params);
+			if (!GenerationActors[I]) { OutError = TEXT("generation fixture spawn"); return false; }
+			Actors.Add(GenerationActors[I]);
+			GenerationActors[I]->SetActorTickEnabled(false); GenerationActors[I]->SetActorEnableCollision(false);
+		}
+		UMMOClanComponent* Leaders[2] = {GenerationActors[0]->GetClanComponent(), GenerationActors[1]->GetClanComponent()};
+		UMMOClanComponent* Recipient = GenerationActors[2]->GetClanComponent();
+		const FString ClanA = TEXT("A") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(11);
+		const FString ClanB = TEXT("B") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(11);
+		Leaders[0]->ClanName = ClanA; Leaders[1]->ClanName = ClanB;
+		Leaders[0]->bIsLeader = true; Leaders[1]->bIsLeader = true;
+		struct FClanSnapshot
+		{
+			FString Name, PendingClan; bool Leader, Acting; int64 Seq; uint64 Id;
+			TWeakObjectPtr<AMMOCharacter> Pending; float Time, Last;
+			FMMOCharacterSaveData Inventory;
+		};
+		auto Capture = [&]()
+		{
+			TArray<FClanSnapshot> Result;
+			for (AMMOCharacter* C : GenerationActors)
+			{
+				UMMOClanComponent* CC = C->GetClanComponent(); FClanSnapshot Snap;
+				Snap.Name = CC->ClanName; Snap.Leader = CC->bIsLeader; Snap.Acting = CC->bActingLeader; Snap.Seq = CC->JoinSeq;
+				Snap.Id = CC->PendingInviteId; Snap.Pending = CC->PendingInviteFrom; Snap.PendingClan = CC->PendingInviteClan;
+				Snap.Time = CC->PendingInviteTime; Snap.Last = CC->LastInviteTime; C->GetInventory()->FillSaveData(Snap.Inventory);
+				Result.Add(Snap);
+			}
+			return Result;
+		};
+		auto Equal = [&](const TArray<FClanSnapshot>& Before)
+		{
+			const TArray<FClanSnapshot> After = Capture();
+			for (int32 I = 0; I < 3; ++I)
+			{
+				const FClanSnapshot& A = Before[I]; const FClanSnapshot& B = After[I]; TArray<FString> Differences;
+				FMMOCharacterSaveJson::FindDifferences(A.Inventory, B.Inventory, Differences);
+				if (A.Name != B.Name || A.Leader != B.Leader || A.Acting != B.Acting || A.Seq != B.Seq || A.Id != B.Id
+					|| A.Pending != B.Pending || A.PendingClan != B.PendingClan || A.Time != B.Time || A.Last != B.Last || !Differences.IsEmpty()) return false;
+			}
+			return true;
+		};
+		auto Rejected = [&](uint64 Id)
+		{
+			const auto Before = Capture(); Recipient->CmdAcceptSeen(Id); return Equal(Before);
+		};
+		for (int32 Round = 0; Round < 2; ++Round)
+		{
+			Leaders[0]->ClanName = ClanA;
+			if (!Check(Recipient->SetPendingInviteServer(GenerationActors[0]) && Recipient->PendingInviteId != 0
+				&& Recipient->PendingInviteFrom.Get() == GenerationActors[0] && Recipient->PendingInviteClan == ClanA, TEXT("old generation issuance"))) return false;
+			const uint64 Old = Recipient->PendingInviteId;
+			Recipient->CmdAccept();
+			if (!Check(Recipient->ClanName == ClanA && !Recipient->bIsLeader && Recipient->PendingInviteId == Old
+				&& !Recipient->PendingInviteFrom.IsValid() && Recipient->PendingInviteClan.IsEmpty(), TEXT("current accept and generation retention"))) return false;
+			Recipient->CmdLeave();
+			AMMOCharacter* Sender = GenerationActors[Round];
+			if (Round == 0) Leaders[0]->ClanName = ClanB; // Same inviter, different clan after a consumed invite.
+			if (!Check(!Recipient->IsInClan() && Recipient->PendingInviteId == Old && Recipient->SetPendingInviteServer(Sender)
+				&& Recipient->PendingInviteId > Old && Recipient->PendingInviteFrom.Get() == Sender
+				&& Recipient->PendingInviteClan == ClanB, TEXT("replacement clan invitation"))) return false;
+			const uint64 Fresh = Recipient->PendingInviteId;
+			if (!Check(Rejected(Old), TEXT("stale clan acceptance mutated replacement"))) return false;
+			if (!Check(Rejected(0), TEXT("zero clan acceptance mutated replacement"))) return false;
+			if (!Check(Rejected(Fresh + 1), TEXT("future clan acceptance mutated replacement"))) return false;
+			Recipient->CmdAcceptSeen(Fresh);
+			if (!Check(Recipient->ClanName == ClanB && !Recipient->bIsLeader && !Recipient->bActingLeader
+				&& Recipient->JoinSeq > 0 && !Recipient->PendingInviteFrom.IsValid() && Recipient->PendingInviteClan.IsEmpty()
+				&& Recipient->PendingInviteTime < 0.f && Recipient->PendingInviteId == Fresh, TEXT("fresh clan acceptance rejected"))) return false;
+			if (!Check(Rejected(Fresh), TEXT("duplicate clan acceptance changed membership"))) return false;
+			Recipient->CmdLeave();
+			if (!Check(!Recipient->IsInClan() && Recipient->JoinSeq == 0 && Recipient->PendingInviteId == Fresh, TEXT("leave reset clan generation"))) return false;
+		}
+		if (!Recipient->SetPendingInviteServer(GenerationActors[1])) { OutError = TEXT("dead fixture issuance"); return false; }
+		GenerationActors[2]->GetStats()->bIsDead = true; const uint64 DeadId = Recipient->PendingInviteId;
+		Recipient->CmdAcceptSeen(DeadId); GenerationActors[2]->GetStats()->bIsDead = false;
+		if (!Check(!Recipient->IsInClan() && Recipient->PendingInviteId == DeadId && !Recipient->PendingInviteFrom.IsValid()
+			&& Recipient->PendingInviteClan.IsEmpty() && Recipient->PendingInviteTime < 0.f, TEXT("matching dead acceptance changed rule"))) return false;
+		Recipient->PendingInviteId = MAX_uint64 - 1;
+		if (!Check(Recipient->SetPendingInviteServer(GenerationActors[1]) && Recipient->PendingInviteId == MAX_uint64, TEXT("last clan generation issuance"))) return false;
+		if (!Check(Rejected(MAX_uint64 - 1), TEXT("stale last generation accepted"))) return false;
+		Recipient->CmdAcceptSeen(MAX_uint64);
+		if (!Check(Recipient->ClanName == ClanB && Recipient->PendingInviteId == MAX_uint64 && !Recipient->PendingInviteFrom.IsValid(), TEXT("last generation fresh acceptance"))) return false;
+		const auto MaxBefore = Capture();
+		if (!Check(!Recipient->SetPendingInviteServer(GenerationActors[0]) && Equal(MaxBefore), TEXT("clan generation overflow mutated state"))) return false;
+		return AMMOPlayerController::RunClanChatContextSelfTest(World, OutError, OutChecks);
 	}();
 	for (AMMOCharacter* Character : Actors)
 	{
@@ -226,6 +314,7 @@ void UMMOClanComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UMMOClanComponent, ClanName);
 	DOREPLIFETIME_CONDITION(UMMOClanComponent, bIsLeader, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOClanComponent, PendingInviteId, COND_OwnerOnly);
 }
 
 void UMMOClanComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -496,15 +585,31 @@ void UMMOClanComponent::CmdInvite()
 		NotifyOwner(TEXT("Oyuncunun bekleyen baska bir daveti var; biraz sonra tekrar dene."));
 		return;
 	}
-	TC->PendingInviteFrom = Self;
-	TC->PendingInviteClan = ClanName;
-	TC->PendingInviteTime = Now;
+	if (!TC->SetPendingInviteServer(Self)) return;
 	TC->NotifyOwner(FString::Printf(TEXT("%s seni [%s] klanina davet etti. Kabul: /klan kabul"), *ClanPlayerNameOf(Self), *ClanName));
 	NotifyOwner(FString::Printf(TEXT("%s adli oyuncuya klan daveti gonderildi."), *ClanPlayerNameOf(Target)));
 }
 
+bool UMMOClanComponent::SetPendingInviteServer(AMMOCharacter* Inviter)
+{
+	const AMMOCharacter* Self = GetOwnerCharacter();
+	const UWorld* World = GetWorld();
+	const UMMOClanComponent* IC = IsValid(Inviter) ? Inviter->GetClanComponent() : nullptr;
+	if (!HasAuthorityInternal() || !Self || !World || !IC || Inviter == Self || IC->ClanName.IsEmpty()
+		|| !Inviter->HasAuthority() || Inviter->GetWorld() != World || PendingInviteId == MAX_uint64) return false;
+	++PendingInviteId; // Never reuse a consumed invitation within this pawn's lifetime.
+	PendingInviteFrom = Inviter; PendingInviteClan = IC->ClanName; PendingInviteTime = World->GetTimeSeconds();
+	return true;
+}
+
 void UMMOClanComponent::CmdAccept()
 {
+	CmdAcceptSeen(PendingInviteId);
+}
+
+void UMMOClanComponent::CmdAcceptSeen(uint64 SeenInviteId)
+{
+	if (!HasAuthorityInternal() || SeenInviteId == 0 || SeenInviteId != PendingInviteId) return;
 	AMMOCharacter* Self = GetOwnerCharacter();
 	const UWorld* World = GetWorld();
 	if (!HasAuthorityInternal() || !Self || !World)
@@ -512,7 +617,7 @@ void UMMOClanComponent::CmdAccept()
 		return;
 	}
 
-	// Davet her durumda tuketilir (eski davet sonradan kabul edilemesin).
+	// Yalniz eslesen davet tuketilir; stale/zero/future kimlik pending durumu korur.
 	AMMOCharacter* Inviter = PendingInviteFrom.Get();
 	const FString InviteClan = PendingInviteClan;
 	const float InviteTime = PendingInviteTime;

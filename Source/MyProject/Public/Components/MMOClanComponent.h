@@ -57,6 +57,11 @@ public:
 	void CmdCreate(const FString& Name);
 	void CmdInvite();
 	void CmdAccept();
+	// Chat must pass the generation captured by its sending pawn; no current-server fallback.
+	void CmdAcceptSeen(uint64 SeenInviteId);
+	// Owner-only runtime generation; retained after consumption, never saved or wrapped.
+	UPROPERTY(Replicated)
+	uint64 PendingInviteId = 0;
 	void CmdLeave();
 	void CmdKick(const FString& TargetName);
 	void CmdList();
@@ -76,6 +81,7 @@ protected:
 	void OnRep_Clan();
 
 	bool HasAuthorityInternal() const;
+	bool SetPendingInviteServer(AMMOCharacter* Inviter);
 	AMMOCharacter* GetOwnerCharacter() const;
 
 	// Sahibin ekranina sistem sohbet satiri gonderir.

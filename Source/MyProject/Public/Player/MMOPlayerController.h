@@ -73,6 +73,7 @@ public:
 	// Native controller chat bodies/owning pawn context; no network transport or Slate input.
 	static bool RunTradeChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunPartyChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunClanChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
@@ -88,8 +89,8 @@ protected:
 #endif
 
 	UFUNCTION(Server, Reliable)
-	void ServerSendChat(const FString& Message, AMMOCharacter* SeenCommandPawn, uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId);
-	// Capture party/trade command context before the owning client sends chat.
+	void ServerSendChat(const FString& Message, AMMOCharacter* SeenCommandPawn, uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId);
+	// Capture party/trade/clan command context before the owning client sends chat.
 	void SendChatWithContext(const FString& Message);
 
 	// Sunucu tarafi sohbet spam korumasi.

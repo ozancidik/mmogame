@@ -1922,3 +1922,109 @@ Source/Scripts SHA256 listesi aynıdır; build/test boyunca kod/runner değişme
 Son belge güncellemeleri ayrıdır. UE/UBT kapalı. Gerçek Blueprint callback,
 Shipping/Server paket, timer/respawn/DoT/PvP kaynak kimliği ve20dkPIE açık;
 PLAYTEST_CHECKLIST maddeleri işaretlenmedi.
+
+
+## 61. Klan kabulünü gönderimdeki davet kimliği ve pawn'a bağlama
+
+8 Ekim 2026 (yerel saat; önceki native loglar 7 Ekim UTC): önceki HEAD
+3df7a3e, son commitler, tracked durum ve paralel dosyalar incelendi. Beş kod/test
+dosyası parent tarafından yazıldı; .agents/.codex/AGENTS.md korunur. Carver yerel
+Unreal Multiplayer Architect ve repo QA rehberiyle salt okunur inceleme yaptı;
+Agency paket kökeni doğrulanmadı. Kod yazmadı/test çalıştırmadı. Son olumlu
+kaynakların TEMP yedekleriyle byte/SHA eşitliğini bağımsız denetledi, somut hata
+bulmadı. Son agent kapatma çağrısında ID artık bulunamadı; aktif yazıcı yok.
+
+**O24/ORTA, sınırlı yeniden üretim:** parametresiz CmdAccept sunucudaki güncel
+pending daveti kullanıyordu. Eski A niyetinden sonra B pending'i geçerli hale
+getirilirse eski kabul B klanına katılıyordu. Eski kodda native FAIL checks=8,
+reason=old clan accept joined replacement invite, 20:23:07.388 UTC; UE0/PS1.
+TEMP mmo_clan_invite_before_generation_20261007.log. Baseline fixture doğrudan
+pending/klan alanını değiştirdi; gerçek gecikmiş RPC, sürenin geçmesi veya canlı
+CmdInvite takeover çalıştırılmadı. Üretimde geçerli başka bekleyen daveti ezme
+koruması vardı; hata onun aşılması kanıtı değildir. Tüketim/expiry/invalidation
+sonrası yeni davete taşınan eski niyet sınırıdır.
+
+Alıcı pawn'da owner-only replicated uint64 PendingInviteId eklenir. Üretim
+CmdInvite mevcut canlılık/liderlik/menzil/3 sn cooldown/duplicate ve takeover
+kapılarından sonra SetPendingInviteServer kullanır; helper artan kimlik ve
+sunucu pending alanlarını birlikte yazar. Tüketim/ayrılma kimliği sıfırlamaz,
+MAX'ta yeni davet fail-closed reddedilir; kayıt şemasına alan eklenmedi.
+CmdAcceptSeen authority/nonzero/eşitlik kapısını pending tüketiminden önce
+uygular. Güncel eşleşmede eski 30 sn süre/canlılık/mevcut üyelik/davetçinin
+halen aynı klanın lideri olması kuralları korunur. Native sunucu convenience
+CmdAccept yalnız mevcut kimlikle delegasyon yapar; chat bu fallback'i kullanmaz.
+
+Say ve OnChatCommitted, gönderen pawn + latest replicated clan ID yakalar;
+ServerSendChat /klan kabul, Seen pawn mevcut GetPawn ile aynıysa CmdAcceptSeen
+çağırır. Null/yanlış pawn, yeni pawn'da sayısal ID aynı olsa da ret üretir. Diğer
+klan komutları ve 200 karakter/0,7 sn chat sınırı değişmedi. RPC imzası bütün
+chatte ek clan uint64 taşır, bant gerçek profiler ile ölçülmedi; iki uçta aynı
+yeni DLL gerekir. Owner-only ID ile bildirim metni atomik değildir; oyuncunun
+okuduğu eski satırı güncel ID'ye bağlama UX riski sürer.
+
+**43 native kontrol = eski9 +23 component +11 controller chat.** Component:
+aynı/farklı davetçiden tüketim sonrası yeni generation; eski/0/ileri retlerde
+üç karakterin üyelik/lider/acting/JoinSeq/pending/ID/saat/cooldown ve inventory
+snapshot'ı korunur; fresh/duplicate kabul, leave sonrası ID, ölü eşleşmede eski
+tüketim kuralı ve MAX son kimlik/overflow sınanır. Generation fixture helper'ı
+doğrudan kullanır; üretim cooldown/nearest/expiry akışı bu 23 kontrolün iddiası
+değildir. Controller: dört native PC+Pawn, gerçek nearest CmdInvite,
+OnChatCommitted/Say kabul/ayrıl ve ham endpoint; native possession değişimi,
+fixture'da elle tohumlanan generation ile yeni pawn'da geçerli aynı sayısal kimlikli davet, yanlış/null bağlam, stale/0/ileri
+ID ve fresh doğru davetçi. Controller retleri public clan/save ve inventory
+snapshot'ını denetler; protected pending alanlarının tam snapshot'ı component
+testindedir. Replacement ret sonrası güncel kabul davetin korunmasını doğrular.
+Fixture'lar aynı senkron frame'de, load timer çalışmadan temizlenir; klanlar
+teardown/leader election öncesi silinir. Slate/input, gerçek remote ownership,
+owner-only teslim ve disk kalıcılığı kanıtı değildir.
+
+**Negatif kanıt:** olumlu DLL Succeeded12,95 sn; doğrudan PASS43 20:33:13.767 UTC.
+Yalnız nonzero/eşitlik guard'ı kaldırılarak DLL Succeeded3,09 sn; FAIL12/stale
+clan acceptance mutated replacement (20:34:01.612 UTC), UE0/PS1. Kaynak byte
+exact geri yüklendi. Ardından yalnız /klan kabul pawn guard'ı kaldırıldı;
+DLL Succeeded4,34 sn; FAIL38/check39 replaced pawn matching generation
+(20:34:33.694 UTC), UE0/PS1. Her iki negatif test gerçek derlenmiş DLL üzerindedir.
+TEMP mmo_clan_invite_negative_generation_20261007.log ve
+mmo_clan_invite_negative_pawn_20261007.log. Pawn guard da byte exact restore;
+son normal Editor DLL Succeeded4,19 sn; restored PASS43 ve chat PASS11
+20:35:16.958 UTC. TEMP mmo_clan_invite_restored_20261007.log. PS runner artık
+ana43 + chat11 marker ve UE/error kapılarını ister. Carver pawn negatifinin
+sonucunu bağımsız doğrulamadı; bu sonuç parent logundan alınmıştır.
+
+
+**Son doğrulama (8 Ekim UTC):** RunAllChecks.ps1 -SkipBuild -FullCompile
+37/37 GECTI, exit0. Normal DLL ayrıca Succeeded; 18 PCH'siz /W4 dosya warning C0.
+Klan43 PASS15:04:05.432 UTC (PS ayrıca chat11 ister), parti46/takas218, ilk
+ölüm14/3first+5death ve parser576/576 dahil tüm regresyonlar geçti. ValidateData
+ve StaticLint temiz; bilinen Lv33+ skill boşluğu/InitGameState whitelist
+uyarıları sürer. JSON schema2/negative111; store394 loaded394,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Kayıt adedi oyuncu/PIE/Lv1–30 tamamlama sayısı değildir.
+Summer51/Winter27 doğum, smoke exit0/error0; NetSmoke1join/1welcome ve
+server/client error0. TEMP mmo_net_server_180739.log / mmo_net_client_180739.log,
+tam paket mmo_all_clan_invite_final_20261007.log. Öncesi/sonrası147 Source/Scripts
+SHA256 listesi eşittir; kod/runner test boyunca değiştirilmedi. Son doküman
+editi ayrı tutuldu. Gerçek PIE/Server/Shipping ve bildirimin metniyle kimliğin
+ortak görünümü açıktır; PLAYTEST_CHECKLIST maddeleri işaretlenmedi.
+
+**ECC uygulaması:** Yeni ecc-mmo-plan/review/verify dosyaları okunarak bu işin
+kalan kapsamı ve kabul ölçütleri belirlendi: mevcut dört C++ dosyası ve bir
+runner, authority/nonzero/ID/pawn kapıları, normal DLL +43 native + iki negatif
+ve tam paket, dürüst PIE maddeleri, ardından yalnız doğrulanan dosyalarda commit.
+Ayrı küçük-iş plan belgesi oluşturulmadı. ECC review ile header/caller/replication,
+weak UObject ömrü, pending tüketim sırası, MAX ve save uyumluluğu incelendi;
+ek somut düzeltme gerektiren hata bulunmadı. Yeni timer/Tick veya save alanı
+yok. İnceleme remote ownership testi sayılmaz. Ek yalnız değişen Source/Scripts
+satırlarında sınırlı credential-pattern taraması 0 sonuç verdi; bütün depo
+güvenliği garantisi değildir. ECC verify sonuçları:
+
+| Kontrol | Sonuç | Sınır |
+| --- | --- | --- |
+| UBT / UHT / C++ imzalar / 18 PCH'siz dosya | Geçti | Editor Development; Server/Shipping değil |
+| Veri / lint / ilgili native / tam paket | Geçti, 37/37 | 43 clan ve iki negatif; coverage yüzdesi ölçülmedi |
+| ECC kod/diff incelemesi | Ek bulgu yok | Sınırlı değişiklik, eski açık O24 UX ve diğer klan komutları sürer |
+| Gerçek host + uzak istemci PIE | Yapılmadı | Native fixture ve NetSmoke bütün feature replikasyonunu kanıtlamaz |
+
+Skill kurulumunun .agents altındaki başka sohbet işi değiştirilmedi veya bu
+oyun commit'ine eklenmedi. Kullanıcı uzun süre bilgisayar başında olmayacağını
+ve yeni ECC becerileriyle geliştirmeyi sürdürmemizi ayrıca belirtti.

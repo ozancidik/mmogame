@@ -4371,3 +4371,34 @@ callback'i, remote ağ/ownership veya Slate/input oynanmış sayılmadı.
   reentrancy bu fixture'ın kanıtı değildir. Eski logda first_death sure=? olmalı;
   sıradan death zamanından first elapsed türetilmemeli. Dört sınıf/20 dk koşusu
   ve gerçek Shipping/Server paket derlemesi açık kalır.
+
+
+## 2026-10-08 — Klan daveti kimliği ve chat pawn bağlamı (PIE açık)
+
+Native43 (eski9 lider +23 component/helper +11 native controller chat) ve normal
+Editor DLL geçti. ID ve pawn guard negatifleri FAIL12 / FAIL38 ile yakalandı,
+restore edildi. Aynı-frame native nearest, possession, Say/OnChatCommitted ve
+endpoint kanıtıdır; gerçek Slate/Enter, remote RPC/ownership/owner-only teslim,
+expiry zamanı, kayıt/yeniden giriş veya Server/Shipping paketi oynanmadı.
+
+- [ ] Üç oyuncu aynı yeni DLL: A klan davetini kabul et, ayrıl; B liderinden yeni
+  davet al. Eski A kimliğiyle gecikmiş /klan kabul gönder: B pending/üyelik/lider
+  ve envanter korunmalı. Güncel kabul yalnız B klanına katılmalı; duplicate kabul
+  üyeliği değiştirmemeli. Aynı davetçi yeni klana geçtiğinde de yeniden dene.
+- [ ] Geçerli daveti başka lider ezemesin; aynı lider tekrarında süre uzamasın.
+  Gerçek 30 sn expiry sonrası yenileme, davetçinin ayrılması/düşmesi/yetkisini
+  kaybetmesi, alıcının ölmesi veya zaten klanda olması kurallarını birlikte dene.
+  Native helper testi gerçek cooldown/expiry bekleme kanıtı değildir.
+- [ ] Chat gönderim–teslim arasında gerçek respawn/possession/bölge geçişi olsun:
+  eski pawn, yeni pawn'da aynı sayısal ID olsa da kabul etmemeli. Null/yanlış
+  pawn ve eski/0/ileri ID güncel pending'e fallback yapmamalı, bağlantı sürmeli.
+  Güncel Say/Enter kabulü, native possession fixture'ının remote karşılığını
+  doğrulamalı. Diğer klan komutları için stale bağlam ayrı inceleme ister.
+- [ ] Davet metni ID'den önce gelsin; ilk 0/eski ret sonrası kimlik replike olunca
+  yeniden deneme çalışmalı. PendingInviteId yalnız alıcıda görünmeli. Eski metin
+  dururken yeni latest ID gelirse bu değişiklik eski görünür satıra bağlamaz;
+  bildirim/ID ortak görünümü hâlâ açık, yanlış klanı kabul etme UX riskini ölç.
+- [ ] Kabul/ayrıl sonrası gerçek save/logout/login üyeliği korunmalı; runtime
+  davet kimliği kayda yazılmamalı. Genel/party/clan/whisper/trade chat ve 200
+  karakter/0,7 sn sınırı sürmeli; bütün chat trafiğindeki ek uint64 maliyetini
+  Network Profiler ile ölç. Gerçek Server/Shipping hedefini ayrı doğrula.

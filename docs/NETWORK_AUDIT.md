@@ -45,6 +45,7 @@ Kapsam dosyaları: `MMOTradeComponent`, `MMOClanComponent`, `MMOFriendsComponent
 | O21 | ORTA | **Native UE'de yeniden üretildi ve düzeltildi, gerçek ağ/HUD bekliyor (2026-10-07):** eski aktif takas iptali yeni takası sonlandırıyordu; cancel/X görülen session ile doğrulanır, inaktif davet reddi ayrı RPC'dir | `UMMOTradeComponent::ServerCancel/ServerDeclineInvite`, `AMMOHUD::HandleTradeClick/HandleWindowClick` |
 | O22 | ORTA | **Native UE'de yeniden üretildi ve sınırlı olarak düzeltildi, gerçek ağ/bildirim görünümü bekliyor (2026-10-07):** eski inaktif ret yeni daveti siliyordu; accept/decline davet generation'ı, sohbet ise gönderim pawn/kimlik/iptal niyetini taşır | `UMMOTradeComponent::ServerAccept/ServerDeclineInvite/SetPendingInviteServer`, `AMMOPlayerController::SendChatWithContext/ServerSendChat` |
 | O23 | ORTA | **Native UE'de yeniden üretildi ve sınırlı düzeltildi, gerçek ağ/bildirim görünümü bekliyor (2026-10-07):** parametresiz eski parti reddi yeni daveti siliyordu; accept/decline recipient generation, chat gönderim pawn/ID bağlamı kullanır | `UMMOPartyComponent::ServerAccept/ServerDecline/SetPendingInviteServer`, `AMMOPlayerController::SendChatWithContext/ServerSendChat` |
+| O24 | ORTA | **Native UE'de yeniden üretildi ve sınırlı düzeltildi, gerçek ağ/bildirim görünümü bekliyor (2026-10-08):** eski klan kabulü replacement pending klanına katılabiliyordu; kabul recipient generation ve gönderim pawn bağlamını doğrular | `UMMOClanComponent::CmdAcceptSeen/SetPendingInviteServer`, `AMMOPlayerController::SendChatWithContext/ServerSendChat` |
 | D1-D10 | DÜŞÜK | Bkz. bölüm 7 | |
 
 ---
@@ -688,3 +689,36 @@ gerçek remote respawn/yükleme değildir. Normal DLL/doğrudan46 geçti; son
 negatif ve tam paket kanıtı CHECKLIST_FIXES §59'dadır. Party RPC ve chat sözleşmeleri
 iki uçta aynı yeni DLL ister. Kayıt/hesap/dedicated/kick/leave oturum kimliği bu
 sınırlı değişiklikle tamamlanmış sayılmaz.
+
+
+### O24 · ORTA · Eski klan kabulünün yeni davete taşınması — sınırlı düzeltildi
+
+Önceki HEAD3df7a3e üzerinde parametresiz CmdAccept, doğrudan kurulan geçerli
+replacement pending klanına katıldı: native FAIL8, 20:23:07 UTC, UE0/PS1.
+Gerçek gecikmiş RPC veya unexpired takeover kanıtı yok; CmdInvite'ın mevcut
+başka-pending engeli korunur. Tüketim/expiry/invalidation sonrası yeni davete
+eski niyetin uygulanması ayrı bir sınırdır.
+
+Alıcı pawn'da artan owner-only uint64 PendingInviteId, tüketim/leave sonrası
+korunur; MAX wrap reddedilir ve kayda yazılmaz. CmdAcceptSeen nonzero/eşitliği
+pending temizliğinden önce denetler; süre/canlılık/güncel lider yetkisi kuralları
+aynıdır. Yerel sunucu CmdAccept convenience güncel ID kullanır; /klan kabul
+bu fallback'i kullanmaz. Say/OnChatCommitted gönderimde pawn/latest ID yakalar,
+server chat mevcut pawn eşleşmesini şart koşar. Yeni pawn aynı sayısal ID'ye
+sahip olsa da eski pawn kabulü yönlenmez. Diğer klan komutları kapsam dışıdır;
+leave/kick/create/invite için ayrı stale-context incelemesi açık kalır.
+
+43 native kontrol (9 lider +23 generation/helper +11 native controller chat)
+ve normal DLL geçti. ID guard kaldırılması FAIL12, pawn guard kaldırılması
+FAIL38/check39 ile yakalandı, her ikisi restore edildi. Component tam private
+clan/pending/kimlik/saat ve inventory snapshot'ı; controller public clan/save ve
+inventory, gerçek nearest ve native possession/matching ID yürütür. Aynı-frame
+fixture, gerçek remote ownership/RPC/owner-only teslim/input/save kanıtı değildir.
+Son tam paket kanıtı CHECKLIST_FIXES §61'de; gerçek kontroller PLAYTEST_CHECKLIST'te.
+
+Davet yazısı ile ID replikasyonu atomik değildir. Eski görünür satır okunurken
+yeni latest ID geldiyse kabul yeni snapshot'ı kullanır; görülmüş satır kimliği
+iddiası yok. ID gelmeden 0/eski ret sonrası yeniden deneme gerekebilir. Ortak
+bildirim/kimlik görünümü ve bütün chatte ek uint64 bant maliyeti gerçek PIE ve
+profiler ile açık. Chat RPC iki uçta aynı DLL ister; Server/Shipping/persistence
+ve gerçek expiry/respawn/bölge geçişi bu native kanıtla tamamlanmış sayılmaz.
