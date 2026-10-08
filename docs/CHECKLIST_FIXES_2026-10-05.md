@@ -2393,3 +2393,95 @@ Lv33+ beceri bosluklari/InitGameState whitelist uyari sinirlari surer.
 | Tam mevcut regresyon paketi | Gecti39/39 | NetSmoke baglanti; tum gameplay replication degil |
 | ECC + readonly Unreal/QA | Kapsamda blocker yok; fixture hatalari giderildi | Parent final restore/DLL/full ile dogruladi |
 | Gercek host/uzak istemci PIE | Yapilmadi | Travel/abort/teardown/300sn/multiworld/persistence acik |
+
+
+## 66 · DoT kaynak omru ve anonim hasara dusme (2026-10-08; D2/O29)
+
+ECC plan/review/verify + mmo-feature/ue-build ile D2 kaynak incelemesi native
+fixture'a tasindi. ad5fa0c uzerinde normal DLL Succeeded11,78 sn, orijinal
+ProcessEffects: FAIL10 20:27:08.046 UTC / UE0/PS1. Source pawn Destroy sonrasi
+Poison tick'i Instigator=null ile ApplyDamage yapip PvP-off victim canini azaltti.
+TEMP mmo_dot_source_baseline_20261008.log. Bu fixture dogrudan sunucu ApplyEffect
+API'sini kurar; mevcut offensive skill hedefleri mob-only oldugu icin normal
+oyuncu PvP zehri/remote exploit erisimi kaniti olarak sayilmaz. Ayni orphan kaynak
+moba anonim fatal hasar ve creditsiz oldurme de yapabiliyordu; sinirli ret eklendi.
+
+FMMOActiveEffect'te server-only/plain bPlayerSource, kaynak AMMOCharacter ama
+AMMOMob degilken set edilir; controller varligina bagli degildir. Insertion ve
+same-ID refresh instigator + classification + hub cache'i gunceller. Pending
+listesine raw actor yerine weak reference ve classification kopyalanir; HER
+hasar dispatch oncesi weak yeniden cozulur. Ilk hasar callback'i source'u yok
+ederse sonraki pending tick anonim hale gelmez. Player kaynakli PeriodicDamage
++ kaynak gecersiz ise sadece hasar atlanir. Etki sure/isareti normal sona erer;
+client HUD'in orphansource zehir simgesini gormesi sifir damage garantisinden
+ayri bir oynanis kontroludur. Yeni damage yolu/yerel stats shortcut yok:
+canli kaynak ApplyDamage -> Character TakeDamage PvP/party/clan/hub kapilarini
+kullanir. Mob zehri cached hub/outside davranisi, environment/null kaynak ve
+periodic healing korunur. RPC/save schema/replicated alan/yeni Tick/timer yok.
+
+Native33 gerçek controlled source/victim, actual Destroy/UnPossess, ProcessEffects
+ve TakeDamage kullanir: canli PvP/party/clan/hub ret; permitted player8 damage;
+controllerless live source ret; destroyed player source PvP ve mob hasari/combat
+stamp/LastAppliedDamage/olum yok; queued catch-up ve expiry; player->mob/null,
+mob->player/null same-ID refresh, weak source/classification/hub/timer reset;
+destroyed mob cached hub/outside poison, null environment, destroyed healer
+Regen, self poison, spawn protection ve fatal catch-up ClearAllEffects.
+Defense0/HP100 senaryosunda Poison8 ile exact Health sayar. Artificial ProcessEffects
+DeltaTime kullanilir; gercek elapsed scheduler/nav/PIE degildir. World tick/load
+calismaz, GUID isimli fixture karakterleri save yazmaz. GM PvP ve fixture aktorler
+normal cleanup'ta geri alinir; timeout disposable process'i keser.
+
+Editor-only private UFUNCTION callback iki-float OnHealthChanged'e dogru signature
+ile baglanir. Ilk gercek kabul edilmis tick bu native health delegate'inde source'u
+Destroy eder; ikinci pending tick skip, toplam8 damage. Production ApplyDamage'e
+test hook eklenmedi. UFUNCTION/helper WITH_EDITOR, console/self-test non-Shipping
+ve standalone unattended NullRHI guard'li; Shipping/Server hedefi ayrica derlenmedi.
+
+Initial fix normal DLL Succeeded11,15 sn -> PASS33 20:29:57.193 UTC / UE0/PS0.
+Derlenmis raw-pending negatifi Succeeded3,61 sn -> FAIL32 20:30:42.896 UTC;
+refresh classification negatif Succeeded3,57 sn -> FAIL15 20:31:21.484 UTC.
+Negatifler UE0/PS1, TEMP mmo_dot_source_negative_raw_20261008.log ve
+mmo_dot_source_negative_refresh_20261008.log. Byte-exact restore DLL
+Succeeded3,60 sn -> PASS33 20:32:33.106. Ardindan direct PlayerState include
+NoPCH hijyeni icin eklendi; final DLL Succeeded3,57 sn -> PASS33
+20:34:01.974 / UE0/PS0. TEMP mmo_dot_source_final_20261008.log ve
+mmo_dot_source_final_restore_20261008.cpp final-source yedegi; mutant DLL kalmadi.
+
+Open: gercek remote effect/HUD replication, elapsed tick/expiry, player skill
+PvP hedef erisimi, source-controller rebinding/kimlik, yuzlerce actor network
+profiler, effect clear/refresh callback sonrasi zaten toplanmis pending'in iptali
+ve DeltaTime duration overshoot mevcut semantik. Bunlar bu fix'te degistirilmedi.
+
+
+ECC readonly Unreal/multiplayer security/QA reviewer Arendt actual final diff,
+fixture ve backup'i inceledi; production blocker yok. Parent'in include DLL
+Succeeded3,57 sn ve latest PASS33 kaniti mevcut. Ajan build/test/dosya yazmadi;
+full freeze baslarken salt-okunur inceleme surdu, full bitmeden kapatildi.
+Kaynak ve runner mutation'i full boyunca yapilmadi. Agency plugin kokeni
+kurulu/discoverable dosyalarda bulunmadi; rol incelemesi diye kaydedildi.
+
+
+**Final ECC verify:** RunAllChecks.ps1 -SkipBuild -FullCompile 40/40 GECTI,
+exit0. Final include/restore normal DLL Succeeded3,57 sn ayrica dogrulandi;
+19 PCH'siz /W4 CPP dosya warning C0. Native DoT33 PASS20:41:23.178 UTC;
+save26 PASS20:38:16.273, presence24 PASS20:38:23.516, parti83 PASS20:39:37.188,
+klan43 PASS20:39:53.304, takas218 PASS20:42:44.450, death14/3first+5death ve
+parser576/576 dahil eski regresyonlar gecti. JSON schema2/negative111. Store426
+loaded426, invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6,
+writeorder1, roundtrip equal1; bunlar oyuncu/Lv1-30 kosu sayisi degildir.
+Summer51/Winter27 mob dogumu, exit0/error0; iki random smoke yeni icerik degil.
+NetSmoke1join/1welcome ve server/client error0; TEMP mmo_net_server_234322.log /
+mmo_net_client_234322.log. Full log mmo_all_dot_source_final_20261008.log (TEMP).
+Full oncesi/sonrasi150 Source/Scripts SHA256 differences0; TEMP
+mmo_dot_source_final_hashes_20261008.txt. Full boyunca source/runner yazimi yok;
+agent readonly kaldi, full bitmeden kapatildi. Belgeler freeze disinda degisti.
+Engine/UBT process0, MMOSave_ZDot*.sav0. Gercek PIE ve Server/Shipping acik;
+bilinen Lv33+ beceri bosluklari/InitGameState whitelist uyari sinirlari surer.
+
+| Kontrol | Sonuc | Sinir |
+| --- | --- | --- |
+| Final normal DLL + 19 PCH'siz dosya | Gecti; warning C0 | Editor Development; Server/Shipping acik |
+| Native33 + baseline/2 derlenmis negatif | PASS33; FAIL10/32/15 | Actual authority dispatch/delegate; elapsed/remote degil |
+| Mevcut tum regresyon paketi | Gecti40/40 | NetSmoke baglanti, tum replication/oynanis degil |
+| ECC + readonly Unreal/security/QA | Kapsamda blocker yok | Parent final kaynak/DLL/full dogruladi |
+| Gercek host/uzak istemci PIE | Yapilmadi | Effect HUD/scheduling/source rebinding/profiler acik |

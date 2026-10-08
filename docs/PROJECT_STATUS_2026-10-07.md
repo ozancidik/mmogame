@@ -1,16 +1,18 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 8 Ekim 2026. Kaynak kod ve son tamamlanan test paketi esas alınmıştır.
-Önceki HEAD `16099a3` (§64/O27), son kaydı PlayerState silinmeden önce yazdı.
-Son sınırlı düzeltme (§65/O28), possession bitişinde arkadaş offline bildirimini
-aynı kimlik silinmeden önce duyurur. Sunucu otoritesi, karşılıklı rıza ve travel/
-EndPlay kapıları korunur; bildirim initial-load/save başarısına bağlı değildir.
-ECC plan/review/verify ile ilerledi. Normal DLL, 24 native presence kontrolü,
-39/39 son paket ve 19 PCH'siz dosya/warning0 geçti. Baseline/load-gate FAIL6,
-EndPlay-gate FAIL18; final kaynak ve DLL restore edildi.
-Gerçek remote reconnect/PIE, disk hata dayanıklılığı, 300 sn/process-static cache,
-committed travel sonrası disconnect ve retained pawn kimliği; kick ve atomik
-roster/bildirim görünümü hâlâ açık.
+Önceki HEAD `ad5fa0c` (§65/O28), arkadaş offline bildirimini PlayerState
+silinmeden önce duyurdu. Son sınırlı düzeltme (§66/O29/D2), DoT uygulayan oyuncu
+pawn'ı yok olunca tick'in anonim hasara dönüşmesini engeller. Server-only kaynak
+classification ve her pending tick'te weak resolution kullanılır; canlı kaynak
+PvP/party/clan/hub yolu, mob cached hub, environment ve Regen korunur. ECC plan/
+review/verify ile ilerledi. Normal DLL, 33 native DoT kontrolü, 40/40 son paket
+ve 19 PCH'siz dosya/warning0 geçti. Baseline FAIL10; raw-pending/refresh
+negatifleri FAIL32/15; final kaynak ve DLL restore edildi.
+Doğrudan native API kanıtıdır; mevcut offensive skill hedefleri mob-only,
+normal PvP zehri erişimi doğrulanmadı. Gerçek remote/elapsed/PIE, source kimlik
+rebinding, disk hata dayanıklılığı, presence cache/committed disconnect;
+kick ve atomik roster/bildirim görünümü hâlâ açık.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -26,19 +28,19 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | Karakter ve statlar | STR/DEX/INT/VIT, can/mana, XP/seviye, stat puanı, ölüm/diriliş; sunucu otoritesi | Kayıt stat/XP/puan bütçesi ve dört sınıf için 15 UE kontrolü; ölüm kuralları ayrı fixture'larda | Gerçek ölüm/respawn, kayıt sonrası istemci stat paneli ve uzun oturum |
 | Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi; tek cooldown kapısı ve double damga | Temel saldırı 21 kontrol; yeni cooldown 89 kontrol, yedi sentetik uptime/eşik sınırları; eski RPC önce UE'de FAIL0 verdi | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü; gerçek uzun oturum |
 | Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; rütbe + bakiye bütçesi; kayıtlı ücretli beceriyi minimum ağaç rütbesine taşıma | 81 beceri; 12 bütçe/iade + 12 yeni öğrenilmiş-beceri kontrolü; hata önce UE'de yeniden üretildi | Gerçek legacy dosya göçü, yatırım/kayıt/sınıf RPC ve HUD; sınıf dengesi, Lv33+ beceri boşlukları |
-| Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Veri/kod/derleme | İstemci efekt süresi ve Network Profiler bant ölçümü |
+| Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Native DoT33: lost player source/callback/refresh; live policy, mob hub, Regen/expiry; önce FAIL10, negatif32/15 | Gerçek elapsed tick/expiry, istemci efekt süresi/HUD, source rebinding ve Network Profiler bant ölçümü |
 | Ekipman ve envanter | 53 ekipman; InstanceId ile kuşanma/satış/yükseltme; çanta/yığın sınırları; nadirlik/+; ilk başarılı istek ölçümü | Kayıtlı ekipman seviye şartı: 11 kontrol; yeni kuşanma ölçümü: 8 kontrol, otomatik/restore hariç | Gecikmeli çift tıklama, uzak HUD, gerçek dosyadan yeniden giriş |
 | Satıcı ve ekonomi | Ekipman/iksir alış-satışı; yalnız teslim edilen adet kadar ücret; ölü/uzak işlem reddi | Yeni satıcı regresyonu: 14 kontrol geçti | Gelir/harcama dengesi, uzun oturum, gerçek RPC ve kayıt kalıcılığı |
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 79 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 51 arketip (13 elit), 29 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 48, Winter 30 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer 51, Winter 27 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider rızası; davet/üyelik kimliği; chat pawn bağlamı; authority EndPlay cleanup | 83 native: önceki73 +10 gerçek lifecycle; UnPossess/Destroy/leader/member/transition route; baseline/negatif FAIL75 | Gerçek disconnect/travel/owner-only teslim/HUD/XP; kalıcı reconnect/presence; kick stale bağlamı ve roster atomik görünümü |
 | Ticaret ve depo | Görülen session/revision teklif/onay; session cancel/X; recipient invite generation accept/decline; chat gönderim pawn/kimlik/iptal niyeti; kimlik/kapasite/altın tavanı ve NPC depo | 218 native kontrol: önceki182 +28 invite +8 controller chat; eski decline önce FAIL165/check166; tam component ret snapshot'ı ve native Say/OnChatCommitted/endpoint kanıtı | Gerçek davet/RPC/HUD; bildirimle kimliğin ortak görünümü; reentrant rollback; ortak kalıcı işlem/çökme/yeniden giriş; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, recipient generation ve chat pawn bağlamı; arkadaş listesi, sohbet/hız sınırı | Klan43: eski9 lider +23 generation/helper +11 native controller chat; ID/pawn negatifleri FAIL12/FAIL38; arkadaş presence24 native HUD/lifecycle | Gerçek owner-only teslim/bildirim görünümü, diğer klan komutlarında stale bağlam; çevrimdışı üyelik/rıza ve yeniden giriş |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 419 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; 426 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
@@ -85,6 +87,7 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `b9ae6e0` (§63/O26) | PlayerState'ten bağımsız authority EndPlay cleanup; survivor üyelik kimliği korunur | Önce/negatif FAIL75, normal DLL/PASS83,37/37 paket,18 PCHdosya/warning0; gerçek remote/save/PIE açık |
 | 8 Ekim kayıt lifecycle (§64/O27) | PlayerState silinmeden force save; detached load/save/nav timer ve initial-load kapısı kapanır; EndPlay tek yazım | Önce FAIL4; negatif FAIL9/17/10; DLL/PASS26,38/38 paket,18 PCHdosya/warning0; gerçek reconnect/presence/PIE açık |
 | 8 Ekim arkadaş presence (§65/O28) | Identity detach öncesi offline; initial-load/save bağımsız, mutual/travel/EndPlay korumalı | Önce/negatif FAIL6/6/18; DLL/PASS24,39/39 paket,19 PCHdosya/warning0; gerçek remote/PIE/cache sınırları açık |
+| 8 Ekim DoT kaynak ömrü (§66/O29/D2) | Player kaynak kaybolunca anonim hasar reddi; pending weak reference her dispatch'te çözülür; refresh provenance | Önce FAIL10; negatif FAIL32/15; DLL/PASS33,40/40 paket,19 PCHdosya/warning0; gerçek remote/elapsed/source rebinding açık |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -105,20 +108,21 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-8 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **39/39 geçti**.
+8 Ekim'deki son tamamlanan `RunAllChecks.ps1 -SkipBuild -FullCompile`: **40/40 geçti**.
 Normal Editor derlemesi ayrıca geçti. 19 dosyanın PCH olmadan /W4 derlemesinde
 warning C0. Veri denetiminde Lv33+ beceri boşluğu uyarıları, StaticLint'te
 InitGameState override beyaz liste uyarısı açık. Yerel test edilen en yüksek gerçek
-kayıt seviyesi 6; 419 kaydın okunması oyuncu sayısı veya Lv1–30 koşusu değildir.
-Save lifecycle26, arkadaş presence24, klan43, parti83, takas218, ilk oyuncu
-ölümü14/3first+5death, parser576/576 ve tüm eski kontroller bu pakette geçti.
-JSON schema2/negative111; store loaded419, invalid/loadFailed/existsMismatch/
-jsonMismatch0, writeorder1 ve roundtrip equal1. Summer48/Winter30 smoke hata0;
+kayıt seviyesi 6; 426 kaydın okunması oyuncu sayısı veya Lv1–30 koşusu değildir.
+DoT source33, save lifecycle26, arkadaş presence24, klan43, parti83, takas218,
+ilk oyuncu ölümü14/3first+5death, parser576/576 ve eski kontroller bu pakette geçti.
+JSON schema2/negative111; store loaded426, invalid/loadFailed/existsMismatch/
+jsonMismatch0, writeorder1 ve roundtrip equal1. Summer51/Winter27 smoke hata0;
 NetSmoke1join/1welcome, iki tarafta hata0. LLM25 bellek helper'larını sınar;
 gerçek HTTP/disk/callback veya uzak HUD için kanıt değildir. Presence24 native
-standalone HUD buffer'ıdır; rendering/gerçek RPC/world travel PIE açıktır.
-Son paket logu `mmo_all_presence_final_20261008.log` (TEMP); NetSmoke logları
-`mmo_net_server_231716.log` / `mmo_net_client_231716.log`. 149 Source/Scripts SHA256
+standalone HUD buffer'ıdır. DoT33 actual damage/health-delegate callback ama
+elapsed scheduler/uzak effect replication ve normal PvP skill erişimi kanıtı değildir.
+Son paket logu `mmo_all_dot_source_final_20261008.log` (TEMP); NetSmoke logları
+`mmo_net_server_234322.log` / `mmo_net_client_234322.log`. 150 Source/Scripts SHA256
 listesi paket öncesi/sonrası aynı; bu kaynak/runner doğrulandı, editör kapalı.
 İlk eylemler sunucu controller ömrüne aittir; kalıcı karakterin
 ilk görevi/becerisi veya gerçek 20 dakika koşusu olarak yorumlanmaz.

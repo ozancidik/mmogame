@@ -4535,3 +4535,32 @@ PASS24. Sentetik abort/teardown/RouteEndPlay actual world travel/shutdown degild
 - [ ] Gercek teardown'da crash/ensure/RPC spam olmamali; NPC ve client-side detach
   sunucu offline fan-out veya save RPC baslatmamali. Friends listesi sahibine
   replike olmali, riza ve diger oyuncularin save/party/envanter/altini korunmali.
+
+
+## 2026-10-08 — DoT kaynak omru (D2/O29; gercek PIE acik)
+
+Native33 direct authoritative ApplyEffect/ProcessEffects ve gercek Actor Destroy
+kullanir. Mevcut offensive skills mob-only; fixture normal oyuncu PvP skill yolu
+veya remote exploit erisimi kaniti degildir. Baseline FAIL10, raw-pending FAIL32,
+refresh FAIL15, final restore PASS33. Elapsed scheduler/HUD ayrica acik.
+
+- [ ] Host + uzak istemci, izinli player->mob Poison: source pawn yok olunca
+  sonraki tick can dusurmemeli/anonim kill-XP uretmemeli; effect normal expiry'ye
+  gitmeli. Canli kaynak ve mob kill kredi/XP onceki kurali korumali. Source logout,
+  pawn replacement/travel ve sadece UnPossess'i ayri kaydet: source actor hayattayken
+  mevcut policy yolu korunur; account/controller rebinding bu fix'te cozulmedi.
+- [ ] PvP effect yolu sunucu tarafindan yetkili testte uygulanirsa canli kaynak
+  PvP-off/party/clan ve attacker-victim hub kapilarina uymali. Kaynak Destroy
+  sonrasi damage reddi tum hedeflere uygulansin. Production player-target skill
+  yoksa testi normal skill oynanisinda yapilmis gibi isaretleme.
+- [ ] Same-ID refresh player->mob/environment ve tersi: tek icon, yeni duration/
+  tick accumulator/source/cache; detached mob poison cached hub icinde zarar
+  vermemeli, disarida eski davranisi korumali. Null environment ve Regen degismemeli.
+- [ ] Iki pending tick arasinda health/death callback source Destroy: ilk kabul
+  dogru hasar/attribution verir, sonraki player tick skip; crash/ensure yok.
+  Fatal catch-up death/XP/loot bir kez olmali. Native health-delegate callback
+  ayni-frame kanitidir; gercek gameplay callback ve actor GC zamanlamasini da olc.
+- [ ] Uzak client effect EndServerTime/icon/health ve spawn protection gorunumu,
+  normal expired duration ve uzun elapsed tick'ler; network delay/loss altinda
+  server mutasyonu ve client HUD tutarli olmali. Profiler sonuclari olmadan
+  performans/bant veya tum replication gecti iddiasi yapma.

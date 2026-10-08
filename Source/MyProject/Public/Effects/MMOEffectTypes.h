@@ -97,6 +97,8 @@ struct FMMOActiveEffect
 	float TickInterval = 0.f;
 	float TimeSinceLastTick = 0.f;
 	TWeakObjectPtr<AActor> Instigator;
+	// Preserve player provenance when the weak source expires; never downgrade to environmental damage.
+	bool bPlayerSource = false;
 	// Mob yok edilse bile kaynak moba ait hub korumasini DoT suresince uygula.
 	FVector MobSourceHubLocation = FVector::ZeroVector;
 	float MobSourceHubRadius = 0.f;

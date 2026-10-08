@@ -28,6 +28,9 @@ class MYPROJECT_API UMMOStatsComponent : public UActorComponent
 
 public:
 	UMMOStatsComponent();
+#if !UE_BUILD_SHIPPING
+	static bool RunDotSourceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void BeginPlay() override;
@@ -321,6 +324,12 @@ protected:
 	// --- Durum efekti isleme (sunucu) ---
 	// Aktif efektleri her tick isler: sureleri azaltir, periyodik hasar/sifa uygular, bitenleri kaldirir.
 	void ProcessEffects(float DeltaTime);
+#if WITH_EDITOR
+	// Native disposable fixture callback; no gameplay binding or shipping RPC.
+	UFUNCTION()
+	void DestroyDotFixtureSourceOnHealthChanged(float NewHealth, float NewMaxHealth);
+	TWeakObjectPtr<AActor> DotFixtureSourceToDestroy;
+#endif
 
 	// Aktif SpeedBuff efektlerine gore sahibin hareket hizini gunceller (sunucu + istemci).
 	void ApplyMovementSpeedFromEffects();

@@ -384,7 +384,7 @@ denetim ve önceki düzeltme notları tarihsel bağlamdır; O6 tümden kapanmad�
 ## 7. Düşük ciddiyetli bulgular
 
 - **D1** Debug RPC'leri Shipping'e giriyor (MMOCharacter.cpp:640, 1126, 1163, 1393, 1613): `IsLocalController` kilitli; `#if !UE_BUILD_SHIPPING`.
-- **D2** DoT'u uygulayan pawn geçersizleşince (`P.Instigator` weak) `InstController=null`, `DamageCauser=null` → `TakeDamage`'de `Attacker==null` olduğu için parti/klan/hub kuralları atlanır (MMOStatsComponent.cpp:751-756, MMOCharacter.cpp:768-783). Örn. hub'a sığınan kurbanı, saldırganı ayrıldıktan sonra da zehir vurmaya devam eder. DoT instigator'ı `TWeakObjectPtr<AController>` + cache'lenmiş "oyuncu-kaynaklı" bayrağı ile sakla **[doğrulanmalı]**.
+- **D2** DoT source weak pointer expired -> anonim damage -> PvP/party/clan/hub kapisi atlama native yeniden uretildi. §66/O29 server-only source classification ve HER pending tick'te weak resolution ile sinirli duzeltildi. Current offensive skills mob-only; normal PvP skill exploit erisimi kanitlanmadi. Gercek remote/rebinding/elapsed scheduling acik.
 - **D3** Satıcı ve `TryUpgrade`: ölü kontrol yok (MMOInventoryComponent.cpp:354-372; depo ölüyü reddediyor, 590-597); `TryUpgrade` NPC gereksinimi/yakınlık istemiyor (297-347) — KO'da NPC gerekir; tasarım kararı değilse ekle.
 - **D4 — kısmen kapandı (2026-10-06):** `UseConsumable/UseHealthPotion` istemci ve sunucuda ortak 1 sn kullanım kapısından geçer; hem Reliable RPC yığılması hem aynı karede çoklu iksir tüketimi engellenir. Trade `Accept/Cancel` ve Klan komutlarının RPC başına sınırı hâlâ açık; Trade `RemoveItem` mevcut 0,3 sn teklif değişikliği sınırını kullanır.
 - **D5** Sohbet: genel kanalda mesaj "[Dunya] ..." / "[Klan] ..." öneki taşıyarak sistem satırı taklit edebilir (satır biçimi `Sender: Mesaj`, MMOPlayerController.cpp:433); kontrol karakterleri temizlenmiyor.
@@ -843,3 +843,26 @@ penceresi ve backend/account identity acik. D6'nin eski 512 hard-cap iddiasi
 kaynakla uyusmuyordu: yalniz eski kayitlar prune edilir, fresh tablo buyuyebilir.
 RPC/save schema yeni alan/timer/Tick eklenmedi. O27 save ve O26 party davranisi
 korunur; slot/hesap kimligi fallback'i eklenmedi.
+
+
+### O29 · ORTA · DoT player kaynagi kaybolunca anonim hasar (D2; sinirli native duzeltme)
+
+Source Destroy sonrasi ProcessEffects'in weak.Get() null donerken anonymous
+ApplyDamage, Character TakeDamage'deki attacker policy'sini atliyordu. Native
+baseline FAIL10 (PvP-off victim Health dustu); mevcut offensive skill hedefleri
+mob-only, dolayisiyla runtime PvP erisimi bu kanitta yok. Orphan player->mob tick
+creditsiz hasar/kill uretebilir; ayni ret tum hedefler icin uygulanir.
+
+Plain/nonreplicated bPlayerSource (non-mob Character) apply ve refresh'te cache
+edilir. Pending weak source + flag'i tasir, her damage oncesi cozer; orphan
+player damage skip edilir. Canli source normal ApplyDamage/TakeDamage kapilarina
+gider. Mob cached hub/outside, environment/null, Regen ve expiry korunur.
+Reentrant health delegate ilk accepted damage'da source Destroy eder: ikinci
+queued tick source'u yeniden cozer. Native33, raw-pending negatif FAIL32, refresh
+negatif FAIL15; restore DLL/PASS33. Source-controller/hesap rebinding degismedi.
+Yeni RPC/save schema/replicated property/Tick yok. Editor-only callback fixture
+helper'i production damage hook'u degildir; Shipping hedefi derlenmedi.
+
+ECC readonly Unreal/security/QA incelemesi ve ayrintili kanit CHECKLIST_FIXES
+§66; gercek host/remote/HUD/elapsed scheduling PLAYTEST_CHECKLIST'te acik. Pending
+clear/refresh cancellation ve duration overshoot bu sinirli fix'in disindadir.

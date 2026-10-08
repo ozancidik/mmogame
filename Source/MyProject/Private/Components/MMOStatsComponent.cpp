@@ -20,6 +20,15 @@
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Guid.h"
+#include "Core/MMOGameMode.h"
+#include "Player/MMOPlayerController.h"
+#include "Components/MMOPartyComponent.h"
+#include "Components/MMOClanComponent.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerState.h"
 
 namespace
 {
@@ -740,6 +749,7 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 		return;
 	}
 	const AMMOMob* SourceMob = Cast<AMMOMob>(EffectInstigator);
+	const bool bPlayerSource = Cast<AMMOCharacter>(EffectInstigator) && !SourceMob;
 	const float SourceHubRadius = (SourceMob && SourceMob->bHasHub) ? SourceMob->HubSafeRadius : 0.f;
 	const FVector SourceHubLocation = SourceMob ? SourceMob->HubLocation : FVector::ZeroVector;
 
@@ -758,6 +768,7 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 			E.EndServerTime = EffectEnd;
 			E.TimeSinceLastTick = 0.f;
 			E.Instigator = EffectInstigator;
+			E.bPlayerSource = bPlayerSource;
 			E.MobSourceHubLocation = SourceHubLocation;
 			E.MobSourceHubRadius = SourceHubRadius;
 			OnEffectsChanged.Broadcast();
@@ -776,6 +787,7 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	A.TickInterval = Def->TickInterval;
 	A.TimeSinceLastTick = 0.f;
 	A.Instigator = EffectInstigator;
+	A.bPlayerSource = bPlayerSource;
 	A.MobSourceHubLocation = SourceHubLocation;
 	A.MobSourceHubRadius = SourceHubRadius;
 	ActiveEffects.Add(A);
@@ -849,7 +861,8 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 	{
 		EMMOEffectType Type;
 		float Magnitude;
-		AActor* Instigator;
+		TWeakObjectPtr<AActor> Instigator;
+		bool bPlayerSource;
 		float MobSourceHubRadius;
 		FVector MobSourceHubLocation;
 	};
@@ -866,7 +879,7 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 			while (E.TimeSinceLastTick >= E.TickInterval)
 			{
 				E.TimeSinceLastTick -= E.TickInterval;
-				Pending.Add({ E.Type, E.Magnitude, E.Instigator.Get(), E.MobSourceHubRadius, E.MobSourceHubLocation });
+				Pending.Add({ E.Type, E.Magnitude, E.Instigator, E.bPlayerSource, E.MobSourceHubRadius, E.MobSourceHubLocation });
 			}
 		}
 	}
@@ -911,12 +924,18 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 					}
 				}
 			}
+			// Resolve again for EACH pending tick: an earlier damage callback may destroy the source.
+			AActor* Instigator = P.Instigator.Get();
+			if (P.bPlayerSource && !Instigator)
+			{
+				continue; // Orphan player DoT cannot bypass PvP/party/clan/hub or kill without attribution.
+			}
 			AController* InstController = nullptr;
-			if (APawn* InstPawn = Cast<APawn>(P.Instigator))
+			if (APawn* InstPawn = Cast<APawn>(Instigator))
 			{
 				InstController = InstPawn->GetController();
 			}
-			UGameplayStatics::ApplyDamage(GetOwner(), P.Magnitude, InstController, P.Instigator, nullptr);
+			UGameplayStatics::ApplyDamage(GetOwner(), P.Magnitude, InstController, Instigator, nullptr);
 		}
 	}
 
@@ -1077,3 +1096,179 @@ void UMMOStatsComponent::OnRep_Effects()
 	ApplyMovementSpeedFromEffects();
 	OnEffectsChanged.Broadcast();
 }
+
+
+#if WITH_EDITOR
+void UMMOStatsComponent::DestroyDotFixtureSourceOnHealthChanged(float, float)
+{
+	AActor* Source = DotFixtureSourceToDestroy.Get();
+	DotFixtureSourceToDestroy.Reset();
+	if (Source) Source->Destroy();
+}
+#endif
+
+#if !UE_BUILD_SHIPPING
+bool UMMOStatsComponent::RunDotSourceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutError.Reset(); OutChecks = 0;
+	AMMOGameMode* GM = World ? Cast<AMMOGameMode>(World->GetAuthGameMode()) : nullptr;
+	if (!GM || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{
+		OutError = TEXT("disposable standalone headless MMO world required"); return false;
+	}
+	const bool bOriginalPvP = GM->bAllowPvP;
+	const FVector Far(1000000., 1000000., 5000.);
+	const FString Tag = TEXT("ZDot") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(12);
+	TArray<AMMOCharacter*> Pawns;
+	TArray<AMMOPlayerController*> PCs;
+	for (int32 I = 0; I < 7; ++I)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		UClass* Class = I < 4 ? AMMOCharacter::StaticClass() : AMMOMob::StaticClass();
+		AMMOCharacter* C = World->SpawnActor<AMMOCharacter>(Class, Far + FVector(I * 200., 0., 0.), FRotator::ZeroRotator, Params);
+		Pawns.Add(C);
+		if (!C || !C->GetStats()) { OutError = TEXT("fixture actor/stats missing"); break; }
+		C->SetActorTickEnabled(false); C->GetStats()->SetComponentTickEnabled(false);
+		if (I < 3)
+		{
+			AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(); PCs.Add(PC);
+			if (!PC) { OutError = TEXT("fixture controller missing"); break; }
+			PC->SetActorTickEnabled(false); PC->Possess(C);
+			if (!C->GetPlayerState()) { OutError = TEXT("fixture PlayerState missing"); break; }
+			C->GetPlayerState()->SetPlayerName(Tag + FString::FromInt(I));
+			C->EndSpawnProtection();
+		}
+	}
+	const auto Check = [&](bool bOk, const TCHAR* Why)
+	{
+		++OutChecks; if (!bOk && OutError.IsEmpty()) OutError = Why; return bOk;
+	};
+	const auto Reset = [](UMMOStatsComponent* S, float HP = 100.f)
+	{
+		S->ClearAllEffects(); S->bIsDead = false; S->MaxHealth = 200.f; S->Health = HP; S->Defense = 0.f; S->LastAppliedDamage = -1.f; S->LastCombatActivityTime = -100.f;
+	};
+	const auto Run = [&]() -> bool
+	{
+		if (!OutError.IsEmpty()) return false;
+		AMMOCharacter* Victim = Pawns[0]; AMMOCharacter* Source = Pawns[1];
+		UMMOStatsComponent* V = Victim->GetStats(); UMMOStatsComponent* MobTarget = Pawns[4]->GetStats();
+		if (!Check(Victim->HasAuthority() && Source->IsPlayerControlled() && !Victim->IsSpawnProtected(), TEXT("invalid native controlled fixture"))) return false;
+		GM->SetPvPAllowed(false); Reset(V); V->ApplyEffect(TEXT("Poison"), Source); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("live source bypassed PvP off"))) return false;
+		GM->SetPvPAllowed(true); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 92.f, TEXT("live permitted player DoT changed"))) return false;
+		Reset(V); V->ApplyEffect(TEXT("Poison"), Source); Source->GetPartyComponent()->Members.Add(Victim); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("live source bypassed party"))) return false;
+		Source->GetPartyComponent()->Members.Reset();
+		Source->GetClanComponent()->ClanName = Tag; Victim->GetClanComponent()->ClanName = Tag; V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("live source bypassed clan"))) return false;
+		Source->GetClanComponent()->ClanName.Reset(); Victim->GetClanComponent()->ClanName.Reset();
+		APlayerStart* Start = nullptr; for (TActorIterator<APlayerStart> It(World); It; ++It) { Start = *It; break; }
+		if (!Check(Start != nullptr, TEXT("hub fixture PlayerStart missing"))) return false;
+		Victim->SetActorLocation(Start->GetActorLocation()); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("live source bypassed player hub"))) return false;
+		Victim->SetActorLocation(Far);
+		GM->SetPvPAllowed(false); PCs[1]->UnPossess(); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("detached live source became anonymous"))) return false;
+		PCs[1]->Possess(Source); Source->EndSpawnProtection();
+		Reset(V); Reset(MobTarget); V->ApplyEffect(TEXT("Poison"), Source); MobTarget->ApplyEffect(TEXT("Poison"), Source);
+		if (!Check(Source->Destroy(), TEXT("source Destroy failed"))) return false;
+		V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f && !V->bIsDead && V->LastAppliedDamage == -1.f && V->LastCombatActivityTime == -100.f, TEXT("destroyed player source bypassed PvP off"))) return false;
+		GM->SetPvPAllowed(true); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("destroyed player source damaged anonymously"))) return false;
+		MobTarget->ProcessEffects(1.f);
+		if (!Check(MobTarget->Health == 100.f && !MobTarget->bIsDead && MobTarget->LastAppliedDamage == -1.f && MobTarget->LastCombatActivityTime == -100.f, TEXT("destroyed player source damaged mob without credit"))) return false;
+		V->ProcessEffects(2.f);
+		if (!Check(V->Health == 100.f && V->ActiveEffects.Num() == 1, TEXT("orphan catch-up ticks damaged"))) return false;
+		V->ProcessEffects(8.f);
+		if (!Check(V->Health == 100.f && V->ActiveEffects.IsEmpty(), TEXT("orphan effect failed to expire"))) return false;
+
+		// Refresh must replace source classification in BOTH directions.
+		Reset(V); V->ApplyEffect(TEXT("Poison"), Pawns[2]); V->ProcessEffects(0.5f); V->ApplyEffect(TEXT("Poison"), Pawns[5]);
+		if (!Check(V->ActiveEffects.Num() == 1 && !V->ActiveEffects[0].bPlayerSource
+			&& V->ActiveEffects[0].Instigator.Get() == Pawns[5] && V->ActiveEffects[0].RemainingTime == 8.f
+			&& V->ActiveEffects[0].TimeSinceLastTick == 0.f, TEXT("refresh mob provenance/timers stale"))) return false;
+		if (!Check(Pawns[5]->Destroy(), TEXT("refresh mob Destroy failed"))) return false;
+		V->ProcessEffects(1.f);
+		if (!Check(V->Health == 92.f && V->ActiveEffects.Num() == 1, TEXT("player-to-mob refresh retained player classification"))) return false;
+		Reset(V); V->ApplyEffect(TEXT("Poison"), Pawns[2]); V->ApplyEffect(TEXT("Poison"), nullptr); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 92.f && !V->ActiveEffects[0].bPlayerSource, TEXT("player-to-null refresh stale"))) return false;
+		Reset(V); V->ApplyEffect(TEXT("Poison"), Pawns[6]); V->ProcessEffects(0.5f); V->ApplyEffect(TEXT("Poison"), Pawns[2]);
+		if (!Check(V->ActiveEffects.Num() == 1 && V->ActiveEffects[0].bPlayerSource
+			&& V->ActiveEffects[0].Instigator.Get() == Pawns[2] && V->ActiveEffects[0].RemainingTime == 8.f
+			&& V->ActiveEffects[0].TimeSinceLastTick == 0.f && V->ActiveEffects[0].MobSourceHubRadius == 0.f,
+			TEXT("refresh player provenance/timers stale"))) return false;
+		if (!Check(Pawns[2]->Destroy(), TEXT("refresh player Destroy failed"))) return false;
+		V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f && V->ActiveEffects.Num() == 1, TEXT("mob-to-player refresh lost player classification"))) return false;
+
+		AMMOMob* HubSource = Cast<AMMOMob>(Pawns[6]);
+		HubSource->bHasHub = true; HubSource->HubLocation = Far; HubSource->HubSafeRadius = 500.f;
+		Reset(V); V->ApplyEffect(TEXT("Poison"), HubSource);
+		if (!Check(HubSource->Destroy(), TEXT("cached hub source Destroy failed"))) return false;
+		V->ProcessEffects(1.f);
+		if (!Check(V->Health == 100.f, TEXT("destroyed mob lost cached hub protection"))) return false;
+		Victim->SetActorLocation(Far + FVector(1000., 0., 0.)); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 92.f, TEXT("destroyed mob poison stopped outside hub"))) return false;
+		Victim->SetActorLocation(Far); V->ApplyEffect(TEXT("Poison"), nullptr); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 84.f && V->ActiveEffects[0].MobSourceHubRadius == 0.f, TEXT("mob-to-null refresh kept hub"))) return false;
+		Reset(V); V->ApplyEffect(TEXT("Poison"), nullptr); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 92.f, TEXT("environmental poison changed"))) return false;
+		Reset(V, 50.f); V->ApplyEffect(TEXT("Regen"), Pawns[3]);
+		if (!Check(Pawns[3]->Destroy(), TEXT("healer source Destroy failed"))) return false;
+		V->ProcessEffects(1.f);
+		if (!Check(V->Health == 62.f, TEXT("orphan periodic heal changed"))) return false;
+		GM->SetPvPAllowed(false); Reset(V); V->ApplyEffect(TEXT("Poison"), Victim); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 92.f, TEXT("live self poison changed"))) return false;
+		Reset(V); V->ApplyEffect(TEXT("Poison"), Victim); Victim->bSpawnProtected = true; V->ProcessEffects(1.f); Victim->bSpawnProtected = false;
+		if (!Check(V->Health == 100.f, TEXT("DoT bypassed spawn protection"))) return false;
+#if WITH_EDITOR
+		FActorSpawnParameters CallbackParams; CallbackParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* CallbackSource = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Far + FVector(2000., 0., 0.), FRotator::ZeroRotator, CallbackParams);
+		Pawns.Add(CallbackSource);
+		if (!Check(CallbackSource != nullptr, TEXT("callback source spawn failed"))) return false;
+		CallbackSource->SetActorTickEnabled(false); CallbackSource->GetStats()->SetComponentTickEnabled(false);
+		GM->SetPvPAllowed(true); Reset(V); V->ApplyEffect(TEXT("Poison"), CallbackSource);
+		V->DotFixtureSourceToDestroy = CallbackSource;
+		V->OnHealthChanged.AddDynamic(V, &UMMOStatsComponent::DestroyDotFixtureSourceOnHealthChanged);
+		V->ProcessEffects(2.f); // The real health delegate destroys source during the first accepted tick.
+		V->OnHealthChanged.RemoveDynamic(V, &UMMOStatsComponent::DestroyDotFixtureSourceOnHealthChanged);
+		V->DotFixtureSourceToDestroy.Reset();
+		if (!Check(V->Health == 92.f && !IsValid(CallbackSource), TEXT("queued tick reused destroyed callback source"))) return false;
+#else
+		OutError = TEXT("editor callback fixture required"); return false;
+#endif
+		Reset(V, 5.f); V->ApplyEffect(TEXT("Poison"), Victim); V->ProcessEffects(2.f);
+		if (!Check(V->Health == 0.f && V->bIsDead && V->ActiveEffects.IsEmpty(), TEXT("fatal catch-up DoT reentrancy changed"))) return false;
+		return true;
+	};
+	const bool bPassed = Run();
+	GM->SetPvPAllowed(bOriginalPvP);
+	for (AMMOCharacter* C : Pawns) if (IsValid(C))
+	{
+		C->SetTravelSaveCommitted(true); C->GetPartyComponent()->Members.Reset(); C->GetClanComponent()->ClanName.Reset();
+	}
+	for (AMMOPlayerController* PC : PCs) if (IsValid(PC)) { PC->UnPossess(); PC->Destroy(); }
+	for (AMMOCharacter* C : Pawns) if (IsValid(C)) C->Destroy();
+	return bPassed;
+}
+namespace
+{
+	struct FMMODotSourceLifecycleExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestDotSourceLifecycle"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMOStatsComponent::RunDotSourceLifecycleSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_DOT_SOURCE_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMODotSourceLifecycleExec GMMODotSourceLifecycleExec;
+}
+#endif
