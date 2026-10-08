@@ -4439,3 +4439,35 @@ paket, remote ownership, Slate veya property teslim sırası kanıtı değildir.
   ulaşılmadığında cleanup boşluğu bu işte çözülmedi; native leave testi bu
   lifecycle yolunu kanıtlamaz. Kick'in eski hedef/üyelik bağlamı ayrı açık.
   Session/membership GUID'leri runtime'dır; save şeması değişmedi.
+
+
+## 2026-10-08 — Parti EndPlay cleanup (O26; gerçek PIE açık)
+
+Parti test runner'ı artık83 native kontrol: önceki73 +10 gerçek native
+possession/UnPossess/Destroy/RouteEndPlay lifecycle. Eski gate FAIL75 verdi;
+düzeltme PASS83. Bunlar aynı-frame engine çağrılarıdır; gerçek bağlantı
+kopması, property teslimi, harita yükleme ve kayıt kalıcılığı doğrulanmadı.
+O25'teki EndPlay gate maddesinin parti kısmı native düzeltildi; bu bölüm gerçek
+ağ karşılığını tamamlar. Yeni sayılar coverage yüzdesi veya oyuncu sayısı değildir.
+
+- [ ] Host + uzak istemci ikili parti: istemci bağlantısını kapat, host'ta
+  server destruction'dan sonra parti Members boş/Leader null olmalı. GUID'ler
+  sıfırlanmalı ve HUD kapanmalı; GC bekleyerek düzelmesi yeterli değildir.
+  Tekrar bağlanıp fresh parti kurma/leave normal çalışmalı.
+- [ ] Üç kişi, ayrılan lider: lider pawn'ını gerçek possession varken destroy et.
+  Kalan iki kişi yok edilen actor'u içermemeli, sıradaki üye lider olmalı;
+  sürekli üyelerin session ve personal membership kimlikleri korunmalı.
+  Güncel leave istekleri çalışmalı; gerçek uzak HUD/XP paylaşımını doğrula.
+- [ ] Üç kişi, sıradan üye: gerçek UnPossess sonrası Destroy; mevcut lider ve
+  survivor kimlikleri korunmalı. Salt UnPossess, EndPlay olmadan üyeliği
+  kaldırmamalı (bu değişiklik controller değişiminde otomatik kick yapmaz).
+- [ ] Partili pawn ile gerçek Summer→Winter ServerTravel/seamless/level unload
+  ve editor Stop: pending-kill üyeler kalmamalı, istemci crash/ensure vermemeli.
+  Native RouteEndPlay(LevelTransition) map loading veya yeni dünyada grup
+  devamlılığını kanıtlamaz; yeniden kurulma davranışını ayrıca kaydet.
+- [ ] Partisiz NPC ve oyuncu destruction güvenli olmalı. Bu authority cleanup
+  istemci EndPlay'de yeni RPC göndermemeli. Diğer üyelerin envanter/altın/görev
+  değerleri değişmemeli. Save/friends player-control gate'i korunmuştur;
+  destruction sonrası son kaydın yazılması ve presence ayrı açık ölçümlerdir.
+  Bu düzeltmeyi save garantisi sayma; yok olmuş PlayerState yerine Default
+  yuvaya yazma gibi bir fallback bu işe eklenmedi.

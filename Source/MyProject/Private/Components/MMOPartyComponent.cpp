@@ -590,6 +590,7 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		return false;
 	}
 	TArray<AMMOCharacter*> Actors;
+	TArray<AMMOPlayerController*> LifecycleControllers;
 	const bool bSuccess = [&]()
 	{
 		FActorSpawnParameters Params;
@@ -802,11 +803,57 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		if (!Check(Matches({ Actors[0], Actors[1], Actors[2], Actors[3] }, Actors[0]) && P0->PartySessionId == SessionA
 			&& P0->PartyMembershipId != A0 && P1->PartyMembershipId == Survivor1 && P2->PartyMembershipId == Survivor2
 			&& P3->PartyMembershipId == Survivor3, TEXT("solo inviter replaced continuing group identities"))) return false;
-		return AMMOPlayerController::RunPartyChatContextSelfTest(World, OutError, OutChecks);
+		if (!AMMOPlayerController::RunPartyChatContextSelfTest(World, OutError, OutChecks)) return false;
+		ClearGroups();
+		// Real native UnPossess/Destroy/RouteEndPlay. Same frame: no AutoLoad/save/remote logout proof.
+		auto PossessFixture = [&](int32 I) {
+			AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Params);
+			if (!PC) return static_cast<AMMOPlayerController*>(nullptr);
+			LifecycleControllers.Add(PC); PC->Possess(Actors[I]); PC->SetActorTickEnabled(false);
+			Actors[I]->SetActorTickEnabled(false); return PC;
+		};
+		if (!Accept(0, 1)) return false;
+		AMMOPlayerController* DetachedPC = PossessFixture(0);
+		if (!Check(DetachedPC && Actors[0]->IsPlayerControlled() && Matches(A, Actors[0]), TEXT("lifecycle possessed pair setup"))) return false;
+		DetachedPC->UnPossess();
+		if (!Check(!Actors[0]->IsPlayerControlled() && !Actors[0]->GetPlayerState() && !DetachedPC->GetPawn()
+			&& Matches(A, Actors[0]), TEXT("unpossess lifecycle precondition"))) return false;
+		if (!Actors[0]->Destroy()) { OutError = TEXT("detached native Destroy failed"); return false; }
+		if (!Check(Solo(1), TEXT("destroy after unpossess retained dead party member"))) return false;
+		if (!Accept(2, 3) || !Accept(2, 4)) return false;
+		AMMOPlayerController* AttachedPC = PossessFixture(2);
+		const FGuid DestroySession = P3->PartySessionId, Surviving3 = P3->PartyMembershipId;
+		const FGuid Surviving4 = Actors[4]->GetPartyComponent()->PartyMembershipId;
+		if (!Check(AttachedPC && Actors[2]->IsPlayerControlled() && Matches({ Actors[2], Actors[3], Actors[4] }, Actors[2]),
+			TEXT("destroy attached leader setup"))) return false;
+		if (!Actors[2]->Destroy()) { OutError = TEXT("attached native Destroy failed"); return false; }
+		if (!Check(!AttachedPC->GetPawn() && Matches({ Actors[3], Actors[4] }, Actors[3]) && P3->PartySessionId == DestroySession
+			&& P3->PartyMembershipId == Surviving3 && Actors[4]->GetPartyComponent()->PartyMembershipId == Surviving4,
+			TEXT("destroy leader lost survivor roster or membership"))) return false;
+		if (!Accept(5, 6) || !Accept(5, 7)) return false;
+		UMMOPartyComponent* P5 = Actors[5]->GetPartyComponent(); UMMOPartyComponent* P7 = Actors[7]->GetPartyComponent();
+		const FGuid MemberSession = P5->PartySessionId, Surviving5 = P5->PartyMembershipId, Surviving7 = P7->PartyMembershipId;
+		AMMOPlayerController* MemberPC = PossessFixture(6);
+		if (!Check(MemberPC && Actors[6]->IsPlayerControlled(), TEXT("possessed ordinary member setup"))) return false;
+		MemberPC->UnPossess();
+		if (!Check(!Actors[6]->IsPlayerControlled() && Matches({ Actors[5], Actors[6], Actors[7] }, Actors[5]),
+			TEXT("detached member lifecycle setup"))) return false;
+		if (!Actors[6]->Destroy()) { OutError = TEXT("member native Destroy failed"); return false; }
+		if (!Check(Matches({ Actors[5], Actors[7] }, Actors[5]) && P5->PartySessionId == MemberSession
+			&& P5->PartyMembershipId == Surviving5 && P7->PartyMembershipId == Surviving7,
+			TEXT("destroy member changed survivor identity"))) return false;
+		Actors[7]->RouteEndPlay(EEndPlayReason::LevelTransition);
+		if (!Check(Solo(5) && Solo(7), TEXT("native transition EndPlay left party references"))) return false;
+		FMMOCharacterSaveData BeforeFinalDestroy; Actors[5]->GetInventory()->FillSaveData(BeforeFinalDestroy);
+		if (!Actors[7]->Destroy()) { OutError = TEXT("post EndPlay native Destroy failed"); return false; }
+		FMMOCharacterSaveData AfterFinalDestroy; Actors[5]->GetInventory()->FillSaveData(AfterFinalDestroy);
+		TArray<FString> FinalDifferences; FMMOCharacterSaveJson::FindDifferences(BeforeFinalDestroy, AfterFinalDestroy, FinalDifferences);
+		return Check(Solo(5) && FinalDifferences.IsEmpty(), TEXT("post-EndPlay Destroy changed solo inventory"));
 	}();
 	// Controllersiz fixture'lar EndPlay'de oyuncu kaydi yazmaz; grup referanslarini da temizle.
-	for (AMMOCharacter* Character : Actors) { Character->GetPartyComponent()->RequestLeave(); }
-	for (AMMOCharacter* Character : Actors) { Character->Destroy(); }
+	for (AMMOPlayerController* PC : LifecycleControllers) { if (IsValid(PC)) { PC->UnPossess(); PC->Destroy(); } }
+	for (AMMOCharacter* Character : Actors) { if (IsValid(Character)) Character->GetPartyComponent()->RequestLeave(); }
+	for (AMMOCharacter* Character : Actors) { if (IsValid(Character)) Character->Destroy(); }
 	return bSuccess;
 }
 

@@ -860,21 +860,17 @@ void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			SaveCharacterForTravel(true); // karakter yok oluyor: gecis penceresinde bile ertelenmez
 		}
 
-		// Partideyse hemen ayril: yoksa kalan uyelerin Members listesi, bu aktor GC ile
-		// null'lanana kadar gecerliligini yitirmis (pending-kill) bir isaretci tutar ve
-		// "PARTI" HUD'u/uye sayisi/paylasilan XP kisa sure (ya da GC tetiklenene kadar)
-		// yanlis/eksik gorunur. Yukleme tamamlanmamis olsa bile parti temizligi guvenlidir
-		// (yeni-possess bir karakter zaten partide olamaz), o yuzden bagimsiz calisir.
-		if (PartyComponent)
-		{
-			PartyComponent->RequestLeave();
-		}
-
 		// Gercek cikis (Destroyed; bolge gecisi/kapanis degil): arkadaslara cevrimdisi haberi.
 		if (FriendsComponent && EndPlayReason == EEndPlayReason::Destroyed && !bTravelSaveCommitted)
 		{
 			FriendsComponent->AnnouncePresence(false);
 		}
+	}
+	// Destroyed() detaches the controller before EndPlay; party cleanup must not require PlayerState.
+	// Components are still alive until Super::EndPlay. Authority dispatch is local even without ownership.
+	if (HasAuthority() && PartyComponent)
+	{
+		PartyComponent->RequestLeave();
 	}
 	Super::EndPlay(EndPlayReason);
 }

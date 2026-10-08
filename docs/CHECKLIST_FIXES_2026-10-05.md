@@ -2132,3 +2132,92 @@ ve agent yazımı yok; bitimde UE/UBT süreci yok. Son doc düzeni ayrı tutuldu
 | Tam mevcut paket | Geçti37/37 | Bağlantı smoke'u tüm gameplay replication'ını kanıtlamaz |
 | ECC + salt okunur multiplayer/QA inceleme | Kapsamda ek engel yok | EndPlay gate/kick/atomic UX riskleri ayrı açık |
 | Gerçek host + uzak istemci PIE | Yapılmadı | Checklist işaretlenmedi; coverage yüzdesi üretilmedi |
+
+
+## 63. PlayerState kaybından bağımsız sunucu parti EndPlay cleanup — 2026-10-08 (O26)
+
+**ECC plan:** Başlangıç HEAD967800c, tracked ağaç temiz; aynı checkout'taki ECC
+kurulum sohbeti idle, önceki agent kapalı. Yarım iş yok. §62'nin açık party
+EndPlay gate'i için önce native engine yaşam döngüsüyle hata kanıtı, ardından
+iki C++ dosyası + mevcut runner'da sınırlı değişiklik. Kriterler: gerçek
+unpossess/destroy ikilisinde survivor solo; attached leader/member destruction
+sonrası simetrik survivor roster/leader ve sürekli üyelik kimlikleri korunur;
+client cleanup RPC üretmez. Save/friends kimliği, kick ve HUD atomik görünümü
+bu kapsamda genişletilmez. ECC plan/review/verify ve ue-build kullanıldı.
+
+**Baseline:** Eski Character EndPlay authority + IsPlayerControlled gate'ine
+party cleanup'ı da bağlamıştı. Yerel UE5.7 Pawn.cpp: IsPlayerControlled PlayerState
+ister; UnPossessed temizler; Destroyed detach'i actor RouteEndPlay'den önce
+çalıştırır. Native PC gerçek pawn possess eder, grup valid olur; UnPossess sonrası
+PlayerState null, controller pawn null, mevcut grup korunur. Pawn Destroy true
+döndükten hemen sonra canlı diğer pawn hâlâ partilidir: FAIL75 reason=destroy
+after unpossess retained dead party member, 15:44:38.825 UTC, UE0/PS1.
+Önce normal DLL Succeeded10,43 sn. TEMP mmo_party_lifecycle_baseline_20261008.log.
+Bu fixture doğrudan EndPlay çağırmaz; gerçek motor destruction yolunu yürütür.
+Eski fixture'lar önce RequestLeave yaptıkları için bu hatayı ölçmüyordu.
+
+**Fix:** Character EndPlay, save/friends gate'inden sonra ve Super'den önce ayrı
+HasAuthority && PartyComponent ile RequestLeave çağırır. UObject component bu
+noktada henüz Super tarafından EndPlay edilmemiştir. Component owner karakterdir;
+actor controller/connection kaybı authority dispatch'ini engellemez. Yerel
+implementation §62 valid/current membership guard'ını ve mevcut grup düzenlemesini
+kullanır. Client EndPlay authority false olduğu için leave RPC göndermez.
+Player-control save/friends gate'i genişletilmedi; PlayerState yokken Default
+save kimliğine yazmak gibi bir fallback eklenmedi. Yeni property/RPC/timer/Tick
+ve save alanı yok. Salt UnPossess, EndPlay olmadan partiyi bozmaz.
+
+**Native83:** Eski73 +10 lifecycle. Detached pair (gerçek PC/player state),
+attached leader destruction üçlü grup, ordinary member possess/unpossess/Destroy,
+new survivor leader/session/personal ID, engine RouteEndPlay(LevelTransition)
+ve sonraki Destroy/solo envanter kontrolü. Yok edilen actor/component yeniden
+okunmaz; canlı survivors destruction'dan hemen sonra incelenir. Final fixture
+teardown IsValid ile ölü actor'ları atlar, native PC'leri unpossess/destroy eder.
+Tüm test aynı-frame, deferred AutoLoad .6sn world timer'ı çalışmadan biter;
+Tick kapatmak world timer'ını kapatır iddiası yok. Save/HTTP/remote logout
+kanıtı değildir. RouteEndPlay gerçek ServerTravel değildir. Sonraki Destroy
+begun-play guard nedeniyle ikinci Character EndPlay çağırmaz; ikinci cleanup
+çağrısı kanıtı olarak sayılmaz. Son assertion etiketi bunu açıkça belirtir.
+
+İlk fix DLL Succeeded8,18 sn; PASS83/15:46:12.827 UTC, PS0.
+TEMP mmo_party_lifecycle_positive_20261008.log. Descartes logları salt okunur
+inceledi: baseline/fixed marker ve failure-pattern0 teyit etti; process exit
+kodlarını bağımsız doğrulamadı. Parent exit kodlarını kaydetti.
+
+**Derlenmiş negatif:** Yeni cleanup kapısına tekrar IsPlayerControlled eklendi;
+DLL Succeeded4,93 sn, FAIL75/15:47:46.674 UTC, UE0/PS1. TEMP
+mmo_party_lifecycle_negative_gate_20261008.log. Character.cpp byte exact restore,
+son normal DLL Succeeded4,91 sn; PASS83/15:48:17.980 UTC, PS0. TEMP
+mmo_party_lifecycle_restored_20261008.log. Negatif mutant final kaynak/DLL'de yok.
+
+**ECC review / ajan:** Descartes yerel Unreal Multiplayer Architect TOML, repo
+QA ve ECC review ile motor destruction sırası, component lifetime, actual diff
+ve fixture/runner83 eşleşmesini salt okunur inceledi. Son diff'te engel bulmadı.
+Transition route + Destroy tekrar EndPlay değildir sınırını belirtti; test etiketi
+netleştirildi. Ajan dosya/build/test yazmadı, tam paket öncesi kapatıldı; Agency
+paket kökeni doğrulanmadı. Parent bütün uygulama/build/test'i yürüttü. İlgili
+code/caller/super sırası kontrol edildi. Gerçek remote ownership/delivery/save,
+client HUD/XP ve kalıcı logout, Server/Shipping açık; PLAYTEST maddeleri eklenip
+hiçbiri geçti işaretlenmedi.
+
+
+**Son ECC verify:** RunAllChecks.ps1 -SkipBuild -FullCompile 37/37 GECTI,
+exit0. Normal Editor DLL ayrıca Succeeded4,91 sn; 18 PCH'siz /W4 dosya warning C0.
+Veri/lint temiz; bilinen Lv33+ beceri boşluğu/InitGameState whitelist uyarıları
+sürer. Parti83 PASS15:53:44.551 UTC; klan43/takas218, ölüm14/3first+5death ve
+parser576/576 dahil bütün mevcut regresyonlar geçti. JSON schema2/negative111;
+store406 loaded406, invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6,
+writeorder1, roundtrip equal1. Yuva sayısı oyuncu/PIE/Lv1–30 koşu sayısı değildir.
+Summer52/Winter31 doğum, smoke exit0/error0; NetSmoke1join/1welcome ve iki tarafta
+error0. Bu koşunun spawn log sayımı içerik değişikliği değildir. TEMP tam paket
+mmo_all_party_lifecycle_final_20261008.log; ağ logları mmo_net_server_185737.log
+ve mmo_net_client_185737.log. Öncesi/sonrası147 Source/Scripts SHA256 aynı,
+differences0; mmo_party_lifecycle_final_hashes_20261008.txt. Paket boyunca kod/
+runner/ajan yazımı yok; bitimde UE/UBT süreci yok. Son doküman düzeni ayrı.
+
+| Kontrol | Sonuç | Sınır |
+| --- | --- | --- |
+| Normal UBT + 18 PCH'siz dosya | Geçti | Editor Development; gerçek Server/Shipping açık |
+| Native83 + derlenmiş gate negatifi | Geçti83; mutant FAIL75 | Gerçek native engine lifecycle, remote logout değil |
+| Tam mevcut regresyon paketi | Geçti37/37 | NetSmoke tüm gameplay replication'ını sınamaz |
+| ECC + salt okunur Unreal/QA inceleme | Kapsamda engel yok | Save/presence lifecycle ve kick ayrı açık |
+| Gerçek host + uzak istemci PIE | Yapılmadı | Checklist açık; oyuncu koşusu/coverage yüzdesi yok |

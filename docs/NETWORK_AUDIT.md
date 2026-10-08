@@ -755,3 +755,37 @@ RPC ownership testi değildir; GUID'ler save'e eklenmedi, yeni timer/Tick yok.
 Chat sözleşmesi iki uçta aynı DLL ister; ek FGuid bant maliyeti ölçülmedi.
 Kick stale bağlamı ve Character EndPlay IsPlayerControlled gate sonrası gerçek
 unpossess/destroy cleanup ayrı açık. Bu iş disconnect cleanup garantisi vermez.
+
+
+### O26 · ORTA · Unpossess/destroy sonrası kalan hayalet parti — sınırlı düzeltildi
+
+967800c sonrası gerçek native PC UnPossess(); Pawn Destroy() fixture'ında
+survivor boşalmadı: FAIL75, 8 Ekim 15:44:38.825 UTC, UEexit0/PS1. Eski testler
+Destroy öncesi RequestLeave ile temizlediğinden bu engine lifecycle boşluğunu
+ölçmüyordu. Yerel UE5.7 Pawn.cpp IsPlayerControlled için PlayerState ister;
+UnPossessed PlayerState'i temizler. Destroyed detach'i Character EndPlay'den
+önce çalıştırır. Böylece save/friends ile ortak player-control gate içindeki
+party cleanup çalışmıyordu; native baseline aynı yolu gerçekten yürüttü.
+
+Character EndPlay ayrı HasAuthority + PartyComponent kapısından, Super'den
+önce RequestLeave çağırır. Component bu aşamada canlıdır; authority yerel
+implementation'a gider, PlayerState/connection gerektirmez. §62 üyelik kimliği
+ve survivor devamlılığı korunur. Save/friends gate genişletilmedi; controller/
+kayıt kimliği kaybında kalıcılık ve presence ayrı açık. Yeni RPC/property,
+Tick/timer veya save şeması yok. Salt UnPossess üyeliği bozmaz; cleanup EndPlay'de.
+
+83 native = önceki73 +10 lifecycle. Possessed pair → gerçek UnPossess → Destroy;
+possessed leader doğrudan Destroy; ordinary member possess/unpossess/Destroy;
+survivor leader/session/personal ID; engine RouteEndPlay(LevelTransition) sonra
+Destroy ve solo inventory kontrolü. Destroy edilmiş pawn/component'i testte
+yeniden okumadan canlı survivors hemen denetlenir; GC/manual teardown beklenmez.
+Transition route gerçek harita geçişi değildir; daha sonra Destroy motorun
+begun-play gate'i nedeniyle ikinci Character EndPlay çağrısı yapmaz. Tekrar
+cleanup çalışması, remote logout veya kalıcı save kanıtı olarak yorumlanmaz.
+
+Player-control gate tekrar eklenen derlenmiş negatif FAIL75 verdi; byte exact
+restore sonrası normal DLL ve PASS83 geçti. Son paket kanıtı CHECKLIST_FIXES §63.
+Gerçek host/uzak istemci destroy/logout/travel/replication/parti XP ve GUID
+owner-only teslimi PLAYTEST_CHECKLIST'te açık. Kick ve eski roster/latest ID
+UX sınırları sürer. O25'te açık bırakılan party EndPlay gate'i bu kapsamda
+native düzeltildi; genel player identity/save/presence lifecycle çözülmedi.
