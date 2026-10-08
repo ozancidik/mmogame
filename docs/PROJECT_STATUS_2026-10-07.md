@@ -77,7 +77,6 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | `c4effd1` | Recipient generation; gönderim pawn/kimlik/iptal niyeti; farklı pawn'a fallback yok | Önce FAIL165/check166; DLL/218 native ve36/36 tam paket geçti; 18 PCH'siz dosya/warning0 (§58); gerçek bildirim görünümü/ağ açık |
 | `dd9f354` | Recipient generation accept/decline; chat gönderim pawn/ID; eski davete/pawn'a fallback yok | Önce FAIL10/negatif FAIL13; normal DLL/46 native ve36/36 tam paket,18 PCH'siz/warning0 (§59); gerçek ağ/bildirim görünümü açık |
 | `3df7a3e` | Controller ilk death zamanı/by/gerçek xploss; normal death toplamlarını çift saymaz | Native14/3first+5death; oturum6 genişletildi; Lost+1 negatif PSexit1, restore; parser576/576, DLL/37 paket/18 PCHdosya (§60); gerçek callback/PIE açık |
-
 | 8 Ekim klan kabulü (bu belgeyle aynı commit) | Recipient generation ve chat gönderim pawn eşleşmesi; stale kabul pending'i tüketmez | Önce FAIL8; ID/pawn negatifleri FAIL12/FAIL38; normal DLL/43 native,37/37 paket,18 PCHdosya/warning0 (§61/O24); gerçek bildirim/ağ/PIE açık |
 
 ## 3. Sıradaki çalışma sırası
@@ -229,3 +228,8 @@ okundu ve klan işinin kapsam/inceleme/doğrulama akışına uygulandı. Genel w
 komutları veya coverage hedefi eklenmedi. Gerçek PIE açık kalır. Yeni işlerde
 plan → server-authoritative uygulama → inceleme → mevcut Unreal kontrolleri
 akışı kullanılır; skill kurulumu başka sohbetin .agents dosyalarında korunur.
+
+Otonom geliştirme otomasyonu ACTIVE tutuldu; aynı sohbet ve sıklık korunarak
+ECC plan/review/verify kullanımını sonraki çalışmalara taşıyan talimat eklendi.
+Yalnız anlamlı tamamlanma/hata/müdahale bildirilir; kullanıcı “durdur” dediğinde
+yeni işe başlanmaz ve otomasyon durdurulur.
