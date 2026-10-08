@@ -2485,3 +2485,86 @@ bilinen Lv33+ beceri bosluklari/InitGameState whitelist uyari sinirlari surer.
 | Mevcut tum regresyon paketi | Gecti40/40 | NetSmoke baglanti, tum replication/oynanis degil |
 | ECC + readonly Unreal/security/QA | Kapsamda blocker yok | Parent final kaynak/DLL/full dogruladi |
 | Gercek host/uzak istemci PIE | Yapilmadi | Effect HUD/scheduling/source rebinding/profiler acik |
+
+
+## 67. Klan komutlarini gonderen pawn'a baglama (2026-10-08, O30)
+
+**ECC plan/review:** Say ve OnChatCommitted zaten gonderim anindaki pawn'i
+ServerSendChat'e tasiyordu; yalniz /klan kabul bunu denetliyordu. Gercek native
+possession switch sonrasi eski /klan ayril replacement pawn'in farkli klanini
+bosaltti: orijinal dispatch + yeni fixture DLL Succeeded4,42 sn, FAIL45
+(next check46) 20:52:39.170 UTC. TEMP mmo_clan_commands_baseline_20261008.log.
+Bu orta davranis/veri butunlugu hatasidir; sahte girdiyle lider yetkisini asma
+iddiasi degildir. Gecikmis eski /klan at/davet/kur/liste ve /g de yeni pawn'a
+route ediliyordu; kabul zaten ID ve pawn korumasina sahipti.
+
+ServerSendChat'in /klan ve /g dallarinin basinda, mevcut ortak throttle sonrasi
+IsValid(SeenCommandPawn) && SeenCommandPawn == GetPawn() gerekir. Ret sessizdir;
+yeni pawn'da ayni sayisal invite ID olmasi yetmez. Clan component otorite,
+liderlik/olum/cooldown/ad kurallari ve CmdAcceptSeen ID denetimi korunur.
+Yeni RPC parametresi, replication/property, save schema, Tick veya timer yok.
+Sunucu halen kendi mevcut pawn'ini kullanir; istemcinin referansi sadece eslesme
+icin okunur. Possession bilgisi istemcide gec guncellenirse fresh baglamla tekrar
+gondermek gerekir. Ayni pawn'da klan ayril/rejoin, hedef kick-rejoin, kalici klan
+kimligi ve atomik roster/bildirim gorunumu bu scope'ta cozulmedi.
+
+Mevcut klan self-test 43 ->73; controller chat11 ->41. Yeni30 kontrol:
+4nativePC/pawn + ClientSetHUD/ClientReceiveChat standalone buffer; actual
+UnPossess/Possess farkli klan/liderlik; eski/null/baska pawn ×6command ret,
+stale/null kur ret; clan/inventory/leader/inviteID/HUD-delivery korunmasi;
+fresh Say /G yalniz ayni klan alicilari, committed liste yalniz owner;
+fresh davet mevcut3sn cooldown cevabi; nonleader/dead kick ret, leader kick,
+fresh replacement leave, invalidcreate normal feedback. Yeni fresh valid kur
+ve real cooldown bekleme yok; invite issuance onceki43 kapsaminda. Butun
+fixture ayni frame'de: world tick/load timer/save calismaz, GUID clan/name,
+cleanup once clan state sonra controller/pawn/HUD; gercek karakter kaydi yok.
+Freshinvite beklentisinin ilk FAIL67'si ayni-frame cooldown'u ihmal eden test
+beklentisiydi, production bug sayilmadi; private testhook/time advance eklenmedi.
+
+Production iki gate ile DLL Succeeded4,28 sn ->PASS73 20:53:44.949 UTC.
+/g kapisi kaldirilan derlenmis mutant DLL Succeeded4,24 sn ->FAIL49
+(next50) 20:54:14.201 / UE0/runner1: gercek stale HUD mesaj teslimi yakalandi.
+TEMP mmo_clan_commands_negative_g_20261008.log. Byte-exact Copy-Item restore
+eski timestamp'i koruyunca UBT up-to-date dedi; test tekrarFAIL49 ile mutantDLL'i
+yakaladi. LastWriteTimeUtc yenilenip gercek compile/link Succeeded4,23 sn;
+finalPASS73 /chat41 20:55:01.333 /UE0/runner0. Kaynak yedegiyle bytes ayni;
+mutantDLL ile commit yok. TEMP mmo_clan_commands_final_restore_20261008.cpp
+ve mmo_clan_commands_final_20261008.log. Tek degisen CPP PCH'siz /W4
+-NoPCH -NoLink -SingleFile ile Succeeded12,54 sn, warning C0;
+TEMP mmo_clan_commands_nopch_20261008.log. Onceki19CPP full kontrolunu
+bu degisiklige yeni full19 kaniti olarak atfetmiyoruz.
+
+Readonly Unreal/multiplayer/security/QA Peirce final diff, restore byte hash,
+negative /g ve final73/41 logunu inceledi: blocker yok. ECC review/verify
+uygulandi; ajan dosya yazmadi/build/test yapmadi ve paket surerken kapatildi.
+Agency plugin kokeni bulunmadigindan plugin kullanildi diye sunulmadi.
+Gercek uzak RPC, Slate input/Canvas, owner-only teslim/respawn/travel/packet
+latency ve Server/Shipping oynanmadi; PLAYTEST_CHECKLIST O30 maddeleri acik.
+
+
+**Final ECC verify (9 Ekim yerel / 8 Ekim UTC):** Gercek restore DLL sonrasi
+RunAllChecks.ps1 -SkipBuild 39/39 GECTI, exit0. Tek CPP degistigi icin eski19
+NoPCH dosyayi yeniden calistirmadik; degisen MMOPlayerController.cpp ayrica
+NoPCH/NoLink/SingleFile Succeeded12,54 sn, responsefile /W4 ve warning C0.
+Klan73 PASS20:58:03.460 UTC; save26 20:56:31.545, presence24 20:56:43.344,
+parti83 20:57:48.403, DoT33 20:59:23.074, takas218 21:00:44.273; parser576/576,
+JSON schema2/negative111 ve mevcut regresyonlar gecti. Store433 loaded433,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Bunlar gercek oyuncu/Lv1-30 kosusu degildir. Summer47/Winter29
+random smoke mob dogumu, exit0/error0. NetSmoke1join/1welcome iki taraftaerror0;
+TEMP mmo_net_server_000117.log / mmo_net_client_000117.log. Paket logu TEMP
+mmo_all_clan_commands_final_20261008.log. Paket oncesi/sonrasi150 Source/Scripts
+SHA256 differences0; liste mmo_clan_commands_final_hashes_20261008.txt.
+ControllerCPP restore SHA256 F7353620D07E69B23BC61F64D9ECD3A6F64F79DADA66312069B73605828274AC.
+Kaynak/runner freeze boyunca yazilmadi. Readonly ajan kapali; diger ayni checkout
+ECC chat notLoaded, aktif baska yazici yok. Engine/UBT process0,
+MMOSave_ZClanCtx*.sav0. StaticLint InitGameState whitelist / Lv33+ beceri uyari
+sinirlari devam eder. Gercek remote/PIE/Server/Shipping acik.
+
+| Kontrol | Sonuc | Sinir |
+| --- | --- | --- |
+| Gercek compile/link ve degisen CPP NoPCH/W4 | Gecti, warning C0 | Editor Development; Server/Shipping acik |
+| Native klan73/chat41 + baseline/g mutant | PASS73; FAIL45/49 | Actual possession/nativeHUD, remote/rendering degil |
+| RunAllChecks -SkipBuild | Gecti39/39 | FullCompile19 yeniden calismadi; NetSmoke sadece baglanti |
+| ECC readonly Unreal/security/QA | Final diff'te blocker yok | Parent build/fixture/paket/hash dogruladi |
+| Gercek host/remote PIE | Yapilmadi | Respawn/travel/teslim sirasi/aynipawn rejoin acik |

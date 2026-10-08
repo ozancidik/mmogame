@@ -4393,7 +4393,8 @@ expiry zamanı, kayıt/yeniden giriş veya Server/Shipping paketi oynanmadı.
   eski pawn, yeni pawn'da aynı sayısal ID olsa da kabul etmemeli. Null/yanlış
   pawn ve eski/0/ileri ID güncel pending'e fallback yapmamalı, bağlantı sürmeli.
   Güncel Say/Enter kabulü, native possession fixture'ının remote karşılığını
-  doğrulamalı. Diğer klan komutları için stale bağlam ayrı inceleme ister.
+  doğrulamalı. Diğer komutların pawn değişikliği O30 bölümünde; aynı pawn
+  üyelik değişimi için generation bağlamı hâlâ açık.
 - [ ] Davet metni ID'den önce gelsin; ilk 0/eski ret sonrası kimlik replike olunca
   yeniden deneme çalışmalı. PendingInviteId yalnız alıcıda görünmeli. Eski metin
   dururken yeni latest ID gelirse bu değişiklik eski görünür satıra bağlamaz;
@@ -4564,3 +4565,27 @@ refresh FAIL15, final restore PASS33. Elapsed scheduler/HUD ayrica acik.
   normal expired duration ve uzun elapsed tick'ler; network delay/loss altinda
   server mutasyonu ve client HUD tutarli olmali. Profiler sonuclari olmadan
   performans/bant veya tum replication gecti iddiasi yapma.
+
+
+## 2026-10-08 — Bütün klan komutlarında gönderim pawn bağlamı (O30, PIE açık)
+
+Native73/chat41 actual authority possession switch ve standalone HUD buffer
+kontrolleridir. Baseline eski ayrıl isteği replacement klanını boşalttı; /g
+kapısı kaldırılınca stale mesaj teslimi yakalandı. Gerçek uzak RPC/Canvas/Slate,
+respawn/travel, gecikme/kayıp, Server/Shipping veya save/login yapılmadı.
+
+- [ ] Host + uzak istemci aynı DLL: /klan ayril, at isim, davet, kur ad, liste
+  ve /g mesaj gönderimi ile sunucu teslimi arasında pawn değişsin. Yeni pawn
+  başka klan/liderlik taşısın: eski/null/başka pawn isteği üyelik/lider/davet/
+  envanter/kayıt veya HUD mesajı üretmemeli. Gerçek respawn ve bölge geçişini
+  ayrı dene; native doğrudan possession bunun ağ karşılığı değildir.
+- [ ] Güncel pawn replike olduktan sonra Say/Enter ile normal ayrıl, yetkili at,
+  davet, geçerli yeni klan kurma, liste ve /g çalışmalı; liste yalnız sahibine,
+  /g yalnız kendi klanına gitmeli. Native yeni valid kur veya gerçek 3sn bekleme
+  yapmadı. Ölü/nonleader ret, 0,7sn chat sınırı ve 3sn davet sınırı korunmalı.
+- [ ] Possession teslim sırası/gecikmesi yüzünden ilk sessiz ret oluşursa fresh
+  bağlamla tekrar gönderim çalışmalı; eski isteği otomatik yeni pawn'a taşımamalı.
+  Genel/parti/whisper ve diğer komutlar ayrı regresyon olarak çalışmalı.
+- [ ] Aynı pawn klan ayrıl/rejoin veya hedef isim/pawn/üyelik değişimi: O30
+  bunlar için membership nonce sağlamaz. Hedef kick yenidenkatılım, offline
+  üye kalıcılığı, roster/bildirim ortak görünümü ve gerçek save/login açık kalsın.

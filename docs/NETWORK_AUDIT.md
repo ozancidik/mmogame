@@ -866,3 +866,27 @@ helper'i production damage hook'u degildir; Shipping hedefi derlenmedi.
 ECC readonly Unreal/security/QA incelemesi ve ayrintili kanit CHECKLIST_FIXES
 §66; gercek host/remote/HUD/elapsed scheduling PLAYTEST_CHECKLIST'te acik. Pending
 clear/refresh cancellation ve duration overshoot bu sinirli fix'in disindadir.
+
+
+### O30 · ORTA · Eski klan chat isteginin replacement pawn'a uygulanmasi
+
+ServerSendChat pawn baglamini gonderiyordu ama yalniz /klan kabul denetliyordu.
+Native actual possession switch baseline eski /klan ayril ile yeni pawn'in
+farkli klanini bosaltti: FAIL45/next46. /klan dalinin ve /g mesajinin basinda
+IsValid+GetPawn eslesmesi eklendi; ortak throttle ve component authority,
+liderlik/olum/cooldown/ad kurallari/accept generation korunur. Ret sessiz;
+current client baglamiyla normal komutlar devam eder. Yeni wire field/save
+schema/timer/Tick yok. Native73 (onceki43 +30), chat41; /g gate mutantFAIL49,
+restore gercekDLL/PASS73. Ayrinti CHECKLIST_FIXES §67.
+
+Bu fix pawn degisikligini kapsar; ayni pawn clan leave/rejoin generation,
+hedef kick rejoin/isim yenidenkullanim, offline uyelik ve atomik roster acik.
+Fixture HUD buffer/native endpoints remote/Slate/rendering kaniti degildir.
+Gercek respawn/travel/packet lag ve normalfresh UX PLAYTEST_CHECKLIST'te acik.
+
+
+O30 final: gercek restore DLL + degisen controller CPP NoPCH/W4/warning0;
+RunAllChecks -SkipBuild39/39 exit0 (FullCompile19 yeniden calismadi),
+150 Source/Scripts hash differences0. Klan73, parti83, DoT33, save26,
+presence24, trade218; Summer47/Winter29/error0 ve Net1join/1welcome/error0.
+Paket gunu9Ekim yerel/8EkimUTC; remote ve Shipping/Dedicated acik.
