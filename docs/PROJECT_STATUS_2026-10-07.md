@@ -1,19 +1,19 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 9 Ekim 2026 (8 Ekim UTC). Kaynak kod ve tamamlanan kontroller esas alınmıştır.
-Önceki HEAD `ec27984` (§66/O29), kaynağı yok olan oyuncu DoT hasarını ve callback
-sonrası bayat pending tick'i reddetti. Son sınırlı düzeltme (§67/O30), bütün
-/klan komutları ve /g mesajını gönderim anındaki pawn'a bağlar. Gerçek native
-possession değişiminde eski ayrıl isteği yeni pawn'ın farklı klanını boşalttı
-(FAIL45/next46); /g kapısı kaldırılınca eski mesaj HUD'a ulaştı (FAIL49/next50).
-Mevcut ortak throttle, lider/ölüm/cooldown/ad kuralları ve kabul ID kontrolü
-korunur; yeni RPC alanı, save/replikasyon şeması veya timer yok. ECC plan/review/
-verify ve readonly Unreal/multiplayer/security/QA incelemesi kullanıldı.
-Final gerçek compile/link, 73 native klan kontrolü (chat41) ve değişen CPP'nin
-PCH'siz /W4 derlemesi/warning0 ve 39/39 güncel paket geçti. Timestamp korunmuş restore'un eski DLL'i
-testte yakalandı; gerçek rebuild sonrası PASS73, kaynak bytes yedekle aynı.
-Gerçek remote/Slate/PIE, aynı pawn üyelik leave/rejoin generation, hedef kick
-rejoin, atomik roster/bildirim ve Server/Shipping hâlâ açık.
+Önceki HEAD `3d30dd7` (§67/O30), bütün klan komutlarını gönderim pawn'ına bağladı.
+Son sınırlı düzeltme (§68/O31), /arkadas sil/ekle/kabul/accept/liste ve çıplak
+komutu da replacement component'i seçmeden aynı pawn eşleşmesine bağlar.
+Actual native possession switch'te eski sil isteği yeni pawn ve karşı taraftaki
+ilişkiyi kaldırdı (FAIL2). Yeni gate sonrası PASS28; her arkadaş komutunu kesen
+mutant normal rızayı reddetti ve FAIL20 verdi. Gerçek restore compile/link
+4,40 sn, PASS28, değişen CPP NoPCH/W4/warning0 ve 40/40 güncel paket geçti. ECC plan/review/verify ve
+readonly Unreal/multiplayer/security/QA incelemesi uygulandı. Yeni RPC parametresi,
+replicated/save alanı veya timer yok; mutual consent/capacity/ad ve owner-only
+liste korunur. Ret ortak0,7sn throttle'a girer, fresh bağlamla tekrar gerekir.
+Gerçek remote/Slate/PIE, aynı pawn pending A→B davetinde recipient generation,
+kimlik/reconnect/offline rıza ve Server/Shipping açık. Native HUD buffer bu
+oynanışları veya gerçek save/login'i kanıtlamaz.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -35,13 +35,13 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 79 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 51 arketip (13 elit), 29 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer47, Winter29 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer48, Winter26 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider rızası; davet/üyelik kimliği; chat pawn bağlamı; authority EndPlay cleanup | 83 native: önceki73 +10 gerçek lifecycle; UnPossess/Destroy/leader/member/transition route; baseline/negatif FAIL75 | Gerçek disconnect/travel/owner-only teslim/HUD/XP; kalıcı reconnect/presence; kick stale bağlamı ve roster atomik görünümü |
 | Ticaret ve depo | Görülen session/revision teklif/onay; session cancel/X; recipient invite generation accept/decline; chat gönderim pawn/kimlik/iptal niyeti; kimlik/kapasite/altın tavanı ve NPC depo | 218 native kontrol: önceki182 +28 invite +8 controller chat; eski decline önce FAIL165/check166; tam component ret snapshot'ı ve native Say/OnChatCommitted/endpoint kanıtı | Gerçek davet/RPC/HUD; bildirimle kimliğin ortak görünümü; reentrant rollback; ortak kalıcı işlem/çökme/yeniden giriş; gerçek depo RPC |
-| Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, recipient generation; bütün /klan ve /g gönderim pawn eşleşmesi; arkadaş listesi, sohbet/hız sınırı | Klan73: önceki43 +30 native command/HUD/possession; chat41; baseline45/g negatif49; arkadaş presence24 | Gerçek remote/owner-only teslim; aynı pawn clan üyelik generation, hedef kick rejoin; çevrimdışı üyelik/rıza ve yeniden giriş |
+| Klan, arkadaş ve sohbet | Klan üyelik/liderlik/davet, recipient generation; /klan, /g ve /arkadas gönderim pawn eşleşmesi; mutual Friends/owner-only | Klan73/chat41; arkadaş presence24 +yeni chat28 (baseline2/drop-all20), actual possession/HUD | Gerçek remote; aynı pawn friend invite/clan membership generation, hedef kick rejoin; hesap/offline rıza/yeniden giriş |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; son paket433 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; son paket440 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
@@ -90,6 +90,7 @@ sunucusu kapasitesi için kanıt oluşturmaz.
 | 8 Ekim arkadaş presence (§65/O28) | Identity detach öncesi offline; initial-load/save bağımsız, mutual/travel/EndPlay korumalı | Önce/negatif FAIL6/6/18; DLL/PASS24,39/39 paket,19 PCHdosya/warning0; gerçek remote/PIE/cache sınırları açık |
 | 8 Ekim DoT kaynak ömrü (§66/O29/D2) | Player kaynak kaybolunca anonim hasar reddi; pending weak reference her dispatch'te çözülür; refresh provenance | Önce FAIL10; negatif FAIL32/15; DLL/PASS33,40/40 paket,19 PCHdosya/warning0; gerçek remote/elapsed/source rebinding açık |
 | 8 Ekim bütün klan chat komutlarında pawn bağlamı (§67/O30) | Eski /klan ve /g yeni pawn'a uygulanmaz; fresh authority/cooldown kuralları korunur | BaselineFAIL45, g negatifFAIL49; gerçek DLL/PASS73/chat41,39/39 paket, tek değişen CPP NoPCH/warning0; remote/aynı pawn üyelik generation açık |
+| 9 Ekim arkadaş komutlarında pawn bağlamı (§68/O31) | Eski chat replacement liste/pending'e uygulanmaz; fresh mutual consent korunur | BaselineFAIL2/drop-allFAIL20; restore DLL/PASS28,40/40 paket, değişenCPP NoPCH/warning0; remote/aynıpawn davet generation açık |
 
 ## 3. Sıradaki çalışma sırası
 
@@ -110,7 +111,20 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-**O30 güncel paket:** `RunAllChecks.ps1 -SkipBuild` **39/39 geçti**, exit0.
+**O31 güncel paket:** `RunAllChecks.ps1 -SkipBuild` **40/40 geçti**, exit0;
+yeni arkadaş chat adımı eklendi. Restore compile/link4,40 sn; değişen controller
+CPP ayrıca NoPCH/NoLink/SingleFile12,51 sn, /W4 warning0. FullCompile19 yeniden yok.
+Friendchat28, presence24, save26, klan73/chat41, parti83, DoT33, trade218;
+parser576/576 ve JSONschema2/negative111. Store loaded440/invalid0/loadFailed0/
+existsMismatch0/jsonMismatch0/maxLevel6/writeorder1/roundtrip equal1. Summer48/
+Winter26/error0, Net1join/1welcome/error0. TEMP `mmo_all_friends_chat_final_20261009.log`,
+`mmo_net_server_001558.log` / `mmo_net_client_001558.log`. 151 Source/Scripts SHA256
+paket öncesi/sonrası aynı; engine/UBT0 ve friendfixture kayıt0. §68/O31,
+PLAYTEST_CHECKLIST gerçek PIE ve aynı pawn davet generation sınırlarını kaydeder.
+
+
+
+**O30 önceki paket:** `RunAllChecks.ps1 -SkipBuild` **39/39 geçti**, exit0.
 Gerçek restore compile/link ayrıca Succeeded4,23 sn; değişen controller CPP
 NoPCH/NoLink/SingleFile12,54 sn ve /W4 warning0. FullCompile19 yeniden yapılmadı.
 Klan73/chat41, DoT33, save26, presence24, parti83, takas218 ve parser576/576;

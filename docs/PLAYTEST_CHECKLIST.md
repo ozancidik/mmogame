@@ -4589,3 +4589,29 @@ respawn/travel, gecikme/kayıp, Server/Shipping veya save/login yapılmadı.
 - [ ] Aynı pawn klan ayrıl/rejoin veya hedef isim/pawn/üyelik değişimi: O30
   bunlar için membership nonce sağlamaz. Hedef kick yenidenkatılım, offline
   üye kalıcılığı, roster/bildirim ortak görünümü ve gerçek save/login açık kalsın.
+
+
+## 2026-10-09 — Arkadaş chat gönderim pawn bağlamı (O31, gerçek PIE açık)
+
+Native28 gerçek authority possession switch + standalone client HUD buffer;
+eski sil yeni pawn ve karşı taraf ilişkisini sildi; drop-all mutant fresh rızayı
+reddetti. Gerçek remote RPC, replication/Slate/Canvas, respawn/travel ve save/login
+oynanmadı. SaveThrottled çağrısı var, fixture initial-load kapısı disk yazısını keser.
+
+- [ ] Host + uzak istemci aynı DLL: /arkadas sil, ekle, kabul/accept, liste ve
+  çıplak /arkadas gönderimi ile teslim arasında pawn değişsin. Yeni pawn'ın
+  listesi ve ayrı pending daveti olsun; eski/null/başka pawn isteği iki listede
+  değişiklik veya HUD satırı üretmemeli. Pending, sonraki fresh kabul için kalmalı.
+  Native ret snapshot'ı private pending'i doğrudan karşılaştırmadı; fresh kabul
+  doğru bekleyen kişiyi seçti. Gerçek respawn ve bölge geçişinde ayrı doğrula.
+- [ ] Güncel pawn istemciye geldikten sonra Say/Enter ekle→hedef rızası→mutual
+  liste→sil→yenidenekle akışı çalışmalı. Duplicate kabul ilişkiyi çoğaltmamalı;
+  kendi adını/boş adını ekleme ve dolu liste kuralları korunmalı. Liste sadece
+  sahibi görmeli; sistem newline satırları okunmalı, presence gizliliği sürmeli.
+- [ ] Paket gecikmesi/sahiplik geçişinde ilk sessiz ret sonrası fresh bağlamla
+  yeniden dene; 0,7sn ortak throttle eski isteği de sayar. Genel/parti/klan ve
+  fısıltı regresyonunu çalıştır; eski komutu otomatik yeni pawn'a taşımamalı.
+- [ ] Aynı pawn'da A daveti tüketilip B daveti geldiğinde eski kabul gönder:
+  O31 recipient generation sağlamaz; yanlış latest daveti kabul UX riski açık.
+  ID/metin ortak görünümü, account kimliği, gerçek reconnect ve offline rıza
+  kalıcılığı ayrı iş olarak kalsın. Yeni Server/Shipping hedefini doğrula.

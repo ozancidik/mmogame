@@ -101,6 +101,11 @@ Step "Arkadas presence possession bitisi ve yeniden giris" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Arkadas komutlarinda gonderim pawn baglami" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFriendsChatContext.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Asenkron kayit onayli bolge gecisi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravel.ps1") | Out-Host
     $LASTEXITCODE -eq 0

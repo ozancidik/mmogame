@@ -2568,3 +2568,90 @@ sinirlari devam eder. Gercek remote/PIE/Server/Shipping acik.
 | RunAllChecks -SkipBuild | Gecti39/39 | FullCompile19 yeniden calismadi; NetSmoke sadece baglanti |
 | ECC readonly Unreal/security/QA | Final diff'te blocker yok | Parent build/fixture/paket/hash dogruladi |
 | Gercek host/remote PIE | Yapilmadi | Respawn/travel/teslim sirasi/aynipawn rejoin acik |
+
+
+## 68. Arkadas komutlarinin gonderim pawn baglami (2026-10-09 yerel, O31)
+
+**ECC plan/review:** ServerSendChat /arkadas dali Me/GetPawn ile guncel Friends
+component'i seciyordu; mevcut SeenCommandPawn kontrol edilmiyordu. Actual
+native PC1 Pawn1->Pawn3 possession switch ve iki farkli listeyle eski
+/arkadas sil komutu replacementPawn3 ve karsiPawn2 listesindeki iliskiyi
+kaldirdi. Orijinaldispatch/yeni fixture DLL Succeeded4,36 sn ->FAIL2
+21:06:49.454 UTC /UE0/runner1. TEMP mmo_friends_chat_baseline_20261009.log.
+Orta davranis/veri butunlugu hatasi: eski kullanici niyeti baska pawn'in listesi
+ve pending riza istegine uygulanabilir. Bu kanit remote exploit/paket sirasini
+veya hesap yetkisini asmayi kanitlamaz.
+
+/arkadas dalinin basinda IsValid(SeenCommandPawn) && ==GetPawn gerekir; component
+okumasindan once sessiz ret, ortak0,7sn throttle'dan sonra. Sil/ekle/kabul/accept,
+liste ve ciplak /arkadas ayni kapiyi kullanir. Say/OnChatCommitted gonderim pawn'ini
+zaten tasiyordu; yeni RPC parametresi/replicated alan/save schema yok. Friends
+owner-only, component authority, mutual consent/capacity/name ve SaveThrottled
+korunur. Ret yine chat throttle zamanini tuketir; fresh pawn replica geldikten
+sonra yeniden gonderim gerekir. Eski UI gorunur davet satirina generation
+baglanmaz; ayni pawn'da A daveti tuketilip B pending oldugunda gecikmis kabul B'yi
+kabul edebilir. Recipient ID/generation/account kimligi bu scope'ta acik kalir.
+
+Yeni nonShipping RunFriendsChatContextSelfTest + MMOTestFriendsChatContext:
+standalone gameworld/unattended/NullRHI guard; 4nativePC/pawn ve GUID20charad;
+ClientSetHUD/ClientReceiveChat buffer, renderer/Slate yok. PC identity/ad kalir
+ama iki pawn'in listeleri farklidir; actual UnPossess/Possess sonrasi snapshot
+alinir. PC0 actualCmdAdd ile replacementPawn3'te pending olusturur. 6commands
+(sil/kabul/accept/ekle/liste/bare) x3invalidcontext (old/null/foreign) sessiz ret,
+4Friends listesi/HUDcount ve inventory korunur. Privatepending exact snapshot
+yok; reddedilen kabullerden sonra freshSayaccept dogru A ile mutual riza kurar.
+Duplicate kabul entry eklemez, committed sil iki tarafli, ekle listeyi riza
+oncesi degistirmez, hedef CmdAccept iliskiyi geri kurar; liste yalniz owner.
+CmdList tekRPC sistem satirini newline ile split eder: HUD3 satir (header+2uye),
+remote bant/rendering kaniti degildir. Invalid/selfadd ve inventorykontrol dahil28.
+
+Worldtick/loadtimer calismaz; SaveThrottled normal SaveCharacter'i cagirir ama
+initial-loadfalse disk yazisini keser. Gercek save/login kaniti degildir. Cleanup
+once fixture committedflag, controllerdetach/destroy, pawn/HUDdestroy; presence
+syntheticoffline yaratmaz. Kalici ad/GUID veya invitegeneration alanlari eklenmedi.
+Header yalniz nonShipping staticfixture deklarasyonu; UHT0fileswritten, shipping
+console/function yok. Server/Shipping hedefi ayrica derlenmedi.
+
+Yeni kapi sonrasindaki positive DLL Succeeded4,38 sn ->PASS28 21:07:19.508UTC.
+Drop-all /arkadas branch mutant DLL Succeeded4,38 sn ->FAIL20 21:08:13.431UTC
+(UE0/runner1): fresh consentin reddini yakaladi. TEMP
+mmo_friends_chat_negative_dropall_20261009.log. Python.write_bytes byteexact
+restore yeni timestamp ile actualcompile/link Succeeded4,40 sn ->PASS28
+21:08:42.444UTC /UE0/runner0; mutantDLL ile commit yok. TEMP
+mmo_friends_chat_final_restore_20261009.cpp ve mmo_friends_chat_final_20261009.log.
+Restore SHA256 311C9FA7B3112B3E1C9A7791EF45F27F32FBB350F2F16352C9FE9B81666ACDD0.
+Degisen controllerCPP -NoPCH -NoLink -SingleFile Succeeded12,51 sn warning C0;
+TEMP mmo_friends_chat_nopch_20261009.log. Onceki19 fullCPP bu tur yeniden yok.
+
+ECC readonly Unreal/multiplayer/security/QA Leibniz final gate/callers/header,
+fixture28/runner/RunAllChecksstep, restore bytes ve lifecycle sinirlarini
+inceledi: blocker yok; dosya yazma/build/test yok. Parent finalrestorecompile,
+PASS28 ve NoPCH kanitini gordu; agent paket surerken kapatildi. Agency plugin
+provenansi bulunmadigi icin plugin kullanildi diye sunulmadi. Gercek remote
+RPC/ownership/replication/Slate/PIE/load/reconnect ve aynipawn davetgeneration
+PLAYTEST_CHECKLIST O31 maddelerinde acik. Yeni RunAllChecks step hazir.
+
+
+**Final ECC verify:** RunAllChecks.ps1 -SkipBuild **40/40 GECTI**, exit0.
+Yeni friendchatstep eklendi; FullCompile19 yeniden yok, degisen CPP ayri
+NoPCH/W4/warning0 ve restore normalDLL onceden gecti. Friendchat28
+21:10:54.566UTC, presence24 21:10:45.450, save26 21:10:38.350, parti83
+21:12:07.420, klan73 21:12:26.460, DoT33 21:13:50.375, trade218
+21:15:17.568 PASS; parser576/576, JSONschema2/negative111. Store440 loaded440,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Gercek oyuncu veya Lv1-30 kosu sayisi degildir.
+Summer48/Winter26 randommob smoke exit0/error0; Net1join/1welcome ve ikitaraferror0.
+TEMP mmo_all_friends_chat_final_20261009.log, mmo_net_server_001558.log /
+mmo_net_client_001558.log. 151 Source/Scripts oncesi/sonrasi SHA256 differences0;
+TEMP mmo_friends_chat_final_hashes_20261009.txt. Engine/UBT0, MMOSave_ZFC*.sav0.
+Ayni checkout digerECCchat notLoaded, baska aktif yazici yok; readonlyreviewer
+kapali, source/runnerfreeze boyunca yazim yok. StaticLintInitGameStatewhitelist
+ve Lv33+skilluyarilari surer; gercek PIE/Shipping/Server acik.
+
+| Kontrol | Sonuc | Sinir |
+| --- | --- | --- |
+| Restore normalDLL + controller NoPCH/W4 | Gecti; warning C0 | EditorDevelopment, Shipping/Server acik |
+| Yeni friendchat28 + baseline/drop-all | PASS28, FAIL2/20 | Actual possession/HUD endpoints; remote degil |
+| RunAllChecks -SkipBuild | Gecti40/40 | FullCompile19 yeniden yok; baglanti tum replikasyon degil |
+| ECC readonly Unreal/multiplayer/security/QA | Final diff'te blocker yok | Parent actualbuild/log/paket/hashdogruladi |
+| Gercek PIE | Yapilmadi | Samepawn invitegeneration, remote/load/identity acik |

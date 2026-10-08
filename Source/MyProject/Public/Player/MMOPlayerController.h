@@ -74,6 +74,7 @@ public:
 	static bool RunTradeChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunPartyChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunClanChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunFriendsChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:

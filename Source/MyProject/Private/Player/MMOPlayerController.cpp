@@ -40,6 +40,7 @@
 #include "Widgets/Input/SEditableTextBox.h"
 #if !UE_BUILD_SHIPPING
 #include "Save/MMOCharacterSaveJson.h"
+#include "Misc/CommandLine.h"
 #endif
 
 AMMOPlayerController::AMMOPlayerController()
@@ -779,6 +780,129 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 }
 #endif
 
+#if !UE_BUILD_SHIPPING
+bool AMMOPlayerController::RunFriendsChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{ OutError = TEXT("disposable standalone headless world required"); return false; }
+	AMMOPlayerController* PCs[4] = {}; AMMOCharacter* Pawns[4] = {};
+	UMMOFriendsComponent* Friends[4] = {}; AMMOHUD* HUDs[4] = {};
+	const bool Passed = [&]()
+	{
+		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FString Prefix = TEXT("ZFC") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(16);
+		FString Names[4]; FMMOCharacterSaveData Inventory[4];
+		for (int32 I = 0; I < 4; ++I)
+		{
+			PCs[I] = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Params);
+			Pawns[I] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(2400000 + I * 100, 2400000, 5000), FRotator::ZeroRotator, Params);
+			if (!PCs[I] || !Pawns[I] || !Pawns[I]->GetInventory() || !Pawns[I]->GetFriendsComponent())
+			{ OutError = TEXT("friend chat fixture spawn"); return false; }
+			PCs[I]->Possess(Pawns[I]); PCs[I]->SetActorTickEnabled(false); Pawns[I]->SetActorTickEnabled(false);
+			Pawns[I]->SetActorEnableCollision(false); Friends[I] = Pawns[I]->GetFriendsComponent();
+			if (!PCs[I]->PlayerState) { OutError = TEXT("friend chat fixture PlayerState missing"); return false; }
+			Names[I] = Prefix + FString::FromInt(I); PCs[I]->PlayerState->SetPlayerName(Names[I]);
+			PCs[I]->ClientSetHUD(AMMOHUD::StaticClass()); HUDs[I] = Cast<AMMOHUD>(PCs[I]->GetHUD());
+			if (!HUDs[I]) { OutError = TEXT("friend chat fixture HUD missing"); return false; }
+			HUDs[I]->SetActorTickEnabled(false); Pawns[I]->GetInventory()->FillSaveData(Inventory[I]);
+		}
+		auto Check = [&](bool Value, const TCHAR* Label)
+		{
+			++OutChecks; if (!Value) OutError = FString::Printf(TEXT("%s (check=%d)"), Label, OutChecks); return Value;
+		};
+		auto InventoryUnchanged = [&]()
+		{
+			for (int32 I = 0; I < 4; ++I)
+			{
+				FMMOCharacterSaveData After; Pawns[I]->GetInventory()->FillSaveData(After); TArray<FString> Differences;
+				FMMOCharacterSaveJson::FindDifferences(Inventory[I], After, Differences); if (!Differences.IsEmpty()) return false;
+			}
+			return true;
+		};
+		// Controller identity/name stays live, but the old and replacement pawn own different lists.
+		PCs[3]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[3]); PCs[3]->Possess(Pawns[1]);
+		Friends[3]->Friends.Add(Names[2]); Friends[2]->Friends.Add(Names[1]);
+		Friends[0]->CmdAdd(Names[1]); // Real pending consent on replacement, not on the sending old pawn.
+		if (!Check(PCs[1]->GetPawn() == Pawns[3] && Friends[3]->HasFriend(Names[2])
+			&& !Friends[3]->HasFriend(Names[0]) && InventoryUnchanged(), TEXT("friend actual possession fixture"))) return false;
+		auto Send = [&](const FString& Text, AMMOCharacter* SeenPawn)
+		{
+			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid());
+		};
+		auto Reject = [&](const FString& Text, AMMOCharacter* SeenPawn)
+		{
+			TArray<FString> Lists[4]; int32 Lines[4];
+			for (int32 I = 0; I < 4; ++I) { Lists[I] = Friends[I]->Friends; Lines[I] = HUDs[I]->GetChatLinesForTests().Num(); }
+			Send(Text, SeenPawn);
+			for (int32 I = 0; I < 4; ++I)
+			{
+				if (Lists[I] != Friends[I]->Friends || Lines[I] != HUDs[I]->GetChatLinesForTests().Num()) return false;
+			}
+			return InventoryUnchanged();
+		};
+		const FString Remove = TEXT("/arkadas sil ") + Names[2];
+		const FString Add = TEXT("/arkadas ekle ") + Names[2];
+		const FString Commands[] = {Remove, TEXT("/arkadas kabul"), TEXT("/arkadas accept"), Add, TEXT("/ARKADAS LISTE"), TEXT("/arkadas")};
+		for (AMMOCharacter* SeenPawn : {Pawns[1], static_cast<AMMOCharacter*>(nullptr), Pawns[0]})
+		{
+			for (const FString& Command : Commands)
+			{
+				if (!Check(Reject(Command, SeenPawn), *FString::Printf(TEXT("stale friend command mutated/delivered: %s"), *Command))) return false;
+			}
+		}
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/arkadas accept"));
+		if (!Check(Friends[3]->Friends.Num() == 2 && Friends[3]->HasFriend(Names[0]) && Friends[0]->HasFriend(Names[1])
+			&& Friends[1]->Friends.IsEmpty() && Friends[2]->HasFriend(Names[1]), TEXT("fresh consent did not preserve correct pending/list"))) return false;
+		Send(TEXT("/arkadas kabul"), Pawns[3]);
+		if (!Check(Friends[3]->Friends.Num() == 2 && Friends[0]->Friends.Num() == 1, TEXT("duplicate consent added entries"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(Remove), ETextCommit::OnEnter);
+		if (!Check(!Friends[3]->HasFriend(Names[2]) && !Friends[2]->HasFriend(Names[1])
+			&& Friends[3]->HasFriend(Names[0]), TEXT("fresh mutual removal"))) return false;
+		Send(Add, Pawns[3]);
+		if (!Check(!Friends[3]->HasFriend(Names[2]) && !Friends[2]->HasFriend(Names[1]), TEXT("fresh request skipped target consent"))) return false;
+		Friends[2]->CmdAccept();
+		if (!Check(Friends[3]->HasFriend(Names[2]) && Friends[2]->HasFriend(Names[1]), TEXT("fresh re-add consent"))) return false;
+		const int32 BeforeList = HUDs[1]->GetChatLinesForTests().Num();
+		const int32 OtherLines = HUDs[0]->GetChatLinesForTests().Num() + HUDs[2]->GetChatLinesForTests().Num() + HUDs[3]->GetChatLinesForTests().Num();
+		Send(TEXT("/arkadas"), Pawns[3]);
+		if (!Check(HUDs[1]->GetChatLinesForTests().Num() == BeforeList + Friends[3]->Friends.Num() + 1
+			&& OtherLines == HUDs[0]->GetChatLinesForTests().Num() + HUDs[2]->GetChatLinesForTests().Num() + HUDs[3]->GetChatLinesForTests().Num(), TEXT("fresh list owner delivery"))) return false;
+		const int32 BeforeInvalid = HUDs[1]->GetChatLinesForTests().Num();
+		Send(TEXT("/arkadas ekle"), Pawns[3]);
+		if (!Check(HUDs[1]->GetChatLinesForTests().Num() == BeforeInvalid + 1 && Friends[3]->Friends.Num() == 2, TEXT("fresh empty add feedback"))) return false;
+		Send(TEXT("/arkadas ekle ") + Names[1], Pawns[3]);
+		if (!Check(!Friends[3]->HasFriend(Names[1]) && Friends[3]->Friends.Num() == 2, TEXT("fresh self add accepted"))) return false;
+		return Check(InventoryUnchanged(), TEXT("friend chat changed inventory"));
+	}();
+	// Same synchronous frame; no auto-load/save timer fires. Suppress synthetic cleanup presence.
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
+	for (AMMOPlayerController* PC : PCs) if (IsValid(PC)) { PC->UnPossess(); PC->Destroy(); }
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->Destroy();
+	for (AMMOHUD* HUD : HUDs) if (IsValid(HUD)) HUD->Destroy();
+	return Passed;
+}
+namespace
+{
+	struct FMMOFriendsChatContextTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFriendsChatContext"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOPlayerController::RunFriendsChatContextSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FRIENDS_CHAT_CONTEXT_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFriendsChatContextTestExec GMMOFriendsChatContextTestExec;
+}
+#endif
+
 void AMMOPlayerController::Say(const FString& Message)
 {
 	SendChatWithContext(Message);
@@ -978,6 +1102,8 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 	// Arkadas listesi: "/arkadas ekle <isim>", "/arkadas kabul", "/arkadas sil <isim>" veya "/arkadas liste".
 	if (Msg.Equals(TEXT("/arkadas"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/arkadas "), ESearchCase::IgnoreCase))
 	{
+		// Reject old consent/list mutations before selecting the replacement pawn component.
+		if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
 		UMMOFriendsComponent* Friends = nullptr;
 		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
 		{

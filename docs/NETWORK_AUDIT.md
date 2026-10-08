@@ -890,3 +890,26 @@ RunAllChecks -SkipBuild39/39 exit0 (FullCompile19 yeniden calismadi),
 150 Source/Scripts hash differences0. Klan73, parti83, DoT33, save26,
 presence24, trade218; Summer47/Winter29/error0 ve Net1join/1welcome/error0.
 Paket gunu9Ekim yerel/8EkimUTC; remote ve Shipping/Dedicated acik.
+
+
+### O31 · ORTA · Eski arkadas chat istegi replacement pawn'in listesine uygulanir
+
+Native actual possession switch baseline eski /arkadas sil ile replacement ve
+karsi taraftaki friendship silindi: FAIL2. /arkadas dalinin ilkcomponentsecimi
+oncesi IsValid+SeenCommandPawn==GetPawn kapi; Say/committed zaten contextgonderir.
+Sil/ekle/kabul/accept/liste/bare korunur; authority, mutualconsent, owner-only
+Friends, capacity/name/SaveThrottled ve ortak0,7sn throttle ayni. Yeni RPC field,
+replicated/save schema/timer yok. Native28, drop-allmutantFAIL20, restoreDLL/PASS28,
+controller NoPCH/W4/warning0; ayrinti CHECKLIST_FIXES §68.
+
+Ayni pawn'da pending A->B davetde generation olmadigi icin eski kabul latestB'ye
+uygulanabilir; bu fix bunu cozmuyor. Davet notification/identity ortakgorunum,
+isim/account/presence cache, reconnect/offlineconsent kaliciligi acik. Native
+HUDbuffer/possession remotepaketsirasi/PIE/Shipping kaniti degildir.
+
+
+O31 final restoreDLL/PASS28 + degisen controllerNoPCH/warning0;
+RunAllChecks -SkipBuild40/40 exit0 (yeni friendchatstep, FullCompile19 yok).
+151 Source/Scripts hashdifferences0, store440/schema2; presence24/save26/
+clan73/party83/DoT33/trade218. Summer48/Winter26/error0, Net1/1/error0;
+gercekPIE ve samepawn pendinggeneration acik. Kanit §68.
