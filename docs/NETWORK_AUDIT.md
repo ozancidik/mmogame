@@ -789,3 +789,33 @@ Gerçek host/uzak istemci destroy/logout/travel/replication/parti XP ve GUID
 owner-only teslimi PLAYTEST_CHECKLIST'te açık. Kick ve eski roster/latest ID
 UX sınırları sürer. O25'te açık bırakılan party EndPlay gate'i bu kapsamda
 native düzeltildi; genel player identity/save/presence lifecycle çözülmedi.
+
+
+### O27 · ORTA · Identity detachment son kaydi atliyor — sinirli native duzeltme
+
+O26'daki party fix save kapisini korumustu. Native possessed pawn Destroy
+b9ae6e0 kodunda kendi slotuna son altini kaydetmedi (FAIL4 / UE0/PS1). Yerel
+UE5.7 Pawn Destroyed -> Detach -> controller UnPossess -> Character UnPossessed
+-> APawn PlayerState temizligi -> Character EndPlay sirasinda eski gate false.
+Canli UnPossess sonrasi load/save/nav retry timer'i da kimliksiz pawn'da Default
+slotunu secebiliyordu; bu timer etkisi kaynak incelemesiyle tespit edildi,
+fixture elapsed timer'i degil handle kapanisini ve explicit save reddini olcer.
+
+Authority UnPossessed, Super oncesi player + initial-load + !committed-travel
++ !EndPlay-started iken mevcut force save yolunu kullanir. Kayit kimligi hala
+canli PlayerState'tendir, yeni fallback yok. Ardindan authority detach'inde
+uc persistence timer'i ve initial load kapisi kapanir. Non-destroy EndPlay
+once kendi save'ini yazar; started bayragi nested UnPossessed duplicate'ini keser.
+K-1/slot tracker ayni API'de korunur. Save hatasi Warning, basari varsayilmaz.
+
+Native26: GUID disposable slotlar, possessed/explicit/controller destruction,
+unloaded/committed-travel ret, transition route tracker tek yazim, detached save
+ret/timer handle ve existing-target K-1. Default ve iki rename fixture slotu
+verileri korunur. Reset-negatifi FAIL9, EndPlay-gate-negatifi FAIL17, arm edilmis nav-retry
+iptal negatifi FAIL10; restore
+PASS26 ve normal DLL. Ayrintili build/paket kaniti CHECKLIST_FIXES §64.
+Save schema/RPC/replication degismedi; yeni timer/Tick yok. Local synchronous
+store icin lifecycle iyilesmesidir; disk failure dayanıklı retry, depoda CAS/
+HTTP yazim sirasi, retained seamless pawn identity, gercek remote reconnect ve
+PIE acik. Friends presence destruction kapisi bu iste cozulmedi. O26 parti
+cleanup korunur; bu degisiklik salt UnPossess'te parti leave cagirmaz.

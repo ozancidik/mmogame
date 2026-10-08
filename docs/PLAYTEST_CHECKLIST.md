@@ -4471,3 +4471,37 @@ ağ karşılığını tamamlar. Yeni sayılar coverage yüzdesi veya oyuncu say�
   destruction sonrası son kaydın yazılması ve presence ayrı açık ölçümlerdir.
   Bu düzeltmeyi save garantisi sayma; yok olmuş PlayerState yerine Default
   yuvaya yazma gibi bir fallback bu işe eklenmedi.
+
+
+## 2026-10-08 — Possession bitisinde karakter kaydi (O27; gercek PIE acik)
+
+Native26 son-snapshot/timer/tek-yazim kontrolleri, authority ayni-kare local
+store fixture'idir. Baseline FAIL4, reset negatifi FAIL9, tekrar-yazim negatifi
+FAIL17, arm edilmis nav-retry iptal negatifi FAIL10 ve restore PASS26.
+Remote logout/travel veya tum persistence garantisi
+olarak sayilmaz; GUID'li gecici slotlar test sonunda silinir.
+
+- [ ] Host + uzak istemci: son autosave sonrasi altin/item/gorev/XP degistir,
+  istemciyi kapat; sunucuda Character detach kendi slotuna en son snapshot'i
+  yazmali. Ayni adla yeniden giriste stat/envanter/gorev dogru gelmeli;
+  Default ve baska oyuncunun kaydi degismemeli. Iki taraftaki gercek loglari tut.
+- [ ] Load0,6 sn oncesi veya saved-position nav beklerken disconnect: ilk load
+  tamamlanmadigindan var olan kayit varsayilan veriyle ezilmemeli. Yuva read/load
+  hatasi ve disk yazim reddini de gercek dosyayla dogrula; hata Warning'i basari
+  degildir. Kayit hatasinda dayanıklı retry bu degisiklikte yok.
+- [ ] Canli pawn UnPossess/controller degisimi: son snapshot eski PlayerState
+  varken yazilmali; detached load/autosave/nav-retry timer'lari kapali kalmali,
+  Default yuklememeli/yazmamali. Baska oyuncu possess ettiginde kendi yuklemesi
+  tamamlanmadan onceki oyuncunun verisini kaydetmemeli; yeni controller HUD/RPC
+  ve load davranisi normal olmali. Salt UnPossess parti uyeligini kaldirmaz.
+- [ ] Summer->Winter gercek travel ve editor Stop: committed snapshot yeniden
+  yazilmamali; non-destroy EndPlay + nested UnPossessed tek yazar. Gecikmeli
+  travel callback, forced detach write ve superseded kararini gercek backend
+  ile dogrula. Native RouteEndPlay map yukleme kaniti degildir. Custom seamless
+  pawn retention/PlayerState yenileme ayrica kimlik rebinding gerektirir.
+- [ ] Isim degisiminde mevcut baska yuvaya son kayit K-1 tarafindan reddedilmeli;
+  otomatik old-slot/Default fallback olmamali. Yeni bos ada yazim ve tekrar
+  giris ayrica dogrulanmali. Isim hala hesap kimligi degildir.
+- [ ] Client EndPlay/UnPossessed yeni save RPC veya yerel disk yazimi baslatmamali;
+  NPC destruction kayit yazmamali. Arkadas offline presence player-control gate
+  halen ayrica acik; son save'in duzelmesi presence kaniti degildir.

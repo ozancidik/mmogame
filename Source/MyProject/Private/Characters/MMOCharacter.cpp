@@ -57,6 +57,150 @@ DEFINE_LOG_CATEGORY_STATIC(LogMMOIdentityAudit, Log, All);
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
 #include "Misc/CommandLine.h"
+#include "Misc/Guid.h"
+
+bool AMMOCharacter::RunSaveLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || World->GetNetMode() == NM_Client
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{
+		OutError = TEXT("disposable authority headless world required"); return false;
+	}
+	IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(World);
+	if (!Store) { OutError = TEXT("store unavailable"); return false; }
+	// Only new GUID slots are written/deleted; existing Default is read for comparison.
+	const FString Prefix = TEXT("ZLife") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(20);
+	TArray<AMMOCharacter*> Pawns;
+	TArray<AMMOPlayerController*> Controllers;
+	TArray<FString> Slots;
+	for (int32 I = 0; I < 7; ++I)
+	{
+		const FString Name = Prefix + FString::FromInt(I);
+		const FString Slot = TEXT("MMOSave_") + Name;
+		if (Store->Exists(Slot)) { OutError = TEXT("temporary slot collision"); return false; }
+		Slots.Add(Slot);
+	}
+	const auto Check = [&](bool bOk, const TCHAR* Why)
+	{
+		++OutChecks;
+		if (!bOk && OutError.IsEmpty()) OutError = Why;
+		return bOk;
+	};
+	const bool bDefaultBefore = Store->Exists(TEXT("MMOSave_Default"));
+	FMMOCharacterSaveData DefaultBefore;
+	if (bDefaultBefore && !Store->Load(TEXT("MMOSave_Default"), DefaultBefore))
+	{
+		OutError = TEXT("cannot compare existing Default"); return false;
+	}
+	for (int32 I = 0; I < 7; ++I)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* Pawn = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(),
+			FVector(0., 0., 5000. + I * 200.), FRotator::ZeroRotator, Params);
+		AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>();
+		Pawns.Add(Pawn); Controllers.Add(PC);
+		if (!Pawn || !PC) { OutError = TEXT("fixture spawn failed"); break; }
+		Pawn->SetActorTickEnabled(false); PC->SetActorTickEnabled(false);
+		PC->Possess(Pawn);
+		if (!Pawn->GetPlayerState()) { OutError = TEXT("fixture player state missing"); break; }
+		Pawn->GetPlayerState()->SetPlayerName(Prefix + FString::FromInt(I));
+	}
+	const auto Run = [&]() -> bool
+	{
+		if (!OutError.IsEmpty()) return false;
+		FMMOCharacterSaveData Back;
+		AMMOCharacter* P = Pawns[0];
+		if (!Check(P->IsPlayerControlled() && P->GetSaveSlotName() == Slots[0], TEXT("identity fixture invalid"))) return false;
+		P->LoadCharacter(); // No record: false return, but initial load complete.
+		if (!Check(P->bInitialLoadComplete && !Store->Exists(Slots[0]), TEXT("new character initialization invalid"))) return false;
+		P->Inventory->AddGold(123);
+		if (!Check(P->Destroy(), TEXT("possessed Destroy rejected"))) return false;
+		if (!Check(Store->Load(Slots[0], Back) && Back.bValid && Back.Gold == 123,
+			TEXT("possessed Destroy lost latest character save"))) return false;
+		if (!Check(Controllers[0]->GetPawn() == nullptr, TEXT("Destroy retained controller pawn"))) return false;
+
+		P = Pawns[1]; P->LoadCharacter(); P->Inventory->AddGold(11);
+		// Arm the real callback explicitly; this checks cancellation, not nav readiness.
+		World->GetTimerManager().SetTimer(P->SavedLocationRetryTimerHandle, P,
+			&AMMOCharacter::RetrySavedLocationRestore, 30.f, false);
+		if (!Check(P->SaveCharacterForTravel()
+			&& World->GetTimerManager().IsTimerActive(P->AutoLoadTimerHandle)
+			&& World->GetTimerManager().IsTimerActive(P->AutoSaveTimerHandle)
+			&& World->GetTimerManager().IsTimerActive(P->SavedLocationRetryTimerHandle), TEXT("initial save/timer fixture failed"))) return false;
+		P->Inventory->AddGold(29);
+		Controllers[1]->UnPossess();
+		if (!Check(!P->GetPlayerState() && P->GetSaveSlotName() == TEXT("MMOSave_Default"), TEXT("identity did not detach"))) return false;
+		if (!Check(Store->Load(Slots[1], Back) && Back.Gold == 40, TEXT("UnPossess lost latest gold"))) return false;
+		if (!Check(!P->bInitialLoadComplete, TEXT("detached pawn saving remained enabled"))) return false;
+		if (!Check(!World->GetTimerManager().IsTimerActive(P->AutoLoadTimerHandle)
+			&& !World->GetTimerManager().IsTimerActive(P->AutoSaveTimerHandle)
+			&& !World->GetTimerManager().IsTimerActive(P->SavedLocationRetryTimerHandle), TEXT("detached persistence timer remained active"))) return false;
+		if (!Check(!P->SaveCharacterForTravel(true), TEXT("detached pawn accepted Default save"))) return false;
+		if (!Check(P->Destroy() && Store->Load(Slots[1], Back) && Back.Gold == 40, TEXT("post-UnPossess Destroy rewrote save"))) return false;
+
+		P = Pawns[2]; P->Inventory->AddGold(222);
+		if (!Check(!P->bInitialLoadComplete && P->Destroy() && !Store->Exists(Slots[2]), TEXT("uninitialized pawn wrote save"))) return false;
+
+		P = Pawns[3]; P->LoadCharacter(); P->Inventory->AddGold(31);
+		if (!Check(P->SaveCharacterForTravel(), TEXT("travel fixture save failed"))) return false;
+		P->SetTravelSaveCommitted(true); P->Inventory->AddGold(99);
+		if (!Check(P->Destroy() && Store->Load(Slots[3], Back) && Back.Gold == 31, TEXT("committed travel snapshot overwritten"))) return false;
+
+		P = Pawns[4]; P->LoadCharacter(); P->Inventory->AddGold(45);
+		const auto Tracker = Store->GetWriteTracker();
+		const uint64 Before = Tracker->BeginWrite(Slots[4]);
+		P->RouteEndPlay(EEndPlayReason::LevelTransition); // Native route, NOT ServerTravel.
+		const uint64 After = Tracker->BeginWrite(Slots[4]);
+		if (!Check(Store->Load(Slots[4], Back) && Back.Gold == 45, TEXT("transition EndPlay lost snapshot"))) return false;
+		if (!Check(After == Before + 2, TEXT("transition EndPlay wrote more than once"))) return false;
+		if (!Check(!P->GetPlayerState() && !P->bInitialLoadComplete, TEXT("transition persistence remained enabled"))) return false;
+
+		P = Pawns[5]; P->LoadCharacter(); P->Inventory->AddGold(56);
+		if (!Check(Controllers[5]->Destroy(), TEXT("controller Destroy rejected"))) return false;
+		if (!Check(Store->Load(Slots[5], Back) && Back.Gold == 56, TEXT("controller teardown lost character save"))) return false;
+
+		P = Pawns[6]; P->LoadCharacter(); P->Inventory->AddGold(61);
+		if (!Check(P->SaveCharacterForTravel(), TEXT("rename source save failed"))) return false;
+		// Existing target is another disposable fixture, never a user slot.
+		P->Inventory->AddGold(99);
+		P->GetPlayerState()->SetPlayerName(Prefix + TEXT("0"));
+		Controllers[6]->UnPossess();
+		if (!Check(Store->Load(Slots[0], Back) && Back.Gold == 123, TEXT("rename overwrote existing target"))) return false;
+		if (!Check(Store->Load(Slots[6], Back) && Back.Gold == 61, TEXT("rejected rename silently saved old identity"))) return false;
+		if (!Check(!P->bInitialLoadComplete && !P->SaveCharacterForTravel(true), TEXT("rejected rename left saving enabled"))) return false;
+
+		if (!Check(Store->Exists(TEXT("MMOSave_Default")) == bDefaultBefore, TEXT("Default slot existence changed"))) return false;
+		TArray<FString> Diff;
+		if (bDefaultBefore)
+		{
+			if (!Store->Load(TEXT("MMOSave_Default"), Back)) { OutError = TEXT("Default no longer readable"); return false; }
+			FMMOCharacterSaveJson::FindDifferences(DefaultBefore, Back, Diff);
+		}
+		return Check(Diff.IsEmpty(), TEXT("Default slot data changed"));
+	};
+	const bool bPassed = Run();
+	// Disable persistence before fixture cleanup even after an early failed assertion.
+	for (AMMOCharacter* Pawn : Pawns)
+	{
+		if (IsValid(Pawn)) { Pawn->bInitialLoadComplete = false; Pawn->SetTravelSaveCommitted(true); }
+	}
+	for (AMMOPlayerController* PC : Controllers)
+	{
+		if (IsValid(PC)) { PC->UnPossess(); PC->Destroy(); }
+	}
+	for (AMMOCharacter* Pawn : Pawns) { if (IsValid(Pawn)) Pawn->Destroy(); }
+	for (const FString& Slot : Slots)
+	{
+		if (Store->Exists(Slot) && !UGameplayStatics::DeleteGameInSlot(Slot, 0))
+		{
+			OutError = TEXT("temporary slot cleanup failed");
+		}
+	}
+	return bPassed && OutError.IsEmpty();
+}
 
 bool AMMOCharacter::RunMeleeCooldownSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
@@ -440,6 +584,19 @@ bool AMMOCharacter::RunConsumableBenefitSelfTest(UWorld* World, FString& OutErro
 
 namespace
 {
+	struct FMMOSaveLifecycleTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestSaveLifecycle"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = AMMOCharacter::RunSaveLifecycleSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_SAVE_LIFECYCLE_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOSaveLifecycleTestExec GMMOSaveLifecycleTestExec;
+
 	struct FMMOMeleeCooldownTestExec : public FSelfRegisteringExec
 	{
 		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
@@ -599,6 +756,7 @@ void AMMOCharacter::PlayAttackAnimLocal(int32 AnimIndex)
 
 void AMMOCharacter::BeginPlay()
 {
+	bEndPlayStarted = false;
 	Super::BeginPlay();
 
 	if (Stats)
@@ -735,6 +893,29 @@ void AMMOCharacter::PossessedBy(AController* NewController)
 	}
 }
 
+void AMMOCharacter::UnPossessed()
+{
+	if (HasAuthority())
+	{
+		// APawn::Destroyed detaches before Character EndPlay. Save BEFORE Super
+		// removes PlayerState; never derive a Default identity for a detached pawn.
+		if (!bEndPlayStarted && IsPlayerControlled() && bInitialLoadComplete && !bTravelSaveCommitted)
+		{
+			if (!SaveCharacterForTravel(true))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("Character detach save not confirmed: %s"), *GetSaveSlotName());
+			}
+		}
+		// The pawn can remain alive after a controller switch. Its old autoload
+		// must not load Default, and autosave/nav retry must not reopen saving.
+		GetWorldTimerManager().ClearTimer(AutoLoadTimerHandle);
+		GetWorldTimerManager().ClearTimer(AutoSaveTimerHandle);
+		GetWorldTimerManager().ClearTimer(SavedLocationRetryTimerHandle);
+		bInitialLoadComplete = false;
+	}
+	Super::UnPossessed();
+}
+
 void AMMOCharacter::AutoLoadDeferred()
 {
 	// bInitialLoadComplete artik LoadCharacter() icinde (her cagiran yoldan) set edilir.
@@ -848,6 +1029,7 @@ void AMMOCharacter::RetrySavedLocationRestore()
 
 void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	bEndPlayStarted = true;
 	// Oyundan cikis/level bitiminde otomatik kaydet (otorite + oyuncu).
 	if (HasAuthority() && IsPlayerControlled())
 	{

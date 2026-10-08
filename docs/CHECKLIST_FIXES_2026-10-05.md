@@ -2221,3 +2221,99 @@ runner/ajan yazımı yok; bitimde UE/UBT süreci yok. Son doküman düzeni ayrı
 | Tam mevcut regresyon paketi | Geçti37/37 | NetSmoke tüm gameplay replication'ını sınamaz |
 | ECC + salt okunur Unreal/QA inceleme | Kapsamda engel yok | Save/presence lifecycle ve kick ayrı açık |
 | Gerçek host + uzak istemci PIE | Yapılmadı | Checklist açık; oyuncu koşusu/coverage yüzdesi yok |
+
+
+## 64. Possession bitmeden son karakter kaydi; detached persistence kapisi (8 Ekim / O27)
+
+**ECC plan:** O26 parti cleanup sonrasi kalan kayit boslugu ele alindi. Kabul
+olcutu: authority oyuncu pawn'indaki son altin snapshot'i PlayerState kaybolmadan
+kendi yuvasina yazilir; ilk load tamamlanmadiysa/committed travel ise yazilmaz;
+canli unpossessed pawn Default'a kaydetmez veya timer ile Default yuklemez;
+non-destroy EndPlay tek yazar; K-1 hedef yuva korumasi devam eder.
+Kapsam Character.cpp/.h, TestSaveLifecycle.ps1, RunAllChecks ve bu mevcut belgeler.
+Blueprint, RPC, replicated property, save semasi ve hesap kimligi degismedi.
+
+**Once hata:** Eski b9ae6e0 uretim kodu ile yeni native fixture normal DLL
+Succeeded11,62 sn. Gercek possessed pawn Destroy sonrasinda kendi yeni yuvasi
+okunamadi: FAIL4 / 16:07:49.456 UTC, UEexit0 / PSexit1. TEMP
+mmo_save_lifecycle_baseline_20261008.log. UnPossessed PlayerState'i siler;
+Pawn Destroyed bunu Character EndPlay'den once yapar. Ortak player-control
+gate EndPlay save'ini atliyordu. Bu fixture tek karede engine yolunu yurutur.
+
+**Sinirli uygulama:** Character UnPossessed authority/player/initial-load/
+!travel-committed/!EndPlay-started kapisiyla SaveCharacterForTravel(true)'yi
+Super'den ONCE cagirir. Slot hala canli PlayerState'ten secilir; eski ActiveSlot
+veya Default fallback eklenmez. K-1 ve tracker ayni save yolundadir. Ret/hata
+Warning ile kaydedilir; basari varsayilmaz. Tum authority detach'lerinde load,
+save ve saved-position retry timer'lari kapanir, bInitialLoadComplete false olur.
+Yeni possession mevcut 0,6 sn yukleme akisini kullanir. EndPlay giris bayragi,
+non-destroy EndPlay'nin mevcut snapshot'ini Super icindeki UnPossessed'de ikinci
+kez yazmayi onler. Yeni timer/Tick yok; bir local lifecycle bayragi ve override var.
+Friends presence kapisi bu iste degismedi. Kalici hesap kimligi cozumu degildir.
+
+**Native26:** Yalniz unattended/NullRHI authority dunyasinda 7 native PC/pawn;
+GUID ile olusturulan 7 yeni slot, collision varsa fixture baslamaz. Yalniz bu
+slotlar yazilir ve DeleteGameInSlot ile temizlenir; mevcut Default salt okunup
+alan alan karsilastirilir. Possessed Destroy son altin123, explicit UnPossess
+11+29=40, detached Save ret/3 timer handle kapali, unloaded Destroy yazmaz,
+committed snapshot31 ustune99 eklenip destruction'da geri yazilmaz,
+RouteEndPlay(LevelTransition) altin45 ve tracker ile tek yazim, native controller
+Destroy altin56, mevcut baska disposable hedefe ad degisimi K-1 reddi ve iki
+slot korunmasi. Yok edilmis pawn tekrar okunmaz; fixture cleanup'ta once load
+kapisi kapatilir. Presence, gercek client logout, timer suresinin dolmasi,
+network ownership ve ServerTravel degildir; native PC Player=null teardown'dur.
+Disk arizasi/HTTP/depoda siralama ve gercek corrupted save bu fixture'da yok.
+
+Ilk fix DLL Succeeded9,72 sn; PASS26 16:08:53.563 UTC, PS0; TEMP
+mmo_save_lifecycle_positive_20261008.log. Derlenmis reset-negatifi DLL
+Succeeded5,16 sn -> FAIL9 16:09:49.675 UTC, UE0/PS1 (detached save enabled).
+Derlenmis EndPlay-gate-negatifi Succeeded5,14 sn -> FAIL17 16:10:17.320 UTC,
+UE0/PS1 (transition iki yazim). TEMP mmo_save_lifecycle_negative_reset_20261008.log
+ve mmo_save_lifecycle_negative_duplicate_20261008.log. Byte exact restore sonrasi
+ara normal DLL Succeeded4,99 sn, PASS26 16:11:13.464 UTC / PS0; TEMP
+mmo_save_lifecycle_restored_20261008.log. Negatifler final kaynakta yok.
+
+**ECC review / ajan:** Anscombe yerel user-level Unreal Multiplayer Architect,
+repo QA ve ECC review ile motor Pawn/Controller/PlayerController/World sirasini
+ve actual diff'i salt okunur inceledi. Rol paketinin Agency kokeni dogrulanmadi.
+Uretim kapsaminda engel bulmadi; reset + force save gerekliligini teyit etti.
+P3 fixture cleanup ilk silme hatasinda duruyordu: kalan gecici yuvalarin da
+silinmesini deneyecek sekilde duzeltildi. Navigation retry assertion'i bos
+handle'i kontrol ediyordu: gercek callback timer'i fixture'da sentetik30 sn ile
+arm edildi ve uc timer'in aktif oldugu onkosulu eklendi. Bu gercek navmesh
+pending akisi degildir. Ajan build/test/dosya yazmadi, full paket oncesi kapatildi.
+Parent kod, normal DLL, negatifler, hash ve full paketi yurutur. BeginPlay lifecycle
+bayragini sifirlar; custom seamless-retained pawn kimligi bu is kapsaminda degil.
+
+Timer cancellation negatifi (son fixture) DLL Succeeded5,04 sn -> FAIL10
+16:14:17.707 UTC / UE0/PS1; TEMP mmo_save_lifecycle_negative_timer_20261008.log.
+Final byte-exact restore ve normal DLL Succeeded5,11 sn, exit0. TEMP
+mmo_save_lifecycle_final_restore_20261008.cpp final-source yedegi (repo disinda).
+Normal cleanup butun yuvalari dener; timeout/process kill yuva birakabilir.
+Tek-yazim sayaci yalniz LevelTransition route'unda olculdu; diger yollardaki
+ayni verili duplicate yazim sayisi bu fixture'da olculmedi.
+
+**Son ECC verify:** RunAllChecks.ps1 -SkipBuild -FullCompile 38/38 GECTI,
+exit0. Normal Editor DLL ayrica Succeeded5,11 sn; 18 PCH'siz /W4 dosya warning C0.
+Native save26 PASS16:18:19.638 UTC (son fixture, arm edilmis retry timer'i ve
+cleanup duzeltmesi dahil). Parti83 PASS16:19:27.665, klan43 PASS16:19:45.659,
+takas218, olum14/3first+5death ve parser576/576 dahil tum eski regresyonlar gecti.
+JSON schema2/negative111. Store412 loaded412, invalid/loadFailed/existsMismatch/
+jsonMismatch0, maxLevel6, writeorder1, roundtrip equal1. Bu yuva sayisi oyuncu/
+PIE/Lv1-30 kosu sayisi degildir. Summer51/Winter29 mob dogumu; iki smoke exit0/
+error0. Dogum sayimi yeni icerik anlamina gelmez. NetSmoke1join/1welcome;
+server/client error0. TEMP mmo_all_save_lifecycle_final_20261008.log; ag loglari
+mmo_net_server_192317.log / mmo_net_client_192317.log. Full oncesi/sonrasi148
+Source/Scripts SHA256 differences0; mmo_save_lifecycle_final_hashes_20261008.txt.
+Full boyunca kod/runner/ajan yazimi yok. Sonunda engine/UBT process0 ve
+MMOSave_ZLife*.sav gecici yuva0; mevcut Default kaldi, fixture alan karsilastirma
+kontrolu gecti. Belgeler full kaynak freeze'i disinda duzenlendi. Bilinen Lv33+
+beceri bosluklari/InitGameState whitelist uyari sinirlari surer.
+
+| Kontrol | Sonuc | Sinir |
+| --- | --- | --- |
+| Normal UBT + 18 PCH'siz dosya | Gecti | Editor Development; Server/Shipping acik |
+| Native26 + baseline/3 derlenmis negatif | PASS26; FAIL4/9/17/10 | Local synchronous store; elapsed nav/remote logout degil |
+| Tam mevcut regresyon paketi | Gecti38/38 | NetSmoke baglanti kaniti; tum gameplay replication degil |
+| ECC + salt okunur Unreal/QA inceleme | Kapsamda engel yok; P3/fixture eksigi giderildi | Ajan build/test yazmadi; parent final duzeltmeleri dogruladi |
+| Gercek host + uzak istemci PIE | Yapilmadi | Save failure/reconnect/nav/seamless/presence checklist acik |

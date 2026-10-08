@@ -91,6 +91,11 @@ Step "Karakter magazasi (yerel .sav) okuma + gidis-donus testi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Possession bitisinde karakter kaydi ve timer kapilari" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestSaveLifecycle.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Asenkron kayit onayli bolge gecisi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestZoneTravel.ps1") | Out-Host
     $LASTEXITCODE -eq 0

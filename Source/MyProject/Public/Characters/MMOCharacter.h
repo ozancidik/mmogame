@@ -34,6 +34,7 @@ public:
 	static bool RunFirstBasicAttackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstDeathSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunMeleeCooldownSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunSaveLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
@@ -342,6 +343,8 @@ protected:
 
 	// Sunucuda possession aninda calisir: oyuncuysa sinif kurulumunu yapar (MP-guvenli).
 	virtual void PossessedBy(AController* NewController) override;
+	// Save while PlayerState/identity still exist; disable detached persistence timers.
+	virtual void UnPossessed() override;
 
 	// Sahibi istemcide input hazir oldugunda calisir: BP'nin Enhanced Input mappinglerini temizler.
 	virtual void PawnClientRestart() override;
@@ -382,6 +385,8 @@ protected:
 	// Basarisiz/bozuk yuklemede otomatik, manuel ve EndPlay kaydi mevcut dosyayi
 	// varsayilan karakter verisiyle ezmemelidir.
 	bool bInitialLoadComplete = false;
+	// EndPlay saves before Super detaches; UnPossessed must not write that snapshot twice.
+	bool bEndPlayStarted = false;
 	bool bTravelSaveCommitted = false;
 	// Bolge gecisi kaydi ucustayken bir kayit istegi geldi ve ertelendi (FlushDeferredSave'e kadar).
 	bool bSaveDeferredByTravel = false;
