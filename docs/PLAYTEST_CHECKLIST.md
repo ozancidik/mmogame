@@ -4505,3 +4505,33 @@ olarak sayilmaz; GUID'li gecici slotlar test sonunda silinir.
 - [ ] Client EndPlay/UnPossessed yeni save RPC veya yerel disk yazimi baslatmamali;
   NPC destruction kayit yazmamali. Arkadas offline presence player-control gate
   halen ayrica acik; son save'in duzelmesi presence kaniti degildir.
+
+
+## 2026-10-08 — Arkadas offline lifecycle (O28; gercek PIE acik)
+
+Native24 standalone client endpoint/HUD buffer'i kontrol eder; rendering ve
+uzak RPC kaniti degildir. Baseline/load-gate FAIL6, EndPlay-gate FAIL18 ve restore
+PASS24. Sentetik abort/teardown/RouteEndPlay actual world travel/shutdown degildir.
+
+- [ ] Host + uzak istemci, karsilikli arkadas olan A/B ve one-way/unrelated C:
+  A disconnect veya pawn destruction sonrasi B'de tam bir offline sistem satiri,
+  dogru isim ve turuncu kanal2 rengi gorulmeli. A/C'ye presence sizmamali. Gercek
+  server/client log ve HUD goruntulerini tut; payload/reflection tek basina yetmez.
+- [ ] A hemen ayni adla (buyuk/kucuk harf varyanti da dahil) yeniden girsin:
+  B bir online gormeli, ikinci offline/online spam olmamali. Ayni pawn controller
+  degisimi/repossess ve post-UnPossess Destroy'i de ayri kontrol et. Yeni possessor
+  gercek autoload/arkadas listesi ile devam etmeli; native manual Announce online
+  nav/load timers'in gercek teslimini kanitlamaz.
+- [ ] Initial-load pending/failed veya disk save reddi sonrasi disconnect:
+  previously-online oyuncunun offline'i save basarisina baglanmamali; hic online
+  olmamis isim icin offline cikmamali. Kayit hatasi persistence acik maddesi kalir.
+- [ ] Gercek Summer->Winter travel/seamless/abort/editor Stop: sahte offline ve
+  duplicate online olmamali; abort sonrası normal disconnect offline gondermeli.
+  Travel committed olduktan sonraki gercek disconnect penceresi halen acik:
+  offline baskilanabilir ve reconnect online 300 sn gecikebilir; sonucu kaydet.
+- [ ] 300 sn uzeri oturum, iki world/PIE same-process ve isim yeniden kullanimi:
+  process static cache'i world/account izolasyonuna sahip degil. Cache >512 iken
+  fresh kayitlar hard cap ile kesilmez; test bu limitleri duzeltti iddiasi tasimaz.
+- [ ] Gercek teardown'da crash/ensure/RPC spam olmamali; NPC ve client-side detach
+  sunucu offline fan-out veya save RPC baslatmamali. Friends listesi sahibine
+  replike olmali, riza ve diger oyuncularin save/party/envanter/altini korunmali.

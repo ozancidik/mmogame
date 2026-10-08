@@ -57,7 +57,7 @@ if ($FullCompile) {
         $src = Join-Path $root "Source\MyProject\Private"
         $files = @(
             "Characters\MMOCharacter.cpp", "Core\MMOGameMode.cpp", "Components\MMOInventoryComponent.cpp",
-            "Components\MMOStatsComponent.cpp", "Components\MMOSkillComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp",
+            "Components\MMOStatsComponent.cpp", "Components\MMOSkillComponent.cpp", "Components\MMOPartyComponent.cpp", "Components\MMOClanComponent.cpp", "Components\MMOFriendsComponent.cpp",
             "Components\MMOQuestComponent.cpp", "Components\MMOTradeComponent.cpp", "Tests\MMOTradeSelfTest.cpp", "World\MMOLootPickup.cpp",
             "Player\MMOPlayerController.cpp", "UI\MMOHUD.cpp",
             "Characters\MMOMob.cpp", "AI\MMODialogueSubsystem.cpp"
@@ -93,6 +93,11 @@ Step "Karakter magazasi (yerel .sav) okuma + gidis-donus testi" {
 
 Step "Possession bitisinde karakter kaydi ve timer kapilari" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestSaveLifecycle.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Arkadas presence possession bitisi ve yeniden giris" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFriendsPresence.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 

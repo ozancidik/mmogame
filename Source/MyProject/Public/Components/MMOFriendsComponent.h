@@ -22,6 +22,9 @@ class MYPROJECT_API UMMOFriendsComponent : public UActorComponent
 
 public:
 	UMMOFriendsComponent();
+#if !UE_BUILD_SHIPPING
+	static bool RunPresenceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+#endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -42,7 +45,7 @@ public:
 	void CmdList();
 
 	// Sahibi cevrimici oldu/cikti: listesinde bu karakter olan diger cevrimici oyunculara sistem satiri.
-	// Yalniz otorite. (Giris: AMMOCharacter::AutoLoadDeferred, cikis: AMMOCharacter::EndPlay.)
+	// Yalniz otorite. (Giris: AMMOCharacter::AutoLoadDeferred, cikis: AMMOCharacter::UnPossessed / EndPlay.)
 	// NameOverride bos degilse o ad icin duyurur (ad degisiminde eski adi cevrimdisi yapmak icin).
 	// Ayni durum tekrar duyurulmaz (bolge gecisinde sahte "cevrimici oldu" yok; QA ORTA-1).
 	void AnnouncePresence(bool bOnline, const FString& NameOverride = FString()) const;

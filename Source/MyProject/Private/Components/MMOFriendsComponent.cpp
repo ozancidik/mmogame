@@ -10,9 +10,23 @@
 #include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 #include "HAL/PlatformTime.h"
+#if !UE_BUILD_SHIPPING
+#include "UI/MMOHUD.h"
+#include "Misc/CoreMisc.h"
+#include "Misc/OutputDevice.h"
+#include "Misc/Parse.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Guid.h"
+#endif
 
 namespace
 {
+	TMap<FString, TPair<bool, double>>& MMOFriendPresenceRecords()
+	{
+		static TMap<FString, TPair<bool, double>> Records;
+		return Records;
+	}
+
 	FString FriendPlayerNameOf(const AMMOCharacter* C)
 	{
 		if (C)
@@ -354,7 +368,7 @@ void UMMOFriendsComponent::AnnouncePresence(bool bOnline, const FString& NameOve
 	// Durum tekrari bastirma: ayni ad icin ayni durum zaten duyurulduysa sus. Bolge gecisinde
 	// eski pawn "cevrimdisi" duyurmaz, yeni pawn tekrar "cevrimici" demez. Guvenlik: 5 dk'dan eski
 	// "cevrimici" kaydi (kopma sirasinda cevrimdisi kacmis olabilir) yenilenebilir.
-	static TMap<FString, TPair<bool, double>> GAnnounced;
+	TMap<FString, TPair<bool, double>>& GAnnounced = MMOFriendPresenceRecords();
 	const FString Key = MyName.ToLower();
 	const double NowSec = FPlatformTime::Seconds();
 	if (const TPair<bool, double>* Last = GAnnounced.Find(Key))
@@ -424,3 +438,166 @@ void UMMOFriendsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 		}
 	}
 }
+
+
+#if !UE_BUILD_SHIPPING
+bool UMMOFriendsComponent::RunPresenceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended"))
+		|| !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{
+		OutError = TEXT("disposable standalone headless world required"); return false;
+	}
+	// Avoid production-cache pruning by the synthetic fixture. Only its GUID keys are removed.
+	if (MMOFriendPresenceRecords().Num() > 480) { OutError = TEXT("presence cache too full for isolated fixture"); return false; }
+	const FString Prefix = TEXT("ZPres") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(16);
+	TArray<FString> Names;
+	TArray<AMMOCharacter*> Pawns;
+	TArray<AMMOPlayerController*> PCs;
+	TArray<AMMOHUD*> HUDs;
+	for (int32 I = 0; I < 10; ++I) Names.Add(Prefix + FString::FromInt(I));
+	for (const FString& Name : Names)
+	{
+		if (MMOFriendPresenceRecords().Contains(Name.ToLower())) { OutError = TEXT("presence fixture key collision"); return false; }
+	}
+	for (int32 I = 0; I < Names.Num(); ++I)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* Pawn = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(),
+			FVector(0., 0., 5000. + I * 200.), FRotator::ZeroRotator, Params);
+		AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>();
+		Pawns.Add(Pawn); PCs.Add(PC);
+		if (!Pawn || !PC) { OutError = TEXT("fixture spawn failed"); break; }
+		Pawn->SetActorTickEnabled(false); PC->SetActorTickEnabled(false);
+		PC->Possess(Pawn);
+		if (!Pawn->GetPlayerState()) { OutError = TEXT("fixture PlayerState missing"); break; }
+		Pawn->GetPlayerState()->SetPlayerName(Names[I]);
+		PC->ClientSetHUD(AMMOHUD::StaticClass()); // Native client endpoint in standalone, no rendering.
+		AMMOHUD* HUD = Cast<AMMOHUD>(PC->GetHUD());
+		HUDs.Add(HUD);
+		if (!HUD) { OutError = TEXT("fixture HUD missing"); break; }
+		HUD->SetActorTickEnabled(false);
+	}
+	const auto Check = [&](bool bOk, const TCHAR* Why)
+	{
+		++OutChecks;
+		if (!bOk && OutError.IsEmpty()) OutError = Why;
+		return bOk;
+	};
+	const auto Count = [&](int32 Observer, const FString& Name, bool bOnline)
+	{
+		const FString Expected = Name + (bOnline ? TEXT(" cevrimici oldu.") : TEXT(" cevrimdisi oldu."));
+		int32 N = 0;
+		for (const FMMOChatLine& L : HUDs[Observer]->GetChatLinesForTests()) if (L.Text.Equals(Expected, ESearchCase::CaseSensitive)) ++N;
+		return N;
+	};
+	const auto Run = [&]() -> bool
+	{
+		if (!OutError.IsEmpty()) return false;
+		for (int32 I = 2; I < Pawns.Num(); ++I)
+		{
+			Pawns[0]->GetFriendsComponent()->Friends.Add(Names[I]);
+			Pawns[1]->GetFriendsComponent()->Friends.Add(Names[I]); // One-way, never consented by source.
+			Pawns[I]->GetFriendsComponent()->Friends.Add(Names[0]);
+		}
+		if (!Check(Pawns[2]->IsPlayerControlled() && HUDs[0]->GetChatLinesForTests().IsEmpty(), TEXT("presence fixture invalid"))) return false;
+		Pawns[2]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[2], true) == 1, TEXT("mutual online not delivered to native HUD"))) return false;
+		Pawns[2]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[2], true) == 1, TEXT("duplicate online delivered"))) return false;
+		if (!Check(HUDs[1]->GetChatLinesForTests().IsEmpty() && HUDs[2]->GetChatLinesForTests().IsEmpty(), TEXT("presence leaked to one-way or self"))) return false;
+		if (!Check(Pawns[2]->Destroy(), TEXT("possessed Destroy rejected"))) return false;
+		if (!Check(Count(0, Names[2], false) == 1, TEXT("possessed Destroy lost offline notification"))) return false;
+		const TPair<bool, double>* Last = MMOFriendPresenceRecords().Find(Names[2].ToLower());
+		if (!Check(Last && !Last->Key, TEXT("destroy retained online dedupe state"))) return false;
+
+		// A fresh pawn reconnecting under the same name within the 300s dedupe window.
+		const FString ReconnectName = Names[2].ToLower();
+		Pawns[6]->GetPlayerState()->SetPlayerName(ReconnectName);
+		Pawns[6]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[2], true) == 1 && Count(0, ReconnectName, true) == 1, TEXT("immediate reconnect online suppressed"))) return false;
+		Pawns[6]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[2], true) == 1 && Count(0, ReconnectName, true) == 1, TEXT("reconnect duplicate online delivered"))) return false;
+		if (!Check(Pawns[6]->Destroy() && Count(0, Names[2], false) == 1 && Count(0, ReconnectName, false) == 1, TEXT("reconnected pawn offline lost or duplicated"))) return false;
+
+		Pawns[3]->GetFriendsComponent()->AnnouncePresence(true);
+		PCs[3]->UnPossess();
+		if (!Check(!Pawns[3]->GetPlayerState() && Count(0, Names[3], false) == 1, TEXT("UnPossess lost old name offline"))) return false;
+		Pawns[3]->GetFriendsComponent()->AnnouncePresence(false, Names[3]);
+		if (!Check(Count(0, Names[3], false) == 1, TEXT("duplicate detached offline delivered"))) return false;
+		PCs[3]->Possess(Pawns[3]);
+		Pawns[3]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[3], true) == 2, TEXT("repossess online suppressed"))) return false;
+		PCs[3]->UnPossess();
+		if (!Check(Pawns[3]->Destroy() && Count(0, Names[3], false) == 2, TEXT("post-UnPossess Destroy duplicated offline"))) return false;
+
+		Pawns[4]->GetFriendsComponent()->AnnouncePresence(true);
+		Pawns[4]->SetTravelSaveCommitted(true);
+		if (!Check(Pawns[4]->Destroy() && Count(0, Names[4], false) == 0, TEXT("committed travel announced offline"))) return false;
+		Pawns[7]->GetPlayerState()->SetPlayerName(Names[4]);
+		Pawns[7]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[4], true) == 1, TEXT("travel replacement duplicated online"))) return false;
+		// Synthetic abort flag reset, not a real GameMode travel abort.
+		Pawns[7]->SetTravelSaveCommitted(true);
+		Pawns[7]->SetTravelSaveCommitted(false);
+		if (!Check(Pawns[7]->Destroy() && Count(0, Names[4], false) == 1, TEXT("abort flag reset suppressed disconnect"))) return false;
+
+		Pawns[5]->GetFriendsComponent()->AnnouncePresence(true);
+		Pawns[5]->RouteEndPlay(EEndPlayReason::LevelTransition); // NOT actual map travel.
+		if (!Check(!Pawns[5]->GetPlayerState() && Count(0, Names[5], false) == 0, TEXT("transition route announced offline"))) return false;
+		Pawns[8]->GetPlayerState()->SetPlayerName(Names[5]);
+		Pawns[8]->GetFriendsComponent()->AnnouncePresence(true);
+		if (!Check(Count(0, Names[5], true) == 1, TEXT("transition replacement duplicated online"))) return false;
+
+		const int32 BeforeTeardown = HUDs[0]->GetChatLinesForTests().Num();
+		const bool bWasTearingDown = World->bIsTearingDown;
+		World->bIsTearingDown = true;
+		Pawns[8]->GetFriendsComponent()->AnnouncePresence(false);
+		World->bIsTearingDown = bWasTearingDown;
+		const TPair<bool, double>* TransitionLast = MMOFriendPresenceRecords().Find(Names[5].ToLower());
+		if (!Check(HUDs[0]->GetChatLinesForTests().Num() == BeforeTeardown && TransitionLast && TransitionLast->Key,
+			TEXT("teardown guard changed presence"))) return false;
+		FActorSpawnParameters NPCParams;
+		NPCParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AMMOCharacter* NPC = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(),
+			FVector(0., 0., 9000.), FRotator::ZeroRotator, NPCParams);
+		const bool bNPCDestroyed = NPC && NPC->Destroy();
+		if (IsValid(NPC)) NPC->Destroy();
+		if (!Check(bNPCDestroyed && HUDs[0]->GetChatLinesForTests().Num() == BeforeTeardown,
+			TEXT("uncontrolled NPC changed presence"))) return false;
+		bool bSystemColor = true;
+		for (const FMMOChatLine& L : HUDs[0]->GetChatLinesForTests()) bSystemColor &= L.Color == FLinearColor(1.f, 0.65f, 0.2f);
+		if (!Check(bSystemColor, TEXT("presence channel color changed"))) return false;
+
+		if (!Check(Pawns[9]->Destroy() && Count(0, Names[9], false) == 0
+			&& !MMOFriendPresenceRecords().Contains(Names[9].ToLower()), TEXT("never-online pawn announced offline"))) return false;
+		if (!Check(HUDs[1]->GetChatLinesForTests().IsEmpty() && HUDs[9]->GetChatLinesForTests().IsEmpty(), TEXT("lifecycle presence leaked to one-way or unrelated player"))) return false;
+		return true;
+	};
+	const bool bPassed = Run();
+	// No LoadCharacter/world tick: fixtures never write a save. Skip cleanup announcements.
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
+	for (AMMOPlayerController* PC : PCs) if (IsValid(PC)) { PC->UnPossess(); PC->Destroy(); }
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->Destroy();
+	for (const FString& Name : Names) MMOFriendPresenceRecords().Remove(Name.ToLower());
+	return bPassed;
+}
+namespace
+{
+	struct FMMOFriendsPresenceTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestFriendsPresence"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool bPassed = UMMOFriendsComponent::RunPresenceLifecycleSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_FRIENDS_PRESENCE_TEST] %s checks=%d reason=%s"), bPassed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOFriendsPresenceTestExec GMMOFriendsPresenceTestExec;
+}
+#endif

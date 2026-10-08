@@ -59,6 +59,10 @@ public:
 
 	// Sohbet satiri ekler (sunucudan gelen genel/parti/sistem mesaji). Son 50 satir tutulur.
 	void AddChatLine(const FString& Line, const FLinearColor& Color);
+#if !UE_BUILD_SHIPPING
+	// Read-only native fixture evidence; rendering/remote delivery must be tested in PIE.
+	const TArray<FMMOChatLine>& GetChatLinesForTests() const { return ChatLines; }
+#endif
 
 	// --- NPC diyalog balonu (konusan NPC'ye tiklaninca alt-ortada gosterilir) ---
 	// Pencere DEGILDIR: hareketi engellemez, sadece bir sure gorunur ve solar.

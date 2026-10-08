@@ -2317,3 +2317,79 @@ beceri bosluklari/InitGameState whitelist uyari sinirlari surer.
 | Tam mevcut regresyon paketi | Gecti38/38 | NetSmoke baglanti kaniti; tum gameplay replication degil |
 | ECC + salt okunur Unreal/QA inceleme | Kapsamda engel yok; P3/fixture eksigi giderildi | Ajan build/test yazmadi; parent final duzeltmeleri dogruladi |
 | Gercek host + uzak istemci PIE | Yapilmadi | Save failure/reconnect/nav/seamless/presence checklist acik |
+
+
+## 65 · Arkadas offline presence kimlik silinmeden once (2026-10-08; O28)
+
+ECC plan/review/verify + mmo-feature/ue-build ile O27'nin acik presence yolu
+secildi. Kayit kodu korunur. 16099a3 uzerinde possessed native pawn Destroy,
+PlayerState detach sonrasi EndPlay player gate'ine ulasamadi: baseline FAIL6
+16:34:56.771 UTC / UE0/PS1 (TEMP mmo_friends_presence_baseline_20261008.log).
+
+Authority UnPossessed, Super oncesi !EndPlay-started + player-controlled +
+!committed-travel + Friends iken offline duyurur. Initial-load/save basarisina
+baglanmaz: AutoLoadDeferred zaten pending load icin online duyurabilir. Eski
+EndPlay yolu, teardown guard, karsilikli riza, case-insensitive ad anahtari ve
+300 sn duplicate suppression korunur. Yeni RPC/replicated alan/timer/Tick yok;
+kayit schema'si degismedi. Salt UnPossess parti leave baslatmaz.
+
+Native24, GUID adli 10 gercek native PC/pawn ve ClientSetHUD -> ClientReceiveChat
+-> HUD buffer yoluyla kontrol eder: possessed Destroy, explicit UnPossess ve
+post-detach Destroy, ayni pawn repossess, case-varied yeni pawn reconnect,
+online/offline tekilligi, one-way/self/unrelated gizliligi, kanal2 rengi,
+never-online sessizligi, committed replacement, LevelTransition route,
+sentetik abort bayragi ve teardown guard; uncontrolled NPC destruction guvenli.
+World tick/load yok, fixture save yazmaz; yalniz kendi GUID cache anahtarlarini
+normal cleanup'ta siler. Cache onkosulu >480 iken testi reddeder; existing key
+collision reddi mevcut. Shipping'de test ve salt-okunur HUD getter derlenmez.
+NPC kontrolu player gate'ini bagimsiz ispatlamaz (NPC adi/cache yoktur).
+
+Iki fixture hatasi duzeltildi: ilk case-varied reconnect FAIL8, FString ==
+case-insensitive sayimiydi; .Equals(..., CaseSensitive) gercek exact text sayar.
+NPC FAIL21, origin'deki collision nedeniyle spawn NULL idi; AlwaysSpawn/Z9000
+kullanildi. Bunlar yeni production bug olarak sayilmaz. Son fixture DLL
+Succeeded2,91 sn -> PASS24 20:06:43.956 UTC / UE0/PS0.
+
+Derlenmis load-gate negatifi Succeeded5,09 sn -> FAIL6 20:07:11.155 UTC;
+EndPlay-gate negatifi Succeeded5,00 sn -> FAIL18 20:07:40.833 UTC. Iki negatif
+UE0/PS1; TEMP mmo_friends_presence_negative_load_20261008.log ve
+mmo_friends_presence_negative_endplay_20261008.log. Final byte-exact restore,
+normal DLL Succeeded5,10 sn exit0 -> PASS24 20:08:02.186 UTC / UE0/PS0;
+TEMP mmo_friends_presence_final_20261008.log. Negatif DLL finalde kalmadi.
+
+Salt-okunur Unreal/QA reviewer Galileo actual diff'i inceledi; production engeli
+bulmadi, fixture comparator/NPC duzeltmeleri ve kanit sinirlari kayda alindi.
+Ajan dosya/build/test/alt-ajan baslatmadi; final restore/build/full parent'ta.
+Tam paket oncesi kapatildi. Agency plugin kokeni dogrulanmadi, rol incelemesi
+Unreal/QA/ECC olarak kullanildi.
+
+Gercek remote RPC/HUD rendering, actual logout/travel/abort/teardown, save failure
+sonrasi presence, >300 sn expiry ve multiple worlds PIE acik. Cache hala process
+static/ad tabanli; fresh512 uzeri kayitlar hard cap degil, yalniz >=300 sn olanlar
+prune edilir. Committed travel sonrasi gercek disconnect offline'i baskilayip
+hizli reconnect online'ini 300 sn bastirabilir; bu pencere duzeltilmedi.
+
+
+**Final ECC verify:** RunAllChecks.ps1 -SkipBuild -FullCompile 39/39 GECTI,
+exit0. Final restore normal DLL Succeeded5,10 sn ayrica gecti. 19 PCH'siz /W4
+CPP dosya warning C0 (Friends yeni listeye eklendi). Native presence24
+PASS20:12:26.180 UTC; save26 PASS20:12:16.211, parti83 PASS20:13:44.154,
+klan43 PASS20:14:02.154, takas218, olum14/3first+5death ve parser576/576 dahil
+eski kontroller gecti. JSON schema2/negative111. Store419 loaded419, invalid/
+loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1, roundtrip equal1.
+Bu yuva sayisi oyuncu/Lv1-30 kosu kaniti degildir. Summer48/Winter30 smoke,
+exit0/error0; rastgele dogum sayimi yeni icerik degildir. NetSmoke1join/1welcome,
+server/client error0. TEMP mmo_all_presence_final_20261008.log ve
+mmo_net_server_231716.log / mmo_net_client_231716.log. Full oncesi/sonrasi149
+Source/Scripts SHA256 differences0; TEMP mmo_presence_final_hashes_20261008.txt.
+Kaynak/runner/ajan yazimi full boyunca yok; belgeler freeze disinda duzenlendi.
+Full sonunda engine/UBT process0 ve MMOSave_ZPres*.sav0. Gercek PIE acik;
+Lv33+ beceri bosluklari/InitGameState whitelist uyari sinirlari surer.
+
+| Kontrol | Sonuc | Sinir |
+| --- | --- | --- |
+| Final normal DLL + 19 PCH'siz dosya | Gecti; warning C0 | Editor Development; Server/Shipping acik |
+| Native24 + baseline/2 derlenmis negatif | PASS24; FAIL6/6/18 | Standalone HUD buffer; rendering/remote RPC degil |
+| Tam mevcut regresyon paketi | Gecti39/39 | NetSmoke baglanti; tum gameplay replication degil |
+| ECC + readonly Unreal/QA | Kapsamda blocker yok; fixture hatalari giderildi | Parent final restore/DLL/full ile dogruladi |
+| Gercek host/uzak istemci PIE | Yapilmadi | Travel/abort/teardown/300sn/multiworld/persistence acik |

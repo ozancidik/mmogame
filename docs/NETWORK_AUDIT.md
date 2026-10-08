@@ -359,7 +359,7 @@ denetim ve önceki düzeltme notları tarihsel bağlamdır; O6 tümden kapanmad�
   geçiş/timeout testleri ayrı kanıttır. Depoda yazım sırası/iptal ve XP/altın anlık görüntü
   penceresi bu değişiklikle çözülmedi; O6'nın bu bölümleri açık kalır.
 - Seamless sonrası yeni pawn 0.6 sn boyunca varsayılan durumda (kayıt yüklenmedi; `bInitialLoadComplete=false` olduğu için kayıt yazılmıyor — iyi). Bu pencerede girilen `/klan`, `/arkadas`, ticaret komutları `ApplySaveData` ile ezilir (MMOClanComponent.cpp:567-640, MMOFriendsComponent.cpp:287-308) — zararsız ama komutlar "başarılı" görünür. İstersen `bInitialLoadComplete` olmadan RPC'leri reddet.
-- Bağlantı kopması: Trade ve Klan EndPlay'ı doğru; Friends `AnnouncePresence(false)` yalnız `Destroyed` + `!bTravelSaveCommitted` (MMOCharacter.cpp:399) — doğru. `static GAnnounced` (MMOFriendsComponent.cpp:250) süreç ömrü boyunca büyür, PIE'de sunucu/istemci aynı süreçte paylaşılır (D6).
+- Bağlantı kopması: Trade ve Klan EndPlay'ı doğru; Friends eski `AnnouncePresence(false)` yalnız EndPlay `Destroyed` + `!bTravelSaveCommitted` yolundaydı; identity detach kapısı offline kaybettirdi (O28: UnPossessed içinde sınırlı düzeltildi). `static GAnnounced` (MMOFriendsComponent.cpp:250) süreç ömrü boyunca büyür, PIE'de sunucu/istemci aynı süreçte paylaşılır (D6).
 - Parti, bölge geçişinde dağılır (EndPlay `RequestLeave`, MMOCharacter.cpp:393-396); kalıcı değil — tasarım notu.
 
 ---
@@ -425,7 +425,7 @@ denetim ve önceki düzeltme notları tarihsel bağlamdır; O6 tümden kapanmad�
 
 PR [ozancidik/mmogame#1](https://github.com/ozancidik/mmogame/pull/1) değişiklikleri **derlenmedi**. Önceki yerel turda kapananlar: Y2/O9, Y4/O10, Y5, O1, O2, O3.
 
-- **Bu turda (derlenmedi):** D1 (debug RPC'leri Shipping'de erken döner), D3 (ölü karakter satıcıdan işlem ve yükseltme yapamaz; yükseltmede NPC yakınlık koşulu tasarım kararı olarak eklenmedi), D5/D9 (sohbet kontrol ve bidi karakter temizliği), D6 (`GAnnounced` tablosu 512 kayıtla sınırlı), D9/Y1 ad değiştirme soğuması (30 sn, yalnız uzak istemci).
+- **Bu turda (derlenmedi):** D1 (debug RPC'leri Shipping'de erken döner), D3 (ölü karakter satıcıdan işlem ve yükseltme yapamaz; yükseltmede NPC yakınlık koşulu tasarım kararı olarak eklenmedi), D5/D9 (sohbet kontrol ve bidi karakter temizliği), D6 (`GAnnounced` >512 iken en az 300 sn eski kayıtları temizler; fresh kayıtlar için hard cap yok, O28 sınırı), D9/Y1 ad değiştirme soğuması (30 sn, yalnız uzak istemci).
 - **Y3 madde 1** (can/mana her karede kirlenir): yenilenme ≥1 puanlık adımlara bağlandı (derlenmedi). Madde 2 (`ActiveEffects.RemainingTime`): `NotReplicated` yapıldı, replike `EndServerTime` eklendi, HUD kalan süreyi ondan hesaplıyor (derlenmedi).
 - **O11 madde 3** (geri bildirim `IsLocallyControlled()`'e bağlı): `MMONotify::ToOwner` eklendi, envanter ve görev bileşeni mesajları uzak istemciye de gider (derlenmedi). Beceri/karakter/ganimet/parti mesajları açık.
 - **Açık:** Y1 (kimlik; kısmi hafifletmeler `SECURITY_AUDIT.md` K-1'de), O4 (parti ve ticaret davet kapma), O5 (arkadaş rızası), O6, O11, D2, D4'ün Trade `Accept/Cancel` ve Klan komutları, D7 (mevcut yollar çanta dolu durumunu zaten koruyor), D8. O8'in hedef taraması ve spawner kanalı kapandı; yalnız mob tick/ölçüm ayarı açık. O7, O12 ve D10 kodda kapandı; PIE/log doğrulaması aşağıdaki checklist'te bekliyor.
@@ -819,3 +819,27 @@ store icin lifecycle iyilesmesidir; disk failure dayanıklı retry, depoda CAS/
 HTTP yazim sirasi, retained seamless pawn identity, gercek remote reconnect ve
 PIE acik. Friends presence destruction kapisi bu iste cozulmedi. O26 parti
 cleanup korunur; bu degisiklik salt UnPossess'te parti leave cagirmaz.
+
+
+### O28 · ORTA · Possession bitisinde arkadas offline kaybi — sinirli native duzeltme
+
+O27 sonrasi native possessed Destroy'da offline satiri kayboldu: baseline FAIL6.
+Controller detach EndPlay'den once PlayerState'i temizledigi icin eski player
+control gate'i false olur. Authority UnPossessed, canli eski PlayerState varken
+Friends offline duyurur; initial-load/save sonucu gate'e katilmaz. EndPlay-started
+ve committed-travel kapilari nested/gercek gecis niyetinde sahte offline'i keser.
+Karsilikli riza, owner-only Friends replication ve mevcut notification RPC ayni.
+
+Native24 actual PC/pawn + standalone client endpoint/HUD buffer: destroy,
+unpossess/post-destroy/repossess, case-varied reconnect, tekillik/gizlilik/reng,
+never-online, committed/transition replacement; sentetik abort/teardown ve NPC.
+Load-gate negatifi FAIL6, EndPlay-gate negatifi FAIL18, restore normal DLL/PASS24.
+Fixture case comparator ve spawn hatalari production bug sayilmaz. Ayrintili
+kanit CHECKLIST_FIXES §65; gercek remote/PIE PLAYTEST_CHECKLIST'te acik.
+
+Bu lifecycle iyilesmesi tum presence garantisi degildir: 300 sn expiry, process
+static ad anahtarlari/cross-world collision, committed travel sonra disconnect
+penceresi ve backend/account identity acik. D6'nin eski 512 hard-cap iddiasi
+kaynakla uyusmuyordu: yalniz eski kayitlar prune edilir, fresh tablo buyuyebilir.
+RPC/save schema yeni alan/timer/Tick eklenmedi. O27 save ve O26 party davranisi
+korunur; slot/hesap kimligi fallback'i eklenmedi.

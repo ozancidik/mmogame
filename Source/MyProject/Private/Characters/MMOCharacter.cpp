@@ -897,6 +897,12 @@ void AMMOCharacter::UnPossessed()
 {
 	if (HasAuthority())
 	{
+		// Publish while the old PlayerState is still available, even if loading
+		// or saving never completed. A travel/EndPlay route keeps online continuity.
+		if (!bEndPlayStarted && IsPlayerControlled() && !bTravelSaveCommitted && FriendsComponent)
+		{
+			FriendsComponent->AnnouncePresence(false);
+		}
 		// APawn::Destroyed detaches before Character EndPlay. Save BEFORE Super
 		// removes PlayerState; never derive a Default identity for a detached pawn.
 		if (!bEndPlayStarted && IsPlayerControlled() && bInitialLoadComplete && !bTravelSaveCommitted)
