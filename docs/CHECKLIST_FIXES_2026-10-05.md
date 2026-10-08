@@ -2655,3 +2655,102 @@ ve Lv33+skilluyarilari surer; gercek PIE/Shipping/Server acik.
 | RunAllChecks -SkipBuild | Gecti40/40 | FullCompile19 yeniden yok; baglanti tum replikasyon degil |
 | ECC readonly Unreal/multiplayer/security/QA | Final diff'te blocker yok | Parent actualbuild/log/paket/hashdogruladi |
 | Gercek PIE | Yapilmadi | Samepawn invitegeneration, remote/load/identity acik |
+
+
+## 69. Arkadas kabulunde alici davet nesli (2026-10-09 yerel / 8 Ekim UTC, O32)
+
+ECC plan/review/verify, mmo-feature ve ue-build birlikte uygulanir. Bounded is:
+ayni pawn'da tuketilen/suresi dolan A davetinin eski kabul istegi, yeni B'yi
+kabul etmemeli; ret B'yi tuketmemeli, fresh Say/Enter kabul calismali. Mevcut
+O31 pawn kapisi, ortak 0,7 sn throttle, mutual consent, liste/ad siniri ve
+SaveThrottled korunur. Dosyalar Friends component/header, controller/header,
+mevcut friend chat runner ve dort gorev belgesi. Baslangic HEAD901cb5f,
+tracked temiz; .agents/.codex/AGENTS.md korunur. Diger ECC sohbeti notLoaded;
+aktif baska yazici veya editor/UBT yoktu.
+
+### Uygulama
+
+Alici component'te runtime uint64 PendingInviteId owner-only replike olur.
+Yalniz gercek davet verilirken artar; tuketim veya expiry sifirlamaz, MAX_uint64
+sonrasinda yeni davet reddedilir. Weak inviter ve expiry server-only kalir;
+yeni timer/Tick/save semasi yok. CmdAcceptSeen sifir veya uyusmayan ID'yi
+pending'i okumadan/tuketmeden keser. Trusted native CmdAccept wrapper'i mevcut
+ID'yi kullanir; client chat bu wrapper'i cagirmiyor. Say ve committed Enter
+SendChatWithContext uzerinden gonderim anindaki owner ID'yi sekizinci RPC
+parametresi olarak tasir. Server /arkadas kabul/accept bunu dogrular. Eski
+trade/party/clan native cagrilarina ilgisiz friend alaninda0 eklendi.
+RPC imzasi degistigi icin host/istemci ayni yeni build'i kullanmali.
+
+### Gercek UE davranis kaniti
+
+Ilk compiled baseline generation alanini ve yeni fixture'i iceriyordu;
+chat dispatch kasitli olarak onceki CmdAccept latest fallback'i kullaniyordu.
+11,69 sn UHT/compile/link Succeeded/exit0. UE'de FAIL33 21:22:53.439 UTC:
+A tuketildikten sonra B beklerken A'nin eski /arkadas kabul istegi B ile iki
+listeyi guncelledi. UE exit0, runner exit1 (davranis hatasi) idi.
+TEMP mmo_friend_generation_baseline_build_20261009.log /
+mmo_friend_generation_baseline_20261009.log.
+
+Final dispatch + component boundary fixture derlemesi Succeeded7,91 sn/exit0;
+PASS53 21:23:58.262 UTC. Native controller eski28 +15 yeni =43; component
+private expiry/MAX boundary10 =53. A->B, sifir/eski/future ID ve iki kabul
+alias'i, fresh Say/committed, duplicate, ayni inviter yeniden davet, expiry
+sonrasi replacement, private pending/expiry korunmasi, duplicate invitation,
+occupied pending ve son uint64 issuance/accept/exhaustion kapsandi. Expiry
+fixture'i saati beklemek yerine private expiry'yi geriye alir; World tick veya
+auto-load/save timer'i calistirmaz. Initial-load kapisi SaveThrottled'in
+SaveCharacter cagrilarinin diske yazmasini keser. Gercek save/login testi degil.
+
+Iki compiled negatif: component Seen ID kapi kaldirilinca FAIL33
+21:24:23.502; wrap kapisi kaldirilinca FAIL53 21:24:55.625. Her ikisinde UE0,
+runner1; kaynak restore Python write_bytes ile yeni timestamp aldi. Son
+normal derleme actual Friends CPP compile/lib/DLL link, Succeeded2,91 sn/exit0;
+restore PASS53 21:25:23.248 UTC. Final byte backup TEMP
+mmo_friend_generation_final_restore_20261009.cpp; final paket asagida.
+
+### Sinirlar
+
+Generation gonderim aninda yakalanir; gorunen davet mesaji/kimlik ile ID'nin
+atomik istemci sunumu saglanmadi. Eski mesaj okunurken client zaten B'nin ID'sini
+aldiysa yazilan generic kabul B'yi secebilir. Hesap/isim yeniden kullanimi,
+source controller rebinding, reconnect/offline consent ve atomik disk kaydi
+ayri acik konulardir. Native authority/HUD buffer gercek remote RPC teslimi,
+replication veya Slate/Canvas kaniti degildir. Shipping/Server derlenmedi.
+Gercek PIE maddeleri PLAYTEST_CHECKLIST O32 bolumunde aciktir.
+
+Salt okunur reviewer Franklin (Unreal/multiplayer/security/QA + ECC) final
+header/diff/callers/save/lifetime ve 43+10 sayimini inceledi; somut blocker yok.
+Tum RPC cagrilarinin 8 parametre tasidigi, client fallback olmadigi ve owner-only
+alan/save ayrimi dogrulandi. Ajan dosya/build/test yazmadi; parent actual UE
+log/exit/restore byte equality dogruladi. Ajan paket surerken kapatildi.
+Agency plugin paket kokeni yerelde dogrulanmadi; bu inceleme acik rol olarak
+kullanildi. Final Friends CPP / TEMP backup SHA256 ayni:
+7456007CB45692B03A27E544A4DAE5F4E8996E35108A01A532E354A05CCEB1D7.
+
+### O32 final paket
+
+`RunAllChecks.ps1 -SkipBuild -FullCompile`: 41/41 GECTI, exit0. Bu sefer 19 CPP
+NoPCH/NoLink/SingleFile /W4 gercekten yeniden derlendi, hepsi OK/warning C0;
+toplam warning0. Normal linked DLL once restore edilip PASS53 verdigi icin
+-SkipBuild eski/mutant DLL'yi gizlemiyor. Final native53 21:29:47.639 UTC;
+presence24 21:29:35.837, save26 21:29:27.725, parti83 21:30:44.551,
+klan73 21:31:02.427, DoT33 21:32:23.145 ve trade218 21:33:50.111 PASS.
+Parser576/576, JSONschema2/negative111. Store447 slots/447loaded, invalid/
+loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1/roundtrip equal1.
+Bu sayi gercek oyuncu veya Lv1-30 kosusu degildir.
+
+Summer50/Winter29 random mob smoke exit0/error0; Net1join/1welcome,
+server/client error0. TEMP mmo_all_friend_generation_final_20261009.log,
+mmo_net_server_003418.log / mmo_net_client_003418.log. Source/Scripts 151 SHA256
+oncesi/sonrasi differences0; TEMP mmo_friend_generation_final_hashes_20261009.json.
+Restore backup byte equality saglandi. MMOSave_ZFC*.sav0; engine/UBT0.
+Reviewer kapali, oyun kaynaklari ve runner tum paket boyunca sabitti.
+StaticLint InitGameState whitelist ve Lv33+ skill uyari sinirlari surer.
+
+| Kontrol | Sonuc | Sinir |
+| --- | --- | --- |
+| UHT + restore normal linked DLL | Gecti; actual compile/lib/DLL link | Editor Development; Server/Shipping acik |
+| Native controller + private boundary | PASS53; baseline/gate33/wrap53 negatifleri yakalandi | Sentetik expiry, HUDbuffer; gercek remote degil |
+| RunAllChecks -SkipBuild -FullCompile | Gecti 41/41; 19 PCH'siz CPP warning0 | Net baglanti davet UI/replication kaniti degil |
+| ECC + readonly rol incelemesi | Final diff'te blocker yok | Parent actual build/log/hash/exit dogruladi |
+| Gercek PIE | Yapilmadi | O32 remote/mesaj-ID/kimlik/reconnect maddeleri acik |

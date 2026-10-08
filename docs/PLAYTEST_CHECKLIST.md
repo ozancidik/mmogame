@@ -4612,6 +4612,38 @@ oynanmadı. SaveThrottled çağrısı var, fixture initial-load kapısı disk ya
   yeniden dene; 0,7sn ortak throttle eski isteği de sayar. Genel/parti/klan ve
   fısıltı regresyonunu çalıştır; eski komutu otomatik yeni pawn'a taşımamalı.
 - [ ] Aynı pawn'da A daveti tüketilip B daveti geldiğinde eski kabul gönder:
-  O31 recipient generation sağlamaz; yanlış latest daveti kabul UX riski açık.
+  O31 recipient generation sağlamazdı; O32 server observed-generation kapısı
+  eklendi. Mesaj/ID ortak görünümünden gelen UX riski hâlâ açık.
   ID/metin ortak görünümü, account kimliği, gerçek reconnect ve offline rıza
   kalıcılığı ayrı iş olarak kalsın. Yeni Server/Shipping hedefini doğrula.
+
+
+## 2026-10-09 — Arkadaş davet nesli (O32, gerçek PIE açık)
+
+Native53 authority controller/component testidir; controller43, private expiry
+ve MAX boundary10. Expiry geriye ayarlanır, gerçek20sn beklenmez. Restore DLL
+ve headless HUD buffer gerçek remote replikasyon/Slate testi değildir.
+O31'in aynı pawn A→B eksikliği sunucu observed-generation kapısıyla giderildi;
+görünen mesaj/ID ortak sunumu hâlâ açık.
+
+- [ ] Host + uzak istemci aynı yeni DLL: A davetini kabul et, ilişkiyi sil,
+  aynı pawn B daveti alsın. Eski A ID'siyle gecikmiş kabul/accept B'yi kabul
+  etmemeli ve pending B kalmalı; güncel owner ID ulaştığında fresh Enter/Say
+  yalnız B ile iki karşılıklı listeyi güncellemeli. Sıfır/yanlış ID de ret.
+- [ ] Aynı kişinin daveti süresi dolsun veya tüketilip yeniden verilsin:
+  önceki ID kabul edilemesin. Gerçek20sn sona erme ve yeni generation owner
+  replication gözlensin; duplicate çağrı iki listeyi çoğaltmasın. O31 eski
+  pawn/null/foreign pawn, capacity/ad, liste ve ortak0,7sn sınırını tekrar dene.
+- [ ] ID replikasyonu gecikirse sessiz ilk ret sonrası fresh bağlamla tekrar
+  çalışmalı. Başka oyuncular alıcının pending ID'sini almamalı; host yerel Say
+  ve uzak Enter aynı akışı kullanmalı. Trade/party/clan kabul regresyonu çalışsın.
+- [ ] Bildirim metni ile observed ID ayrı teslim edilir: kullanıcı eski A
+  satırını okurken B'nin ID'si gelmiş olabilir; generic kabul doğru görülen
+  daveti garanti etmez. Mesaj/kimlik/ID ortak sunumu ayrı iş olarak kalsın.
+  Rename/controller rebinding, reconnect/offline consent ve gerçek save/login
+  açık; yeni Shipping ve Dedicated Server hedeflerini ayrıca doğrula.
+
+O32 otomatik final: linked restore DLL + native53;
+`RunAllChecks.ps1 -SkipBuild -FullCompile`: 41/41 exit0, 19 NoPCH CPP /W4
+warning0; Summer50/Winter29/error0,
+Net1join/1welcome/error0. Bunlar yukarıdaki gerçek PIE kutularını kapatmaz.

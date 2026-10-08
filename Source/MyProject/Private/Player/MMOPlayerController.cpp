@@ -435,7 +435,7 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 		auto Chat = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Invite, uint64 Session)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0, FGuid());
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0, FGuid(), 0);
 		};
 		Trades[0]->RequestInviteNearest();
 		const uint64 Old = Trades[1]->PendingInviteId;
@@ -514,7 +514,7 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 				Pending[I] = Parties[I]->PendingInviteFrom; Ids[I] = Parties[I]->PendingInviteId; Times[I] = Parties[I]->PendingInviteTime;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0, SeenMembership);
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0, SeenMembership, 0);
 			for (int32 I = 0; I < 3; ++I)
 			{
 				if (Parties[I]->Members != Members[I] || Parties[I]->Leader != Leaders[I]
@@ -641,7 +641,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 				Leaders[I] = Clans[I]->bIsLeader; Ids[I] = Clans[I]->PendingInviteId;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(TEXT("/klan kabul"), SeenPawn, 0, 0, 0, Id, FGuid());
+			PCs[1]->ServerSendChat_Implementation(TEXT("/klan kabul"), SeenPawn, 0, 0, 0, Id, FGuid(), 0);
 			for (int32 I = 0; I < 4; ++I)
 			{
 				FMMOCharacterSaveData After; Clans[I]->FillSaveData(After);
@@ -707,7 +707,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		auto Send = [&](const FString& Text, AMMOCharacter* SeenPawn)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid());
+			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid(), 0);
 		};
 		auto RejectCommand = [&](const FString& Text, AMMOCharacter* SeenPawn)
 		{
@@ -828,10 +828,10 @@ bool AMMOPlayerController::RunFriendsChatContextSelfTest(UWorld* World, FString&
 		Friends[0]->CmdAdd(Names[1]); // Real pending consent on replacement, not on the sending old pawn.
 		if (!Check(PCs[1]->GetPawn() == Pawns[3] && Friends[3]->HasFriend(Names[2])
 			&& !Friends[3]->HasFriend(Names[0]) && InventoryUnchanged(), TEXT("friend actual possession fixture"))) return false;
-		auto Send = [&](const FString& Text, AMMOCharacter* SeenPawn)
+		auto Send = [&](const FString& Text, AMMOCharacter* SeenPawn, uint64 SeenFriendId = 0)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid());
+			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid(), SeenFriendId);
 		};
 		auto Reject = [&](const FString& Text, AMMOCharacter* SeenPawn)
 		{
@@ -877,7 +877,38 @@ bool AMMOPlayerController::RunFriendsChatContextSelfTest(UWorld* World, FString&
 		if (!Check(HUDs[1]->GetChatLinesForTests().Num() == BeforeInvalid + 1 && Friends[3]->Friends.Num() == 2, TEXT("fresh empty add feedback"))) return false;
 		Send(TEXT("/arkadas ekle ") + Names[1], Pawns[3]);
 		if (!Check(!Friends[3]->HasFriend(Names[1]) && Friends[3]->Friends.Num() == 2, TEXT("fresh self add accepted"))) return false;
-		return Check(InventoryUnchanged(), TEXT("friend chat changed inventory"));
+		if (!Check(InventoryUnchanged(), TEXT("friend chat changed inventory"))) return false;
+		// A consumed invitation must never accept a later B on the very same pawn.
+		Friends[3]->CmdRemove(Names[0]); Friends[3]->CmdRemove(Names[2]);
+		if (!Check(Friends[3]->Friends.IsEmpty() && Friends[0]->Friends.IsEmpty() && Friends[2]->Friends.IsEmpty(), TEXT("generation fixture mutual cleanup"))) return false;
+		Friends[0]->CmdAdd(Names[1]); const uint64 Old = Friends[3]->GetPendingInviteId();
+		if (!Check(Old > 0 && Friends[3]->Friends.IsEmpty(), TEXT("friend A generation issuance"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/arkadas kabul"));
+		if (!Check(Friends[3]->HasFriend(Names[0]) && Friends[0]->HasFriend(Names[1]) && Friends[3]->GetPendingInviteId() == Old, TEXT("fresh A acceptance/reset generation"))) return false;
+		Friends[3]->CmdRemove(Names[0]); Friends[2]->CmdAdd(Names[1]); const uint64 Fresh = Friends[3]->GetPendingInviteId();
+		if (!Check(Fresh > Old && Friends[3]->Friends.IsEmpty() && Friends[2]->Friends.IsEmpty(), TEXT("friend B replacement generation"))) return false;
+		for (uint64 SeenId : {Old, static_cast<uint64>(0), Fresh + 1})
+		{
+			for (const TCHAR* Command : {TEXT("/arkadas kabul"), TEXT("/arkadas accept")})
+			{
+				Send(Command, Pawns[3], SeenId);
+				if (!Check(Friends[3]->Friends.IsEmpty() && Friends[2]->Friends.IsEmpty() && Friends[0]->Friends.IsEmpty()
+					&& Friends[3]->GetPendingInviteId() == Fresh, TEXT("stale friend accept consumed replacement B"))) return false;
+			}
+		}
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/arkadas accept")), ETextCommit::OnEnter);
+		if (!Check(Friends[3]->Friends.Num() == 1 && Friends[3]->HasFriend(Names[2]) && Friends[2]->HasFriend(Names[1])
+			&& Friends[0]->Friends.IsEmpty() && Friends[3]->GetPendingInviteId() == Fresh, TEXT("fresh B acceptance after stale requests"))) return false;
+		Send(TEXT("/arkadas kabul"), Pawns[3], Fresh);
+		if (!Check(Friends[3]->Friends.Num() == 1 && Friends[2]->Friends.Num() == 1, TEXT("same generation replay duplicate"))) return false;
+		Friends[3]->CmdRemove(Names[2]); Friends[2]->CmdAdd(Names[1]); const uint64 Reissued = Friends[3]->GetPendingInviteId();
+		Send(TEXT("/arkadas accept"), Pawns[3], Fresh);
+		if (!Check(Reissued > Fresh && Friends[3]->Friends.IsEmpty() && Friends[2]->Friends.IsEmpty(), TEXT("same inviter reissue accepted old ID"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/arkadas kabul"));
+		if (!Check(Friends[3]->HasFriend(Names[2]) && Friends[2]->HasFriend(Names[1]) && Friends[3]->GetPendingInviteId() == Reissued, TEXT("fresh same inviter reissue"))) return false;
+		if (!Check(InventoryUnchanged(), TEXT("friend generation changed inventory"))) return false;
+		return UMMOFriendsComponent::RunInviteGenerationBoundarySelfTest(Pawns[0], Pawns[2], Pawns[3], OutError, OutChecks);
 	}();
 	// Same synchronous frame; no auto-load/save timer fires. Suppress synthetic cleanup presence.
 	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
@@ -914,13 +945,14 @@ void AMMOPlayerController::SendChatWithContext(const FString& Message)
 	const UMMOTradeComponent* Trade = Me ? Me->GetTradeComponent() : nullptr;
 	const UMMOPartyComponent* Party = Me ? Me->GetPartyComponent() : nullptr;
 	const UMMOClanComponent* Clan = Me ? Me->GetClanComponent() : nullptr;
+	const UMMOFriendsComponent* Friends = Me ? Me->GetFriendsComponent() : nullptr;
 	ServerSendChat(Message, Me, Trade ? Trade->PendingInviteId : 0,
 		Trade && Trade->bTradeActive ? Trade->TradeSessionId : 0, Party ? Party->PendingInviteId : 0,
-		Clan ? Clan->PendingInviteId : 0, Party ? Party->PartyMembershipId : FGuid());
+		Clan ? Clan->PendingInviteId : 0, Party ? Party->PartyMembershipId : FGuid(), Friends ? Friends->GetPendingInviteId() : 0);
 }
 
 void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message, AMMOCharacter* SeenCommandPawn,
-	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId)
+	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId, uint64 SeenFriendInviteId)
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -1128,7 +1160,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
 		{
-			Friends->CmdAccept();
+			Friends->CmdAcceptSeen(SeenFriendInviteId);
 		}
 		else if (Sub.Equals(TEXT("sil"), ESearchCase::IgnoreCase))
 		{

@@ -913,3 +913,29 @@ RunAllChecks -SkipBuild40/40 exit0 (yeni friendchatstep, FullCompile19 yok).
 151 Source/Scripts hashdifferences0, store440/schema2; presence24/save26/
 clan73/party83/DoT33/trade218. Summer48/Winter26/error0, Net1/1/error0;
 gercekPIE ve samepawn pendinggeneration acik. Kanit §68.
+
+
+### O32 · ORTA · Ayni pawn eski arkadas kabulu yeni daveti tuketir
+
+O31'in acik biraktigi A->B nesil sorunu UE'de yeniden uretildi: yeni ID alanli
+baseline eski latest-dispatch ile FAIL33; eski A kabul B friendship'ini kurdu.
+Alici runtime owner-only uint64 ID, server issuance'da artar; expiry/tuketimde
+korunur, MAX sonrasi fail closed. Chat gonderim aninda client observed ID'yi
+sekizinci ServerSendChat parametresinde tasir; CmdAcceptSeen zero/mismatch'i
+pending'i tuketmeden keser. Trusted native latest wrapper client path'te yok.
+O31 pawn guard, throttle ve mutual consent/capacity/save kurallari ayni.
+
+Native53 = controller43 + private component boundary10; expiry sentetik,
+normal/fresh/replay/occupied/MAX kontrolleri. Compiled guard/wrap negatifleri
+FAIL33/53; actual restore compile/link + PASS53. Ayrinti CHECKLIST_FIXES §69.
+Save schema/Tick degismedi. RPC imzasi degisti: ayni yeni host/client build.
+UI invite message/ID atomikligi ve source/account/name rebinding, gercek
+reconnect/save/remote replication/Shipping/Server acik; genel kabul metni
+kullanicinin gordugu davet kimligini tek basina garanti etmez.
+
+
+O32 final: UHT + actual restore DLL/PASS53; RunAllChecks -SkipBuild -FullCompile
+41/41 exit0,19 CPP NoPCH/W4 warning0. Source/Scripts151 hash differences0;
+store447/schema2, presence24/save26/party83/clan73/DoT33/trade218. Summer50/
+Winter29/error0 ve Net1join/1welcome/error0. ECC readonly review blocker0;
+Shipping/Server/gercekPIE ve notification-ID ortakgorunumu acik. §69 kanitlari.

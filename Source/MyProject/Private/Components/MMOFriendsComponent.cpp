@@ -74,6 +74,7 @@ void UMMOFriendsComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(UMMOFriendsComponent, Friends, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOFriendsComponent, PendingInviteId, COND_OwnerOnly);
 }
 
 bool UMMOFriendsComponent::HasAuthorityInternal() const
@@ -200,6 +201,13 @@ void UMMOFriendsComponent::CmdAdd(const FString& Name)
 		return;
 	}
 
+	// Fail closed instead of reusing a consumed generation after integer wrap.
+	if (TargetFriends->PendingInviteId == MAX_uint64)
+	{
+		NotifyOwner(TEXT("Bu oyuncuya yeni arkadaslik istegi gonderilemiyor."));
+		return;
+	}
+	++TargetFriends->PendingInviteId;
 	TargetFriends->PendingFriendInviter = Me;
 	TargetFriends->PendingFriendInviteExpiry = Now + FriendInviteDuration;
 	NotifyOwner(FString::Printf(TEXT("%s oyuncusuna arkadaslik istegi gonderildi."), *Canonical));
@@ -209,6 +217,11 @@ void UMMOFriendsComponent::CmdAdd(const FString& Name)
 
 void UMMOFriendsComponent::CmdAccept()
 {
+	CmdAcceptSeen(PendingInviteId);
+}
+
+void UMMOFriendsComponent::CmdAcceptSeen(uint64 SeenInviteId)
+{
 	AMMOCharacter* Me = GetOwnerCharacter();
 	const UWorld* World = GetWorld();
 	if (!HasAuthorityInternal() || !Me || !World)
@@ -216,6 +229,7 @@ void UMMOFriendsComponent::CmdAccept()
 		return;
 	}
 
+	if (SeenInviteId == 0 || SeenInviteId != PendingInviteId) return;
 	AMMOCharacter* Inviter = PendingFriendInviter.Get();
 	const float Now = World->GetTimeSeconds();
 	PendingFriendInviter.Reset();
@@ -256,6 +270,56 @@ void UMMOFriendsComponent::CmdAccept()
 	SaveThrottled(Me);
 	InviterFriends->SaveThrottled(Inviter);
 }
+
+#if !UE_BUILD_SHIPPING
+bool UMMOFriendsComponent::RunInviteGenerationBoundarySelfTest(AMMOCharacter* A, AMMOCharacter* B,
+	AMMOCharacter* Recipient, FString& OutError, int32& OutChecks)
+{
+	UWorld* World = IsValid(Recipient) ? Recipient->GetWorld() : nullptr;
+	if (!World || !World->IsGameWorld() || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended")) || !FParse::Param(FCommandLine::Get(), TEXT("NullRHI"))
+		|| !IsValid(A) || !IsValid(B) || A == B || A == Recipient || B == Recipient
+		|| A->GetWorld() != World || B->GetWorld() != World)
+	{ OutError = TEXT("friend boundary disposable fixture required"); return false; }
+	UMMOFriendsComponent* AF = A->GetFriendsComponent(); UMMOFriendsComponent* BF = B->GetFriendsComponent();
+	UMMOFriendsComponent* RF = Recipient->GetFriendsComponent();
+	if (!AF || !BF || !RF) { OutError = TEXT("friend boundary components missing"); return false; }
+	const FString AName = FriendPlayerNameOf(A), BName = FriendPlayerNameOf(B), RName = FriendPlayerNameOf(Recipient);
+	auto Check = [&](bool Value, const TCHAR* Label)
+	{
+		++OutChecks; if (!Value) OutError = FString::Printf(TEXT("%s (check=%d)"), Label, OutChecks); return Value;
+	};
+	RF->CmdRemove(BName);
+	if (!Check(AF->Friends.IsEmpty() && BF->Friends.IsEmpty() && RF->Friends.IsEmpty(), TEXT("boundary mutual cleanup"))) return false;
+	AF->CmdAdd(RName); const uint64 ExpiredId = RF->PendingInviteId;
+	RF->PendingFriendInviteExpiry = World->GetTimeSeconds() - 1.f; // Drive expiry without ticking actors/load timers.
+	RF->CmdAcceptSeen(ExpiredId);
+	if (!Check(RF->Friends.IsEmpty() && AF->Friends.IsEmpty() && !RF->PendingFriendInviter.IsValid()
+		&& RF->PendingFriendInviteExpiry < 0.f && RF->PendingInviteId == ExpiredId, TEXT("expired friend consent/reset generation"))) return false;
+	BF->CmdAdd(RName); const uint64 Fresh = RF->PendingInviteId; const float Expiry = RF->PendingFriendInviteExpiry;
+	if (!Check(Fresh > ExpiredId && RF->PendingFriendInviter.Get() == B, TEXT("expired friend replacement issuance"))) return false;
+	RF->CmdAcceptSeen(ExpiredId);
+	if (!Check(RF->PendingFriendInviter.Get() == B && RF->PendingFriendInviteExpiry == Expiry && RF->PendingInviteId == Fresh
+		&& RF->Friends.IsEmpty() && BF->Friends.IsEmpty(), TEXT("stale direct consent consumed pending friend"))) return false;
+	RF->CmdAcceptSeen(Fresh);
+	if (!Check(RF->HasFriend(BName) && BF->HasFriend(RName) && !RF->PendingFriendInviter.IsValid()
+		&& RF->PendingFriendInviteExpiry < 0.f && RF->PendingInviteId == Fresh, TEXT("fresh boundary friend consent"))) return false;
+	BF->CmdAdd(RName);
+	if (!Check(RF->PendingInviteId == Fresh && !RF->PendingFriendInviter.IsValid(), TEXT("duplicate friendship rotated invite"))) return false;
+	RF->CmdRemove(BName); RF->PendingInviteId = MAX_uint64 - 1;
+	AF->CmdAdd(RName);
+	if (!Check(RF->PendingInviteId == MAX_uint64 && RF->PendingFriendInviter.Get() == A, TEXT("last friend generation issuance"))) return false;
+	const float MaxExpiry = RF->PendingFriendInviteExpiry; BF->CmdAdd(RName);
+	if (!Check(RF->PendingInviteId == MAX_uint64 && RF->PendingFriendInviter.Get() == A
+		&& RF->PendingFriendInviteExpiry == MaxExpiry, TEXT("occupied friend invite replaced/refreshed"))) return false;
+	RF->CmdAcceptSeen(MAX_uint64);
+	if (!Check(RF->HasFriend(AName) && AF->HasFriend(RName) && RF->PendingInviteId == MAX_uint64
+		&& !RF->PendingFriendInviter.IsValid(), TEXT("last friend generation acceptance"))) return false;
+	RF->CmdRemove(AName); BF->CmdAdd(RName);
+	return Check(RF->PendingInviteId == MAX_uint64 && !RF->PendingFriendInviter.IsValid() && RF->PendingFriendInviteExpiry < 0.f
+		&& RF->Friends.IsEmpty() && AF->Friends.IsEmpty() && BF->Friends.IsEmpty(), TEXT("friend generation wrapped/reissued after exhaustion"));
+}
+#endif
 
 void UMMOFriendsComponent::CmdRemove(const FString& Name)
 {

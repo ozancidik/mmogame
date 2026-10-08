@@ -24,6 +24,8 @@ public:
 	UMMOFriendsComponent();
 #if !UE_BUILD_SHIPPING
 	static bool RunPresenceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	// Reuses disposable native controller fixture actors; drives private expiry/exhaustion boundaries.
+	static bool RunInviteGenerationBoundarySelfTest(AMMOCharacter* A, AMMOCharacter* B, AMMOCharacter* Recipient, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -40,7 +42,9 @@ public:
 
 	// --- Sohbet komutlari (yalniz sunucu/otorite; ServerSendChat icinden cagrilir) ---
 	void CmdAdd(const FString& Name);
-	void CmdAccept();
+	void CmdAccept(); // Trusted server callers only; client chat supplies the observed generation.
+	void CmdAcceptSeen(uint64 SeenInviteId);
+	uint64 GetPendingInviteId() const { return PendingInviteId; }
 	void CmdRemove(const FString& Name);
 	void CmdList();
 
@@ -65,6 +69,10 @@ protected:
 	float LastFriendSaveTime = -100.f;
 	void SaveThrottled(AMMOCharacter* Me);
 	static constexpr float FriendSaveCooldown = 5.f;
+
+	// Recipient generation survives consumption/expiry; runtime owner-only, never saved.
+	UPROPERTY(Replicated)
+	uint64 PendingInviteId = 0;
 
 	// Yalniz sunucuda tutulan, kisa omurlu arkadaslik istegi. Kayda/replikasyona girmez;
 	// kabul edilince iki oyuncunun listesi birlikte guncellenir.
