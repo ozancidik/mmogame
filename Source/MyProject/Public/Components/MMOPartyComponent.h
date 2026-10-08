@@ -41,6 +41,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MMO|Party")
 	bool IsInParty() const { return Members.Num() > 0; }
 
+	// Owner-only server identities: session shared by the group; membership changes on rejoin/transfer.
+	// They are request context, not an atomic snapshot of the displayed roster.
+	UPROPERTY(Replicated)
+	FGuid PartySessionId;
+	UPROPERTY(Replicated)
+	FGuid PartyMembershipId;
+
 	// Sahibi bu partinin lideri mi? (Sadece lider uye cikarabilir.)
 	UFUNCTION(BlueprintPure, Category = "MMO|Party")
 	bool IsPartyLeader() const;
@@ -53,6 +60,7 @@ public:
 	void RequestAccept();
 	void RequestAcceptSeen(uint64 SeenInviteId);
 	void RequestLeave();
+	void RequestLeaveSeen(const FGuid& SeenMembershipId);
 	// Gelen parti davetini reddeder (davetciye bildirim gider).
 	void RequestDecline();
 	void RequestDeclineSeen(uint64 SeenInviteId);
@@ -111,7 +119,7 @@ protected:
 
 	// Verilen tam uye kumesini her uyenin Members listesine (kendisi haric) yazar ve
 	// hepsine ayni lideri isler.
-	static void ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AMMOCharacter* NewLeader);
+	static void ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AMMOCharacter* NewLeader, const FGuid& SessionId);
 
 	// Daveti sunucu cozer (istemci diger oyuncularin controller'larini goremez).
 	UFUNCTION(Server, Reliable)
@@ -124,7 +132,7 @@ protected:
 	void ServerDecline(uint64 SeenInviteId);
 
 	UFUNCTION(Server, Reliable)
-	void ServerLeave();
+	void ServerLeave(const FGuid& SeenMembershipId);
 
 	// Uye cikarma; sunucu Leader == cagiran mi diye dogrular.
 	UFUNCTION(Server, Reliable)

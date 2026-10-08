@@ -434,7 +434,7 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 		auto Chat = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Invite, uint64 Session)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0);
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0, FGuid());
 		};
 		Trades[0]->RequestInviteNearest();
 		const uint64 Old = Trades[1]->PendingInviteId;
@@ -502,22 +502,24 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 			if (!Value) { OutError = FString::Printf(TEXT("%s (check=%d)"), Label, OutChecks + 1); return false; }
 			++OutChecks; return true;
 		};
-		auto RejectedUnchanged = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Id)
+		auto RejectedUnchanged = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Id, const FGuid& SeenMembership = FGuid())
 		{
 			TArray<TObjectPtr<AMMOCharacter>> Members[3]; TObjectPtr<AMMOCharacter> Leaders[3];
-			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3];
+			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3]; FGuid Sessions[3], Memberships[3];
 			for (int32 I = 0; I < 3; ++I)
 			{
 				Members[I] = Parties[I]->Members; Leaders[I] = Parties[I]->Leader;
+				Sessions[I] = Parties[I]->PartySessionId; Memberships[I] = Parties[I]->PartyMembershipId;
 				Pending[I] = Parties[I]->PendingInviteFrom; Ids[I] = Parties[I]->PendingInviteId; Times[I] = Parties[I]->PendingInviteTime;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0);
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0, SeenMembership);
 			for (int32 I = 0; I < 3; ++I)
 			{
 				if (Parties[I]->Members != Members[I] || Parties[I]->Leader != Leaders[I]
 					|| Parties[I]->PendingInviteFrom != Pending[I] || Parties[I]->PendingInviteId != Ids[I]
-					|| Parties[I]->PendingInviteTime != Times[I]) return false;
+					|| Parties[I]->PendingInviteTime != Times[I] || Parties[I]->PartySessionId != Sessions[I]
+					|| Parties[I]->PartyMembershipId != Memberships[I]) return false;
 			}
 			return InventoryUnchanged();
 		};
@@ -545,8 +547,41 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 			&& !Parties[0]->IsInParty() && !Parties[1]->PendingInviteFrom.IsValid() && InventoryUnchanged(), TEXT("party fresh Say correct sender"))) return false;
 		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
 		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/parti leave")), ETextCommit::OnEnter);
-		return Check(!Parties[1]->IsInParty() && !Parties[2]->IsInParty() && Parties[1]->Leader == nullptr
-			&& Parties[2]->Leader == nullptr && InventoryUnchanged(), TEXT("party current leave unchanged"));
+		if (!Check(!Parties[1]->IsInParty() && !Parties[2]->IsInParty() && Parties[1]->Leader == nullptr
+			&& Parties[2]->Leader == nullptr && InventoryUnchanged(), TEXT("party current leave unchanged"))) return false;
+		// New leave cases seed native invite context, not delayed network delivery.
+		auto FormPair = [&](int32 From, int32 To) {
+			Parties[To]->PendingInviteFrom = Pawns[From]; Parties[To]->PendingInviteTime = World->GetTimeSeconds();
+			++Parties[To]->PendingInviteId; Parties[To]->RequestAccept();
+		};
+		auto PairMatches = [&](int32 A, int32 B) {
+			return Parties[A]->Members.Num() == 1 && Parties[A]->Members.Contains(Pawns[B])
+				&& Parties[B]->Members.Num() == 1 && Parties[B]->Members.Contains(Pawns[A])
+				&& Parties[A]->PartySessionId.IsValid() && Parties[A]->PartySessionId == Parties[B]->PartySessionId
+				&& Parties[A]->PartyMembershipId.IsValid() && Parties[B]->PartyMembershipId.IsValid()
+				&& Parties[A]->PartyMembershipId != Parties[B]->PartyMembershipId && InventoryUnchanged();
+		};
+		auto Solo = [&](int32 I) { return !Parties[I]->IsInParty() && !Parties[I]->Leader
+			&& !Parties[I]->PartySessionId.IsValid() && !Parties[I]->PartyMembershipId.IsValid(); };
+		FormPair(2, 1); const FGuid OldMembership = Parties[1]->PartyMembershipId;
+		if (!Check(PairMatches(1, 2), TEXT("leave chat membership setup"))) return false;
+		// Genuine native possession switch inside the same party; matching new-pawn ID isolates pawn check.
+		PCs[2]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[2]);
+		const bool WrongPawnRejected = PCs[1]->GetPawn() == Pawns[2]
+			&& RejectedUnchanged(TEXT("/parti leave"), Pawns[1], 0, Parties[2]->PartyMembershipId);
+		PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[1]); PCs[2]->Possess(Pawns[2]);
+		if (!Check(WrongPawnRejected, TEXT("leave chat replaced pawn matching membership"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti ayril"), nullptr, 0, OldMembership), TEXT("leave chat null pawn no fallback"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti leave"), Pawns[1], 0, FGuid()), TEXT("leave chat zero membership no fallback"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti ayril"), Pawns[1], 0, Parties[2]->PartyMembershipId), TEXT("leave chat foreign membership"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/parti leave"));
+		if (!Check(Solo(1) && Solo(2) && InventoryUnchanged(), TEXT("leave chat fresh Say"))) return false;
+		FormPair(0, 1);
+		if (!Check(PairMatches(0, 1) && Parties[1]->PartyMembershipId != OldMembership, TEXT("leave chat replacement setup"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti leave"), Pawns[1], 0, OldMembership), TEXT("leave chat old membership removed replacement"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/parti ayril")), ETextCommit::OnEnter);
+		return Check(Solo(0) && Solo(1) && InventoryUnchanged(), TEXT("leave chat fresh commit"));
 	}();
 	for (int32 I = 0; I < 3; ++I) { if (Parties[I]) Parties[I]->RequestLeave(); }
 	for (int32 I = 0; I < 3; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
@@ -605,7 +640,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 				Leaders[I] = Clans[I]->bIsLeader; Ids[I] = Clans[I]->PendingInviteId;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(TEXT("/klan kabul"), SeenPawn, 0, 0, 0, Id);
+			PCs[1]->ServerSendChat_Implementation(TEXT("/klan kabul"), SeenPawn, 0, 0, 0, Id, FGuid());
 			for (int32 I = 0; I < 4; ++I)
 			{
 				FMMOCharacterSaveData After; Clans[I]->FillSaveData(After);
@@ -671,11 +706,11 @@ void AMMOPlayerController::SendChatWithContext(const FString& Message)
 	const UMMOClanComponent* Clan = Me ? Me->GetClanComponent() : nullptr;
 	ServerSendChat(Message, Me, Trade ? Trade->PendingInviteId : 0,
 		Trade && Trade->bTradeActive ? Trade->TradeSessionId : 0, Party ? Party->PendingInviteId : 0,
-		Clan ? Clan->PendingInviteId : 0);
+		Clan ? Clan->PendingInviteId : 0, Party ? Party->PartyMembershipId : FGuid());
 }
 
 void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message, AMMOCharacter* SeenCommandPawn,
-	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId)
+	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId)
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -762,7 +797,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("ayril"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("leave"), ESearchCase::IgnoreCase))
 		{
-			Party->RequestLeave();
+			if (SeenCommandPawn == GetPawn()) Party->RequestLeaveSeen(SeenPartyMembershipId);
 		}
 		else
 		{

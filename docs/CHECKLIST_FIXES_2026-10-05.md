@@ -2028,3 +2028,107 @@ güvenliği garantisi değildir. ECC verify sonuçları:
 Skill kurulumunun .agents altındaki başka sohbet işi değiştirilmedi veya bu
 oyun commit'ine eklenmedi. Kullanıcı uzun süre bilgisayar başında olmayacağını
 ve yeni ECC becerileriyle geliştirmeyi sürdürmemizi ayrıca belirtti.
+
+
+## 62. Parti ayrılmasını kişisel üyelik ömrüne bağlama — 2026-10-08 (O25)
+
+**ECC plan / kapsam:** Başlangıç HEAD04d2921, tracked ağaç temiz;
+.agents/.codex/AGENTS.md kullanıcı/başka sohbet dosyaları korunur. Küçük iş
+kabul ölçütleri: gecikmiş eski leave replacement/same-party rejoin üyeliğine
+uygulanmasın; sürekli üyelerin ayrılma hakkı roster/lider değişiminde korunsun;
+chat gönderim pawn + kişisel membership ile dispatch yapsın. Mevcut party
+component/controller dört C++ dosyası ve TestPartyConsent.ps1 değişti. Save,
+kick, disconnect lifecycle, atomik HUD snapshot'ı kapsamı genişletilmedi.
+
+**Önce hata:** Native regression eski parametresiz ServerLeave'i A-B dağılıp
+A-C oluştuktan sonra çağırdı: normal Editor DLL Succeeded13,48 sn, ardından
+FAIL38 reason=old leave removed replacement party, 15:21:10.421 UTC;
+UEexit0 ama PS runner1. TEMP mmo_party_leave_baseline_20261008.log. Bu test
+gerçek gecikmiş RPC değildir; aynı-frame doğrudan native intent fixture'ıdır.
+
+**Uygulama:** Grup için owner-only FGuid PartySessionId; her kişinin katılım
+ömrü için ayrı owner-only PartyMembershipId. Solo oluşum yeni session alır.
+Davetçinin mevcut session'ı, yoksa davet edilenin mevcut session'ı kullanılır.
+ApplyPartySet önceki session farklıysa veya personal kimlik yoksa ayrı NewGuid
+üretir, sonra alanları/delegate'i yazar. Ayrılan/son kişi iki alanı temizler;
+survivor grubu eski session ile yeniden düzenlenir. Bu nedenle aynı gruba
+rejoin ve diğer gruptan merge yeni personal ID üretir; mevcut üyelerin ID'leri
+roster/lider değişiminde korunur. GUID bir yetki/capability veya kalıcı anahtar
+iddiası değildir; ownership ve authority kontrolleri sürer.
+
+RequestLeave convenience yerel current membership'ı yakalar. ServerLeave
+HasAuthority + inparty + nonzero + eşitlik kontrolünden sonra mevcut cleanup'ı
+çağırır. ServerSendChat yedinci argümanıyla gönderimdeki membership'ı taşır;
+/parti leave/ayril ayrıca SeenCommandPawn == GetPawn ister ve explicit Seen
+API'sini çağırır. Sunucu current üyeliğe fallback yapmaz. Eski trade/clan chat
+fixture çağrıları yedinci sıfır GUID argümanıyla güncellendi. Yeni Tick/timer
+ve save alanı yok; reflection/RPC için iki uçta aynı DLL gerekir.
+
+**Native doğrulama:** 73 = önceki46 +18 component +9 leave chat kontrolü.
+Sıfır/bilinmeyen/başka kişi kimliği, fresh leave, aynı/different pair yeniden
+kurulumu, aynı devam eden gruba rejoin, member ekleme/ayrılma, lider değişimi,
+merge transferi, solo inviter mevcut grup, native possession/matching yeni
+pawn kimliği, null/eski chat ve fresh Say/Enter kapsanır. Component retlerinde
+9 actor Members/Leader/pending/inviteID/saatler/session/membership/envanter
+snapshot'ı aynıdır. Controller 3 actor public party/pending/kimlik/envanter
+snapshot'ı; private invite cooldown'ı ölçmez. Yeni chat formation helper'ı
+pending'i native seed eder; nearest/delivery kanıtı değildir. Önceki8 chat
+nearest davet/Say/OnChatCommitted kontrolleri de çalışır.
+
+İlk yeni native koşu FAIL50/15:24:39.561 UTC verdi: test grubu [0,2,1] kurdu,
+0 ayrılınca ilk survivor2 lider olurken assert1 bekliyordu. Yalnız fixture
+beklentisi düzeltildi; üretim bug'ı sayılmadı. DLL Succeeded3,06 sn sonrası
+PASS73/15:25:23.489 UTC, PS0. TEMP mmo_party_leave_positive_20261008.log ilk
+FAIL50'yi, mmo_party_leave_positive_fixed_20261008.log doğru PASS'ı tutar.
+
+**Derlenmiş negatifler:** Yalnız membership eşitliği guard'ı kaldırıldı;
+DLL Succeeded3,02 sn, FAIL40 reason=other member leave identity accepted
+15:26:03.584 UTC, UE0/PS1. Component byte exact restore. Yalnız chat pawn
+kapısı kaldırıldı; DLL Succeeded4,23 sn, gerçek native possession/matching
+new-pawn membership testi FAIL65/check66, 15:26:45.726 UTC, UE0/PS1.
+TEMP mmo_party_leave_negative_membership_20261008.log ve
+mmo_party_leave_negative_pawn_20261008.log. Controller byte exact restore;
+son normal Editor DLL Succeeded4,35 sn, restored PASS73/15:27:21.628 UTC/PS0.
+TEMP mmo_party_leave_restored_20261008.log. Negatif mutantlar final DLL'de yok.
+
+**ECC review / ajan:** Lovelace Unreal Multiplayer Architect yerel TOML,
+repo QA ve ECC review ile salt okunur tasarım/actual diff/caller incelemesi
+yaptı. İlk shared session önerisinde same-party rejoin boşluğu buldu; personal
+membership eklenerek kod yazılmadan giderildi. Mevcut EndPlay player-control
+kapısı unpossess/destroy yolunda ayrı cleanup boşluğu olarak açık kaydedildi.
+Son kod/test incelemesinde ek uygulanabilir bulgu yok; FAIL50 test beklentisini
+düzeltme olarak teyit etti. Ajan dosya yazmadı, build/test çalıştırmadı; son
+negatif sonuçları bağımsız doğrulamadı ve tam paket öncesi kapatıldı. Agency
+paket kökeni doğrulanmadı. Parent tüm kod/runner/build/native denemeleri yürüttü.
+
+**Sınırlar:** Same-frame fixtures gerçek RPC ownership/owner-only GUID teslimi,
+Slate/input, gecikmiş paket, save/logout veya Server/Shipping kanıtı değildir.
+GUID ve Members/Leader atomik değil; latest kimlik eski çizilmiş roster'a
+bağlanmaz. 0/eski ret sonrası retry, eski görünüm + yeni kimlik UX, ek GUID
+chat/replication maliyeti gerçek PIE/profiler'da açık. EndPlay gate ve kick
+stale bağlamı çözülmedi. PLAYTEST_CHECKLIST'e somut maddeler eklenip açık bırakıldı.
+
+
+**Son ECC verify paketi (8 Ekim):** RunAllChecks.ps1 -SkipBuild -FullCompile
+37/37 GECTI, exit0; normal DLL ayrıca Succeeded4,35 sn. 18 PCH'siz /W4 dosya
+warning C0; ValidateData/StaticLint temiz (bilinen Lv33+ skill boşluğu ve
+InitGameState whitelist uyarıları sürer). Parti73 PASS15:33:14.808 UTC;
+klan43/takas218, death14/3first+5death/parser576/576 ve bütün mevcut regresyonlar
+geçti. JSON schema2/negative111; store400 loaded400,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Bu sayı oyuncu/PIE/Lv1–30 tamamlanma sayısı değildir.
+Summer52/Winter33 doğum, iki smoke exit0/error0; NetSmoke1join/1welcome,
+server/client error0. Önceki smoke sayılarından fark, bu koşunun log sayımıdır;
+yeni spawner veya içerik eklenmedi. Net logları mmo_net_server_183709.log ve
+mmo_net_client_183709.log; tam paket TEMP mmo_all_party_leave_final_20261008.log.
+Öncesi/sonrası147 Source/Scripts SHA256 listesi aynı, differences0;
+TEMP mmo_party_leave_final_hashes_20261008.txt. Paket boyunca kaynak/runner
+ve agent yazımı yok; bitimde UE/UBT süreci yok. Son doc düzeni ayrı tutuldu.
+
+| Kontrol | Sonuç | Sınır |
+| --- | --- | --- |
+| UBT/UHT + 18 PCH'siz C++ | Geçti | Editor Development; Server/Shipping değil |
+| Native party + iki derlenmiş negatif | Geçti73; negatifler FAIL40/65 | Restore edildi; same-frame intent, canlı paket değil |
+| Tam mevcut paket | Geçti37/37 | Bağlantı smoke'u tüm gameplay replication'ını kanıtlamaz |
+| ECC + salt okunur multiplayer/QA inceleme | Kapsamda ek engel yok | EndPlay gate/kick/atomic UX riskleri ayrı açık |
+| Gerçek host + uzak istemci PIE | Yapılmadı | Checklist işaretlenmedi; coverage yüzdesi üretilmedi |

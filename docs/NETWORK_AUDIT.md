@@ -722,3 +722,36 @@ iddiası yok. ID gelmeden 0/eski ret sonrası yeniden deneme gerekebilir. Ortak
 bildirim/kimlik görünümü ve bütün chatte ek uint64 bant maliyeti gerçek PIE ve
 profiler ile açık. Chat RPC iki uçta aynı DLL ister; Server/Shipping/persistence
 ve gerçek expiry/respawn/bölge geçişi bu native kanıtla tamamlanmış sayılmaz.
+
+
+### O25 · ORTA · Eski parti ayrılmasının yeni üyeliğe taşınması — sınırlı düzeltildi
+
+04d2921 parametresiz ServerLeave üzerinde native eski ayrılma niyeti, yeniden
+kurulan A-C partisini kaldırdı: baseline FAIL38, 8 Ekim 15:21:10.421 UTC,
+UEexit0/PS1. Aynı-frame doğrudan endpoint kanıtıdır, canlı gecikmiş paket değil.
+
+Owner-only FGuid PartySessionId grup devamlılığını, ayrı PartyMembershipId
+kişisel katılım ömrünü tanımlar. Solo oluşum yeni session; davetçinin mevcut
+session'ı, yoksa davet edilenin mevcut session'ı korunur. Birleşmede taşınan
+üyeler ve ayrılıp aynı gruba yeniden katılan kişi yeni membership alır.
+Sürekli üyeler roster/lider değişiminde kimliklerini korur. Ayrılan ve tek
+kalan kişinin iki kimliği delegate öncesi temizlenir. RequestLeave convenience
+çağırıldığı yerdeki membership'ı yakalar; ServerLeave authority/inparty/nonzero/
+eşitliği mutasyondan önce ister. /parti leave/ayril yedinci chat argümanındaki
+membership ve gönderim pawn'ını kullanır, sunucuda güncel kimliğe fallback yok.
+
+73 native kontrol = önceki46 +18 component +9 leave chat. Ret snapshot'larında
+üyeler/lider/pending/invite kimliği/saatler/session/membership/envanter korunur
+(controller chat snapshot'ı private invite cooldown'ı içermez). Equality guard
+kaldırılması FAIL40; pawn guard kaldırılması FAIL65/check66 ile yakalandı ve
+byte exact restore edildi. İlk FAIL50 yeni fixture'da yanlış lider beklentisiydi:
+[0,2,1] roster'dan 0 ayrılınca mevcut sıra kuralıyla lider2 olur; yalnız test
+beklentisi düzeltildi. Tam son paket kanıtı CHECKLIST_FIXES §62'de tutulur.
+
+Members/Leader ve GUID teslimi atomik değil; yakalanan latest membership ID,
+çizilmiş roster kimliği değildir. Kimlik gelmeden ret/yeniden deneme ve eski
+roster + yeni ID UX riski PIE'de açık. Native possession testi remote respawn/
+RPC ownership testi değildir; GUID'ler save'e eklenmedi, yeni timer/Tick yok.
+Chat sözleşmesi iki uçta aynı DLL ister; ek FGuid bant maliyeti ölçülmedi.
+Kick stale bağlamı ve Character EndPlay IsPlayerControlled gate sonrası gerçek
+unpossess/destroy cleanup ayrı açık. Bu iş disconnect cleanup garantisi vermez.

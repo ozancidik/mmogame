@@ -44,6 +44,8 @@ void UMMOPartyComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(UMMOPartyComponent, Members);
 	DOREPLIFETIME(UMMOPartyComponent, Leader);
 	DOREPLIFETIME_CONDITION(UMMOPartyComponent, PendingInviteId, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOPartyComponent, PartySessionId, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UMMOPartyComponent, PartyMembershipId, COND_OwnerOnly);
 }
 
 bool UMMOPartyComponent::HasAuthorityInternal() const
@@ -179,13 +181,18 @@ void UMMOPartyComponent::RequestDeclineSeen(uint64 SeenInviteId)
 
 void UMMOPartyComponent::RequestLeave()
 {
+	RequestLeaveSeen(PartyMembershipId);
+}
+
+void UMMOPartyComponent::RequestLeaveSeen(const FGuid& SeenMembershipId)
+{
 	if (HasAuthorityInternal())
 	{
-		ServerLeave_Implementation();
+		ServerLeave_Implementation(SeenMembershipId);
 	}
 	else
 	{
-		ServerLeave();
+		ServerLeave(SeenMembershipId);
 	}
 }
 
@@ -335,8 +342,10 @@ void UMMOPartyComponent::ServerAccept_Implementation(uint64 SeenInviteId)
 	FormOrJoin(Inviter, Invitee);
 }
 
-void UMMOPartyComponent::ServerLeave_Implementation()
+void UMMOPartyComponent::ServerLeave_Implementation(const FGuid& SeenMembershipId)
 {
+	if (!HasAuthorityInternal() || !IsInParty() || !SeenMembershipId.IsValid()
+		|| SeenMembershipId != PartyMembershipId) return;
 	LeavePartyServer(GetOwnerCharacter());
 }
 
@@ -390,8 +399,9 @@ void UMMOPartyComponent::ClientNotifyKicked_Implementation()
 // Parti kumesi yonetimi (sunucu)
 // ----------------------------------------------------------------------
 
-void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AMMOCharacter* NewLeader)
+void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AMMOCharacter* NewLeader, const FGuid& SessionId)
 {
+	if (!SessionId.IsValid()) return;
 	// Lider kumenin disinda kaldiysa (ya da verilmediyse) ilk uye lider olur —
 	// boylece parti asla lidersiz kalmaz.
 	if (!NewLeader || !FullSet.Contains(NewLeader))
@@ -411,6 +421,12 @@ void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AM
 			continue;
 		}
 
+		// Continuing members retain their context; rejoining/transferred members get a new identity.
+		if (PC->PartySessionId != SessionId || !PC->PartyMembershipId.IsValid())
+		{
+			PC->PartyMembershipId = FGuid::NewGuid();
+		}
+		PC->PartySessionId = SessionId;
 		PC->Leader = NewLeader;
 		PC->Members.Reset();
 		for (AMMOCharacter* Other : FullSet)
@@ -504,7 +520,11 @@ void UMMOPartyComponent::FormOrJoin(AMMOCharacter* Inviter, AMMOCharacter* Invit
 		}
 	}
 
-	ApplyPartySet(Set, NewLeader);
+	const UMMOPartyComponent* IP = Inviter->GetPartyComponent();
+	const UMMOPartyComponent* VP = Invitee->GetPartyComponent();
+	const FGuid SessionId = IP->IsInParty() ? IP->PartySessionId
+		: (VP->IsInParty() ? VP->PartySessionId : FGuid::NewGuid());
+	ApplyPartySet(Set, NewLeader, SessionId);
 }
 
 void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
@@ -532,16 +552,19 @@ void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
 	// Ayrilan lider ise liderlik kalanlardan birine gecer (ApplyPartySet, kumede
 	// olmayan lideri ilk uyeyle degistirir); parti dagilmaz.
 	AMMOCharacter* OldLeader = LP->Leader.Get();
+	const FGuid OldSessionId = LP->PartySessionId;
 
 	// Ayrilani partisiz yap.
 	LP->Members.Reset();
 	LP->Leader = nullptr;
+	LP->PartySessionId.Invalidate();
+	LP->PartyMembershipId.Invalidate();
 	LP->OnPartyChanged.Broadcast();
 
 	// Kalanlari yeniden ayarla (tek kisi kalirsa o da partisiz olur).
 	if (Others.Num() >= 2)
 	{
-		ApplyPartySet(Others, OldLeader);
+		ApplyPartySet(Others, OldLeader, OldSessionId);
 	}
 	else if (Others.Num() == 1)
 	{
@@ -549,6 +572,8 @@ void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
 		{
 			OP->Members.Reset();
 			OP->Leader = nullptr;
+			OP->PartySessionId.Invalidate();
+			OP->PartyMembershipId.Invalidate();
 			OP->OnPartyChanged.Broadcast();
 		}
 	}
@@ -591,7 +616,9 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 			for (AMMOCharacter* Character : Set)
 			{
 				const UMMOPartyComponent* Party = Character->GetPartyComponent();
-				if (Party->Leader != ExpectedLeader || Party->Members.Num() != Set.Num() - 1)
+				if (Party->Leader != ExpectedLeader || Party->Members.Num() != Set.Num() - 1
+					|| !Party->PartySessionId.IsValid() || !Party->PartyMembershipId.IsValid()
+					|| Party->PartySessionId != Set[0]->GetPartyComponent()->PartySessionId)
 				{
 					return false;
 				}
@@ -619,15 +646,15 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		// Davet yetkiliyken gonderilir; lider kabul gelmeden ayrilir/liderlik degisir.
 		UMMOPartyComponent* Target = Actors[2]->GetPartyComponent();
 		if (!Target->SetPendingInviteServer(Actors[0])) { OutError = TEXT("inviter leadership invite issuance"); return false; }
-		ApplyPartySet(A, Actors[1]);
+		ApplyPartySet(A, Actors[1], Actors[1]->GetPartyComponent()->PartySessionId);
 		Target->RequestAccept();
 		if (!Check(Matches(A, Actors[1]) && Matches(B, Actors[2]) && !Target->PendingInviteFrom.IsValid(), TEXT("stale inviter leadership"))) { return false; }
-		ApplyPartySet(A, Actors[0]);
+		ApplyPartySet(A, Actors[0], Actors[0]->GetPartyComponent()->PartySessionId);
 		if (!Target->SetPendingInviteServer(Actors[0])) { OutError = TEXT("invitee leadership invite issuance"); return false; }
-		ApplyPartySet(B, Actors[3]);
+		ApplyPartySet(B, Actors[3], Actors[3]->GetPartyComponent()->PartySessionId);
 		Target->RequestAccept();
 		if (!Check(Matches(A, Actors[0]) && Matches(B, Actors[3]), TEXT("stale invitee leadership"))) { return false; }
-		ApplyPartySet(B, Actors[2]);
+		ApplyPartySet(B, Actors[2], Actors[2]->GetPartyComponent()->PartySessionId);
 		if (!Accept(1, 0)) return false;
 		if (!Check(Matches(A, Actors[0]), TEXT("same group changed leader"))) { return false; }
 		if (!Accept(0, 2)) return false;
@@ -646,10 +673,11 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 			TObjectPtr<AMMOCharacter> Leader;
 			TWeakObjectPtr<AMMOCharacter> Pending;
 			uint64 Id;
+			FGuid Session, Membership;
 			float Time, LastInvite;
 			FMMOCharacterSaveData Inventory;
 		};
-		auto RejectedUnchanged = [&](uint64 Seen, bool Decline)
+		auto ActionUnchanged = [&](auto Action)
 		{
 			TArray<FPartySnapshot> Before;
 			for (AMMOCharacter* Character : Actors)
@@ -657,20 +685,26 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 				const UMMOPartyComponent* P = Character->GetPartyComponent();
 				FPartySnapshot& S = Before.AddDefaulted_GetRef();
 				S.Members = P->Members; S.Leader = P->Leader; S.Pending = P->PendingInviteFrom;
+				S.Session = P->PartySessionId; S.Membership = P->PartyMembershipId;
 				S.Id = P->PendingInviteId; S.Time = P->PendingInviteTime; S.LastInvite = P->LastInviteTime;
 				Character->GetInventory()->FillSaveData(S.Inventory);
 			}
-			if (Decline) Target->RequestDeclineSeen(Seen); else Target->RequestAcceptSeen(Seen);
+			Action();
 			for (int32 I = 0; I < Actors.Num(); ++I)
 			{
 				const UMMOPartyComponent* P = Actors[I]->GetPartyComponent(); const FPartySnapshot& S = Before[I];
 				FMMOCharacterSaveData After; Actors[I]->GetInventory()->FillSaveData(After);
 				TArray<FString> Differences; FMMOCharacterSaveJson::FindDifferences(S.Inventory, After, Differences);
 				if (P->Members != S.Members || P->Leader != S.Leader || P->PendingInviteFrom != S.Pending
+					|| P->PartySessionId != S.Session || P->PartyMembershipId != S.Membership
 					|| P->PendingInviteId != S.Id || P->PendingInviteTime != S.Time || P->LastInviteTime != S.LastInvite
 					|| !Differences.IsEmpty()) return false;
 			}
 			return true;
+		};
+		auto RejectedUnchanged = [&](uint64 Seen, bool Decline)
+		{
+			return ActionUnchanged([&]() { if (Decline) Target->RequestDeclineSeen(Seen); else Target->RequestAcceptSeen(Seen); });
 		};
 		for (int32 Side = 0; Side < 2; ++Side)
 		{
@@ -706,6 +740,68 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		const float MaxInviteTime = Target->PendingInviteTime;
 		if (!Check(!Target->SetPendingInviteServer(Actors[2]) && Target->PendingInviteFrom.Get() == Actors[1]
 			&& Target->PendingInviteId == MAX_uint64 && Target->PendingInviteTime == MaxInviteTime, TEXT("party invite overflow fail closed"))) return false;
+		// Native delayed leave intent: group identity and per-pawn membership lifetime differ.
+		auto ClearGroups = [&]() { for (AMMOCharacter* C : Actors) C->GetPartyComponent()->RequestLeave(); };
+		auto Solo = [&](int32 I) {
+			const UMMOPartyComponent* P = Actors[I]->GetPartyComponent();
+			return !P->IsInParty() && !P->Leader && !P->PartySessionId.IsValid() && !P->PartyMembershipId.IsValid();
+		};
+		auto LeaveRejected = [&](int32 I, const FGuid& Seen) {
+			return ActionUnchanged([&]() { Actors[I]->GetPartyComponent()->ServerLeave_Implementation(Seen); });
+		};
+		ClearGroups();
+		if (!Accept(0, 1)) return false;
+		UMMOPartyComponent* P0 = Actors[0]->GetPartyComponent();
+		UMMOPartyComponent* P1 = Actors[1]->GetPartyComponent();
+		UMMOPartyComponent* P2 = Actors[2]->GetPartyComponent();
+		UMMOPartyComponent* P3 = Actors[3]->GetPartyComponent();
+		const FGuid OldSession = P0->PartySessionId, Old0 = P0->PartyMembershipId;
+		if (!Check(Matches(A, Actors[0]) && P0->PartyMembershipId != P1->PartyMembershipId, TEXT("unique party membership identities"))) return false;
+		if (!Check(LeaveRejected(0, FGuid()), TEXT("zero leave mutated party"))) return false;
+		if (!Check(LeaveRejected(0, P1->PartyMembershipId), TEXT("other member leave identity accepted"))) return false;
+		if (!Check(LeaveRejected(0, FGuid::NewGuid()), TEXT("unknown leave identity accepted"))) return false;
+		P0->RequestLeaveSeen(Old0);
+		if (!Check(Solo(0) && Solo(1), TEXT("fresh leave clears pair identities"))) return false;
+		if (!Accept(0, 1)) return false;
+		if (!Check(Matches(A, Actors[0]) && P0->PartySessionId != OldSession && P0->PartyMembershipId != Old0, TEXT("reformed pair reused identities"))) return false;
+		if (!Check(LeaveRejected(0, Old0), TEXT("old leave removed reformed same pair"))) return false;
+		P0->RequestLeave();
+		if (!Accept(0, 2)) return false;
+		if (!Check(LeaveRejected(0, Old0), TEXT("old leave removed replacement party"))) return false;
+		const FGuid Continuing = P0->PartySessionId, Current0 = P0->PartyMembershipId, Current2 = P2->PartyMembershipId;
+		if (!Accept(0, 1)) return false;
+		const FGuid First1 = P1->PartyMembershipId;
+		if (!Check(Matches({ Actors[0], Actors[1], Actors[2] }, Actors[0]) && P0->PartyMembershipId == Current0
+			&& P2->PartyMembershipId == Current2 && P0->PartySessionId == Continuing, TEXT("adding member changed continuing membership"))) return false;
+		P1->RequestLeaveSeen(First1);
+		if (!Check(Solo(1) && Matches({ Actors[0], Actors[2] }, Actors[0]) && P0->PartySessionId == Continuing
+			&& P0->PartyMembershipId == Current0 && P2->PartyMembershipId == Current2, TEXT("member departure changed survivors"))) return false;
+		if (!Accept(0, 1)) return false;
+		if (!Check(P1->PartySessionId == Continuing && P1->PartyMembershipId.IsValid() && P1->PartyMembershipId != First1,
+			TEXT("same party rejoin reused personal identity"))) return false;
+		if (!Check(LeaveRejected(1, First1), TEXT("delayed leave removed same party rejoin"))) return false;
+		const FGuid Rejoined1 = P1->PartyMembershipId;
+		P0->RequestLeaveSeen(Current0);
+		if (!Check(Solo(0) && Matches({ Actors[1], Actors[2] }, Actors[2]) && P1->PartySessionId == Continuing
+			&& P1->PartyMembershipId == Rejoined1 && P2->PartyMembershipId == Current2, TEXT("leader departure lost continuing membership"))) return false;
+		P1->RequestLeaveSeen(Rejoined1);
+		if (!Check(Solo(1) && Solo(2), TEXT("current leave after leadership change"))) return false;
+		if (!Accept(0, 1) || !Accept(2, 3)) return false;
+		const FGuid SessionA = P0->PartySessionId, A0 = P0->PartyMembershipId, A1 = P1->PartyMembershipId;
+		const FGuid B2 = P2->PartyMembershipId, B3 = P3->PartyMembershipId;
+		if (!Accept(0, 2)) return false;
+		if (!Check(Matches({ Actors[0], Actors[1], Actors[2], Actors[3] }, Actors[0]) && P0->PartySessionId == SessionA
+			&& P0->PartyMembershipId == A0 && P1->PartyMembershipId == A1 && P2->PartyMembershipId != B2
+			&& P3->PartyMembershipId != B3, TEXT("merge failed to renew transferred members"))) return false;
+		if (!Check(LeaveRejected(2, B2), TEXT("old invitee group leave removed merged membership"))) return false;
+		P0->RequestLeave();
+		const FGuid Survivor1 = P1->PartyMembershipId, Survivor2 = P2->PartyMembershipId, Survivor3 = P3->PartyMembershipId;
+		if (!Check(Solo(0) && Matches({ Actors[1], Actors[2], Actors[3] }, Actors[1]) && P1->PartySessionId == SessionA,
+			TEXT("merged group leader departure"))) return false;
+		if (!Accept(0, 1)) return false; // Solo inviter enters invitee's continuing group.
+		if (!Check(Matches({ Actors[0], Actors[1], Actors[2], Actors[3] }, Actors[0]) && P0->PartySessionId == SessionA
+			&& P0->PartyMembershipId != A0 && P1->PartyMembershipId == Survivor1 && P2->PartyMembershipId == Survivor2
+			&& P3->PartyMembershipId == Survivor3, TEXT("solo inviter replaced continuing group identities"))) return false;
 		return AMMOPlayerController::RunPartyChatContextSelfTest(World, OutError, OutChecks);
 	}();
 	// Controllersiz fixture'lar EndPlay'de oyuncu kaydi yazmaz; grup referanslarini da temizle.

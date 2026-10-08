@@ -4402,3 +4402,40 @@ expiry zamanı, kayıt/yeniden giriş veya Server/Shipping paketi oynanmadı.
   davet kimliği kayda yazılmamalı. Genel/party/clan/whisper/trade chat ve 200
   karakter/0,7 sn sınırı sürmeli; bütün chat trafiğindeki ek uint64 maliyetini
   Network Profiler ile ölç. Gerçek Server/Shipping hedefini ayrı doğrula.
+
+
+## 2026-10-08 — Parti ayrılmasında üyelik ömrü (O25; gerçek PIE açık)
+
+ECC plan/review/verify ile sınırlı dört C++ dosyası ve mevcut parti runner'ı.
+Native kontroller 46'dan 73'e çıktı: 18 üyelik/oturum +9 leave chat kontrolü.
+Bunlar aynı-frame component ve native controller fixture'larıdır; gecikmiş
+paket, remote ownership, Slate veya property teslim sırası kanıtı değildir.
+
+- [ ] Host + uzak istemci, aynı DLL: A-B partisindeyken ayrılma isteğinin eski
+  üyelik kimliğini yakala; sunucuda eski parti dağılsın, A-C kurulsun. Eski
+  istek yeni üyeliği kaldırmamalı; güncel ayrılma normal çalışmalı. Aynı A-B
+  ikilisinin yeniden kurulması ve eski isteğin tekrarı da korunmalı.
+- [ ] Üç oyuncu: B ayrılsın, A-C devam etsin, B aynı partiye yeniden katılsın.
+  Ortak session korunurken B'nin kişisel membership kimliği yenilenmeli;
+  ilk B üyeliğinden kalan leave yeni B üyeliğini kaldırmamalı. Başka üyenin
+  katılması/ayrılması ve lider değişimi sürekli üyelerin güncel leave'ini
+  geçersiz yapmamalı; son iki kişinin ayrılması her iki kimliği sıfırlamalı.
+- [ ] İki grubun lider onaylı birleşmesinde davetçi grubun session'ı korunmalı;
+  taşınan grubun kişisel membership kimlikleri yenilenmeli. Eski taşınan
+  grubun leave isteği birleşmiş üyeliğe uygulanmamalı. Partisiz davetçinin
+  mevcut gruba katılmasında devam eden üyelerin kimlikleri korunmalı.
+- [ ] /parti leave ve /parti ayril: null/eski pawn, 0, farklı üyenin kimliği veya
+  eski üyelik güncel sunucu kimliğine fallback yapmamalı, bağlantı sürmeli.
+  Gerçek possession/respawn sonrası yeni pawn'ın güncel kimliği eşleşse bile
+  eski pawn niyeti uygulanmamalı. Güncel Say ve Enter yolu çalışmalı.
+- [ ] Membership/session owner-only teslimi ile Members/Leader atomik değildir.
+  Kimlik gelmeden 0/eski istek ret sonrası yeniden deneme çalışmalı. Eski
+  görünür roster + yeni latest membership ID yanlış görülen gruptan ayrılma
+  UX riski hâlâ açık; bu düzeltme çizilmiş roster snapshot'ına bağlamaz.
+  Bütün chat trafiğindeki ek FGuid ve owner-only alan maliyetini ölç;
+  genel/party/clan/whisper/trade, 200 karakter ve 0,7 sn sınırı korunmalı.
+- [ ] Gerçek logout/destroy/harita geçişi, unpossess öncesi/sonrası parti cleanup
+  ayrıca doğrulanmalı. Mevcut Character EndPlay IsPlayerControlled kapısı
+  ulaşılmadığında cleanup boşluğu bu işte çözülmedi; native leave testi bu
+  lifecycle yolunu kanıtlamaz. Kick'in eski hedef/üyelik bağlamı ayrı açık.
+  Session/membership GUID'leri runtime'dır; save şeması değişmedi.
