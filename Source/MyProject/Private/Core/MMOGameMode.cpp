@@ -967,7 +967,8 @@ void AMMOGameMode::SpawnMobArea()
 		// Hukumdari'na ~1400u idi; gezinme 450u + aggro 600u ile mob'lar 200-500u'ya kadar
 		// yaklasip istenmeyen cekisler yaratabiliyordu, Nobetci ayrica eski navmesh
 		// kenarindaydi. Navmesh genisletmesinden sonra ikisi de >=2400u uzaga tasindi.
-		//  - Gozcu (Lv51) dogu (3000,0): zemin 141..178u.
+		//  - Gozcu (Lv51) dogu: (3000,0) cebi 2026-10-09 smoke'unda ilk doldurmada 2/22 verdi (engebeli tepe); 7x7 probla
+		//    (3250,500,232) secildi: gercek ilk doldurma 6/9 ve 5/9; P48'e 1820u, Muhafiz elitine 2618u, hub'a 3816u.
 		//  - Nobetci (Lv55) kuzey (-3500,3000): ilk (-2800,4400) konumu calisma zamaninda
 		//    2/64 verdi, asagidaki 2026-10-03 notuna bak (yeni konum 64/64).
 		//  - Muhafiz elit (Lv57) (2000,2800): zemin ~186u, halka 16/16.
@@ -998,7 +999,7 @@ void AMMOGameMode::SpawnMobArea()
 		// 23/64 verdi (iz surme baslangicinda cokus: dag cikintisinin basit carpismasi). Yeni konumlar
 		// MMOProbeSurface gridiyle olculdu: Nobetci (-3500,3000) 64/64, Gezgin (-5500,4500) 59/64;
 		// hub'dan tam navmesh yolu var; Kis Hukumdari'ndan 3041u, birbirinden 2500u.
-		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(3250.f, 500.f, 232.f), 51, 51, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-3500.f, 3000.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(2000.f, 2800.f, 236.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
 
