@@ -17,8 +17,26 @@ public:
 	UFUNCTION()
 	void OnRefill(float NewHealth, float MaxHealth)
 	{
+		FireOnce();
+	}
+
+	UFUNCTION()
+	void OnLevel(int32 NewLevel)
+	{
+		FireOnce();
+	}
+
+	UFUNCTION()
+	void OnExperience(int32 CurrentExperience, int32 ExperienceToNextLevel)
+	{
+		FireOnce();
+	}
+
+private:
+	void FireOnce()
+	{
 		if (bFired) return;
-		bFired = true; // Nested refill must not recursively grant XP forever.
+		bFired = true; // All delegate routes share this gate, including nested broadcasts.
 		if (Callback) Callback();
 	}
 };

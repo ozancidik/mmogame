@@ -30,6 +30,7 @@ public:
 	UMMOStatsComponent();
 #if !UE_BUILD_SHIPPING
 	static bool RunDotSourceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunReentrantExperienceSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -237,7 +238,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Combat")
 	void RestoreMana(float Amount);
 
-	/** Deneyim ekler, gerekiyorsa (birden fazla) level atlatır. Sadece otorite. */
+	/** Deneyim ekler, gerekiyorsa (birden fazla) level atlatır. Sadece otorite.
+	 * Refill/OnLevelUp callback'inin ayni bilesene verdigi XP dis cagri tarafindan
+	 * callback dondukten sonra islenir; ic cagri yeni seviyeyi hemen bildirmez. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Progression")
 	void GainExperience(int32 Amount);
 
@@ -326,6 +329,12 @@ protected:
 
 	void HandleLevelUp();
 	bool HasAuthorityInternal() const;
+
+	// A level/refill callback may award XP to this same component. Keep these
+	// accepted awards in one 64-bit authority transaction, not a recursive grant.
+	// Native scratch state only: no save or replication fields.
+	bool bGainExperienceInProgress = false;
+	int64 PendingExperienceBalance = 0;
 
 	// --- Durum efekti isleme (sunucu) ---
 	// Aktif efektleri her tick isler: sureleri azaltir, periyodik hasar/sifa uygular, bitenleri kaldirir.

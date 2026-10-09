@@ -235,6 +235,11 @@ Step "Kayittan stat XP ve puan butcesi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Seviye/refill callback XP odullerinin kayipsiz islenmesi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestReentrantExperience.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Mastery ve sinif iadesinde toplam puan butcesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestMasteryBudget.ps1") | Out-Host
     $LASTEXITCODE -eq 0

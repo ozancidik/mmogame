@@ -506,26 +506,27 @@ void UMMOStatsComponent::GainExperience(int32 Amount)
 		return;
 	}
 
-	// Buyuk tek seferlik odul/debug XP'si int32 toplamayi tasirmasin. Ara bakiye
-	// seviye esikleri dusulene kadar 64 bit kalir; saklanan Experience tekrar
-	// ilgili seviyenin (int32) esiginin altina inince yazilir.
-	int64 PendingExperience = static_cast<int64>(Experience) + Amount;
-
-	// Tek seferde birden fazla level atlanabilir.
-	while (Level < MaxLevel && PendingExperience >= ExperienceToNextLevel)
+	if (bGainExperienceInProgress)
 	{
-		PendingExperience -= ExperienceToNextLevel;
-		HandleLevelUp();
+		// Refill/OnLevelUp callbacks can award XP synchronously. The outer call
+		// owns the progression loop; do not overwrite its balance or recurse.
+		PendingExperienceBalance += FMath::Min<int64>(Amount, MAX_int64 - PendingExperienceBalance);
+		return;
 	}
 
-	if (Level >= MaxLevel)
 	{
-		Experience = 0;
-	}
-	else
-	{
-		Experience = static_cast<int32>(PendingExperience);
-	}
+		TGuardValue<bool> GrantGuard(bGainExperienceInProgress, true);
+		// Keep large awards and callback grants in 64 bits until level thresholds
+		// have been consumed. Only the final bounded balance is replicated/saved.
+		PendingExperienceBalance = static_cast<int64>(Experience) + Amount;
+		while (Level < MaxLevel && PendingExperienceBalance >= ExperienceToNextLevel)
+		{
+			PendingExperienceBalance -= ExperienceToNextLevel;
+			HandleLevelUp();
+		}
+		Experience = (Level >= MaxLevel) ? 0 : static_cast<int32>(PendingExperienceBalance);
+		PendingExperienceBalance = 0;
+	} // Release before the existing final OnExperienceChanged notification.
 
 	OnExperienceChanged.Broadcast(Experience, ExperienceToNextLevel);
 }

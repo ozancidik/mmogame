@@ -3712,3 +3712,67 @@ Gerçek uzak progression/replication, pawn destroy Blueprint callback'i,
 tam ServerTravel/reconnect ve 20 dk süre/model koşusu PLAYTEST_CHECKLIST'te açık.
 Kanıt: TEMP/mmo_o44_first_levelup_20261009 içinde build/native/negative,
 parser ve aggregate logları, source/DLL freeze, main575 sav SHA ve review.
+
+## 83 · Seviye callback'inin verdiği XP'nin kaybolması (9 Ekim 2026, O45)
+
+`GainExperience` dış çağrının yerel bakiyesini en sonda yazarak refill veya
+OnLevelUp callback'inin kabul edilen XP'sini eziyordu. Gerçek dynamic delegate
+fixture'ında eski algoritma: XP0+100, callback+10 → Lv2/0 (beklenen10);
+XP90+35, callback+10 → Lv2/25 (beklenen35). Native206 kontrolün21'i FAIL,
+UE exit0 fakat runner exit1. Bu sonuç yalnız kaynak incelemesi değildir.
+
+Aynı component'in seviye/refill callback ödülleri artık tek int64 bakiyeye
+eklenir; dış çağrı callback döndükten sonra eşikleri tüketir, son XP'yi yazar.
+İç çağrı yeni seviyeyi hemen bildirmez; public API yorumu bu davranışı açıklar.
+Authority/ölü/pozitif miktar/seviye80 kapıları her girişte korunur. Bakiye
+taşmaya karşı doyurulur, seviye döngüsü cap ile sınırlıdır. Native guard/bakiye
+SaveGame veya replicated alan değildir; RPC, timer, tick veya veri biçimi eklenmez.
+Guard son OnExperienceChanged'den önce bırakılır: bu callback'in mevcut
+anlık iç içe ödül davranışı korunur. ApplySaveData, ölüm cezası veya kayıt
+işleminin yarım XP callback'inde çalışması bu düzeltmenin kapsamı dışındadır.
+
+Wegener yalnız206 native kontrol/betik ve güçlü GC referanslı tek çağrılı
+private delegate probe'u yazdı. Planck salt okunur ecc-mmo-review yaptı:
+yeni actionable regression0; Blueprint grafikleri ve worker fixture incelemesi
+bu ajan review'ına dahil değildir. Parent fixture/betiği ayrıca okudu.
+Agency tool kökeni iddia edilmez; iki ajan tamamlandıktan sonra kapatıldı.
+
+Eski algoritma UBT112.07sn Succeeded/exit0 ile derlendi. İlk soğuk asset
+discovery koşusu60sn watchdog'a takıldı, kontrol0; başarı sayılmadı. Sonraki
+aynı DLL koşusunda206 kontrol/21FAIL ile XP kaybı doğrulandı. Exact fixed
+restore yeni timestamp ile Stats'ı gerçekten derleyip DLL link etti:
+UBT3.83sn Succeeded/exit0, native206/206 ve mevcut first_levelup16/5 PASS.
+Kontroller health/mana/level delegate'leri, birden çok/negatif/sıfır ödül,
+ertelenmiş ikinci eşik, iki MAX_int32 ödül ve cap/puan bütçesi, ölü ret,
+iki component bağımsızlığı, son XP callback'i, sonraki ödül ve bellek içi
+save roundtrip'i kapsar. Disposable NPC, aynı frame; gerçek uzak PIE değildir.
+
+İzole `RunAllChecks.ps1 -SkipBuild -NetPort 17779`:43/43 adım, exit0.
+Data temiz, Lint87 temiz; negatif Data14/Lint15 ve parser1140/1140 geçti.
+Summer/Winter native exit0/error0,56/76 mob doğumu. NetSmoke script exit0:
+sunucu1join/istemci1welcome ve iki logda error0; süreçler betik tarafından
+sonlandırılır, native temiz çıkış veya XP RPC/HUD kapsamı iddia edilmez.
+İzole Store slots0: mevcut .sav okuma/JSON/roundtrip atlandı, writeorder geçti.
+Başarısız ilk aggregate dış wrapper'ın TEMP'i uzun yola çözmesi nedeniyle
+eski unquoted ABSLOG JSON logunu bulamadı; kaynak değişmedi. Dış wrapper
+explicit kısa TEMP ile düzeltildi, baştan tam43 koşu geçti. İlk yarım koşu
+başarı sayılmadı. İzole166 giriş ve DLL freeze'i test boyunca aynı kaldı.
+
+Ana checkout'a8 doğrulanmış dosya taşındı. UBT tek action ile gerçek
+compile/link26.56sn Succeeded/exit0; native206, first_levelup16/5,
+parser1140/1140, Data ve Lint87 geçti. Ana Store575/575 yükleme ve JSON575
+alan eşitliği/mismatch0, geçici slot Save/Load equal1 ve writeorder1 geçti.
+Geçici slot başlangıçta yoktu ve temizlendi;575 başlangıç kayıt SHA'sı sabit,
+yeni/eksik slot yok. Altı owned kaynak/betik izole freeze ile byte-eşit;
+diğer girdiler ana başlangıç byte'larını korur. docs/Lore.md dahil166
+girdinin114 önceden var olan CRLF/LF checkout farkı normalize edilince
+aynıdır; ana dosyalar topluca yeniden yazılmadı. İlk integration kanıt
+okuması UTF16 Tee logunu UTF8 okumaya çalışınca kopya başlamadan durdu;
+sonraki up-to-date UBT başarı kanıtı sayılmadı. Log encoding algılaması
+düzeltilip exact integration ve gerçek ana compile/link sonrasında test edildi.
+Shipping/Server/FullCompile ve uzak PIE yapılmadı; açık maddeler
+PLAYTEST_CHECKLIST'te. Tüm yeni test akışı Shipping dışında derlenir;
+paylaşılan private reflected probe tipi Shipping'de kalır.
+
+Kanıt: TEMP/mmo_o45_reentrant_xp_20261009 (eski/fixed build, native log,
+review, giriş/DLL freeze ve ana575 başlangıç kayıt SHA'ları).

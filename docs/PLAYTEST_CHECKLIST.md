@@ -4917,3 +4917,29 @@ başlangıç kayıt SHA'sı aynı kaldı. Aşağıdaki gerçek PIE kutuları aç
 - [ ] 20 dk rehbersiz Lv1–30 koşusunda doğal ilk seviye elapsed süresini kaydet;
   debug XP'yi ayrı tut, modelle karşılaştır. İlk hareket ölçümü halen açıktır.
   Shipping ve dedicated Server hedefleri bu turda derlenmedi.
+
+## 2026-10-09 — Callback XP ödülünün korunması (O45, §83)
+
+Gerçek headless dynamic health/mana/level delegate'leriyle native206/206
+geçti. Eski algoritma21 FAIL verdi: XP0+100+callback10 son0; XP90+35+
+callback10 son25. Düzeltilmiş değerler10 ve35. İç ödül seviye callback'i
+döndükten sonra işlenir; final OnExperienceChanged iç ödülü anında işler.
+Mevcut ilk seviye testi16/5 de geçti. Uzak istemci/HUD doğrulaması yapılmadı.
+
+İzole43/43 paket Summer56/Winter76 doğumuyla smoke ve17779 bağlantı testi
+geçti. Ana gerçek compile/link, native206/206, first16/5, parser1140/1140
+ve Store575 yükleme/JSON eşitliği/geçici SaveLoad geçti;575 asıl kayıt SHA'sı
+korundu. Bu sonuçlar aşağıdaki gerçek oyuncu/Blueprint kutularını kapatmaz.
+
+- [ ] Listen host ve uzak istemcide doğal seviye ödülüne bir defalık health,
+  mana veya OnLevelUp Blueprint ek XP ödülü bağla. Son seviye/XP/puan bütçesi
+  ve HUD iki tarafta aynı olsun; callback içinde ikinci seviye hemen oluşmasın,
+  callback dönüşünden sonra işlensin. Eşik altı ek10 kaybolmasın; ikinci eşik
+  ödülü aynı sunucu çağrısında işlensin, client ayrı ödül üretmesin.
+- [ ] Callback'siz mob/görev/parti XP, final OnExperienceChanged ek ödülü ve
+  seviye80 ret davranışı normal kalsın. Sonuç tamamlandıktan sonra kayıt ve
+  yeniden giriş aynı progression değerlerini korusun. Native bellek roundtrip'i
+  gerçek bağlantı kopması veya asynchronous disk save testi değildir.
+- [ ] Blueprint callback'inde pawn destruction, ApplySaveData veya ölüm
+  cezası tetikleyen içerik varsa ayrıca incele; bu genel callback mutasyonları
+  için transaction garantisi verilmedi. Shipping/Server hedef build yapılmadı.
