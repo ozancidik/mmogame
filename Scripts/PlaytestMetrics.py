@@ -27,6 +27,10 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   first_death who lv by xploss scope=controller sid start elapsed
     (after real server death and actual XP penalty; by is a mob archetype or lowercase none)
     (xploss is the actual integer loss 0..2147483647; marker adds no gameplay counters)
+  first_levelup who lv from to scope=controller sid start elapsed
+    (first authoritative GainExperience -> HandleLevelUp transition before refill/level delegates)
+    (integer from=1..79, to=from+1=2..80, lv=to; first adjacent step of a multi-level award)
+    (excludes save load, direct Level edits, dead/capped/no threshold/NPC; no gameplay counters)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -37,7 +41,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
-FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill", "first_basic_attack", "first_death")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill", "first_basic_attack", "first_death", "first_levelup")
 
 
 def project_root():
@@ -50,6 +54,19 @@ def to_num(text, default=0.0):
         return value if math.isfinite(value) else default
     except (TypeError, ValueError):
         return default
+
+
+def bounded_int_text(text, minimum, maximum):
+    """Validate ASCII integer text exactly, converting only bounded significant digits."""
+    if not isinstance(text, str) or not re.fullmatch(r"[+-]?[0-9]+", text):
+        return None
+    # Strip leading zeroes before conversion: huge tokens cannot hit Python's
+    # integer-string limit, and decimal/exponent text never passes via rounding.
+    digits = text.lstrip("+-").lstrip("0") or "0"
+    if len(digits) > len(str(maximum)):
+        return None
+    value = int(digits) * (-1 if text.startswith("-") else 1)
+    return value if minimum <= value <= maximum else None
 
 
 def parse_log(path):
@@ -117,7 +134,6 @@ def build_stats(events):
             start = to_num(e.get("start"), float("nan"))
             elapsed = to_num(e.get("elapsed"), float("nan"))
             event_time = to_num(e.get("t"), float("nan"))
-            level = to_num(e.get("lv"), float("nan"))
             amount = to_num(e.get("amount"), float("nan"))
             if ev == "first_loot":
                 payload_valid = (e.get("kind") in ("gold", "item", "equipment") and bool(e.get("item"))
@@ -160,8 +176,18 @@ def build_stats(events):
                 payload_valid = (bool(e.get("by")) and e["by"] != "None"
                                  and bool(re.fullmatch(r"[+-]?[0-9]+", e.get("xploss", "")))
                                  and math.isfinite(xp_loss) and 0 <= xp_loss <= 2147483647)
+            elif ev == "first_levelup":
+                from_level = bounded_int_text(e.get("from"), 1, 79)
+                to_level = bounded_int_text(e.get("to"), 2, 80)
+                post_level = bounded_int_text(e.get("lv"), 2, 80)
+                payload_valid = (from_level is not None and to_level is not None
+                                 and post_level is not None and to_level == from_level + 1
+                                 and post_level == to_level)
+                level = float(post_level) if post_level is not None else float("nan")
             else:
                 payload_valid = bool(e.get("quest"))
+            if ev != "first_levelup":
+                level = to_num(e.get("lv"), float("nan"))
             if (e.get("scope") != "controller" or not re.fullmatch(r"[0-9A-Fa-f]{32}", sid)
                     or not all(math.isfinite(n) and n >= 0 for n in (start, elapsed, event_time))
                     or not math.isfinite(level) or level < 1 or not level.is_integer() or not payload_valid
@@ -187,6 +213,8 @@ def build_stats(events):
                 sample.update(target=e["target"], targetid=e["targetid"], tlv=int(target_level))
             elif ev == "first_death":
                 sample.update(by=e["by"], xploss=int(xp_loss))
+            elif ev == "first_levelup":
+                sample.update({"from": from_level, "to": to_level})
             else:
                 sample["quest"] = e["quest"]
             session[ev] = sample
@@ -330,6 +358,8 @@ def print_player(who, p):
                         detail = "target=%s targetid=%s tlv=%d" % (sample["target"], sample["targetid"], sample["tlv"])
                     elif action == "first_death":
                         detail = "by=%s xploss=%d" % (sample["by"], sample["xploss"])
+                    elif action == "first_levelup":
+                        detail = "from=%d to=%d" % (sample["from"], sample["to"])
                     else:
                         detail = "quest=%s" % sample["quest"]
                     print("  sid=%s %s sure=%s lv=%d %s" % (
@@ -341,6 +371,7 @@ def print_player(who, p):
         print("  first_skill sure=? (bu logda olay yok)")
         print("  first_basic_attack sure=? (bu logda olay yok)")
         print("  first_death sure=? (bu logda olay yok)")
+        print("  first_levelup sure=? (bu logda olay yok)")
     if p["first_invalid"] or p["first_duplicates"]:
         print("Ilk olay atlanan: gecersiz=%d tekrar=%d" % (p["first_invalid"], p["first_duplicates"]))
 

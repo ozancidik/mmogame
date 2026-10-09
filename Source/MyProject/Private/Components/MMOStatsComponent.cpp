@@ -15,6 +15,7 @@
 #include "Components/MMOSkillComponent.h"
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
+#include "Player/MMOPlayerController.h"
 #include "Effects/MMODotDamageType.h"
 
 namespace
@@ -553,9 +554,19 @@ void UMMOStatsComponent::HandleLevelUp()
 	UnspentStatPoints += StatPointsPerLevel;
 	UnspentSkillPoints += SkillPointsPerLevel;
 
+#if !UE_BUILD_SHIPPING
+	// Capture the committed adjacent transition before any refill/level delegate
+	// can grant nested XP, detach the controller or destroy its pawn.
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); IsValid(OwnerPawn) && OwnerPawn->IsPlayerControlled())
+	{
+		if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(OwnerPawn->GetController()); IsValid(PC) && PC->GetPawn() == OwnerPawn)
+		{
+			PC->RecordFirstLevelUpMetric(OldLevel);
+		}
+	}
+#endif
 	// Level başına küçük otomatik stat artışı + can/mana yenile.
 	RecalculateDerivedStats(/*bRefill=*/true);
-
 	OnLevelUp.Broadcast(Level);
 
 	// Olcum gunlugu (yalniz oyuncular): seviye atlama.

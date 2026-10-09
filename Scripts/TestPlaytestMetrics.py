@@ -22,6 +22,7 @@ EQUIP_FIXTURE = os.path.join(HERE, "fixtures", "first_equip_metrics_sample.log")
 SKILL_FIXTURE = os.path.join(HERE, "fixtures", "first_skill_metrics_sample.log")
 BASIC_ATTACK_FIXTURE = os.path.join(HERE, "fixtures", "first_basic_attack_metrics_sample.log")
 DEATH_FIXTURE = os.path.join(HERE, "fixtures", "first_death_metrics_sample.log")
+LEVELUP_FIXTURE = os.path.join(HERE, "fixtures", "first_levelup_metrics_sample.log")
 
 failures = []
 assertions = 0
@@ -82,6 +83,230 @@ def run_death_validator(pm, raw, expected):
     finally:
         sys.argv = previous_argv
         os.unlink(path)
+
+
+def run_levelup_validator(pm, raw, expected):
+    validator = load(os.path.join(HERE, "ValidateFirstLevelUpLog.py"))
+    validator.metrics = pm
+    with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as fh:
+        fh.write(raw)
+        path = fh.name
+    previous_argv = sys.argv
+    buf = io.StringIO()
+    try:
+        sys.argv = ["ValidateFirstLevelUpLog.py", path, "--events", str(expected)]
+        with contextlib.redirect_stdout(buf):
+            code = validator.main()
+        return code, buf.getvalue()
+    finally:
+        sys.argv = previous_argv
+        os.unlink(path)
+
+
+def test_first_levelup(pm):
+    def marker(event):
+        return "[MMOMETRIC] " + " ".join("%s=%s" % item for item in event.items()) + "\n"
+
+    events = pm.parse_log(LEVELUP_FIXTURE)
+    check(len(events) == 17, "first levelup fixture: 17 parsed events; missing who skipped")
+    check("first_levelup" in pm.FIRST_ACTIONS, "first_levelup belongs to controller first actions")
+    players = pm.build_stats(events)
+    warrior = players["Warrior"]
+    first = {"seconds": 8, "lv": 2, "from": 1, "to": 2}
+    check(warrior["first_actions"]["a" * 32]["first_levelup"] == first,
+          "first XP transition preserves post-increment level and first adjacent step")
+    check(warrior["first_duplicates"] == 1 and warrior["first_invalid"] == 0
+          and warrior["last_t"] == 15, "normalized duplicate cannot replace payload or extend timing")
+    check(warrior["first_actions"]["b" * 32]["first_levelup"] == {
+        "seconds": 5, "lv": 5, "from": 4, "to": 5}, "same who new SID permits another first levelup")
+    check(warrior["first_actions"]["a" * 32]["first_skill"]["skill"] == "War_PowerStrike",
+          "same SID different first actions stay independent")
+    check(players["Archer"]["first_actions"]["a" * 32]["first_levelup"] == {
+        "seconds": 10, "lv": 80, "from": 79, "to": 80}, "same SID different who and upper bound accepted")
+    check(players["Mage"]["first_actions"]["a" * 32]["first_levelup"] == {
+        "seconds": 15, "lv": 3, "from": 2, "to": 3}, "independent mage first levelup")
+    check(players["Priest"]["first_actions"]["b" * 32]["first_levelup"] == {
+        "seconds": 0, "lv": 2, "from": 1, "to": 2}, "zero elapsed is explicit, not unknown")
+    check(players["Bad"]["first_invalid"] == 2 and players["Bad"]["first_actions"] == {}
+          and not players["Bad"]["timing_started"]
+          and players["Bad"]["first_t"] == players["Bad"]["last_t"] == 0,
+          "rounded fractional text and inconsistent lv neither consume first nor start clocks")
+    check(sum("first_levelup" in a for p in players.values() for a in p["first_actions"].values()) == 5,
+          "five accepted who/controller first levelups")
+    baseline = pm.build_stats([e for e in events if e["ev"] not in pm.FIRST_ACTIONS])["Warrior"]
+    for key in ("level", "start_level", "enter", "lv", "src", "mobs", "quests", "quest_start", "pending"):
+        check(warrior.get(key) == baseline.get(key), "first levelup must not alter gameplay state/counters: " + key)
+    check(warrior["level"] == 3 and warrior["lv"][1]["kills"] == 1
+          and warrior["lv"][1]["xp"] == 25 and warrior["lv"][1]["gold_in"] == 3
+          and warrior["lv"][1]["quest_xp_reward"] == 200
+          and warrior["lv"][3]["deaths"] == 1 and warrior["lv"][3]["xploss"] == 5
+          and warrior["lv"][3]["gold_in"] == 7,
+          "ordinary two-step award owns progression; first transition adds no XP, gold, kill, death or quest")
+    for who in ("Archer", "Mage", "Priest", "Bad"):
+        p = players[who]
+        check(p["level"] is None and all(p[k] == {} for k in
+              ("enter", "dur", "lv", "src", "mobs", "quests", "quest_start")) and p["pending"] == [],
+              "first-only levelup does not establish gameplay levels/counters: " + who)
+
+    valid = next(e for e in events if e["ev"] == "first_levelup")
+    # Every adjacent pair in the runtime level range is accepted, with exact ints.
+    for old in range(1, 80):
+        probe = dict(valid, **{"from": str(old), "to": str(old + 1), "lv": str(old + 1)})
+        p = pm.build_stats([probe])["Warrior"]
+        check(p["first_actions"]["a" * 32]["first_levelup"] == {
+            "seconds": 8, "lv": old + 1, "from": old, "to": old + 1}
+              and p["level"] is None and p["lv"] == {}, "bounded adjacent integer pair %d -> %d" % (old, old + 1))
+    for prefix in ("+", "00", "+00", "0" * 5000):
+        probe = dict(valid, **{"from": prefix + "1", "to": prefix + "2", "lv": prefix + "2"})
+        check(pm.build_stats([probe])["Warrior"]["first_actions"]["a" * 32]["first_levelup"] == first,
+              "integer text normalization accepts positive sign/leading zeros without large int conversion")
+
+    malformed = [
+        ("scope", None), ("scope", ""), ("scope", "character"), ("scope", "Controller"),
+        ("sid", None), ("sid", ""), ("sid", "a" * 31), ("sid", "a" * 33), ("sid", "g" * 32),
+        ("start", "9"), ("elapsed", "7"),
+    ]
+    for field in ("t", "start", "elapsed"):
+        malformed.extend((field, v) for v in (None, "", "-1", "NaN", "Inf", "-Inf", "bad"))
+    for field in ("from", "to", "lv"):
+        malformed.extend((field, v) for v in (
+            None, "", "0", "-1", "81", "2147483647", "9" * 5000, "1.5", "NaN", "Inf", "-Inf",
+            "bad", "+", "--1", "1_0", "0x2", "1e0", "2e0", "1e-400", "2.0",
+            "1.0000000000000001", "2.0000000000000001", "80.0000000000000001",
+            "0.00000000000000000001", "\u0662", "\uff12"))
+    malformed += [("from", "80"), ("from", "2"), ("to", "1"), ("to", "3"),
+                  ("lv", "1"), ("lv", "3")]
+    for field, value in malformed:
+        bad = dict(valid)
+        if value is None:
+            bad.pop(field)
+        else:
+            bad[field] = value
+        label = "%s=%s" % (field, str(value)[:80])
+        rejected = pm.build_stats([bad])["Warrior"]
+        check(rejected["first_invalid"] == 1 and rejected["first_duplicates"] == 0
+              and rejected["first_actions"] == {} and not rejected["timing_started"],
+              "first levelup rejects malformed text/common clock: " + label)
+        recovered = pm.build_stats([bad, valid])["Warrior"]
+        check(recovered["first_invalid"] == 1 and recovered["first_duplicates"] == 0
+              and recovered["first_actions"]["a" * 32]["first_levelup"] == first
+              and recovered["first_t"] == recovered["last_t"] == 8,
+              "invalid first levelup cannot consume first or clocks: " + label)
+        code, out = run_levelup_validator(pm, marker(bad), 1)
+        check(code == 1 and "MMO_FIRST_LEVELUP_PARSER_TEST] FAIL" in out,
+              "native validator rejects malformed first levelup: " + label)
+    for field in ("from", "to", "lv"):
+        bad = dict(valid)
+        bad[field] = 1 if field == "from" else 2
+        check(pm.build_stats([bad])["Warrior"]["first_invalid"] == 1,
+              "strict payload requires text even for direct build_stats input: " + field)
+    for probe in (
+        dict(valid, **{"from": "1", "to": "3", "lv": "3"}),
+        dict(valid, **{"from": "80", "to": "81", "lv": "81"}),
+        dict(valid, **{"from": "0", "to": "1", "lv": "1"}),
+        dict(valid, **{"from": "79.0000000000000001", "to": "80", "lv": "80"}),
+    ):
+        check(pm.build_stats([probe])["Warrior"]["first_invalid"] == 1,
+              "reject skipped, above-cap, below-minimum and float-rounded near-cap transitions")
+        code, out = run_levelup_validator(pm, marker(probe), 1)
+        check(code == 1, "native validator rejects invalid adjacent transition")
+    for timestamp in ("0", "10"):
+        probe = dict(valid, t=timestamp, start=timestamp, elapsed="0")
+        check(pm.build_stats([probe])["Warrior"]["first_actions"]["a" * 32]["first_levelup"]["seconds"] == 0,
+              "zero elapsed first levelup at clock " + timestamp)
+    for elapsed, accepted in (("8.009", True), ("8.011", False)):
+        check(bool(pm.build_stats([dict(valid, elapsed=elapsed)])["Warrior"]["first_actions"]) == accepted,
+              "first levelup inherits 0.01 clock consistency tolerance: " + elapsed)
+    clock_base = [{"who": "Clock", "ev": "kill", "t": "10", "lv": "1", "xp": "25", "mob": "Goblin"}]
+    reference = pm.build_stats(clock_base)["Clock"]
+    for timestamp in ("0", "1000"):
+        bad = dict(valid, who="Clock", lv="3", t=timestamp, start="0", elapsed=timestamp)
+        for sequence in ([bad] + clock_base, clock_base + [bad]):
+            p = pm.build_stats(sequence)["Clock"]
+            check(p["first_invalid"] == 1 and all(p[k] == reference[k] for k in
+                  ("first_t", "last_t", "dur", "level", "enter", "lv")),
+                  "invalid levelup payload never expands observation/gameplay: " + timestamp)
+    bad_after = dict(valid, lv="3", t="1000", elapsed="1000")
+    p = pm.build_stats([valid, bad_after])["Warrior"]
+    check(p["first_invalid"] == 1 and p["first_duplicates"] == 0 and p["last_t"] == 8
+          and p["first_actions"]["a" * 32]["first_levelup"] == first,
+          "invalid after accepted first remains invalid and preserves clock/payload")
+
+    code, out = run_main(pm, ["x", LEVELUP_FIXTURE, "--who", "Warrior"])
+    check(code == 0 and "Olay sayisi: 17 (levelup=2 kill=1 death=1 gold=2)" in out
+          and "quest_accept=1 quest_claim=1" in out, "first levelup report does not double gameplay event counts")
+    check("first_levelup sure=0:08 lv=2 from=1 to=2" in out
+          and "first_levelup sure=0:05 lv=5 from=4 to=5" in out and "gecersiz=0 tekrar=1" in out,
+          "first levelup report displays transition/post level/elapsed and per-session duplicate diagnostics")
+    check(all("Oyuncu: " + who not in out for who in ("Archer", "Mage", "Priest", "Bad")), "levelup --who filter")
+    code, out = run_main(pm, ["x", LEVELUP_FIXTURE, "--who", "Priest"])
+    check(code == 0 and "first_levelup sure=0:00 lv=2 from=1 to=2" in out, "zero elapsed levelup report")
+    code, out = run_main(pm, ["x", LEVELUP_FIXTURE, "--who", "Bad"])
+    check(code == 0 and "gecersiz=2 tekrar=0" in out and "first_levelup sure=?" in out, "invalid levelup report")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check(code == 0 and out.count("first_levelup sure=?") == 2, "old first-action sessions retain unknown levelup")
+    code, out = run_main(pm, ["x", FIXTURE, "--who", "Ozan"])
+    check(code == 0 and "first_levelup sure=?" in out and "first_* suresi bilinmiyor" in out
+          and pm.build_stats(pm.parse_log(FIXTURE))["Ozan"]["first_actions"] == {},
+          "ordinary levelup never implies a first controller levelup")
+
+    accepted_events = []
+    seen = set()
+    for e in events:
+        if e["ev"] != "first_levelup" or e["who"] == "Bad":
+            continue
+        key = (e["who"], e["sid"].lower())
+        if key not in seen:
+            seen.add(key)
+            accepted_events.append(dict(e, sid="%032x" % (len(accepted_events) + 1)))
+    native_raw = "".join(marker(e) for e in accepted_events[:4])
+    ordinary_raw = "".join(marker(e) for e in events if e["ev"] != "first_levelup")
+    for count in (1, 3, 4, 5):
+        raw = "".join(marker(e) for e in accepted_events[:count])
+        code, out = run_levelup_validator(pm, ordinary_raw + raw, count)
+        check(code == 0 and "PASS events=%d who/clock/payload accepted" % count in out,
+              "native validator accepts arbitrary event count, including planned four sessions: %d" % count)
+    missing_who = marker({k: v for k, v in valid.items() if k != "who"})
+    cross_who = dict(valid, who="Other", sid="A" * 32)
+    shared = pm.build_stats([valid, cross_who])
+    check(len(shared) == 2 and all(p["first_invalid"] == p["first_duplicates"] == 0
+          and p["first_actions"]["a" * 32]["first_levelup"] == first for p in shared.values()),
+          "native global SID uniqueness does not leak into shared who/SID parser grouping")
+    for label, raw, count in (
+        ("expected count", native_raw, 5),
+        ("duplicate", native_raw + marker(accepted_events[0]), 5),
+        ("case-insensitive duplicate", marker(valid) + marker(dict(valid, sid="A" * 32)), 2),
+        ("same sid different who", marker(valid) + marker(dict(valid, who="Other")), 2),
+        ("normalized same sid different who", marker(valid) + marker(cross_who), 2),
+        ("missing who", missing_who, 1),
+        ("missing who after valid markers", native_raw + missing_who, 5),
+        ("unparsed extra marker with expected accepted count", native_raw + missing_who, 4),
+        ("empty who", marker(dict(valid, who="")), 1),
+        ("None who", marker(dict(valid, who="None")), 1),
+        ("missing clocks", marker({k: v for k, v in valid.items() if k not in ("t", "start", "elapsed")}), 1),
+        ("overwritten event", marker(valid).rstrip() + " ev=levelup\n", 1),
+        ("repeated raw event token", marker(valid).rstrip() + " ev=first_levelup\n", 1),
+        ("ordinary levelups only", ordinary_raw, 1),
+    ):
+        code, out = run_levelup_validator(pm, raw, count)
+        check(code == 1 and "MMO_FIRST_LEVELUP_PARSER_TEST] FAIL" in out,
+              "native levelup validator rejects " + label)
+        if label in ("same sid different who", "normalized same sid different who"):
+            check("raw=2 parsed=2 accepted=2 invalid=0 duplicates=0 sessions=1" in out,
+                  "native cross-who rejection requires global normalized SID uniqueness: " + label)
+    reordered = {k: v for k, v in valid.items() if k != "ev"}
+    reordered["ev"] = "first_levelup"
+    code, out = run_levelup_validator(pm, marker(reordered).rstrip(), 1)
+    check(code == 0 and "PASS events=1" in out, "native levelup token at EOF without newline")
+    code, out = run_levelup_validator(pm, "LogTemp: ev=first_levelup\n" + native_raw, 4)
+    check(code == 0 and "PASS events=4" in out, "nonmetric levelup text cannot add raw event count")
+    lookalikes = "[MMOMETRIC] ev=first_levelup_extra who=Other note=ev=first_levelup\n"
+    code, out = run_levelup_validator(pm, lookalikes + native_raw, 4)
+    check(code == 0 and "PASS events=4" in out, "event suffixes and embedded values are not raw first_levelup tokens")
+    with open(LEVELUP_FIXTURE, encoding="utf-8") as fh:
+        code, out = run_levelup_validator(pm, fh.read(), 9)
+    check(code == 1 and "raw=9 parsed=8 accepted=5 invalid=2 duplicates=1 sessions=3" in out,
+          "full levelup fixture exposes missing who, malformed payloads, duplicates and shared SIDs")
 
 
 def main(argv):
@@ -686,6 +911,8 @@ def main(argv):
     check(code == 1 and "raw=36 parsed=35 accepted=6 invalid=27 duplicates=2" in out,
           "full adversarial fixture validator rejects raw missing-who, malformed and duplicate markers")
 
+    test_first_levelup(pm)
+
     # Rejected duplicate first markers must not extend observation or level duration.
     # Same controller SID/action keeps its accepted payload, even across casing and clocks.
     first_payloads = {
@@ -697,16 +924,20 @@ def main(argv):
         "first_skill": {"skill": "War_PowerStrike", "effect": "0", "mana": "1"},
         "first_basic_attack": {"target": "mob", "targetid": "Goblin", "tlv": "1"},
         "first_death": {"by": "Goblin", "xploss": "0"},
+        "first_levelup": {"from": "1", "to": "2", "lv": "2"},
     }
     check(set(first_payloads) == set(pm.FIRST_ACTIONS), "duplicate clock coverage includes every first action")
     before = {"ev": "kill", "who": "Clock", "t": "5", "lv": "1", "mob": "Goblin", "xp": "10"}
     after = [{"ev": "levelup", "who": "Clock", "t": "10", "from": "1", "to": "2"},
              dict(before, t="12", lv="2", xp="20")]
     for action, payload in first_payloads.items():
-        accepted = dict(payload, ev=action, who="Clock", t="8", lv="1", scope="controller",
+        accepted = dict(ev=action, who="Clock", t="8", lv="1", scope="controller",
                         sid="a" * 32, start="2", elapsed="6")
+        accepted.update(payload)
         reference = pm.build_stats([before, accepted] + after)["Clock"]
         duplicate = dict(accepted, t="1000", start="2", elapsed="998", sid="A" * 32, lv="80")
+        if action == "first_levelup":
+            duplicate.update({"from": "79", "to": "80"})
         sequences = ([before, accepted] + after + [duplicate],
                      [before, accepted, duplicate] + after,
                      [accepted, duplicate])

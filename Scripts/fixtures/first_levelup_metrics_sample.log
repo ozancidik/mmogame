@@ -1,0 +1,21 @@
+# Synthetic adjacent XP transitions; this fixture is not evidence of runtime hook behavior.
+# Ordinary levelup owns progression. Multi-level awards emit only their first adjacent first_levelup.
+LogTemp: ev=first_levelup without a metric marker is not telemetry.
+[MMOMETRIC] t=1 ev=gold who=Warrior src=loot amount=3 balance=3
+[MMOMETRIC] t=2 ev=kill who=Warrior lv=1 mob=Goblin mlv=1 xp=25 party=0 elite=0
+[MMOMETRIC] t=3 ev=quest_accept who=Warrior lv=1 quest=Q_Goblins
+[MMOMETRIC] t=8 ev=first_levelup who=Warrior lv=2 from=1 to=2 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=8
+[MMOMETRIC] t=8 ev=levelup who=Warrior from=1 to=2
+[MMOMETRIC] t=8 ev=levelup who=Warrior from=2 to=3
+[MMOMETRIC] t=9 ev=quest_claim who=Warrior lv=1 to=3 quest=Q_Goblins xp_reward=200 capped=0
+[MMOMETRIC] t=10 ev=death who=Warrior lv=3 by=Goblin xploss=5
+[MMOMETRIC] t=11 ev=gold who=Warrior src=loot amount=7 balance=10
+[MMOMETRIC] t=1000 ev=first_levelup who=Warrior lv=80 from=79 to=80 scope=controller sid=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA start=0 elapsed=1000
+[MMOMETRIC] t=12 ev=first_skill who=Warrior lv=3 skill=War_PowerStrike effect=0 mana=8 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=0 elapsed=12
+[MMOMETRIC] t=15 ev=first_levelup who=Warrior lv=5 from=4 to=5 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=5
+[MMOMETRIC] t=12 ev=first_levelup who=Archer lv=80 from=79 to=80 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=2 elapsed=10
+[MMOMETRIC] t=20 ev=first_levelup who=Mage lv=3 from=2 to=3 scope=controller sid=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa start=5 elapsed=15
+[MMOMETRIC] t=10 ev=first_levelup who=Priest lv=2 from=1 to=2 scope=controller sid=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb start=10 elapsed=0
+[MMOMETRIC] t=1000 ev=first_levelup who=Bad lv=2 from=1.0000000000000001 to=2 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=1000
+[MMOMETRIC] t=0 ev=first_levelup who=Bad lv=1 from=1 to=2 scope=controller sid=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee start=0 elapsed=0
+[MMOMETRIC] t=8 ev=first_levelup lv=2 from=1 to=2 scope=controller sid=ffffffffffffffffffffffffffffffff start=0 elapsed=8

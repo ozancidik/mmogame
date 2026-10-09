@@ -237,13 +237,26 @@ bool AMMOPlayerController::RecordFirstDeathMetric(FName KillerMobId, int32 XPLos
 #endif
 }
 
+bool AMMOPlayerController::RecordFirstLevelUpMetric(int32 PreviousLevel)
+{
+#if !UE_BUILD_SHIPPING
+	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
+	const UMMOStatsComponent* Stats = IsValid(MetricPawn) ? MetricPawn->GetStats() : nullptr;
+	if (!IsValid(Stats) || Stats->bIsDead || PreviousLevel < 1 || PreviousLevel >= 80
+		|| Stats->Level != PreviousLevel + 1 || Stats->Level > Stats->MaxLevel) return false;
+	return RecordFirstActionMetric(TEXT("levelup"), FString::Printf(TEXT("from=%d to=%d"), PreviousLevel, Stats->Level));
+#else
+	static_cast<void>(PreviousLevel); return false;
+#endif
+}
+
 bool AMMOPlayerController::RecordFirstActionMetric(FName Action, const FString& Payload)
 {
 #if !UE_BUILD_SHIPPING
 	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
 	if (!HasAuthority() || !MetricPawn || !MetricPawn->HasAuthority() || !MetricPawn->IsPlayerControlled()
 		|| !MetricPawn->GetStats() || !FirstActionMetricsSession.IsValid() || FirstActionMetricsStart < 0.0
-		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot") && Action != TEXT("kill") && Action != TEXT("equip") && Action != TEXT("skill") && Action != TEXT("basic_attack") && Action != TEXT("death"))
+		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot") && Action != TEXT("kill") && Action != TEXT("equip") && Action != TEXT("skill") && Action != TEXT("basic_attack") && Action != TEXT("death") && Action != TEXT("levelup"))
 		|| RecordedFirstActionMetrics.Contains(Action))
 	{
 		return false;

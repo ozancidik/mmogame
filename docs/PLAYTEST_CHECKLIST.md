@@ -4890,3 +4890,30 @@ her biri1join/1welcome/error0/native exit0. Parametresiz Winter17056 da geçti.
 Bu bağlantı sonucu §79 kick/remote RPC/HUD/PIE kutularını kapatmaz.
 NetSmoke için log adları ayrıdır; tam RunAllChecks'ın diğer sabit TEMP
 çıktıları ve checkout save/global kaynakları için izolasyon gereği sürer.
+
+## 2026-10-09 — İlk XP seviye geçişi (O44, §82)
+
+Native headless 16 kontrol/5 marker geçti; gerçek refill delegate'inin verdiği
+iç içe XP dahil. İlk geçiş delegate'lerden önce yakalanır. Eski after-refill
+yerleşimi aynı fixture'da check16 FAIL ve yanlış first2→3 üretti; düzeltilmiş
+yerleşim first1→2 üretir. Bu sonuç gerçek uzak oyuncu veya süre ölçümü değildir.
+
+İzole42/42 paket Summer/Winter smoke ve17779 bağlantı testiyle geçti.
+Ana UBT bellek limiti hatası tek action ile çözüldü; gerçek build ve native16/5
+geçti. Ana Store575 yükleme/JSON eşitliği ve geçici gidiş-dönüş geçti;575
+başlangıç kayıt SHA'sı aynı kaldı. Aşağıdaki gerçek PIE kutuları açık kalır.
+
+- [ ] Listen host ve uzak istemci, doğal mob/görev XP'siyle 1→2 olsun. Sunucu
+  her controller SID'si için yalnız bir `first_levelup lv=2 from=1 to=2` yazsın;
+  seviye, stat/beceri puanları ve can/mana iki tarafta aynı yenilensin.
+- [ ] Eşik altı/ölü/capped oyuncuda ilk marker çıkmasın. Bir ödül birkaç seviye
+  verince marker ilk bitişik geçişi, normal progression son seviyeyi göstersin.
+- [ ] Lv5 kayıt yükleme marker üretmesin; sonraki gerçek XP5→6 marker üretsin.
+  Pawn değişimi ve gerçek Summer/Winter seamless travel aynı SID/ilk sonucu
+  korusun; disconnect/reconnect yeni SID başlatsın. Native handoff tam travel değildir.
+- [ ] Refill veya OnLevelUp Blueprint callback'i ek XP verse, pawn'ı ayırsa
+  veya yok etse, kaydedilen ilk geçiş doğru kalsın; BP/HUD ve yaşam döngüsünü
+  gerçek PIE'de kontrol et. Native fixture yalnız refill iç içe XP'yi sınadı.
+- [ ] 20 dk rehbersiz Lv1–30 koşusunda doğal ilk seviye elapsed süresini kaydet;
+  debug XP'yi ayrı tut, modelle karşılaştır. İlk hareket ölçümü halen açıktır.
+  Shipping ve dedicated Server hedefleri bu turda derlenmedi.

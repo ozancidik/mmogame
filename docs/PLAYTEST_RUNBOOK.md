@@ -181,3 +181,27 @@ bu değişiklik okçu/büyücüye yeni menzil veya oyun kuralı eklemez.
 `TestFirstBasicAttack.ps1`: izole native dört sınıf, PvP, nearest fallback,
 öldürücü vuruş/XP öncesi seviye ve ret kapıları; log ayrıca ortak parser'dan geçer.
 Gerçek uzak RPC, kullanıcı giriş süresi, seamless travel ve 20 dk koşu PIE'de açık.
+
+## İlk gerçek XP seviye geçişi (9 Ekim 2026, O44)
+
+`first_levelup` yalnız sunucunun `GainExperience -> HandleLevelUp` yolunda,
+seviye ve puanlar artırıldıktan sonra, can/mana yenileme ve seviye delegate'leri
+çağrılmadan önce yazılır. Böylece callback'in verdiği iç içe XP ilk geçişi
+değiştiremez. Alanlar `lv=<yeni seviye> from=<eski> to=<eski+1>`; 1..79'dan
+2..80'e bitişik geçiştir. Tek ödülle birkaç seviye alınırsa ilk bitişik geçiş
+yazılır. Bu satır XP ödül miktarı, toplam alınan seviye veya yenilenmiş can
+ölçümü değildir; normal `levelup`/XP/kill/gold/quest toplamlarına eklenmez.
+
+Controller `scope/sid/start/elapsed` kapsamı korunur: pawn değişimi ve seamless
+controller kopyası ilk olayı sıfırlamaz, yeni bağlantının controller'ı yeni
+oturumdur. Kayıt yükleme, doğrudan Level düzenleme, ölü/capped oyuncu,
+eşik altı/sıfır/negatif XP ve NPC bu olayı üretmez. Debug XP de gerçek
+`GainExperience` yolundan geçiyorsa sayılır; doğal oynanışla karıştırılmamalı.
+Eksik/eski log `sure=?`; ilk seviye atlama hiç olmadı sonucunu çıkarmayın.
+Parser ASCII tam sayı geçişini ve `lv==to` şartını doğrular; geçersiz veya
+aynı SID/action tekrarı ilk payload'ı ve ölçüm saatini değiştirmez.
+
+`TestFirstLevelUp.ps1` izole native 16 kontrol/5 marker ve ortak parser'ı
+çalıştırır; gerçek health delegate üzerinden iç içe XP içerir. Handoff doğrudan
+`SeamlessTravelTo` çağrısıdır. Gerçek uzak oyuncu progression/replication,
+ServerTravel, reconnect ve 20 dk süre/model karşılaştırması PIE'de açıktır.

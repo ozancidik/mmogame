@@ -68,7 +68,10 @@ public:
 	bool RecordFirstBasicAttackMetric(FName TargetKind, FName TargetId, int32 TargetLevel);
 	// Observed server death after XP penalty; None means unknown/non-mob source, not PvP attribution.
 	bool RecordFirstDeathMetric(FName KillerMobId, int32 XPLoss);
+	// First adjacent authoritative XP level transition; lv/to are post-increment.
+	bool RecordFirstLevelUpMetric(int32 PreviousLevel);
 #if !UE_BUILD_SHIPPING
+	static bool RunFirstLevelUpSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	// Native controller chat bodies/owning pawn context; no network transport or Slate input.
 	static bool RunTradeChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);

@@ -3657,3 +3657,58 @@ Gerçek Lv1–30 PIE süresi/model karşılaştırması ve §79 gameplay kontrol
 açık kalır. Kanıt: TEMP/mmo_o43_metrics_duplicate_clock_20261009 içinde
 baseline/fixed test logları, baseline parser, duplicate_sample.log,
 baseline_report/fixed_report, timing_probe.json, freeze ve final_result.
+
+## 82 · İlk gerçek XP seviye geçişi ve reentrant refill (9 Ekim 2026, O44)
+
+Lv1–30 telemetri işindeki `first_levelup` tamamlandı: gerçek authoritative
+`GainExperience -> HandleLevelUp` yolunda, seviye ve puanlar artırıldıktan
+sonra controller GUID/action başına tek marker. `from=1..79`, `to=from+1`,
+`lv=to=2..80`; çok seviyeli ödülün yalnız ilk bitişik adımıdır. Kayıt yükleme,
+doğrudan Level düzenleme, ölü/capped/eşik altı oyuncu ve NPC hariçtir.
+Pawn değişimi ve `SeamlessTravelTo` controller kopyası tekilliği korur.
+Yeni gameplay RPC/replicated/save alanı, Tick, timer veya oyun kuralı yok.
+
+İlk uygulamada hook refill'den sonraydı. Hooke salt okunur ecc-mmo-review
+P2 buldu: health/mana callback'i 1→2 sırasında XP verirse içteki 2→3 ilk
+marker'ı tüketiyordu. Hook tüm refill/level delegate'lerinden önce taşındı;
+mevcut gameplay/delegate sırası aynı kalır. Native fixture'daki güçlü GC
+referanslı, tek çağrılı dynamic health listener gerçek iç içe XP verir.
+Eski yerleşim gerçek UBT13.77sn build sonrası check16 FAIL ve yanlış
+fifth marker `lv=3 from=2 to=3` verdi. Exact restore kopyası timestamp'i
+koruduğu için ilk UBT up-to-date sonucuna doğrulama denmedi; timestamp
+yenilenip Stats gerçekten derlenerek DLL link edildi: Succeeded3.70sn.
+Düzelmiş native16/5, fifth `lv=2 from=1 to=2`, ortak parser PASS.
+
+Python parser ASCII tam sayı/komşu geçiş/`lv==to` doğrular; float yuvarlaması,
+taşan/Unicode/bozuk alanlar, clock/scope/SID, tekrar ve eski loglar sınandı.
+Normal progression/XP/kill/gold/quest toplamını artırmaz; O43 duplicate saat
+kapısı korunur. Fixture1140/1140 assertion geçti (önceki625'in tamamı dahil).
+Locke yalnız dört parser dosyasını yazdı; test/build/UE çalıştırmadı.
+Hooke takip incelemesi actionable0; iki ajan kapatıldı, Agency kökeni yok.
+Test listener'ının reflected tipi Shipping'de kalır; test akışı ve telemetry
+hook'u Shipping dışında derlenir. Shipping/Server hedef build yapılmadı.
+
+İzole `RunAllChecks.ps1 -SkipBuild -NetPort 17779`: 42/42 adım, exit0.
+Data/Lint86 temiz; negatif Data14/Lint15 geçti. Summer/Winter smoke native
+exit0/error0, sırasıyla56/78 mob doğumu. NetSmoke script exit0: aynı17779
+sunucu1join/istemci1welcome, iki logda error0; bu bağlantı testi progression
+RPC/HUD doğrulaması değildir ve süreçler betik tarafından sonlandırılır.
+Mevcut izole Store adımında slots0: eski .sav okuma/JSON/gidiş-dönüş atlandı,
+writeorder geçti; bu adım mevcut kayıt uyumluluğu kanıtı olarak sunulmaz.
+
+Ana checkout'a doğrulanmış15 dosya entegre edildi. İlk ana UBT exit6,
+MSVC C3859/C1076 ve Windows1455 (disk belleği limiti) verdi. Yerel engine
+BuildConfiguration.cs'teki mevcut `-MaxParallelActions=1` kullanılarak
+tek action ile gerçek derleme/link18.87sn Succeeded/exit0; sistem ayarı
+değiştirilmedi. Ana native16/5+parserPASS, Python1140/1140, Data/Lint86 exit0.
+Ek ana Store native:575/575 yükleme, JSON575 eşit/mismatch0 ve geçici
+slot Save/Load alan eşitliği geçti; geçici slot başlangıçta yoktu ve temizlendi.
+575 başlangıç ana .sav SHA sabit, yeni/eksik yuva yok.11 owned kaynak/betik
+izole freeze ile byte-eşit; diğer ana girdiler başlangıç byte'larını korur.
+113 önceden var olan CRLF/LF checkout farkı newline normalize edilince
+aynıdır; bunun için ana dosyalar topluca yeniden yazılmadı. İzole source/DLL
+test boyunca sabit. `-FullCompile`/NoPCH ve Shipping/Server build yapılmadı.
+Gerçek uzak progression/replication, pawn destroy Blueprint callback'i,
+tam ServerTravel/reconnect ve 20 dk süre/model koşusu PLAYTEST_CHECKLIST'te açık.
+Kanıt: TEMP/mmo_o44_first_levelup_20261009 içinde build/native/negative,
+parser ve aggregate logları, source/DLL freeze, main575 sav SHA ve review.
