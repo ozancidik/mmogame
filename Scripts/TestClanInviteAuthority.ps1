@@ -14,8 +14,8 @@ if (-not $process.WaitForExit(60000)) {
     exit 2
 }
 if (-not (Test-Path -LiteralPath $log)) { Write-Output 'Klan test logu bulunamadi'; exit 1 }
-$pass = Select-String -LiteralPath $log -Pattern '\[MMO_CLAN_INVITE_AUTHORITY_TEST\] PASS checks=112\b'
-$chatPass = Select-String -LiteralPath $log -Pattern '\[MMO_CLAN_CHAT_CONTEXT_TEST\] PASS checks=65\b'
+$pass = Select-String -LiteralPath $log -Pattern '\[MMO_CLAN_INVITE_AUTHORITY_TEST\] PASS checks=138\b'
+$chatPass = Select-String -LiteralPath $log -Pattern '\[MMO_CLAN_CHAT_CONTEXT_TEST\] PASS checks=91\b'
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_CLAN_INVITE_AUTHORITY_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 if ($pass -and $chatPass -and -not $fail -and $process.ExitCode -eq 0) { Write-Output $pass.Line; exit 0 }
 Write-Output "Klan davet yetki testi KALDI (exit=$($process.ExitCode))"

@@ -4726,3 +4726,25 @@ klan112/chat65, parti104, arkadaş53/presence24/save26/DoT33/trade218.
 Parser576/576; Store468/schema2/negative111. Summer49/Winter30/error0;
 Net1join/1welcome/error0. Hash151 fark0/exact restore aynı; §72 ayrıntıları.
 Bu paket gerçek remote/disk login/PIE/Shipping/Server testini kapatmaz.
+
+## 2026-10-09 — Klan davet/at/liste gönderim üyeliği (O36, gerçek PIE açık)
+
+Native138/controller91/component47 standalone headless çalıştırıldı.
+
+- [ ] Aynı pawn A→B sonrasında A üyelik ID'siyle gecikmiş /klan davet, at ve
+  liste B'de davet/üyelik/roster satırı üretmesin. Zero/foreign ID de sessiz
+  ret olsun; kaynak invite cooldown tüketilmesin, ortak chat throttle sürsün.
+- [ ] B ID owner'a ulaşınca fresh Say davet, alıcı kabul, Enter kick ve
+  Say/Enter liste gerçek host+uzak istemcide çalışsın. Lider olmayan/ölü/uzak
+  koşullar ve klansız kişisel hint aynı kalsın; owner dışı ID teslim edilmesin.
+- [ ] Aynı-B source rejoin ve gerçek disk reload/login eski istekleri reddetsin.
+  Eski kick hedefinin ayrılıp yeniden katılması, kesintisiz sender authority
+  epoch, solo create ve account/controller rebinding ayrıca değerlendirilsin.
+- [ ] Geciken ID teslimi, roster/metin/ID birlikte sunumu, tekrar istek ve
+  Canvas/Slate; gerçek Server ve Shipping build/koşusu ayrı doğrulansın.
+
+O36 final: RunAllChecks -SkipBuild40/40 exit0; değişen PC NoPCH/W4 warning0,
+klan138/chat91, parti104, arkadaş53/presence24/save26/DoT33/trade218;
+Store475/schema2/negative111, parser576/576. Summer49/Winter32/error0,
+Net1join/1welcome/error0;151 hash fark0/exact backup aynı, fixture save0/engine0.
+Euler read-only final review blocker0. §73; gerçek PIE kutuları açık.

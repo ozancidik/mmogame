@@ -3025,3 +3025,94 @@ TEMP mmo_net_server_085128.log / mmo_net_client_085128.log. Paket logu
 mmo_all_clan_source_final_20261009.log; hash mmo_clan_source_final_hashes_20261009.json.
 ZClanCtx fixture save0; Sagan kapalı. StaticLint InitGameState whitelist ve
 Lv33+ skill-gap uyarıları sürer; gerçek PIE/disk login/Server/Shipping açık.
+
+## 73. O36 — Klan davet/at/liste isteğinde gönderen üyeliği (9 Ekim 2026)
+
+### Yeniden üretilen hata ve uygulama
+
+O35 kabul anında source GUID'i doğrular; davet isteğinin gönderildiği üyeliği
+tek başına korumaz. Aynı pawn A'dan B'ye geçtiğinde eski /klan at hedef isteği
+B'nin üyesini atabilir, davet B adına çıkabilir, liste B roster'ını döndürebilir.
+O34 pawn kapısı bu aynı-pawn değişimini ayırt etmez; yalnız /g ve ayril üyelik
+kapısına sahipti. Native baseline actual DLL FAIL112/check113 eski kick;
+kick kapısı sonrası FAIL113/check114 eski invite; kick+invite kapısı sonrası
+FAIL114/check115 eski list. Üçü de UE exit0/wrapper1 ile yakalandı.
+
+Küçük derlenebilir adımlar: uygun kaynak/hedef/roster ile native fixture;
+sırasıyla üç kapı ve her aşamada linked DLL/UE testi; final NoPCH /W4;
+frozen source/runner hash, mevcut paket ve bağımsız final inceleme.
+CmdInvite/CmdKick/CmdList çağrılarından hemen önce aktif üyelikte valid/equal
+SeenClanMembershipId istenir. O34 dokuzuncu RPC alanı kullanılır; yeni save,
+replicated alan, UPROPERTY, timer veya RPC imzası yok. Conditional aktif üyelik
+kontrolü klansız kişisel hint'i korur. Ortak chat throttle önce çalışır,
+component leader/life/range/pending/cooldown kapıları sürer. Recipient kabulü
+ayrı SeenClanInviteId yolundadır; source pending GUID O35'teki gibidir.
+
+### Native kanıt ve sınır
+
+112→138 (+26), controller65→91; component47 aynı. Yeni26: yeni kaynak aynı pawn
+A→B ve current leader/eligible target setup; eskiA ile üç ret; zero/foreign/random
+ID ile dokuz ret; fresh Enter liste; fresh Say davet, alıcı Say kabul;
+fresh Enter kick; same-B source rejoin setup/üç ret; same-name reload setup/
+üç ret; fresh Say liste. Son inventory assertion eski sayıya dahildir.
+Ret snapshot'ı dört save clan alanını, üyelik GUID/recipient nonce'larını ve
+HUD Text/Color/Time'ı korur. Private pending kaynak/clock tam snapshot'ı bu
+controller fixture'da yok; stale davetlerden sonra fresh başarı, kaynak
+invite cooldown'ın tüketilmediğini gösterir. Shared chat throttle reset'i
+fixture'a özeldir, component clock/cooldown/expiry bypass edilmez.
+
+Önceki aynı-frame sender davet cooldown'ına girdiği için yeni native pawn
+kullanılır: önceki pawn CmdLeave/UnPossess ile emekliye alınır; travel-save
+marker, synchronous no-load/test koşulu ve teardown destroy ile korunur.
+Yeni sender A→B/rejoin/reload boyunca aynı pawn'dır; dört gerçek PC/HUD reused.
+Hedef kontrollü/yaşayan/klansız ve menzildedir. Source üyelik girişleri doğrudan
+component in-memory ApplySaveData; disk login/create veya elapsed timer değil.
+Native Say/Enter ve HUD buffer gerçek remote RPC/Canvas/Slate kanıtı değildir.
+
+Baseline normal module/PC/lib/DLL10,55sn, FAIL112 05:57:50.411UTC.
+Kick-gate actual compile/link4,71sn, FAIL113 05:58:26.437;
+kick+invite4,67sn, FAIL114 05:59:08.005. Üç kapı final actual PC compile/link
+4,78sn ve PASS138/chat91 05:59:33.401UTC. Bu derlenmiş kısmi kapı sonuçları üç
+eksik dalı ayrı yakalar; final sonrası ayrı mutant derlemesi yapılmadı.
+Final PC NoPCH/NoLink/SingleFile12,57sn, /W4 response, warning C0,
+exit0/Succeeded.19 CPP FullCompile bu bounded dispatcher işi için tekrar yok.
+TEMP mmo_clan_authority_{baseline,kick_gate,invite_gate,fixed,nopch_final}
+20261009 build/test/UE logları, exact final PC backup ve151 source/runner hash.
+
+ECC plan/review/verify ve mmo-feature/ue-build uygulanır. Parent frozen diff,
+authority/context/membership writers/save/GC/caller/throttle/fixture cleanup'ı
+inceler. /klan kur solo bağlamı, hedef kick/rejoin generation (sender üyeliği
+kesintisizse), leader loss/regain epoch, account/controller/name rebinding,
+owner-only gecikme ve UI atomik görünümü bu üç dalın dışında açık kalır.
+
+
+Salt okunur Euler final review blocker0: yalnız PC/runner kaynak farkı,
+151/151 freeze dosyası eşleşti, coverage/hash fark0. Ajan, parent'in mevcut baseline,
+kick-gate, invite-gate ve final DLL/UE loglarını da okudu; kendi test/build/edit
+çalıştırmadı. PC SHA256 B465E60F1CD757F8DB5A08D897EFD67C0E58451C69B842ADB8A17BCCC73E262A,
+runner EA8DFA049D66D38F55F1AB22D12971D1BB438359AA37A859C8610D2A6C32FCBD.
+Final authority/lifecycle/cleanup/current positive yolları incelendi; ajan kapatıldı.
+Unreal/multiplayer/security/QA fallback rolleri, Agency provenance mevcut değil.
+
+### O36 final paket (9 Ekim 2026 UTC)
+
+RunAllChecks.ps1 -SkipBuild40/40 GECTI, exit0. Değişen PC ayrıca NoPCH /W4
+warning0; final linked DLL önce actual compile/link ile üretildi.19 CPP
+FullCompile bu bounded dispatcher işinde tekrar yok. Source/Scripts151 hash
+fark0; final PC exact backup aynı. Klan138/chat91 06:03:15.495UTC;
+parti104 06:02:58.881, arkadaş53 06:02:06.898, presence24 06:01:59.724,
+save26 06:01:53.313, DoT33 06:04:59.003, trade218 06:06:49.364 PASS.
+Parser576/576, JSONschema2/negative111. Store475slots/475loaded,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6,
+writeorder1/roundtrip equal1. Yerel yuva sayısı gerçek oyuncu/Lv30 kanıtı değil.
+Summer49/Winter32 smoke exit0/error0; Net1join/1welcome/server-client error0.
+TEMP mmo_all_clan_authority_final_20261009.log, mmo_net_server_090734.log /
+mmo_net_client_090734.log, mmo_clan_authority_final_hashes_20261009.json.
+Euler kapalı; engine/UBT0, ZClanCtx fixture save0. InitGameState whitelist
+ve Lv33+ skill-gap uyarıları sürer. Gerçek PIE/disk login/Server/Shipping açık.
+
+
+Commit öncesi paralel belge işi gözlendi:0874531 yalnız SKILL_PLAN_LV31_45.md
+ve DECISIONS_NEEDED.md'yi değiştirdi; O36'nın altı dosyasıyla kesişim yok.
+Bu dosyalara dokunulmadı;151 kaynak/runner hash hâlâ aynı. O36 doğrulama
+kanıtı aynı gameplay bytes için geçerli, belge değişikliği oyun derlemesi istemez.

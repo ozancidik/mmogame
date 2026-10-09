@@ -697,6 +697,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 	{ OutError = TEXT("clan chat requires disposable standalone headless world"); return false; }
 	const int32 InitialChecks = OutChecks;
 	AMMOPlayerController* PCs[4] = {}; AMMOCharacter* Pawns[4] = {}; UMMOClanComponent* Clans[4] = {}; AMMOHUD* HUDs[4] = {};
+	AMMOCharacter* RetiredPawn = nullptr;
 	const bool Passed = [&]()
 	{
 		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -950,12 +951,66 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		LoadClan(0, ClanB); const FGuid BeforeReload = Clans[0]->ClanMembershipId; LoadClan(0, ClanB);
 		if (!Check(Clans[0]->ClanMembershipId.IsValid() && Clans[0]->ClanMembershipId != BeforeReload
 			&& RejectMember(TEXT("/g before_reload"), BeforeReload) && RejectMember(TEXT("/klan ayril"), BeforeReload), TEXT("same clan reload retained stale context"))) return false;
+		// A fresh sender avoids the prior fixture's invite cooldown; no clock/timer bypass.
+		Clans[0]->CmdLeave(); RetiredPawn = Pawns[0]; RetiredPawn->SetTravelSaveCommitted(true);
+		PCs[1]->UnPossess();
+		Pawns[0] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(2100000, 2100000, 5000), FRotator::ZeroRotator, Params);
+		if (!Pawns[0]) { OutError = TEXT("clan authority membership fixture pawn"); return false; }
+		PCs[1]->Possess(Pawns[0]); Pawns[0]->SetActorTickEnabled(false); Pawns[0]->SetActorEnableCollision(false);
+		Clans[0] = Pawns[0]->GetClanComponent(); Pawns[0]->GetInventory()->FillSaveData(Before[0]);
+		Clans[1]->CmdLeave(); Clans[2]->CmdLeave();
+		LoadClan(0, ClanA, true); const FGuid AuthorityA = Clans[0]->ClanMembershipId;
+		Clans[0]->CmdLeave(); LoadClan(0, ClanB, true); LoadClan(2, ClanB);
+		const FGuid AuthorityB = Clans[0]->ClanMembershipId;
+		if (!Check(PCs[1]->GetPawn() == Pawns[0] && AuthorityA.IsValid() && AuthorityB.IsValid() && AuthorityA != AuthorityB
+			&& Clans[0]->bIsLeader && !Clans[2]->bIsLeader && Clans[2]->ClanName == ClanB && !Clans[1]->IsInClan(), TEXT("clan authority membership A to B setup"))) return false;
+		const FString AuthorityCommands[] = {Kick, TEXT("/klan davet"), TEXT("/KLAN LISTE")};
+		for (const FString& Command : AuthorityCommands)
+			if (!Check(RejectMember(Command, AuthorityA), *FString::Printf(TEXT("old membership authority command changed replacement: %s"), *Command))) return false;
+		for (const FGuid& Id : {FGuid(), Clans[2]->ClanMembershipId, FGuid::NewGuid()})
+			for (const FString& Command : AuthorityCommands)
+				if (!Check(RejectMember(Command, Id), *FString::Printf(TEXT("invalid membership authority command changed replacement: %s"), *Command))) return false;
+		Lines = LinesCopy(); PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/KLAN LISTE")), ETextCommit::OnEnter);
+		if (!Check(HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1
+			&& HUDs[1]->GetChatLinesForTests().Last().Text.Contains(ClanB)
+			&& HUDs[1]->GetChatLinesForTests().Last().Text.Contains(PCs[2]->PlayerState->GetPlayerName())
+			&& HUDs[0]->GetChatLinesForTests().Num() == Lines[0].Num() && HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num()
+			&& HUDs[3]->GetChatLinesForTests().Num() == Lines[3].Num(), TEXT("fresh Enter authority clan list"))) return false;
+		const uint64 BeforeAuthorityInvite = Clans[1]->PendingInviteId; Lines = LinesCopy(); FreshSay(TEXT("/KLAN DAVET"));
+		if (!Check(Clans[1]->PendingInviteId > BeforeAuthorityInvite && !Clans[1]->IsInClan()
+			&& Clans[0]->ClanMembershipId == AuthorityB && Clans[0]->bIsLeader
+			&& HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1 && HUDs[0]->GetChatLinesForTests().Num() == Lines[0].Num() + 1
+			&& HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num() && HUDs[3]->GetChatLinesForTests().Num() == Lines[3].Num(), TEXT("fresh Say authority clan invite"))) return false;
+		PCs[0]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[0]->Say(TEXT("/klan kabul"));
+		if (!Check(Clans[1]->ClanName == ClanB && Clans[1]->ClanMembershipId.IsValid() && !Clans[1]->bIsLeader
+			&& Clans[0]->ClanMembershipId == AuthorityB, TEXT("authority invitation accepted with recipient context"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(Kick), ETextCommit::OnEnter);
+		if (!Check(!Clans[2]->IsInClan() && !Clans[2]->ClanMembershipId.IsValid() && Clans[0]->ClanMembershipId == AuthorityB
+			&& Clans[0]->bIsLeader && Clans[1]->ClanName == ClanB && InventoryUnchanged(), TEXT("fresh Enter authority clan kick"))) return false;
+		Clans[0]->CmdLeave(); LoadClan(0, ClanB, true); Clans[1]->CmdLeave(); LoadClan(2, ClanB);
+		const FGuid AuthorityRejoin = Clans[0]->ClanMembershipId;
+		if (!Check(AuthorityRejoin.IsValid() && AuthorityRejoin != AuthorityB && Clans[0]->bIsLeader && !Clans[1]->IsInClan()
+			&& Clans[2]->ClanName == ClanB, TEXT("authority same-name rejoin setup"))) return false;
+		for (const FString& Command : AuthorityCommands)
+			if (!Check(RejectMember(Command, AuthorityB), *FString::Printf(TEXT("same-name rejoin accepted old authority command: %s"), *Command))) return false;
+		LoadClan(0, ClanB, true); const FGuid AuthorityReload = Clans[0]->ClanMembershipId;
+		if (!Check(AuthorityReload.IsValid() && AuthorityReload != AuthorityRejoin && Clans[0]->bIsLeader, TEXT("authority same-name reload setup"))) return false;
+		for (const FString& Command : AuthorityCommands)
+			if (!Check(RejectMember(Command, AuthorityRejoin), *FString::Printf(TEXT("same-name reload accepted old authority command: %s"), *Command))) return false;
+		Lines = LinesCopy(); FreshSay(TEXT("/klan liste"));
+		if (!Check(HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1
+			&& HUDs[1]->GetChatLinesForTests().Last().Text.Contains(ClanB)
+			&& HUDs[0]->GetChatLinesForTests().Num() == Lines[0].Num() && HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num()
+			&& HUDs[3]->GetChatLinesForTests().Num() == Lines[3].Num() && InventoryUnchanged(), TEXT("fresh Say authority list after reload"))) return false;
 		return Check(InventoryUnchanged(), TEXT("clan membership routing changed inventory"));
 	}();
 	// Same synchronous frame: no load timer fires; erase fixture clans before teardown/leader election.
 	for (int32 I = 0; I < 4; ++I) { if (Clans[I]) { Clans[I]->ClanName.Reset(); Clans[I]->bIsLeader = false; } }
 	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
 	for (int32 I = 0; I < 4; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
+	if (IsValid(RetiredPawn)) RetiredPawn->Destroy();
 	for (AMMOHUD* HUD : HUDs) { if (IsValid(HUD)) HUD->Destroy(); }
 	if (Passed) UE_LOG(LogTemp, Log, TEXT("[MMO_CLAN_CHAT_CONTEXT_TEST] PASS checks=%d"), OutChecks - InitialChecks);
 	return Passed;
@@ -1289,6 +1344,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("davet"), ESearchCase::IgnoreCase))
 		{
+			if (Clan->IsInClan() && (!SeenClanMembershipId.IsValid() || SeenClanMembershipId != Clan->ClanMembershipId)) return;
 			Clan->CmdInvite();
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase))
@@ -1302,10 +1358,12 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("at"), ESearchCase::IgnoreCase))
 		{
+			if (Clan->IsInClan() && (!SeenClanMembershipId.IsValid() || SeenClanMembershipId != Clan->ClanMembershipId)) return;
 			Clan->CmdKick(Arg);
 		}
 		else if (Sub.Equals(TEXT("liste"), ESearchCase::IgnoreCase))
 		{
+			if (Clan->IsInClan() && (!SeenClanMembershipId.IsValid() || SeenClanMembershipId != Clan->ClanMembershipId)) return;
 			Clan->CmdList();
 		}
 		else

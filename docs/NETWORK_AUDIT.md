@@ -1019,3 +1019,29 @@ klan112/chat65, parti104, arkadaş53/presence24/save26/DoT33/trade218.
 Parser576/576; Store468/schema2/negative111. Summer49/Winter30/error0;
 Net1join/1welcome/error0. Hash151 fark0/exact restore aynı; §72 ayrıntıları.
 Bu paket gerçek remote/disk login/PIE/Shipping/Server testini kapatmaz.
+
+### O36 · ORTA · Eski klan yönetim isteği yeni üyeliğe uygulanır
+
+Aynı pawn A→B'de /klan davet, at ve liste eski üyeliğin isteğini yeni üyelikle
+çalıştırıyordu. O35 source GUID'i issuance anında yakaladığı için bu eski
+issuing chat isteğini ayıramaz. Derlenmiş baseline kick FAIL112; kick kapısı
+sonrası invite FAIL113, iki kapı sonrası liste FAIL114. Aktif üyelikte her üç
+component çağrısı öncesinde observed valid/equal ClanMembershipId kapısı var.
+Conditional guard solo hint'i, ortak throttle ve component kapılarını korur.
+Recipient accept nonce ayrı kalır; mevcut RPC/save/replication şeması aynı.
+
+Native138 = controller91 + component47, önceki112 +26. Current leader/eligible
+nearest target ve named victim; same pawn A→B/same-name rejoin/reload;
+zero/foreign/random IDs ve fresh Say/Enter davet/kabul/kick/liste geçer.
+Davet cooldown için yeni source pawn, clock bypass yok. Actual linked DLL
+PASS138 ve değişen PC NoPCH/W4 warning0. Ayrıntı §73.
+
+Target kick/rejoin generation aynı continuous sender'da, leader authority epoch,
+solo create bağlamı, account/controller rebinding ve UI atomikliği ayrı açık.
+Native buffer/in-memory entry gerçek network/disk login/PIE/Server kanıtı değil.
+
+O36 final: RunAllChecks -SkipBuild40/40 exit0; değişen PC NoPCH/W4 warning0,
+klan138/chat91, parti104, arkadaş53/presence24/save26/DoT33/trade218;
+Store475/schema2/negative111, parser576/576. Summer49/Winter32/error0,
+Net1join/1welcome/error0;151 hash fark0/exact backup aynı, fixture save0/engine0.
+Euler read-only final review blocker0. §73; gerçek PIE kutuları açık.
