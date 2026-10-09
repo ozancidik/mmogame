@@ -249,6 +249,7 @@ OVERRIDE_WHITELIST = {
     "Logout": (["AController*"], False),
     "ChangeName": (["AController*", "const FString&", "bool"], False),
     "InitGame": (["const FString&", "const FString&", "FString&"], False),
+    "InitGameState": ([], False),  # AGameModeBase::InitGameState() UE 5.7 GameModeBase.h:69 (2026-10-09 dogrulandi)
     "SetupPlayerInputComponent": (["UInputComponent*"], False),
     "SetupInputComponent": ([], False),
     "PlayerTick": (["float"], False),
