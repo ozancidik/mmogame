@@ -262,8 +262,22 @@ namespace
 		Table.Last().OnHitEffectId = FName(TEXT("Poison"));
 		Table.Last().OnHitEffectChance = 0.35f;
 
+		// R paketi (CONTENT_PLAN_LV46_80.md 2.4): Arayici (58) ile Bekci (62) arasi hizli kademe. PLACEHOLDER.
+		// Efekt plandaki Zehir yerine Slow: Poison DoT (8/sn) bu seviyede savunmaya karsi fiilen 1 hasar
+		// (SKILL_PLAN_LV31_45.md bulgusu), etkisiz bir efekt eklemek yerine yavaslatma verilir.
+		Table.Add(MakeMob(TEXT("RiftWhisperer"), TEXT("Yarik Fisildayani"), 60, 166, 166, 230.f, 48500, 4550, 7900, 420.f, 600.f, 1.3f, FLinearColor(0.55f, 0.28f, 0.8f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
 		Table.Add(MakeMob(TEXT("RiftKeeper"), TEXT("Yarik Bekcisi"), 62, 172, 178, 238.f, 52000, 4800, 8300, 265.f, 600.f, 1.55f, FLinearColor(0.45f, 0.22f, 0.7f)));
 		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
+		Table.Add(MakeMob(TEXT("RiftWalker"), TEXT("Yarik Yuruyeni"), 64, 182, 188, 250.f, 56000, 5100, 8800, 300.f, 600.f, 1.5f, FLinearColor(0.4f, 0.2f, 0.65f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.3f;
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 

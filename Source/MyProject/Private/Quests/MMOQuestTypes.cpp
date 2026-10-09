@@ -262,6 +262,18 @@ namespace
 			T::KillSpecificMob, TEXT("RiftKeeper"), 6, 130000, 130000, 61, TEXT("Q_RiftKeepers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("RiftPlate"));
 
+		// R yan gorevleri (CONTENT_PLAN_LV46_80.md 2.4): kapi 59 ve 64 bosluklarini kapatir; Q_RiftHerald'a on kosul degil.
+		// XP/altin PLACEHOLDER (~%6-7 esik, pace-notr); PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_RiftWhispers"), TEXT("Yarik Fisiltilari"), TEXT("Yarigin fisiltilarini sustur: 8 Yarik Fisildayani oldur."),
+			T::KillSpecificMob, TEXT("RiftWhisperer"), 8, 60000, 18000, 59, TEXT("Q_RiftSeekers")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_RiftWalkers"), TEXT("Yarik Yuruyenleri"), TEXT("Yarigin derininden cikanlari durdur: 8 Yarik Yuruyeni oldur."),
+			T::KillSpecificMob, TEXT("RiftWalker"), 8, 72000, 22000, 64, TEXT("Q_RiftDepths")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		Table.Add(MakeQuest(TEXT("Q_RiftHerald"), TEXT("Yarik Habercisi"), TEXT("Yarigi acan habercisini devir."),
 			T::KillSpecificMob, TEXT("RiftHerald"), 1, 150000, 150000, 65, TEXT("Q_RiftWatch")));
 		Table.Last().RewardEquipmentId = FName(TEXT("RiftBlade"));

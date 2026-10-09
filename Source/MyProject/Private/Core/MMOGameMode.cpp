@@ -1301,7 +1301,7 @@ void AMMOGameMode::SpawnMobArea()
 		//  - Arayici (Lv58) (800,-4800): zemin ~0, halka 16/16, en yakin eski cep ~3500u.
 		//  - Bekci (Lv62) (-4800,4800): zemin ~-170, halka 16/16, ~3400u.
 		//  - Haberci elit (Lv65) (4800,4000): zemin ~500, halka 16/16, ~3880u.
-		auto SpawnRift = [&](const FVector& Loc, int32 Lv, float Radius, int32 MaxMobs, FName Forced)
+		auto SpawnRift = [&](const FVector& Loc, int32 Lv, int32 LvMax, float Radius, int32 MaxMobs, FName Forced)
 		{
 			const FTransform TM(FRotator::ZeroRotator, Loc);
 			if (AMMOMobSpawner* S = World->SpawnActorDeferred<AMMOMobSpawner>(AMMOMobSpawner::StaticClass(), TM))
@@ -1311,7 +1311,7 @@ void AMMOGameMode::SpawnMobArea()
 				if (Forced.IsNone())
 				{
 					S->MinMobLevel = Lv;
-					S->MaxMobLevel = Lv;
+					S->MaxMobLevel = LvMax;
 				}
 				else
 				{
@@ -1322,9 +1322,11 @@ void AMMOGameMode::SpawnMobArea()
 				UGameplayStatics::FinishSpawningActor(S, TM);
 			}
 		};
-		SpawnRift(FVector(800.f, -4800.f, 50.f), 58, 225.f, 6, NAME_None);
-		SpawnRift(FVector(-4800.f, 4800.f, -120.f), 62, 225.f, 6, NAME_None);
-		SpawnRift(FVector(4800.f, 4000.f, 550.f), 0, 150.f, 1, FName(TEXT("RiftHerald")));
+		// R paketi (CONTENT_PLAN_LV46_80.md 2.4): ayni iki cep, bant genisledi; yeni koordinat yok.
+		// Arayici cebi 58-60 (+ RiftWhisperer), Bekci cebi 62-64 (+ RiftWalker); her cepte 1/2 olasilik.
+		SpawnRift(FVector(800.f, -4800.f, 50.f), 58, 60, 225.f, 6, NAME_None);
+		SpawnRift(FVector(-4800.f, 4800.f, -120.f), 62, 64, 225.f, 6, NAME_None);
+		SpawnRift(FVector(4800.f, 4000.f, 550.f), 0, 0, 150.f, 1, FName(TEXT("RiftHerald")));
 	}
 
 	// Satici NPC'yi oyuncu dogus noktasinin yanina koy (yandan biraz, mob alanina ters yon).

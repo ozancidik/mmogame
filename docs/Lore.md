@@ -647,6 +647,15 @@ Yolu'ndan Yaz'a geri iner; zincir, Buzbağlı Muhafız'ı devirenlere açılır.
   geçiyor; nöbet bozulmadıkça yarığı açan el ortaya çıkmaz. Altı bekçi daha devir."
   - *Dönüşte:* "Nöbet dağıldı; şimdi yarığın içinden bir ses duyuluyor. Yarık
     Zırhı'nı giy — o ses seninle konuşmak isteyecek."
+- **Yarık Fısıltıları** *(Q_RiftWhispers)* — "Yarığın ağzında birbirine fısıldayan
+  gölgeler var, evlat; ne dediklerini anlama, yalnızca sustur. Sekizini devir; hızlı
+  hareket ederler, dokunuşları adımını ağırlaştırır."
+  - *Dönüşte:* "Fısıltılar kesildi… ama sessizlik daha da rahatsız edici, değil mi?
+    Al şu Büyük Can İksirleri'ni; yarığa bir kez daha bakacaksın."
+- **Yarık Yürüyenleri** *(Q_RiftWalkers)* — "Yarığın en derininden yürüyerek çıkanlar
+  var; ağır adımlı, öfkeli. Sekizini durdur, canları azalınca kudurduklarını unutma."
+  - *Dönüşte:* "Yürüyenler durdu. Al şu Büyük Mana İksirleri'ni; yarığın ötesini
+    görmeden önce zihnini topla."
 - **Yarık Habercisi** *(Q_RiftHerald)* — "Yarığı açan el bir habercinin eli.
   Haberciler savaşı değil sözü getirir; ama getirdikleri söz kimi zaman savaştan
   beterdir. Devir onu; dokunuşu zehirler, canı azaldıkça öfkelenir. Son sözünü
