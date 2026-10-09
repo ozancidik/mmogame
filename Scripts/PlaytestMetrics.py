@@ -168,11 +168,12 @@ def build_stats(events):
                     or event_time < start or abs(event_time - start - elapsed) > 0.01):
                 p["first_invalid"] += 1
                 continue
-            record_time(p, event_time)
             session = p["first_actions"].setdefault(sid.lower(), {})
             if ev in session:
                 p["first_duplicates"] += 1
                 continue
+            # A skipped first marker is not a new observation for timing either.
+            record_time(p, event_time)
             sample = {"seconds": elapsed, "lv": int(level)}
             if ev == "first_loot":
                 sample.update(kind=e["kind"], item=e["item"], amount=int(amount))

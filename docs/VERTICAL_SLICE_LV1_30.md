@@ -1,5 +1,12 @@
 # Dikey dilim planı: Lv1–30 oynanabilir deneyim
 
+**2026-10-09 ölçüm düzeltmesi (O43, CHECKLIST_FIXES §81):** Parser'ın atladığı
+aynı controller SID/action first_* tekrarları artık gözlem saatini veya açık
+seviye süresini uzatmaz. Sekiz olay × üç sıra regresyonu dahil625/625 assertion
+geçti; adversarial CLI örneğinde hatalı990sn yerine2sn raporlanır. Kabul edilen
+farklı SID/action gözlemleri ve gameplay sayaçları korunur. Bu offline log
+doğrulamasıdır; gerçek20dk PIE koşusu ve model karşılaştırması açık kalır.
+
 **2026-10-07 görev ölçüm eklemesi:** `quest_accept` ve `quest_claim` yalnız başarılı
 sunucu işlemlerinde, oyuncu karakterleri için loglanır. `PlaytestMetrics.py`
 nominal görev XP'sini teslim öncesi seviyeye yazar; kabul→teslim süresini ve

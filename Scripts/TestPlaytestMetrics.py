@@ -686,6 +686,40 @@ def main(argv):
     check(code == 1 and "raw=36 parsed=35 accepted=6 invalid=27 duplicates=2" in out,
           "full adversarial fixture validator rejects raw missing-who, malformed and duplicate markers")
 
+    # Rejected duplicate first markers must not extend observation or level duration.
+    # Same controller SID/action keeps its accepted payload, even across casing and clocks.
+    first_payloads = {
+        "first_quest_accept": {"quest": "Q_Goblins"},
+        "first_quest_claim": {"quest": "Q_Goblins"},
+        "first_loot": {"kind": "gold", "item": "Gold", "amount": "5"},
+        "first_kill": {"mob": "Goblin", "mlv": "1", "xp": "10", "credit": "fatal", "elite": "0"},
+        "first_equip": {"item": "ShortSword", "instance": "1", "slot": "0"},
+        "first_skill": {"skill": "War_PowerStrike", "effect": "0", "mana": "1"},
+        "first_basic_attack": {"target": "mob", "targetid": "Goblin", "tlv": "1"},
+        "first_death": {"by": "Goblin", "xploss": "0"},
+    }
+    check(set(first_payloads) == set(pm.FIRST_ACTIONS), "duplicate clock coverage includes every first action")
+    before = {"ev": "kill", "who": "Clock", "t": "5", "lv": "1", "mob": "Goblin", "xp": "10"}
+    after = [{"ev": "levelup", "who": "Clock", "t": "10", "from": "1", "to": "2"},
+             dict(before, t="12", lv="2", xp="20")]
+    for action, payload in first_payloads.items():
+        accepted = dict(payload, ev=action, who="Clock", t="8", lv="1", scope="controller",
+                        sid="a" * 32, start="2", elapsed="6")
+        reference = pm.build_stats([before, accepted] + after)["Clock"]
+        duplicate = dict(accepted, t="1000", start="2", elapsed="998", sid="A" * 32, lv="80")
+        sequences = ([before, accepted] + after + [duplicate],
+                     [before, accepted, duplicate] + after,
+                     [accepted, duplicate])
+        for index, sequence in enumerate(sequences):
+            expected = reference if index < 2 else pm.build_stats([accepted])["Clock"]
+            result = pm.build_stats(sequence)["Clock"]
+            check(result["first_duplicates"] == 1 and result["first_invalid"] == 0
+                  and result["first_actions"] == expected["first_actions"],
+                  "duplicate retains accepted payload/session: %s scenario %d" % (action, index))
+            check(all(result[field] == expected[field] for field in
+                      ("timing_started", "first_t", "last_t", "dur", "level", "enter", "lv", "src", "quests")),
+                  "duplicate cannot change clock/gameplay aggregates: %s scenario %d" % (action, index))
+
     code, out = run_main(pm, ["x", os.path.join(HERE, "fixtures", "yok_boyle_bir_log.log")])
     check(code == 0 and "bulunamadi" in out, "eksik log: 0 ile cikip aciklama basmali")
 

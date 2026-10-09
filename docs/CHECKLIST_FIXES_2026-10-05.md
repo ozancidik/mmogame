@@ -3622,3 +3622,38 @@ NetSmoke logları ortak TEMP'te ayrışır; aynı checkout'taki save/global UE
 kaynakları izole edilmiş sayılmaz. Tam RunAllChecks'taki diğer sabit TEMP
 dosyaları için ayrı TEMP/checkout gereği sürer. §79 gerçek PIE ve
 Shipping/Server kontrolleri açık kalır.
+
+## 81 · Atlanan first_* tekrarları ölçüm süresini uzatıyor (9 Ekim 2026, O43)
+
+PlaytestMetrics.py doğrulanmış first_* marker'ında record_time çağrısını
+SID/action tekrar kapısından önce yapıyordu. Sonraki marker atlanmış sayılıp
+ilk payload korunmasına rağmen last_t ve açık seviyenin süresi büyüyordu.
+Bir adversarial log örneğinde Lv2 gerçek kabul edilen gözlem aralığı2sn;
+aynı SID/action'ın t=1000 tekrarından sonra eski rapor990sn gösterdi.
+Bu offline ölçüm hatasıdır; sunucuda XP/altın çoğaltma veya RPC exploit
+kanıtı değildir. Normal emitters bir controller action'ını bir kez üretir.
+
+Saat güncellemesi tekrar reddinden sonraya taşındı. SID normalizasyonu,
+geçersiz payload/clock doğrulaması, ilk payload, duplicate sayacı ve farklı
+SID/action kabulü korunur. Sekiz first action × üç sıra: geç tekrarı sona
+ekleme, normal levelup/kill kuyruğu öncesine ekleme, yalnız first marker'ları.
+Her durumda kabul edilen payload/session ve gözlem/level/XP/quest/altın
+aggregate'ları karşılaştırılır; ek49 assertion var.
+
+Başlangıç eski fixture576/576 geçti. Yeni625 assertion eski parser'la24
+saat/aggregate hatası ve exit1 verdi (baseline_regression_failed.log).
+Son betik625/625 exit0; gerçek CLI örneği aynı ilk payload ve duplicate1
+koruyarak Lv2'yi990sn'den2sn'ye düzeltir. Native validator adversarial
+fixture'ları aynı paket içinde çalışır; bunlar Python log kontrolleridir,
+Unreal process veya PIE çalıştırmaz. ValidateData ve StaticLint exit0,
+84 kaynak temiz; negatif Data14/Lint15 senaryosu geçti.
+
+Önceki O42 snapshot'ına göre158 diğer input/DLL ve575 ana .sav SHA aynı;
+iki değişen betik test freeze'inden son kontrole kadar byte-eşit.
+Noether salt okunur fallback QA/ecc-mmo-review: actionable0, kendi test/build
+ve yazımı yok, kapatıldı; Agency kökeni yok. C++/asset/RPC/save değişmedi;
+UBT/FullCompile, Summer/Winter/NetSmoke ve tam41 paket çalıştırılmadı.
+Gerçek Lv1–30 PIE süresi/model karşılaştırması ve §79 gameplay kontrolleri
+açık kalır. Kanıt: TEMP/mmo_o43_metrics_duplicate_clock_20261009 içinde
+baseline/fixed test logları, baseline parser, duplicate_sample.log,
+baseline_report/fixed_report, timing_probe.json, freeze ve final_result.
