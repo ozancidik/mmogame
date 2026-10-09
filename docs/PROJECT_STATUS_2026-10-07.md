@@ -124,7 +124,16 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-**O34 güncel paket:** `RunAllChecks.ps1 -SkipBuild -FullCompile` **41/41 geçti**,
+**O39 son paket (`e9a6df8`, §77):** `RunAllChecks.ps1 -SkipBuild -FullCompile`
+**42/42 geçti**, exit0. Sabit37d829c+O39 patch üzerinde152 Source/Scripts,
+5 Config ve uproject SHA ile linked DLL aynı; Lore.md base Git blob'u eşit.
+19 CPP NoPCH /W4 warning0; DoT46/parti169/klan138, Store553 loaded/JSON553,
+Summer57/Winter75/error0, Net1join1welcome/error0. Ana aynı patch actual
+build8,99sn +native46 PASS. Kanıt: TEMP `mmo_dot_hub_refresh_20261009`;
+önceki O34 ve diğer paketler aşağıda kendi tarihsel snapshot kapsamındadır.
+Gerçek host/uzak istemci gameplay PIE ve Shipping/Server hedefleri açık.
+
+**O34 önceki paket:** `RunAllChecks.ps1 -SkipBuild -FullCompile` **41/41 geçti**,
 exit0. UHT + final linked DLL4,57sn/PASS97;19 CPP bu pakette NoPCH /W4
 warning0. Klan97/controller65, parti104, arkadaş53/presence24, save26,
 DoT33/trade218; parser576/576, JSONschema2/negative111. Store461 loaded461,

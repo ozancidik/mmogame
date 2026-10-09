@@ -2,7 +2,11 @@
 
 **2026-10-09:** Lv46–80 içerik, 12 yeni beceri, DoT/ekonomi/spawner değişiklikleri ve güncel sayılar (59 mob, 90 görev, 57 ekipman,
 93 beceri, 35 spawner) için [GUNLUK_OZET_2026-10-09.md](GUNLUK_OZET_2026-10-09.md); yeni içeriğin ilk oyun testi
-[PLAYTEST_LV46_80.md](PLAYTEST_LV46_80.md) (`MMOTeleport` ile cepleri gezme). Son otomatik paket 90 adım GECTI; PIE hâlâ açık.
+[PLAYTEST_LV46_80.md](PLAYTEST_LV46_80.md) (`MMOTeleport` ile cepleri gezme). 90 görev tanımı var. **Son doğrulanan paket (O39, `e9a6df8`): 42/42 kontrol geçti**;
+19 CPP NoPCH /W4 derlendi, DoT46 ve parti169 native kontrolü geçti. Summer/Winter ve NetSmoke başarılı;
+gerçek PIE hâlâ açık. Sabit snapshot ve kanıt sınırları
+[CHECKLIST_FIXES_2026-10-05.md, §77](CHECKLIST_FIXES_2026-10-05.md)
+içindedir.
 
 **2026-10-07:** Güncel yaptık/yapacağız tablosu ve doğrulama sınırları
 [PROJECT_STATUS_2026-10-07.md](PROJECT_STATUS_2026-10-07.md) içindedir. Son otomatik
