@@ -1316,7 +1316,9 @@ void AMMOGameMode::SpawnMobArea()
 		// oyuncular Lv58+ mob cekebiliyordu. Summer NavMeshBoundsVolume
 		// (Scripts/ExtendSummerNavigation.py) X/Y +-8500'e genisletildi, cepler uzaklastirildi:
 		//  - Arayici (Lv58) (800,-4800): zemin ~0, halka 16/16, en yakin eski cep ~3500u.
-		//  - Bekci (Lv62) (-4800,4800): zemin ~-170, halka 16/16, ~3400u.
+		//  - Bekci (Lv62-64) (-4400,5400,-92): eski (-4800,4800) cebinde iri Warrok mob dar bir gecitte (~(-4730,4610)) her
+		//    kosuda takiliyordu (90 sn'de 4-8 'is stuck' satiri). 2026-10-09 6x6 probla iki aday gercek olculdu; bu cep 90 sn'de
+		//    0 takilma, ilk doldurma 6/9 ve 6/9; hub'a ~6500u.
 		//  - Haberci elit (Lv65) (4800,4000): zemin ~500, halka 16/16, ~3880u.
 		auto SpawnRift = [&](const FVector& Loc, int32 Lv, int32 LvMax, float Radius, int32 MaxMobs, FName Forced)
 		{
@@ -1342,7 +1344,7 @@ void AMMOGameMode::SpawnMobArea()
 		// R paketi (CONTENT_PLAN_LV46_80.md 2.4): ayni iki cep, bant genisledi; yeni koordinat yok.
 		// Arayici cebi 58-60 (+ RiftWhisperer), Bekci cebi 62-64 (+ RiftWalker); her cepte 1/2 olasilik.
 		SpawnRift(FVector(800.f, -4800.f, 50.f), 58, 60, 225.f, 6, NAME_None);
-		SpawnRift(FVector(-4800.f, 4800.f, -120.f), 62, 64, 225.f, 6, NAME_None);
+		SpawnRift(FVector(-4400.f, 5400.f, -92.f), 62, 64, 225.f, 6, NAME_None);
 		SpawnRift(FVector(4800.f, 4000.f, 550.f), 0, 0, 150.f, 1, FName(TEXT("RiftHerald")));
 	}
 
