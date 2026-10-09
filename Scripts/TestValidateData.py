@@ -45,7 +45,9 @@ CASES = [
 # yazilir (sahte seviye tablosu). Gercek seviyeler: 1-28 arasi sik, sonra 33, 45, 58, 70, 80.
 SKILLS = P + "Skills/MMOSkillDatabase.cpp"
 SKILL_LVL = re.compile(r'(MakeDef\(TEXT\("[^"]+"\),\s*TEXT\("[^"]*"\),\s*C::(\w+),\s*T::\w+,\s*\d+,\s*)(\d+)')
-GAPLESS = {33: 31, 45: 34, 58: 37, 70: 40, 80: 43}  # tum farklar <= 4
+# Tum farklar <= 4. 52/64/75: Lv46-80 bosluk dolgusu becerileri (SKILL_LVL esler; once 80 -> 43, sonra 52 -> 46,
+# 64 -> 49, 75 -> 52 sirasi korunur).
+GAPLESS = {33: 31, 45: 34, 58: 37, 70: 40, 80: 43, 52: 46, 64: 49, 75: 52}
 GAP_RE = re.compile(r"UYARI: \w+: beceri boslugu ")
 
 
@@ -64,8 +66,8 @@ SKILL_CASES = [
     ("Bosluksuz sahte tablo -> bosluk uyarisi yok", remap_skills, [], 0),
     ("Lv30 alti bosluk tek uyari (eski Lv1-30 kurali ile cift sayilmaz)", lambda s: remap_skills(s, {24: 22}),
      ["UYARI: Warrior: beceri boslugu Lv22 -> Lv28 (Lv23-27 arasi yeni beceri yok, 6 seviye)"], 1),
-    ("Kasitli bosluk (Warrior Lv43 -> Lv60)", lambda s: remap_skills(s, {43: 60}),
-     ["UYARI: Warrior: beceri boslugu Lv40 -> Lv60 (Lv41-59 arasi yeni beceri yok, 20 seviye)"], 1),
+    ("Kasitli bosluk (Warrior Lv52 -> Lv60)", lambda s: remap_skills(s, {52: 60}),
+     ["UYARI: Warrior: beceri boslugu Lv49 -> Lv60 (Lv50-59 arasi yeni beceri yok, 11 seviye)"], 1),
     ("Esik siniri (fark 4 uyarmaz, fark 5 uyarir)", lambda s: remap_skills(s, {43: 45}),
      ["UYARI: Warrior: beceri boslugu Lv40 -> Lv45 (Lv41-44 arasi yeni beceri yok, 5 seviye)"], 1),
 ]

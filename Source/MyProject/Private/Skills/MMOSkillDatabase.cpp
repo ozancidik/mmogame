@@ -110,6 +110,16 @@ namespace
 			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkinII")));
 		Table.Add(MakeDef(TEXT("War_Unbreakable"), TEXT("Yikilmaz"), C::Warrior, T::Special2, 3, 58, 3, TEXT("War_SteelArmor"),
 			E::BuffSelf, 150.f, 26.f, 0.f, 0.f, 0.f, TEXT("IronSkinIII")));
+		// Lv46-80 bosluk dolgusu (docs/CONTENT_PLAN_LV46_80.md G11): Lv45 -> Lv58 -> Lv70 -> Lv80 arasi yeni
+		// beceri yoktu. Dort sinifa Lv52 / Lv64 / Lv75 birer halka; Power/Mana/CD Lv45 (510/195/18), Lv58
+		// (660/250/20) ve capstone'lar (Lv70 1150, Lv80 1725) arasinda dogrusal ara deger. PLACEHOLDER;
+		// PIE'de dogrulanmadi. Mevcut zincirin rutbesi (7) korunur, puan butcesi degismez.
+		Table.Add(MakeDef(TEXT("War_BladeStorm"), TEXT("Kilic Kasirgasi"), C::Warrior, T::Special0, 7, 52, 2, TEXT("War_WarCyclone"),
+			E::AoESelf, 220.f, 19.f, 590.f, 0.f, 500.f));
+		Table.Add(MakeDef(TEXT("War_Obliterate"), TEXT("Yikici Darbe"), C::Warrior, T::Special0, 7, 64, 3, TEXT("War_BladeStorm"),
+			E::MeleeDamage, 290.f, 21.f, 880.f, 250.f, 0.f));
+		Table.Add(MakeDef(TEXT("War_WorldBreaker"), TEXT("Dunya Yikici"), C::Warrior, T::Special0, 7, 75, 3, TEXT("War_Obliterate"),
+			E::MeleeDamage, 360.f, 24.f, 1400.f, 260.f, 0.f));
 		// Capstone 1/2: Titan Ofkesi.
 		Table.Add(MakeDef(TEXT("War_TitanWrath"), TEXT("Titan Ofkesi"), C::Warrior, T::Special3, 1, 70, 3, TEXT(""),
 			E::MeleeDamage, 320.f, 20.f, 1150.f, 260.f, 0.f));
@@ -166,6 +176,13 @@ namespace
 			E::AoETarget, 195.f, 18.f, 510.f, 1900.f, 480.f, TEXT("Poison")));
 		Table.Add(MakeDef(TEXT("Arc_PoisonCloud"), TEXT("Zehir Bulutu"), C::Archer, T::Special2, 2, 58, 3, TEXT("Arc_SpikeTrap"),
 			E::AoETarget, 250.f, 20.f, 660.f, 2000.f, 560.f, TEXT("Poison")));
+		// Lv46-80 bosluk dolgusu (bkz. Savasci blogundaki not): Special0 zincirinin devami, rutbe 7. PLACEHOLDER.
+		Table.Add(MakeDef(TEXT("Arc_ShatterShot"), TEXT("Kirici Atis"), C::Archer, T::Special0, 7, 52, 2, TEXT("Arc_Impaler"),
+			E::RangedDamage, 220.f, 19.f, 590.f, 2000.f, 0.f));
+		Table.Add(MakeDef(TEXT("Arc_Multishot"), TEXT("Coklu Atis"), C::Archer, T::Special0, 7, 64, 3, TEXT("Arc_ShatterShot"),
+			E::AoETarget, 285.f, 21.f, 760.f, 2000.f, 520.f));
+		Table.Add(MakeDef(TEXT("Arc_SunderingArrow"), TEXT("Parcalayici Ok"), C::Archer, T::Special0, 7, 75, 3, TEXT("Arc_Multishot"),
+			E::RangedDamage, 340.f, 23.f, 1180.f, 2100.f, 0.f));
 		// Capstone 1/2: Ok Firtinasi.
 		Table.Add(MakeDef(TEXT("Arc_ArrowTempest"), TEXT("Ok Firtinasi"), C::Archer, T::Special3, 1, 70, 3, TEXT(""),
 			E::AoETarget, 320.f, 22.f, 860.f, 2100.f, 620.f));
@@ -221,6 +238,13 @@ namespace
 			E::AoETarget, 195.f, 16.f, 520.f, 1900.f, 500.f));
 		Table.Add(MakeDef(TEXT("Mag_ManaStorm"), TEXT("Mana Firtinasi"), C::Mage, T::Special2, 2, 58, 3, TEXT("Mag_ArcaneBurst"),
 			E::AoETarget, 250.f, 18.f, 680.f, 2000.f, 560.f));
+		// Lv46-80 bosluk dolgusu (bkz. Savasci blogundaki not): Special0 zincirinin devami, rutbe 7. PLACEHOLDER.
+		Table.Add(MakeDef(TEXT("Mag_Combustion"), TEXT("Yanma"), C::Mage, T::Special0, 7, 52, 2, TEXT("Mag_Starfall"),
+			E::RangedDamage, 225.f, 19.f, 600.f, 2000.f, 0.f));
+		Table.Add(MakeDef(TEXT("Mag_GlacialSpike"), TEXT("Buz Mizragi"), C::Mage, T::Special0, 7, 64, 3, TEXT("Mag_Combustion"),
+			E::AoETarget, 290.f, 21.f, 780.f, 2000.f, 540.f, TEXT("Slow")));
+		Table.Add(MakeDef(TEXT("Mag_CosmicBlast"), TEXT("Kozmik Patlama"), C::Mage, T::Special0, 7, 75, 3, TEXT("Mag_GlacialSpike"),
+			E::AoETarget, 350.f, 24.f, 1100.f, 2100.f, 600.f));
 		// Capstone 1/2: Meteor Yagmuru.
 		Table.Add(MakeDef(TEXT("Mag_MeteorShower"), TEXT("Meteor Yagmuru"), C::Mage, T::Special3, 1, 70, 3, TEXT(""),
 			E::AoETarget, 320.f, 20.f, 900.f, 2000.f, 640.f));
@@ -294,6 +318,14 @@ namespace
 			E::BuffSelf, 120.f, 22.f, 0.f, 0.f, 0.f, TEXT("IronSkinII")));
 		Table.Add(MakeDef(TEXT("Pri_ResiliencePrayer"), TEXT("Direnc Duasi"), C::Priest, T::Special2, 2, 58, 3, TEXT("Pri_HolyShield"),
 			E::BuffSelf, 150.f, 24.f, 0.f, 0.f, 0.f, TEXT("RegenII")));
+		// Lv46-80 bosluk dolgusu (bkz. Savasci blogundaki not). Hasar zinciri (Special0, rutbe 5) ve sifa hatti
+		// (Special1, rutbe 5); Rahip'in sifaci kimligi icin ortadaki halka sifa. PLACEHOLDER.
+		Table.Add(MakeDef(TEXT("Pri_SmitingLight"), TEXT("Cezalandirici Isik"), C::Priest, T::Special0, 5, 52, 2, TEXT("Pri_AngelicBlade"),
+			E::RangedDamage, 220.f, 19.f, 590.f, 1600.f, 0.f));
+		Table.Add(MakeDef(TEXT("Pri_HealingSurge"), TEXT("Sifa Dalgasi"), C::Priest, T::Special1, 5, 64, 3, TEXT("Pri_SalvationLight"),
+			E::HealTarget, 285.f, 22.f, 1200.f, 0.f, 0.f, TEXT("Regen")));
+		Table.Add(MakeDef(TEXT("Pri_Sanctify"), TEXT("Arindirma"), C::Priest, T::Special0, 5, 75, 3, TEXT("Pri_SmitingLight"),
+			E::AoETarget, 350.f, 24.f, 1100.f, 1600.f, 580.f));
 		// Capstone 1/2: Tanrisal Yargi (saldiri).
 		Table.Add(MakeDef(TEXT("Pri_DivineJudgment"), TEXT("Tanrisal Yargi"), C::Priest, T::Special3, 1, 70, 3, TEXT(""),
 			E::AoETarget, 320.f, 22.f, 950.f, 1600.f, 600.f));

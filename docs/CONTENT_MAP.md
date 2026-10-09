@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 51 mob (13 elit), 79 gorev, 53 ekipman, 81 beceri.
+Toplam: 57 mob (13 elit), 87 gorev, 53 ekipman, 93 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -50,35 +50,35 @@ Toplam: 51 mob (13 elit), 79 gorev, 53 ekipman, 81 beceri.
 | 44 | WinterGuardian |  | Q_WinterGuardians |  |  |
 | 45 |  |  |  |  | War_WarCyclone, War_SteelArmor, Arc_SpikeTrap, Mag_ArcaneBurst (+2) |
 | 46 | WinterReaver |  | Q_WinterReavers |  |  |
-| 47 | _yeni icerik yok_ | | | | |
+| 47 | WinterWolf |  | Q_WinterHowls |  |  |
 | 48 | WinterWraith |  | Q_WinterWraiths |  |  |
-| 49 | _yeni icerik yok_ | | | | |
+| 49 | WinterBehemoth |  | Q_WinterColossus |  |  |
 | 50 |  | WinterSovereign | Q_WinterSovereign, Q_Level65 |  |  |
 | 51 | FrostboundScout |  | Q_FrostboundScouts | FrostboundBlade, FrostboundPlate, FrostboundHelm, FrostboundBoots |  |
-| 52 | _yeni icerik yok_ | | | | |
-| 53 |  |  | Q_FrostboundSentinels |  |  |
+| 52 |  |  | Q_FrostboundSworn |  | War_BladeStorm, Arc_ShatterShot, Mag_Combustion, Pri_SmitingLight |
+| 53 | FrostboundSworn |  | Q_FrostboundSentinels |  |  |
 | 54 |  |  | Q_FrostboundLine |  |  |
-| 55 | FrostboundSentinel |  |  |  |  |
-| 56 | _yeni icerik yok_ | | | | |
+| 55 | FrostboundSentinel |  | Q_FrostboundWatch |  |  |
+| 56 |  |  | Q_FrostboundOath |  |  |
 | 57 |  | FrostboundWarden | Q_FrostboundWarden |  |  |
 | 58 | RiftSeeker |  | Q_RiftSeekers | RiftBlade, RiftPlate, RiftHelm, RiftBoots | War_WarDeluge, War_Unbreakable, Arc_PoisonCloud, Mag_ManaStorm (+2) |
-| 59 | _yeni icerik yok_ | | | | |
-| 60 |  |  | Q_RiftKeepers |  |  |
+| 59 |  |  | Q_RiftWhispers |  |  |
+| 60 | RiftWhisperer |  | Q_RiftKeepers |  |  |
 | 61 |  |  | Q_RiftWatch, Q_RiftPurge |  |  |
 | 62 | RiftKeeper |  |  |  |  |
 | 63 |  |  | Q_RiftDepths |  |  |
-| 64 | _yeni icerik yok_ | | | | |
+| 64 | RiftWalker |  | Q_RiftWalkers |  | War_Obliterate, Arc_Multishot, Mag_GlacialSpike, Pri_HealingSurge |
 | 65 |  | RiftHerald | Q_RiftHerald, Q_Level80 |  |  |
 | 66 | AshVanguard |  | Q_AshVanguard | AshenBlade, AshenPlate, AshenHelm, AshenBoots |  |
 | 67 |  |  | Q_AshBinders |  |  |
 | 68 | AshBinder |  | Q_AshLine |  |  |
-| 69 | _yeni icerik yok_ | | | | |
+| 69 | AshMarcher |  | Q_AshMarchers |  |  |
 | 70 |  | AshTyrant | Q_AshTyrant |  | War_TitanWrath, Arc_ArrowTempest, Mag_MeteorShower, Pri_DivineJudgment |
 | 71 |  |  | Q_AbyssStriders, Q_AbyssPatrol |  |  |
 | 72 | AbyssStrider |  |  | AbyssBlade, AbyssPlate, AbyssHelm, AbyssBoots |  |
 | 73 |  |  | Q_AbyssEdge |  |  |
 | 74 |  |  | Q_AbyssGuardians |  |  |
-| 75 |  |  | Q_AbyssLine, Q_AbyssVigil |  |  |
+| 75 |  |  | Q_AbyssLine, Q_AbyssVigil |  | War_WorldBreaker, Arc_SunderingArrow, Mag_CosmicBlast, Pri_Sanctify |
 | 76 | AbyssGuardian |  |  |  |  |
 | 77 |  |  | Q_AbyssDescent |  |  |
 | 78 |  |  | Q_AbyssBastion |  |  |
