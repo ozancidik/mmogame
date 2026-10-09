@@ -261,6 +261,12 @@ public:
 	UFUNCTION(Exec)
 	void MMOSpawnMob(const FString& ArchetypeId);
 
+	// Test: karakteri verilen dunya konumuna isinlar (konsol: "MMOTeleport -5000 -3000 150"). Uzak Winter/Summer cepleri
+	// (4-7 bin birim) tiklayarak yurunmeden denenebilsin diye. Z'yi kucuk verirsen zemine dusersin; zemin ustu +100 ver.
+	// Yalniz sunucu yoneticisi (MMOAdmin) ve Shipping disi derleme; mob/yetki/PvP kapilarini degistirmez.
+	UFUNCTION(Exec)
+	void MMOTeleport(float X, float Y, float Z);
+
 	// --- Parti (grup) konsol komutlari ---
 	UFUNCTION(Exec)
 	void MMOInvite();        // en yakin oyuncuyu partiye davet et
@@ -441,6 +447,9 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void ServerSpawnMob(FName ArchetypeId);
+
+	UFUNCTION(Server, Reliable)
+	void ServerTeleport(FVector Location);
 
 	UFUNCTION(Server, Reliable)
 	void ServerSpendStat(FName StatName);

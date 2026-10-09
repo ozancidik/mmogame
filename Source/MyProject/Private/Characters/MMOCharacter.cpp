@@ -2180,6 +2180,45 @@ void AMMOCharacter::MMOSpawnMob(const FString& ArchetypeId)
 	}
 }
 
+void AMMOCharacter::MMOTeleport(float X, float Y, float Z)
+{
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
+	const FVector Target(X, Y, Z);
+	if (HasAuthority())
+	{
+		ServerTeleport_Implementation(Target);
+	}
+	else
+	{
+		ServerTeleport(Target);
+	}
+}
+
+void AMMOCharacter::ServerTeleport_Implementation(FVector Location)
+{
+	if (!MMODebugCommandsEnabled())
+	{
+		return;
+	}
+	// Yalniz sunucu yoneticisi isinlanabilir (MMOSpawnMob ile ayni kapi); olu karakter isinlanmaz.
+	if (!MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController())) || !Stats || Stats->bIsDead)
+	{
+		return;
+	}
+	// Makul harita sinirlari (NaN/devasa deger dunya disina atmasin); Winter navmesh en fazla +-8500.
+	if (Location.ContainsNaN() || FMath::Abs(Location.X) > 20000.f || FMath::Abs(Location.Y) > 20000.f
+		|| Location.Z < -5000.f || Location.Z > 20000.f)
+	{
+		return;
+	}
+	const bool bMoved = TeleportTo(Location, GetActorRotation(), /*bIsATest=*/false, /*bNoCheck=*/true);
+	UE_LOG(LogTemp, Display, TEXT("[MMOTELEPORT] %s -> (%.0f,%.0f,%.0f) moved=%d now=(%.0f,%.0f,%.0f)"), *GetName(),
+		Location.X, Location.Y, Location.Z, bMoved ? 1 : 0, GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z);
+}
+
 void AMMOCharacter::MMOInvite()
 {
 	if (PartyComponent)

@@ -33,7 +33,7 @@ foreach ($line in (Get-Content $log)) {
 }
 foreach ($b in $blocks) {
     if ($b.Tries -ge 5 -and $b.Live -ge 0 -and $b.Live * 2 -lt $b.Tries) {
-        Write-Output "UYARI: cep $($b.Loc) gercek doguma $($b.Live)/$($b.Tries) (yarisindan az; zemin engebeli olabilir, MMOProbeSurface'e guvenme)"
+        Write-Output "UYARI: cep $($b.Loc) ilk doldurmada $($b.Live)/$($b.Tries) dogdu (yarisindan az; spawner 4 sn'de bir yeniden dener, cep gec dolar, bos kalmaz; zemin engebeli olabilir, MMOProbeSurface'e guvenme)"
     }
 }
 if ($errs -gt 0 -or $p.ExitCode -ne 0) { exit 1 } else { exit 0 }
