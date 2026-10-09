@@ -67,5 +67,7 @@ protected:
 	bool bSpawnLocationWarningReported = false;
 
 	void TopUp();
-	void SpawnOne();
+	// Bir mob dogurmayi dener. false = mob dogmadi ama baska bir noktada tekrar denemek ise yarayabilir (kapsul/arazi cakismasi,
+	// guvenli nokta bulunamadi); true = dogdu ya da tekrar denemenin anlami yok (nav/mob kapsulu yok, gecersiz band).
+	bool SpawnOne();
 };

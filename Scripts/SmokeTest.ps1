@@ -32,8 +32,10 @@ foreach ($line in (Get-Content $log)) {
     elseif ($cur -and $line -match "Spawner after TopUp: live=(\d+)") { $cur.Live = [int]$Matches[1]; $cur = $null }
 }
 foreach ($b in $blocks) {
-    if ($b.Tries -ge 5 -and $b.Live -ge 0 -and $b.Live * 2 -lt $b.Tries) {
-        Write-Output "UYARI: cep $($b.Loc) ilk doldurmada $($b.Live)/$($b.Tries) dogdu (yarisindan az; spawner 4 sn'de bir yeniden dener, cep gec dolar, bos kalmaz; zemin engebeli olabilir, MMOProbeSurface'e guvenme)"
+    # Spawner mob basina ayni turda en fazla 4 deneme yapar (cakismada baska noktada tekrar); normal cep 6 mob ister.
+    # 5+ denemeye ragmen 4'ten az mob dogduysa cep zayiftir (iyi cepler ilk doldurmada 5-6 verir).
+    if ($b.Tries -ge 5 -and $b.Live -ge 0 -and $b.Live -lt 4) {
+        Write-Output "UYARI: cep $($b.Loc) ilk doldurmada yalniz $($b.Live) mob dogdu ($($b.Tries) denemede; zemin engebeli olabilir, MMOProbeSurface'e guvenme)"
     }
 }
 if ($errs -gt 0 -or $p.ExitCode -ne 0) { exit 1 } else { exit 0 }

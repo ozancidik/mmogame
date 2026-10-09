@@ -59,9 +59,18 @@ void AMMOMobSpawner::TopUp()
 	});
 
 	const int32 Needed = MaxMobs - LiveMobs.Num();
+	// Cakisma/kotu nokta yuzunden dogmayan mob ayni turda baska bir noktada birkac kez daha denenir (onceden 4 sn beklerdi;
+	// engebeli veya iri kapsullu mob cepleri ilk doldurmada 1-3/6 veriyordu). Tavan: Needed x (1 + MaxSpawnRetries).
+	constexpr int32 MaxSpawnRetries = 3;
 	for (int32 i = 0; i < Needed; ++i)
 	{
-		SpawnOne();
+		for (int32 Try = 0; Try <= MaxSpawnRetries; ++Try)
+		{
+			if (SpawnOne())
+			{
+				break;
+			}
+		}
 	}
 }
 
@@ -115,12 +124,12 @@ bool AMMOMobSpawner::FindSafeSpawnLocation(UWorld* World, const AActor* Ignore, 
 	return false;
 }
 
-void AMMOMobSpawner::SpawnOne()
+bool AMMOMobSpawner::SpawnOne()
 {
 	UWorld* World = GetWorld();
 	if (!HasAuthority() || !World || !MobClass)
 	{
-		return;
+		return true;
 	}
 
 	const FVector Base = GetActorLocation();
@@ -142,7 +151,7 @@ void AMMOMobSpawner::SpawnOne()
 				UE_LOG(LogTemp, Warning, TEXT("[MMODBG] Spawner %s: nav data or mob capsule unavailable; skipping spawn"), *GetName());
 				bSpawnLocationWarningReported = true;
 			}
-			return;
+			return true; // nav/kapsul yok: tekrar denemek anlamsiz
 		}
 
 		constexpr int32 MaxAttempts = 8;
@@ -159,7 +168,7 @@ void AMMOMobSpawner::SpawnOne()
 					*GetName(), *Base.ToCompactString(), MaxAttempts, Stats.TraceMiss, Stats.SlopeOrHeight, Stats.LastGroundZ, Stats.LastNormalZ, Stats.Nav);
 				bSpawnLocationWarningReported = true;
 			}
-			return;
+			return false; // rastgele 8 deneme tutmadi: baska bir denemede tutabilir
 		}
 		SpawnLoc = FoundLoc;
 		bSpawnLocationWarningReported = false;
@@ -181,7 +190,7 @@ void AMMOMobSpawner::SpawnOne()
 					*GetName(), MinMobLevel, MaxMobLevel);
 				bInvalidBandReported = true;
 			}
-			return;
+			return true; // gecersiz band: tekrar denemek anlamsiz
 		}
 		ChosenArchetype = BandMob->ArchetypeId;
 	}
@@ -217,4 +226,5 @@ void AMMOMobSpawner::SpawnOne()
 	{
 		LiveMobs.Add(Mob);
 	}
+	return Mob != nullptr; // false: cakisma (DontSpawnIfColliding) yuzunden dogmadi; TopUp baska noktada yeniden dener
 }
