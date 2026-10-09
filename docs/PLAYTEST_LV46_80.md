@@ -57,7 +57,7 @@ Kontrol: görev listede çıkıyor mu, alış/teslim repliği mantıklı mı, ö
 Savaşçı `War_BladeStorm`, `War_Obliterate`, `War_WorldBreaker` · Okçu `Arc_ShatterShot`, `Arc_Multishot`, `Arc_SunderingArrow` ·
 Büyücü `Mag_Combustion`, `Mag_GlacialSpike`, `Mag_CosmicBlast` · Rahip `Pri_SmitingLight`, `Pri_HealingSurge`, `Pri_Sanctify`.
 
-Kontrol: seviye ve rütbe şartıyla **otomatik açılıyor mu**, mana/bekleme hissi (mana ×0,25 savaşta yenilenir: havuzun yaklaşık %40'ını
+Kontrol: Savaşçı/Rahip hasar zincirleri seviye ve rütbeyle **otomatik açılır**; Okçu ve Büyücü Special0 (rütbe 7) ile Rahip Pri_HealingSurge (Special1, rütbe 5) bir üst rütbe ister: ilgili ağaca **1 puan yatır** (QA DÜŞÜK-3). Ayrıca, mana/bekleme hissi (mana ×0,25 savaşta yenilenir: havuzun yaklaşık %40'ını
 sürdürülebilir kılıyor `[Hesap]`), alan becerileri ikinci hedefte tek hedef becerilerini geçiyor mu.
 
 ## Bilinen açıklar (test etmeden önce bil)

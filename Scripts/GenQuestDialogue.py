@@ -81,7 +81,16 @@ lines += [
     "}",
     "",
 ]
-OUT.write_text("\n".join(lines), encoding="utf-8")
+generated = "\n".join(lines)
+if "--check" in sys.argv:
+    # Yazmadan karsilastir (RunAllChecks): Lore.md degisip betik yeniden calistirilmadiysa oyundaki replikler eskir.
+    current = OUT.read_text(encoding="utf-8").replace("\r\n", "\n") if OUT.exists() else ""
+    if current != generated.replace("\r\n", "\n"):
+        print(f"HATA: {OUT.relative_to(ROOT)} docs/Lore.md ile eslesmiyor; 'python Scripts/GenQuestDialogue.py' calistirip commit et.")
+        sys.exit(1)
+    print(f"{len(entries)} gorev girdisi: uretilmis diyalog Lore.md ile eslesiyor.")
+    sys.exit(0)
+OUT.write_text(generated, encoding="utf-8")
 with_turn = sum(1 for a, t in entries.values() if t)
 print(f"{len(entries)} gorev girdisi ({with_turn} tanesinde teslim repligi) -> {OUT.relative_to(ROOT)}")
 no_turn = sorted(qid for qid, (a, t) in entries.items() if a and not t)

@@ -629,6 +629,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		}
 	}
 	const int32 RewardLevel = Owner->GetStats()->Level;
+	int32 DonatedGold = 0; // bagis gorevinde teslimde dusulen altin (bildirimde gosterilir)
 	if (Owner)
 	{
 		// Altin sink'i (DECISIONS_NEEDED madde 3a): buyuk HaveGold gorevleri artik teslimde altini BAGISLATIR (dusurur);
@@ -637,6 +638,7 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		if (Def->Type == EMMOQuestType::HaveGold && Def->TargetCount >= GoldDonationMinTarget && Owner->GetInventory())
 		{
 			Owner->GetInventory()->AddGoldFrom(-Def->TargetCount, TEXT("gorev_bagis"));
+			DonatedGold = Def->TargetCount;
 		}
 		if (Owner->GetStats() && Def->RewardXP > 0)
 		{
@@ -675,7 +677,8 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		}
 	}
 
-	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin)"), *Def->Name, Def->RewardXP, Def->RewardGold), FColor(120, 255, 120), 3.f);
+	const FString DonationNote = DonatedGold > 0 ? FString::Printf(TEXT(", -%d altin bagislandi"), DonatedGold) : FString();
+	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Gorev tamam: %s  (+%d XP, +%d altin%s)"), *Def->Name, Def->RewardXP, Def->RewardGold, *DonationNote), FColor(120, 255, 120), 3.f);
 }
 
 void UMMOQuestComponent::ServerClaimReward_Implementation(FName QuestId)

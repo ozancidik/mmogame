@@ -14,13 +14,14 @@ Summer/Winter smoke, NetSmoke). Codex'in aynı gün içindeki parti/klan/arkada�
 
 | Alan | Ne | Kanıt |
 |---|---|---|
-| İçerik Lv46–80 | 8 yeni mob (Don Kurdu, Buz Devi, Buzbağlı Yeminli, Yarık Fısıldayanı/Yürüyeni, Kül Yürüyeni, Uçurum Yankısı, Naibin Elçisi), 12 yan görev (kapı boşlukları kapandı), Lv78 **Taht seti** | `ValidateData`, ContentMap, smoke |
+| İçerik Lv46–80 | 8 yeni mob (Don Kurdu, Buz Devi, Buzbağlı Yeminli, Yarık Fısıldayanı/Yürüyeni, Kül Yürüyeni, Uçurum Yankısı, Naibin Elçisi), 11 yan görev (kapı boşlukları kapandı), Lv78 **Taht seti** | `ValidateData`, ContentMap, smoke |
 | Haritalar | Winter'da 6 yeni ayrı cep (P46, P48, P53, P69, P74, P78), Summer Yarık bantları genişledi; 289 + 273 noktalı runtime tarama | smoke: cep başına 5–6/6 ilk doldurma |
 | Beceri | 4 sınıfa Lv52/64/75 (12 beceri); Lv31/39 mevcut sekizin denetim belgesi | beceri bütçesi testleri geçti |
-| Savaş | Oyuncu→mob Zehir/DoT savunmayı atlar, `8 + saldırı×0,10` | `TestDotSourceLifecycle` 36 kontrol + mutasyon |
+| Savaş | Oyuncu→mob Zehir/DoT savunmayı atlar, `8 + saldırı×0,10` | `TestDotSourceLifecycle` 38 kontrol + mutasyon |
 | Ekonomi | Satıcı seviye kapısı (+3), seviyeyle ölçekli yükseltme maliyeti, `Q_Gold5000+` bağış (sink) | gelir/gider 12,4× → 6,8× (+3), 2,2× (+7); vendor 17 / görev 13 kontrol |
 | Spawner | Çakışma/kötü noktada aynı turda 3'e kadar yeniden deneme | Winter mob ~55 → ~77; tüm cepler 5–6/6 |
 | Araçlar | `MMOTeleport`, `SmokeTest.ps1` cep kalitesi uyarısı, `StaticLint` beyaz liste, `ContentMap --write` | hepsi çalıştı |
+| QA | bağımsız denetim (`QA_ROUND_2026-10-09_CLAUDE.md`): kritik yok, 3 orta (diyalog üretilmemişti, Taht münhasır değil, zayıf oyuncu DoT'u ezebiliyordu) ve 6 düşük bulgu; çoğu düzeltildi, `GenQuestDialogue.py --check` kalıcı adım | `RunAllChecks` 90 GECTI |
 | Belge | `CONTENT_PLAN_LV46_80`, `SKILL_PLAN_LV31_45`, `DOT_SCALING_DESIGN`, `PLAYTEST_LV46_80`, bu özet; `DECISIONS_NEEDED` güncellendi | |
 
 ## Dürüst riskler

@@ -25,6 +25,11 @@ Step "Veri denetimi (ValidateData.py)" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Uretilmis gorev diyalogu Lore.md ile eslesiyor (GenQuestDialogue.py --check)" {
+    & $py (Join-Path $PSScriptRoot "GenQuestDialogue.py") --check | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Statik C++ kontrolu (StaticLint.py; derleme degildir)" {
     & $py (Join-Path $PSScriptRoot "StaticLint.py") | Out-Host
     $LASTEXITCODE -eq 0

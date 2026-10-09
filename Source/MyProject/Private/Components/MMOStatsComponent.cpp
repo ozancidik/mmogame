@@ -796,6 +796,17 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	{
 		if (E.EffectId == EffectId)
 		{
+			// QA 2026-10-09 ORTA-3: buyukluk artik kaynagin saldirisina bagli; daha zayif bir OYUNCU, mobdaki daha guclu oyuncu
+			// DoT'unu yeniledigi icin tick'i dusuremez ve kalan tick'lerin olduruden kredisini alamaz: yalniz sure tazelenir.
+			if (Def->Type == EMMOEffectType::PeriodicDamage && bPlayerSource && E.bPlayerSource && E.Instigator.IsValid()
+				&& EffectMagnitude < E.Magnitude)
+			{
+				E.RemainingTime = Def->Duration;
+				E.EndServerTime = EffectEnd;
+				E.TimeSinceLastTick = 0.f;
+				OnEffectsChanged.Broadcast();
+				return;
+			}
 			E.Magnitude = EffectMagnitude;
 			E.RemainingTime = Def->Duration;
 			E.EndServerTime = EffectEnd;
@@ -1197,6 +1208,14 @@ bool UMMOStatsComponent::RunDotSourceLifecycleSelfTest(UWorld* World, FString& O
 		if (!Check(V->Health == 100.f, TEXT("live source bypassed PvP off"))) return false;
 		GM->SetPvPAllowed(true); V->ProcessEffects(1.f);
 		if (!Check(V->Health == 92.f, TEXT("live permitted player DoT changed"))) return false;
+		// QA 2026-10-09 DUSUK-1: gercek PvP DoT'u (kaynak != hedef) savunmadan dusulur ve olceklenmez.
+		Reset(V); V->Defense = 50.f; V->ApplyEffect(TEXT("Poison"), Source); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 99.f && V->ActiveEffects.Num() == 1 && V->ActiveEffects[0].Magnitude == 8.f, TEXT("real PvP DoT ignored defense or got scaled"))) return false;
+		// QA ORTA-3: daha zayif oyuncunun yenilemesi mobdaki daha guclu oyuncu DoT'unun buyuklugunu/kredisini ezmez.
+		Reset(MobTarget); Source->GetStats()->AttackPower = 1000.f; Pawns[2]->GetStats()->AttackPower = 80.f;
+		MobTarget->ApplyEffect(TEXT("Poison"), Source); MobTarget->ApplyEffect(TEXT("Poison"), Pawns[2]);
+		if (!Check(MobTarget->ActiveEffects.Num() == 1 && MobTarget->ActiveEffects[0].Magnitude == 108.f
+			&& MobTarget->ActiveEffects[0].Instigator.Get() == Source, TEXT("weaker player refresh overwrote the stronger DoT"))) return false;
 		Reset(V); V->ApplyEffect(TEXT("Poison"), Source); Source->GetPartyComponent()->Members.Add(Victim); V->ProcessEffects(1.f);
 		if (!Check(V->Health == 100.f, TEXT("live source bypassed party"))) return false;
 		Source->GetPartyComponent()->Members.Reset();
@@ -1288,7 +1307,7 @@ bool UMMOStatsComponent::RunDotSourceLifecycleSelfTest(UWorld* World, FString& O
 		Reset(V); V->Defense = 50.f; V->ApplyEffect(TEXT("Poison"), Pawns[4]); V->ProcessEffects(1.f);
 		if (!Check(V->Health == 99.f && V->ActiveEffects[0].Magnitude == 8.f, TEXT("mob DoT on player lost defense mitigation or got scaled"))) return false;
 		GM->SetPvPAllowed(false); Reset(V); V->Defense = 50.f; V->ApplyEffect(TEXT("Poison"), Victim); V->ProcessEffects(1.f);
-		if (!Check(V->Health == 99.f && V->ActiveEffects[0].Magnitude == 8.f, TEXT("player-on-player DoT ignored defense or got scaled"))) return false;
+		if (!Check(V->Health == 99.f && V->ActiveEffects[0].Magnitude == 8.f, TEXT("self DoT ignored defense or got scaled"))) return false;
 		Reset(V, 5.f); V->ApplyEffect(TEXT("Poison"), Victim); V->ProcessEffects(2.f);
 		if (!Check(V->Health == 0.f && V->bIsDead && V->ActiveEffects.IsEmpty(), TEXT("fatal catch-up DoT reentrancy changed"))) return false;
 		return true;

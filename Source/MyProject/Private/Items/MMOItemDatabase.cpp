@@ -56,7 +56,8 @@ namespace
 		Table.Add(MakeItem(TEXT("AshenBlade"), TEXT("Kul Kilici"), S::Weapon, 164.f, 0.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssBlade"), TEXT("Ucurum Kilici"), S::Weapon, 188.f, 0.f, 72));
 		// Lv78 Taht kademesi (CONTENT_PLAN_LV46_80.md 2.6; Lv73-80 ekipman hedefi yoktu). Onceki kademe farklari +26/+17/+7/+10; gecici deger.
-		// Naib (Lv80 elit) elit havuzu MaxReq=78 oldugu icin artik yalniz bu seti dusurur (Abyss seti gorev odulu/satici/normal mobda kalir).
+		// Naib (Lv80 elit) elit havuzu MaxReq=78 oldugu icin elit ganimeti artik bu seti dusurur; ANCAK satici tum esya tablosunu satar
+		// (alici Lv75'ten itibaren alabilir) ve Lv75+ normal moblar da dusurur: set munhasir degildir (QA ORTA-2, Abyss seti gorev odulu/satici/normal mobda kalir).
 		Table.Add(MakeItem(TEXT("ThroneBlade"), TEXT("Taht Kilici"), S::Weapon, 214.f, 0.f, 78));
 
 		// Zirhlar

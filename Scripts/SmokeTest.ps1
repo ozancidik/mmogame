@@ -31,6 +31,12 @@ foreach ($line in (Get-Content $log)) {
     elseif ($cur -and $line -match "SpawnOne: requested") { $cur.Tries++ }
     elseif ($cur -and $line -match "Spawner after TopUp: live=(\d+)") { $cur.Live = [int]$Matches[1]; $cur = $null }
 }
+# Zemin/nav hic bulunamayan cepler: FindSafeSpawnLocation basarisiz olunca SpawnOne bu uyariyi basar ve 'requested' satiri yazmaz,
+# bu yuzden yukaridaki deneme sayaci en kotu (tamamen engebeli) cepleri goremez (QA DUSUK-2).
+Select-String -Path $log -Pattern "no nearby ground/nav location after" | ForEach-Object {
+    $i = $_.Line.IndexOf("Spawner ")
+    Write-Output ("UYARI: " + $(if ($i -ge 0) { $_.Line.Substring($i, [Math]::Min(170, $_.Line.Length - $i)) } else { $_.Line }))
+}
 foreach ($b in $blocks) {
     # Spawner mob basina ayni turda en fazla 4 deneme yapar (cakismada baska noktada tekrar); normal cep 6 mob ister.
     # 5+ denemeye ragmen 4'ten az mob dogduysa cep zayiftir (iyi cepler ilk doldurmada 5-6 verir).

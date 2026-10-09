@@ -113,7 +113,8 @@ namespace
 		// Lv46-80 bosluk dolgusu (docs/CONTENT_PLAN_LV46_80.md G11): Lv45 -> Lv58 -> Lv70 -> Lv80 arasi yeni
 		// beceri yoktu. Dort sinifa Lv52 / Lv64 / Lv75 birer halka; Power/Mana/CD Lv45 (510/195/18), Lv58
 		// (660/250/20) ve capstone'lar (Lv70 1150, Lv80 1725) arasinda dogrusal ara deger. PLACEHOLDER;
-		// PIE'de dogrulanmadi. Mevcut zincirin rutbesi (7) korunur, puan butcesi degismez.
+		// PIE'de dogrulanmadi. Rutbe: Savasci Special0 7 / Rahip Special0 5 mevcut zincirle ayni; Okcu ve Buyucu Special0 (6 -> 7) ile
+	// Rahip Special1 (4 -> 5) bir ust rutbe ister (1 puan yatirim, otomatik acilmaz); puan butcesi bunu rahatca karsilar (QA DUSUK-3).
 		Table.Add(MakeDef(TEXT("War_BladeStorm"), TEXT("Kilic Kasirgasi"), C::Warrior, T::Special0, 7, 52, 2, TEXT("War_WarCyclone"),
 			E::AoESelf, 220.f, 19.f, 590.f, 0.f, 500.f));
 		Table.Add(MakeDef(TEXT("War_Obliterate"), TEXT("Yikici Darbe"), C::Warrior, T::Special0, 7, 64, 3, TEXT("War_BladeStorm"),
@@ -241,7 +242,7 @@ namespace
 		// Lv46-80 bosluk dolgusu (bkz. Savasci blogundaki not): Special0 zincirinin devami, rutbe 7. PLACEHOLDER.
 		Table.Add(MakeDef(TEXT("Mag_Combustion"), TEXT("Yanma"), C::Mage, T::Special0, 7, 52, 2, TEXT("Mag_Starfall"),
 			E::RangedDamage, 225.f, 19.f, 600.f, 2000.f, 0.f));
-		Table.Add(MakeDef(TEXT("Mag_GlacialSpike"), TEXT("Buz Mizragi"), C::Mage, T::Special0, 7, 64, 3, TEXT("Mag_Combustion"),
+		Table.Add(MakeDef(TEXT("Mag_GlacialSpike"), TEXT("Buz Sutunu"), C::Mage, T::Special0, 7, 64, 3, TEXT("Mag_Combustion"),
 			E::AoETarget, 290.f, 21.f, 780.f, 2000.f, 540.f, TEXT("Slow")));
 		Table.Add(MakeDef(TEXT("Mag_CosmicBlast"), TEXT("Kozmik Patlama"), C::Mage, T::Special0, 7, 75, 3, TEXT("Mag_GlacialSpike"),
 			E::AoETarget, 350.f, 24.f, 1100.f, 2100.f, 600.f));
