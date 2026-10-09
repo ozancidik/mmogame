@@ -291,6 +291,12 @@ namespace
 			T::KillSpecificMob, TEXT("AshBinder"), 6, 200000, 200000, 68, TEXT("Q_AshBinders")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AshenPlate"));
 
+		// A yan gorevi (CONTENT_PLAN_LV46_80.md 2.5): kapi 69 bosluk; Q_AshTyrant'a on kosul degil. PLACEHOLDER (~%6,6 esik).
+		Table.Add(MakeQuest(TEXT("Q_AshMarchers"), TEXT("Kul Yuruyenleri"), TEXT("Hatti asan yuruyenleri durdur: 8 Kul Yuruyeni oldur."),
+			T::KillSpecificMob, TEXT("AshMarcher"), 8, 90000, 27000, 69, TEXT("Q_AshBinders")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		Table.Add(MakeQuest(TEXT("Q_AshTyrant"), TEXT("Kul Tirani"), TEXT("Kul hattinin tiranini devir."),
 			T::KillSpecificMob, TEXT("AshTyrant"), 1, 230000, 230000, 70, TEXT("Q_AshLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AshenBlade"));

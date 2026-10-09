@@ -684,6 +684,11 @@ Yolu'ndan Yaz'a geri iner; zincir, Buzbağlı Muhafız'ı devirenlere açılır.
   düğüm kalsa yeniden örerler. Altı bağlayıcı daha devir ki hat çözülsün."
   - *Dönüşte:* "Hat çözüldü. Al şu Kül Zırhı'nı; ateşten de soğuktan da geçmiş
     birine yakışır."
+- **Kül Yürüyenleri** *(Q_AshMarchers)* — "Hat çözüldü sandık, ama kül yürümeyi
+  bilir, evlat. Hattın ardından yeni bir sürü kaymış; ağır adımlı, öfkesi
+  derinlerde. Sekizini durdur; canları azaldıkça yeniden alevlenirler."
+  - *Dönüşte:* "Yürüyenler durdu. Al şu Büyük Can İksirleri'ni; ardından gelen
+    tirana daha dinç çıkarsın."
 - **Kül Tiranı** *(Q_AshTyrant)* — "Hattın ucunda bir tiran oturuyor: Magma
   Tiranı'nın külünden doğmuş, ateşi sönmüş ama hırsı sönmemiş. Bir kez devirdiğin
   şeyi ikinci kez devirmek daha zordur, evlat — artık seni tanıyor. Dokunuşu

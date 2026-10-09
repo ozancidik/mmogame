@@ -294,6 +294,16 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
+		// A paketi (CONTENT_PLAN_LV46_80.md 2.5): Baglayici (68) ile Ucurum (72) arasi Lv69 kademesi. PLACEHOLDER.
+		// Plan Burn (Lore: kor gibi yakar) onerdi; DoT savunmaya karsi fiilen 1 hasar verdigi icin (SKILL_PLAN_LV31_45.md)
+		// Burn eklenmedi, yavaslatma + ofke kullanildi. Lore <-> kod uyusmazligi acik (DECISIONS_NEEDED).
+		Table.Add(MakeMob(TEXT("AshMarcher"), TEXT("Kul Yuruyeni"), 69, 201, 216, 280.f, 70000, 6300, 10600, 330.f, 600.f, 1.45f, FLinearColor(0.42f, 0.34f, 0.3f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.3f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- On birinci kademe NORMAL moblari (Lv72-76; Ucurum, Winter_scene kuzey/dogu) ---
 		// XP plan hipotezi: 79->80 esigi ~2.0M / 95K ~= 21 kill. PIE'de dogrulanmadi.
 		Table.Add(MakeMob(TEXT("AbyssStrider"), TEXT("Ucurum Gezgini"), 72, 208, 222, 300.f, 82000, 7000, 11500, 445.f, 600.f, 1.3f, FLinearColor(0.2f, 0.18f, 0.35f)));

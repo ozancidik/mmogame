@@ -1012,7 +1012,8 @@ void AMMOGameMode::SpawnMobArea()
 		//  Ucurum Gezgini Lv72 (-5500,4500) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
 		//  (Naib ilk (-7600,-1200)'deydi; gezinmeyle navmesh sinirini -8000 asiyordu, QA ile tasindi.)
 		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
-		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
+		// A paketi (CONTENT_PLAN_LV46_80.md 2.5): Baglayici cebi 68-69 -> AshMarcher (Lv69) burada dogar (yedek, koordinatsiz).
+		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 69, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
 		SpawnFrostbound(FVector(-5500.f, 4500.f, -92.f), 72, 72, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 6, NAME_None, 0.f);
