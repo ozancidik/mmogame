@@ -4869,6 +4869,13 @@ derlendi. Gerçek uzak RPC serialization/sıralama/owner-only teslim testi deği
   roster/metin/ID ortak görünümü ayrı açık kontrollerdir. RPC payload değişti:
   eşleşen client/server binaries ile gerçek gecikme/kayıp testi yapılsın.
 
-§79: izole5d101fb+O41 paket42/42,19 NoPCH/W4 warning0,Party185 ve bağlantı
-smoke'ları geçti. Ana checkout entegrasyonu/yeni aggregate ve Shipping/Server
-açık; bu sonuçlar yukarıdaki PIE kutularını kapatmaz.
+§79 ilk izole koşu:5d101fb+O41 paket42/42,19 NoPCH/W4 warning0,Party185 ve bağlantı
+smoke'ları geçti. O aşamada ana checkout entegrasyonu/yeni aggregate bekliyordu;
+aşağıda tamamlanma kanıtı var. Shipping/Server ve yukarıdaki PIE kutuları açık.
+
+O41 entegrasyon kanıtı (§79): güncel satıcı koduyla aggregate41/41,
+son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke geçti.
+19 NoPCH/W4 warning0,Party185/Vendor18; ana actual build10.19sn ve native
+185/18 geçti. Ana entegrasyon bekleme adımı tamamlandı. Gerçek uzak RPC/HUD/
+PIE, hedef rejoin/authority epoch ve Shipping/Server kutuları açık kalır.
+Parallel smoke: `-NetPort 17779` / `-Port 17779` ve ayrı TEMP; default boş rastgele port.

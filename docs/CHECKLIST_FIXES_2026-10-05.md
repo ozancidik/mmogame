@@ -3514,3 +3514,70 @@ responses/nopch_proof kanıtları. Belge sonrası oyun build başlatılmadı.
 Gerçek host+uzak istemci PIE, RPC serialization/owner-only teslim/HUD/XP,
 Shipping/Server açık. Hedef kick/rejoin, authority epoch, roster/metin/ID
 atomikliği; component davet issuing ve solo roundtrip ayrı açık kapsamlar.
+
+### O41 güncel entegrasyon doğrulaması (9 Ekim 2026)
+
+ee2e61f (e2a3451 satıcı bayrağı dahil) +200cc8e O41 + port ve watchdog betikleri birlikte
+gerçek izole Editor UHT/compile/lib/DLL14,18sn Succeeded. NetSmokeTest artık
+isteğe bağlı -Port, RunAllChecks -NetPort taşır. Sonradan gelen a1897b8 boş
+rastgele port seçimi ve gerçek dinleme portu kontrolü korundu; parametre
+verilmezse otomatik boş port, verilirse doğrulanmış açık port kullanılır.
+İki AST errors0;0/65536 dört parameter validation ret exit1, script
+gövdesi/UE başlatılmadan. UDP17779 boşken ayrı TEMP ile tam paket çalıştırıldı.
+Caller'lar farklı port ve TEMP seçmelidir; aynı saniye/aynı TEMP log adı riski
+bu değişiklikte otomatik giderilmedi. O41 reliable RPC payload için eşleşen
+client/server binaries gerekir; gerçek uzak serialization/ordering hâlâ açık.
+
+`RunAllChecks.ps1 -SkipBuild -NetPort 17779`: 41/41, exit0. Sonrasında yalnız NetSmoke
+çalışma portu değişkeni düzeltildi; aşağıdaki ek smoke kapsamı bu son betiğe aittir.
+159 tracked Source/Scripts/Config/uproject/docs/Lore.md input+linked DLL160 SHA,
+son betik freeze'inden ek smoke ve kayıt kontrolü sonuna kadar aynı.
+Önceki ilk koşuda19 NoPCH/NoLink/SingleFile /W4, /Yu yok;19 object/warning C0;
+response kopyaları/object SHA-size var, bireysel UBT logları ayrı saklanmadı.
+Parti185/Trade230/klan138/DoT46/vendor18/questCapacity13, arkadaş53/presence24/
+save26, JSONschema2/negative111 ve parser576/576 geçti. Data59mob/57item/
+90görev/93skill/12efekt/35spawner;Lint84 temiz, Lv33+ beceri boşluğu uyarıları var.
+Store582 loaded/JSON582, mismatch0/maxLevel6/writeorder1/roundtrip equal1.
+561 ana orijinal save byte-eşit kopyalandı; ilk izole koşudan kalan ek test
+yuvaları store sayımında var. Bu561 ana/izole orijinal SHA paket ve ana
+native sonrasında aynı. Lv30+ gerçek save/login bu maxLevel6 örnekle kanıtlanmaz.
+Summer57/Winter77 spawn/error0; Net port17779 server1join/client1welcome/error0.
+Bu bağlantı smoke'u gerçek kick/HUD/XP gameplay testi değildir.
+
+Readonly Boole fallback Unreal multiplayer/ekonomi QA, ecc-mmo-review ile
+aggregate kaynak incelemesi actionable0. Lorentz watchdog ve Russell
+port birleşimi (selectedPort düzeltmesi öncesi) incelemesi actionable0. Agency kökeni yok; ajanlar
+build/test/yazım yapmadı ve sonuçları alındıktan sonra kapatıldı.
+
+İlk FullCompile paket41/42, exit1: timeout fixture accepted/dropped/ordered
+true, winterFalse;20sn tüm motor açılışı ve Winter yüklemesine yetmedi, log
+StartLoadingDestination Winter sırasında sona erdi. initial_checks_failed.log
+ve timeout_deadline20_failed.log saklandı; o ilk160 input/DLL SHA da sabit.
+Yalnız TestZoneTravelTimeout toplam watchdog60sn yapıldı;native fixture'daki
+0,75sn save timeout, normal15sn süre, timeout/retry sırası ve gerçek Winter yükleme predicates
+değişmedi. İkinci paket yeni freeze ile baştan41/41 geçti; FullCompile ikinci
+kez koşulmadı. İki freeze arasında tek fark bu test betiği; bütün C++/DLL
+SHA aynı olduğundan önceki19 NoPCH kanıtı güncel C++ snapshot'ına aittir.
+a1897b8 port değişikliği ardından iki port betiği birleştirildi ve üçüncü
+tam41/41 paket yeni freeze ile çalıştırıldı. Ardından parametresiz smoke'da
+ValidateRange uygulanmış Port değişkenine sıfır atama hata verdi; UE bağlantısı
+geçse ve runner exit0 dönse de bu koşu temiz sayılmadı (default_assignment_error.log).
+Çalışma portu ayrı selectedPort değişkenine taşındı. Yalnız NetSmoke betiği
+değişti, C++/DLL ve diğer159 freeze girdisi aynı. Son betikle açık port17779
+ve parametresiz rastgele port ayrı ayrı gerçek smoke exit0/hatasız geçti;
+0/65536 ve dolu port başlatma öncesi reddi yeniden doğrulandı. Tam41 paket
+bu tek betik düzeltmesinden sonra tekrarlanmadı. Önceki başarılı paket
+pre_latest_checks_passed.log; third_package_freeze.json, final_port_delta.json
+ve latest_random_net/latest_explicit_net.log kapsamı ayrı kaydeder.
+
+Doğrulanmış aggregate 0405318 ile ana master'a fast-forward edildi;
+git-normalized source snapshot aynı. Ana actual UHT/compile/lib/DLL10.19sn
+Succeeded; nativeParty185 ve Vendor18, Data/Lint exit0. Ana159 input+DLL SHA
+sabit. Yalnız bu kaynak snapshot'ı ve ilgili native kapsam doğrulandı; ana
+checkout'ta tam41 adım ikinci kez çalıştırılmadı. Önceki izole/eskiden dış
+yazım bekleme kanıtı yukarıda tarihsel kapsamıyla korunur.
+TEMP/mmo_o41_integration_ee2e61f_20261009: aggregate/primary build ve native,
+aggregate_checks, freeze/check, primary-freeze/check, original_saves,
+responses/nopch_proof, port_validation, review.md ve integration.json.
+Belge sonrası oyun build başlatılmadı. Gerçek PIE/remote/HUD/XP, hedef kick
+rejoin/authority epoch/roster atomikliği, Shipping/Server açık kalır.

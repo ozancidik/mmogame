@@ -1156,3 +1156,10 @@ Gerçek remote RPC sırası/serialization/replication ve PIE test edilmedi.
 
 Source rejoin ve reform çifti kapsandı. Continuous sender hedef rejoin,
 leader/ownership epoch ve roster/UI atomikliği, Server/Shipping ayrı açık.
+
+O41 entegrasyon tamamlandı: a1897b8+O41+port seçimi aggregate41/41,
+son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke geçti.
+19 NoPCH/W4 warning0,Party185/Vendor18; Summer57/Winter77/Net17779
+1join/1welcome/error0 (§79). Ana source aynı; actual build10.19sn,
+native185/18 ve Data/Lint geçti. Gerçek RPC/PIE/Shipping/Server açık.
+Parallel smoke için -NetPort/-Port ve ayrı TEMP kullanılabilir; default boş rastgele port.

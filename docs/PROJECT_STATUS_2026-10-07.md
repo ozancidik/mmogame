@@ -1,27 +1,28 @@
 # MyProject — yaptık / yapacağız
 
-**Güncelleme:** 9 Ekim 2026. Son sınırlı düzeltme O41 (§79): parti kick
-isteği gönderenin görülen kişisel üyeliğine bağlı; ayrılıp yeniden lider olan
-oyuncunun eski isteği yeni üyelikte hedefi çıkarmaz. Mevcut RequestKick çağrısı
-korundu; reliable RPC payload GUID taşıdığı için client/server build eşleşmeli.
+**Güncelleme:** 9 Ekim 2026. O41 parti kick gönderen üyelik düzeltmesi
+güncel satıcı/ekonomi koduyla ana master'a entegre edildi (§79). Eski üyelikteki
+istek yeni source üyeliğinde hedefi çıkarmaz; current fresh kick çalışır.
+RPC payload değişti: client/server binaries eşleşmeli.
 
-Compiled baseline FAIL102, drop-all negatif FAIL109; exact restore actual
-compile/lib/DLL3,92sn ve native185=169+16 geçti. Sabit5d101fb+O41 izole paket
-42/42 exit0,19 CPP NoPCH/W4 warning0;159 input+linked DLL160 SHA aynı.
-Parti185/Trade230/klan138/DoT46/vendor17/questCapacity13, parser576/576 geçti.
-Store553 loaded/JSON553, mismatch0/writeorder1/roundtrip equal1/maxLevel6;
-553 ana/izole orijinal save SHA değişmedi. Summer57/Winter78/Net hata0.
+Sabit a1897b8+O41+port betikleri: actual Editor build14,18sn,41/41 paket
+exit0; son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke
+geçti (§79). 19 CPP NoPCH/W4 warning0; son freeze159 input+linked DLL160 SHA aynı. Parti185/
+Trade230/klan138/DoT46/vendor18/questCapacity13,parser576/576 geçti.
+Store582 loaded/JSON582, mismatch0/maxLevel6/writeorder1/roundtrip equal1;
+561 orijinal ana/izole save SHA aynı. Summer57/Winter77/Net17779
+1join/1welcome/error0. Ana actual build10.19sn, native185/18 ve Data/Lint
+geçti; ana159 input+DLL SHA sabit. Ana checkout'ta tam41 paket tekrarlanmadı.
 
-ECC plan/review/verify, mmo-feature ve ue-build kullanıldı. Readonly Banach
-fallback Unreal multiplayer/güvenlik QA actionable0; Agency kökeni yok.
-Ana checkout'ta dış satıcı/ekonomi/HUD yazımı başladığından O41 ayrı
-codex/o41-party-kick-membership dalında; ana entegrasyon/aggregate doğrulama açık.
-Önceki O40/§78 ve diğer kanıtlar tarihsel snapshot kapsamında korunur.
+ECC plan/review/verify, mmo-feature/ue-build kullanıldı; readonly Boole fallback
+Unreal multiplayer/ekonomi QA actionable0, Agency kökeni yok. Smoke portu
+-Port/-NetPort ile seçilir (default boş rastgele port); parallel koşuda ayrı TEMP kullanılır.
+O41 ilk izole, O40 ve önceki kanıtlar tarihsel snapshot kapsamında korunur.
 
-Gerçek host+uzak istemci PIE, RPC serialization/HUD/replication, Shipping/Server,
-Lv30+ gerçek login ve uçtan uca Lv1–30 oynanışı açık. Parti hedef kick/rejoin,
-leadership/ownership epoch ve roster atomikliği; trade issuing/aynı-pawn
-roundtrip/nearest niyeti; DoT elapsed XP/loot ve detach sahipliği ayrı açık.
+Gerçek host+uzak istemci PIE, RPC serialization/replication/HUD/XP,
+Shipping/Server, Lv30+ gerçek login ve uçtan uca Lv1–30 oynanışı açık.
+Parti hedef rejoin/leadership epoch/roster atomikliği, trade issuing/aynı-pawn
+roundtrip/nearest niyeti, DoT elapsed XP/loot ve detach sahipliği ayrı açık.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -33,25 +34,25 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 
 | Katman / sistem | Yaptık | Mevcut kanıt | Yapacağız |
 | --- | --- | --- | --- |
-| Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | O41 izole Editor UHT/compile/link;19 CPP NoPCH /W4 warning0; ana entegrasyon ayrı bekler | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
+| Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | O41 güncel aggregate Editor UHT/compile/link;19 NoPCH/W4 warning0; ana actual build10.19sn | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
 | Karakter ve statlar | STR/DEX/INT/VIT, can/mana, XP/seviye, stat puanı, ölüm/diriliş; sunucu otoritesi | Kayıt stat/XP/puan bütçesi ve dört sınıf için 15 UE kontrolü; ölüm kuralları ayrı fixture'larda | Gerçek ölüm/respawn, kayıt sonrası istemci stat paneli ve uzun oturum |
 | Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi; tek cooldown kapısı ve double damga | Temel saldırı 21 kontrol; yeni cooldown 89 kontrol, yedi sentetik uptime/eşik sınırları; eski RPC önce UE'de FAIL0 verdi | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü; gerçek uzun oturum |
 | Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; rütbe + bakiye bütçesi; kayıtlı ücretli beceriyi minimum ağaç rütbesine taşıma | 93 beceri; 12 bütçe/iade + 12 yeni öğrenilmiş-beceri kontrolü; hata önce UE'de yeniden üretildi | Gerçek legacy dosya göçü, yatırım/kayıt/sınıf RPC ve HUD; sınıf dengesi, Lv33+ beceri boşlukları |
 | Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Native DoT46: lost source/callback/refresh, hub kaynak yenilemesi; O39 eski üretim FAIL7; final paket PASS46 | Gerçek elapsed tick/expiry, istemci efekt süresi/HUD, source rebinding ve Network Profiler bant ölçümü |
 | Ekipman ve envanter | 57 ekipman; InstanceId ile kuşanma/satış/yükseltme; çanta/yığın sınırları; nadirlik/+; ilk başarılı istek ölçümü | Kayıtlı ekipman seviye şartı: 11 kontrol; yeni kuşanma ölçümü: 8 kontrol, otomatik/restore hariç | Gecikmeli çift tıklama, uzak HUD, gerçek dosyadan yeniden giriş |
-| Satıcı ve ekonomi | Ekipman/iksir alış-satışı; yalnız teslim edilen adet kadar ücret; ölü/uzak işlem reddi | Güncel satıcı regresyonu: 17 kontrol geçti (sabit O41 izole paketi) | Gelir/harcama dengesi, uzun oturum, gerçek RPC ve kayıt kalıcılığı |
+| Satıcı ve ekonomi | Ekipman/iksir alış-satışı; yalnız teslim edilen adet kadar ücret; ölü/uzak işlem reddi | Güncel satıcı regresyonu: 18 kontrol geçti (e2a3451 dahil O41 aggregate ve ana native) | Gelir/harcama dengesi, uzun oturum, gerçek RPC ve kayıt kalıcılığı |
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
 | Görev | 90 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + güncel13 kapasite/tek teslim UE kontrolü (O41 izole paketi); 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 59 arketip (13 elit), 35 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
-| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | O41 izole Summer57/Winter78 doğum smoke; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
+| Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | O41 aggregate Summer57/Winter77 doğum smoke; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
 | Parti | Üyelik/menzil/XP paylaşımı, lider rızası; davet/üyelik kimliği; chat pawn/üyelik bağlamı, literal kanal; authority EndPlay cleanup | 185 native = önceki169 +16 kick source üyelik; controller58 + diğer127. O41 baselineFAIL102/drop-allFAIL109; exact restore DLL/PASS185 | Gerçek disconnect/travel/owner-only teslim/HUD/XP; kalıcı reconnect/presence; hedef kick/rejoin, leadership epoch ve roster atomik görünümü |
 | Ticaret ve depo | Görülen session/revision teklif/onay; session cancel/X; recipient invite generation accept/decline; chat gönderim pawn/kimlik/iptal niyeti; kimlik/kapasite/altın tavanı ve NPC depo | 230 native kontrol: önceki218 +12 issuing chat (controller20); O40 baselineFAIL201/check202; replacement/null/foreign ret snapshot ve fresh Say/Enter kabul/iptal geçti | Gerçek davet/RPC/HUD; bildirimle kimliğin ortak görünümü; reentrant rollback; ortak kalıcı işlem/çökme/yeniden giriş; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Recipient davet nesli/source üyelik GUID; bütün /klan-/g-/arkadas pawn bağlamı; /g-ayril-davet-at-liste üyelik bağlamı; mutual Friends/owner-only | Klan138/component47/chat91; O36 derlenmiş baseline112/113/114, final PASS138. Arkadaş presence24 + chat/generation53; native authority/HUD | Gerçek remote; roster/metin/ID ortak sunumu; solo create/leader authority epoch, source identity rebinding, continuous sender hedef kick rejoin; hesap/offline rıza/yeniden giriş |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; sabit O41 izole paketi553 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; O41 aggregate582 yuva okundu;561 orijinal SHA korundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
-| Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | O41 NetSmoke: 2 server join eşleşmesi, kendi client1welcome, hata0; ikinci login kaynağı doğrulanmadı | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
+| Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | O41 aggregate NetSmoke17779: 1join/1welcome, hata0 | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |
 | Dedicated / backend | Admin kapısı merkezileştirildi; kayıt arayüzü ve GameState hazırlığı mevcut | Editor hedefinde derleniyor | Kaynak UE 5.7, Server hedefi/paketleme, hesap servisi, gerçek asenkron depolama |
 | Telemetri ve denge | Kill/death/levelup/gold, görev XP/süre; controller oturumunda ilk görev/loot/öldürme kredisi/kuşanma isteği/kabul edilen beceri/temel saldırı/oyuncu ölümü; otomatik başlangıç kuşanması hariç | 6 oturum + 6 loot + 10 ölüm + 8 kuşanma kontrolü; beceri 17 UE kontrolü/7 tür; temel saldırı 21 kontrol/8 olay, sıfır hasarlı kabul ve native RPC dahil; ilk oyuncu ölümü14/3first+5death ve gerçek loss5/0/2; parser576/576 assert; yanlış XP kaybı metadata mutasyonu yakalandı | Diğer ilk eylemler; gerçek solo/parti süreleri, model karşılaştırması ve ardından denge ayarı |
@@ -122,11 +123,19 @@ derlemesi için kurulu Launcher motoruna ek olarak kaynak motor gerekir.
 
 ## 4. Son test paketi ve belge bağlantıları
 
-**O41 son izole paket (5d101fb+patch, §79):** `RunAllChecks.ps1 -SkipBuild -FullCompile`
+**O41 güncel entegrasyon paketi (a1897b8+O41+port, §79):**41/41 exit0;
+son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke geçti.
+19 NoPCH/W4 warning0;159 input+DLL SHA sabit. Party185/Vendor18/Trade230/
+DoT46/klan138,Store582; Summer57/Winter77,Net17779: 1join/1welcome/error0.
+Ana actual build10.19sn/native185/18/Data/Lint geçti. Tam paket ana checkout'ta
+ikinci kez çalıştırılmadı. Kanıt: TEMP `mmo_o41_integration_ee2e61f_20261009`.
+
+**O41 ilk izole paket (5d101fb+patch, §79):** `RunAllChecks.ps1 -SkipBuild -FullCompile`
 **42/42 geçti**, exit0;159 input+linked DLL SHA sabit,19 NoPCH/W4 warning0.
 Party185/Trade230/klan138/DoT46,Store553loaded/JSON553; Summer/Winter ve
-Net2join eşleşmesi/1welcome/error0. Exact restore DLL/native185 geçti. Ana checkout dış
-satıcı/ekonomi yazımı nedeniyle entegrasyon/aggregate test açık. Kanıt:
+Net2join eşleşmesi/1welcome/error0. Exact restore DLL/native185 geçti. O ilk koşuda
+dış satıcı/ekonomi yazımı nedeniyle entegrasyon/aggregate test bekliyordu;
+güncel entegrasyon sonucu yukarıdadır. Kanıt:
 TEMP `mmo_party_kick_sender_20261009`. Gerçek remote/PIE/Shipping/Server açık.
 
 **O40 önceki paket (bb4ab1c+patch, §78):** `RunAllChecks.ps1 -SkipBuild -FullCompile`
