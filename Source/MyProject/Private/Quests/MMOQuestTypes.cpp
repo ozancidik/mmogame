@@ -324,7 +324,9 @@ namespace
 		// Lv79'da alinir: Naip (Lv80 elit) Lv79 oyuncuya da kredi verir; odul XP'si Lv79'da kullanilir.
 		Table.Add(MakeQuest(TEXT("Q_AbyssRegent"), TEXT("Ucurum Naibi"), TEXT("Dogu yaylasindaki ucurum naibini devir."),
 			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 79, TEXT("Q_AbyssLine")));
-		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBlade"));
+		// Odul Lv78 Taht Kilici'na yukseltildi (CONTENT_PLAN_LV46_80.md 2.6): Lv79 kapisinda Lv72 kilic eskimis kaliyordu.
+		// Lv78 <= kapi 79 + 2 (ValidateData). Abyss kilici satici/normal mob/onceki gorevlerde kalir.
+		Table.Last().RewardEquipmentId = FName(TEXT("ThroneBlade"));
 
 		// U yan gorevleri (CONTENT_PLAN_LV46_80.md 2.6): kapi 72 ve 76; ana zinciri kilitlemez, Q_AbyssRegent'e on kosul
 		// degil. XP/altin PLACEHOLDER (~%6,5 esik, pace-notr); PIE'de dogrulanmadi.
@@ -468,11 +470,12 @@ namespace
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
 		Table.Last().RewardConsumableCount = 8;
 
-		// Altin biriktirme zinciri devami: Q_Gold1000 -> Q_Gold5000 -> Q_Gold15000.
-		Table.Add(MakeQuest(TEXT("Q_Gold5000"), TEXT("Vadinin Tuccari"), TEXT("Adin tuccarlar arasinda gecsin: 5000 altin biriktir."),
+		// Altin zinciri devami: Q_Gold1000 -> Q_Gold5000 -> Q_Gold15000. 5000 ve ustu teslimde altini BAGISLATIR (altin sink'i,
+			// bkz. MMOQuestComponent::GoldDonationMinTarget); XP odulu bagisla birlikte "karsilik" olur.
+		Table.Add(MakeQuest(TEXT("Q_Gold5000"), TEXT("Vadinin Tuccari"), TEXT("Adin tuccarlar arasinda gecsin: 5000 altin bagisla (teslimde altin dusulur)."),
 			T::HaveGold, TEXT(""), 5000, 4000, 0, 16, TEXT("Q_Gold1000"))); // XP 6000->4000 (kapi Lv16 carpani x0.3 ile ~1200)
 
-		Table.Add(MakeQuest(TEXT("Q_Gold15000"), TEXT("Efsanevi Servet"), TEXT("15000 altin biriktir."),
+		Table.Add(MakeQuest(TEXT("Q_Gold15000"), TEXT("Efsanevi Servet"), TEXT("15000 altin bagisla (teslimde altin dusulur)."),
 			T::HaveGold, TEXT(""), 15000, 14000, 0, 28, TEXT("Q_Gold5000")));
 
 		// 2026-09-15: kademeli icerik genisletmesinin devami - spawner/mob GEREKTIRMEYEN
@@ -489,10 +492,10 @@ namespace
 			T::ReachLevel, TEXT(""), 80, 90000, 50000, 65, TEXT("Q_Level65")));
 
 		// Altin biriktirme zinciri devami: Q_Gold15000 -> Q_Gold30000 -> Q_Gold50000.
-		Table.Add(MakeQuest(TEXT("Q_Gold30000"), TEXT("Bolge Tuccari"), TEXT("30000 altin biriktir."),
+		Table.Add(MakeQuest(TEXT("Q_Gold30000"), TEXT("Bolge Tuccari"), TEXT("30000 altin bagisla (teslimde altin dusulur)."),
 			T::HaveGold, TEXT(""), 30000, 28000, 0, 28, TEXT("Q_Gold15000")));
 
-		Table.Add(MakeQuest(TEXT("Q_Gold50000"), TEXT("Altin Cagin Efendisi"), TEXT("50000 altin biriktir."),
+		Table.Add(MakeQuest(TEXT("Q_Gold50000"), TEXT("Altin Cagin Efendisi"), TEXT("50000 altin bagisla (teslimde altin dusulur)."),
 			T::HaveGold, TEXT(""), 50000, 45000, 0, 40, TEXT("Q_Gold30000")));
 
 		return Table;

@@ -14,7 +14,7 @@ if (-not $process.WaitForExit(60000)) {
     exit 2
 }
 if (-not (Test-Path -LiteralPath $log)) { Write-Output 'Gorev kapasite logu bulunamadi'; exit 1 }
-$pass = Select-String -LiteralPath $log -Pattern '\[MMO_QUEST_CAPACITY_TEST\] PASS checks=10\b'
+$pass = Select-String -LiteralPath $log -Pattern '\[MMO_QUEST_CAPACITY_TEST\] PASS checks=13\b'
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_QUEST_CAPACITY_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 if ($pass -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $pass.Line

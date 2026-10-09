@@ -79,6 +79,10 @@ protected:
 
 	// Server RPC hiz siniri: kabul ve odul istekleri ayri ayri sinirlanir; ardisik kabul/odul engellenmez.
 	static constexpr float QuestRpcMinInterval = 0.25f;
+
+	// HaveGold gorevleri bu hedefin altinda birikimdir (altin kalir), bu hedef ve ustunde teslimde BAGISTIR (altin dusulur).
+	// Q_Gold500/1000 erken oyunda altin kitligi yuzunden birikim kalir. DECISIONS_NEEDED madde 3(a); PLACEHOLDER.
+	static constexpr int32 GoldDonationMinTarget = 5000;
 	double LastAcceptRpcTime = -1.0;
 	double LastClaimRpcTime = -1.0;
 	bool PassesRpcRateLimit(double& LastTime);

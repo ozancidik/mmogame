@@ -1353,7 +1353,7 @@ void AMMOHUD::DrawInventory(AMMOCharacter* PlayerChar)
 				? FString::Printf(TEXT(" YANMA %%%d"), BurnPct)
 				: FString();
 			Line += FString::Printf(TEXT("   [+%d: %da %%%d%s]"), Inst.Plus + 1,
-				FMMOItemDatabase::GetUpgradeCost(Inst.Plus),
+				FMMOItemDatabase::GetUpgradeCost(Inst.Plus, Def->RequiredLevel),
 				FMMOItemDatabase::GetUpgradeChancePct(Inst.Plus),
 				*BurnTag);
 		}

@@ -111,6 +111,9 @@ public:
 	// dinamik kucultuyor (shop/quest penceresindeki "tasma yok" deseniyle ayni).
 	static constexpr int32 MaxBagSize = 12;
 
+	// Satici seviye kapisi: alici seviyesi + bu pay >= esyanin RequiredLevel'i olmali (BuyEquipment). PLACEHOLDER.
+	static constexpr int32 VendorLevelSlack = 3;
+
 	// Kusanilan ekipman; index = (int)EMMOEquipSlot (4 slot). InstanceId=0 -> bos.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Items, Category = "MMO|Equipment")
 	TArray<FMMOEquipmentInstance> EquippedItems;

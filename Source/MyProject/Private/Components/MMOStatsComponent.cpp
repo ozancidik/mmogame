@@ -177,7 +177,7 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		return;
 	}
 
-	// Aktif buff/debuff'lari isle (moblar dahil herkes icin â€” DoT moba da vurabilmeli).
+	// Aktif buff/debuff'lari isle (moblar dahil herkes icin — DoT moba da vurabilmeli).
 	ProcessEffects(DeltaTime);
 
 	// DoT karakteri oldurmus olabilir; oyleyse yenilenme yapma.
@@ -272,7 +272,7 @@ void UMMOStatsComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// EÅŸik Level'dan deterministik tÃ¼retilir; hem sunucu hem istemci hesaplayabilir.
+	// Eşik Level'dan deterministik türetilir; hem sunucu hem istemci hesaplayabilir.
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
 	// Sahibin varsayilan yurume hizini cache'le (hiz buff'lari bunun ustune oranlanir).
 	if (const ACharacter* Ch = Cast<ACharacter>(GetOwner()))
@@ -285,7 +285,7 @@ void UMMOStatsComponent::BeginPlay()
 
 	if (HasAuthorityInternal())
 	{
-		// Spawn anÄ±nda statlarÄ± ana statlardan hesapla ve can/manayÄ± doldur.
+		// Spawn anında statları ana statlardan hesapla ve can/manayı doldur.
 		RecalculateDerivedStats(/*bRefill=*/true);
 	}
 }
@@ -309,8 +309,8 @@ bool UMMOStatsComponent::HasAuthorityInternal() const
 
 int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 {
-	// Basit Ã¼stel eÄŸri: level yÃ¼kseldikÃ§e gereken exp artar.
-	// L1->L2 = 100, sonrasÄ±nda her seviyede ~%25 artÄ±ÅŸ.
+	// Basit üstel eğri: level yükseldikçe gereken exp artar.
+	// L1->L2 = 100, sonrasında her seviyede ~%25 artış.
 	// GUVENLIK/BUG-HUNT: bu egri MaxLevel=80'e kadar tasarlanmis araligin ICINDE bile
 	// int32'yi tasiyordu (100*1.25^76 ~= 1.85 milyar, 1.25^77 ~= 2.32 milyar > INT32_MAX).
 	// Tasan deger negatife donuyor -> GainExperience'daki "Experience >= ExperienceToNextLevel"
@@ -388,7 +388,7 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill, bool bPreserveCur
 	}
 	else
 	{
-		// Maks deÄŸiÅŸtiyse anlÄ±k deÄŸerleri orantÄ±lÄ± koru, sonra clamp'le.
+		// Maks değiştiyse anlık değerleri orantılı koru, sonra clamp'le.
 		if (OldMaxHealth > 0.f)
 		{
 			Health = FMath::Clamp(Health + (MaxHealth - OldMaxHealth), 0.f, MaxHealth);
@@ -399,7 +399,7 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill, bool bPreserveCur
 		}
 	}
 
-	// Sunucuda deÄŸiÅŸiklikleri hemen dinleyicilere bildir (istemcide OnRep yapar).
+	// Sunucuda değişiklikleri hemen dinleyicilere bildir (istemcide OnRep yapar).
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 	OnManaChanged.Broadcast(Mana, MaxMana);
 }
@@ -426,7 +426,7 @@ float UMMOStatsComponent::ApplyDamageCommon(float RawDamage, AActor* /*DamageIns
 		LastCombatActivityTime = World->GetTimeSeconds();
 	}
 
-	// Defense hasarÄ± azaltÄ±r ama en az 1 hasar geÃ§er.
+	// Defense hasarı azaltır ama en az 1 hasar geçer.
 	const float Mitigated = bIgnoreDefense ? RawDamage : FMath::Max(1.f, RawDamage - Defense);
 	const float ActualDamage = FMath::Min(Mitigated, Health);
 	LastAppliedDamage = ActualDamage; // OnDeath'ten once: olumcul vurusun hasari HandleDeath'te okunur
@@ -553,7 +553,7 @@ void UMMOStatsComponent::HandleLevelUp()
 	UnspentStatPoints += StatPointsPerLevel;
 	UnspentSkillPoints += SkillPointsPerLevel;
 
-	// Level baÅŸÄ±na kÃ¼Ã§Ã¼k otomatik stat artÄ±ÅŸÄ± + can/mana yenile.
+	// Level başına küçük otomatik stat artışı + can/mana yenile.
 	RecalculateDerivedStats(/*bRefill=*/true);
 
 	OnLevelUp.Broadcast(Level);
@@ -942,7 +942,7 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 		{
 			Heal(P.Magnitude);
 		}
-		else // PeriodicDamage (DoT) â€” oldurme XP kredisi icin sahibin TakeDamage akisindan gecir.
+		else // PeriodicDamage (DoT) — oldurme XP kredisi icin sahibin TakeDamage akisindan gecir.
 		{
 			// Mob zehiri guvenli bolgeye giren oyuncuyu oldurmemeli. Oyuncunun moba
 			// uyguladigi DoT bu kapidan etkilenmez.
@@ -1079,7 +1079,7 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 }
 
 // ----------------------------------------------------------------------
-// OnRep â€” istemci tarafÄ±nda deÄŸer replike olunca UI delegate'lerini tetikle
+// OnRep — istemci tarafında değer replike olunca UI delegate'lerini tetikle
 // ----------------------------------------------------------------------
 
 void UMMOStatsComponent::OnRep_Health()
@@ -1114,7 +1114,7 @@ void UMMOStatsComponent::OnRep_Experience()
 
 void UMMOStatsComponent::OnRep_Level()
 {
-	// EÅŸiÄŸi istemcide de Level'a gÃ¶re tazele (ExperienceToNextLevel replike edilmiyor).
+	// Eşiği istemcide de Level'a göre tazele (ExperienceToNextLevel replike edilmiyor).
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
 	OnLevelUp.Broadcast(Level);
 	OnExperienceChanged.Broadcast(Experience, ExperienceToNextLevel);
@@ -1122,7 +1122,7 @@ void UMMOStatsComponent::OnRep_Level()
 
 void UMMOStatsComponent::OnRep_PrimaryStats()
 {
-	// Ana statlar deÄŸiÅŸince UI'Ä±n tÃ¼retilmiÅŸ deÄŸerleri tazelemesi iÃ§in tetikle.
+	// Ana statlar değişince UI'ın türetilmiş değerleri tazelemesi için tetikle.
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 	OnManaChanged.Broadcast(Mana, MaxMana);
 }

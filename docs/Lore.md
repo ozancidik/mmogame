@@ -976,22 +976,22 @@ bölümüyle uyumludur.*
   maceracıya pazar bile selam vermez."
   - *Dönüşte:* "Beş yüz altın… Küçük bir kese, ama büyük bir alışkanlığın başı.
     Aklını da kesen kadar dolu tut."
-- **Vadinin Tüccarı** *(Q_Gold5000)* — "Beş bin altın biriktir, evlat; vadide adın
-  tüccarlar arasında geçsin."
-  - *Dönüşte:* "Beş bin altın taşıyorsun artık. Kesen ağırlaştıkça gözün de açılsın;
-    parası çok olanın düşmanı da çok olur."
-- **Efsanevi Servet** *(Q_Gold15000)* — "On beş bin altın biriktir, evlat; bu servet
-  kılıçtan fazla kapı açar."
+- **Vadinin Tüccarı** *(Q_Gold5000)* — "Beş bin altını vadinin kasasına bağışla,
+  evlat; adın tüccarlar arasında geçsin. Bağışlanan altın geri gelmez, ama söz geri döner."
+  - *Dönüşte:* "Beş bin altın kasaya girdi. Kesen hafifledi, adın ağırlaştı; parası
+    çok olanın düşmanı da çok olur, ama bağış yapanın dostu da."
+- **Efsanevi Servet** *(Q_Gold15000)* — "On beş bin altını bağışla, evlat; bu servet
+  kılıçtan fazla kapı açar, ama önce kesenden çıkması gerekir."
   - *Dönüşte:* "On beş bin altın… Servet kılıçtan çok kapı açar, evlat. Kapıyı kim
-    için açtığına dikkat et."
-- **Bölge Tüccarı** *(Q_Gold30000)* — "Otuz bin altın biriktir, evlat; Akçakule'nin
-  bile kolay görmediği bir kese olsun."
-  - *Dönüşte:* "Otuz bin altın. Altın seni taşısın, sen altını taşıma, evlat; yük
-    olan servet, servet sayılmaz."
-- **Altın Çağın Efendisi** *(Q_Gold50000)* — "Elli bin altın biriktir, evlat; bu
+    için açtığına dikkat et; bağışın izi kalır."
+- **Bölge Tüccarı** *(Q_Gold30000)* — "Otuz bin altını bağışla, evlat; Akçakule'nin
+  bile kolay görmediği bir bağış olsun."
+  - *Dönüşte:* "Otuz bin altın verdin. Altın seni taşısın, sen altını taşıma, evlat;
+    yük olan servet, servet sayılmaz."
+- **Altın Çağın Efendisi** *(Q_Gold50000)* — "Elli bin altını bağışla, evlat; bu
   yolun sonunda kasaya değil, ardında bıraktığına bakılır."
-  - *Dönüşte:* "Elli bin altın. Bütün bölge adını anıyor, evlat. En zengin yolcu, geride
-    bir iyilik bırakandır; unutma."
+  - *Dönüşte:* "Elli bin altın bıraktın. Bütün bölge adını anıyor, evlat. En zengin yolcu,
+    geride bir iyilik bırakandır; unutma."
 
 ## Depocu Rana: Ortak Defter
 

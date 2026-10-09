@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 59 mob (13 elit), 90 gorev, 53 ekipman, 93 beceri.
+Toplam: 59 mob (13 elit), 90 gorev, 57 ekipman, 93 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -81,7 +81,7 @@ Toplam: 59 mob (13 elit), 90 gorev, 53 ekipman, 93 beceri.
 | 75 |  |  | Q_AbyssLine, Q_AbyssVigil |  | War_WorldBreaker, Arc_SunderingArrow, Mag_CosmicBlast, Pri_Sanctify |
 | 76 | AbyssGuardian |  | Q_AbyssEnvoys |  |  |
 | 77 |  |  | Q_AbyssDescent |  |  |
-| 78 | AbyssEnvoy |  | Q_AbyssBastion |  |  |
+| 78 | AbyssEnvoy |  | Q_AbyssBastion | ThroneBlade, ThronePlate, ThroneHelm, ThroneBoots |  |
 | 79 |  |  | Q_AbyssRegent |  |  |
 | 80 |  | AbyssRegent |  |  | War_DoomsdayBlow, Arc_HuntersReckoning, Mag_AbsoluteAnnihilation, Pri_HandOfHeaven |
 

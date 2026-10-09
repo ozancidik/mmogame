@@ -18,8 +18,9 @@ public:
 	// --- Upgrade kurallari (KO tarzi) ---
 	static constexpr int32 MaxPlus = 8;
 
-	// Bir sonraki artiya gecis maliyeti (altin).
-	static int32 GetUpgradeCost(int32 CurrentPlus);
+	// Bir sonraki artiya gecis maliyeti (altin): 50 x (CurrentPlus+1) x (1 + RequiredLevel^2 / 100). Esyanin seviyesiyle
+	// olceklenir (altin sink'i, DECISIONS_NEEDED madde 3b; Lv1 ~1,0x, Lv30 10x, Lv78 ~62x). PLACEHOLDER. RequiredLevel 0 = eski sabit maliyet.
+	static int32 GetUpgradeCost(int32 CurrentPlus, int32 RequiredLevel = 0);
 
 	// Basari sansi (yuzde).
 	static int32 GetUpgradeChancePct(int32 CurrentPlus);

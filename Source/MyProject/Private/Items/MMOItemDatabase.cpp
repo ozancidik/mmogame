@@ -55,6 +55,9 @@ namespace
 		// Lv66 Kul (Ashen) ve Lv72 Ucurum (Abyss) kademeleri (PROGRESSION_PLAN, gecici deger).
 		Table.Add(MakeItem(TEXT("AshenBlade"), TEXT("Kul Kilici"), S::Weapon, 164.f, 0.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssBlade"), TEXT("Ucurum Kilici"), S::Weapon, 188.f, 0.f, 72));
+		// Lv78 Taht kademesi (CONTENT_PLAN_LV46_80.md 2.6; Lv73-80 ekipman hedefi yoktu). Onceki kademe farklari +26/+17/+7/+10; gecici deger.
+		// Naib (Lv80 elit) elit havuzu MaxReq=78 oldugu icin artik yalniz bu seti dusurur (Abyss seti gorev odulu/satici/normal mobda kalir).
+		Table.Add(MakeItem(TEXT("ThroneBlade"), TEXT("Taht Kilici"), S::Weapon, 214.f, 0.f, 78));
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -70,6 +73,7 @@ namespace
 		Table.Add(MakeItem(TEXT("RiftPlate"), TEXT("Yarik Zirhi"), S::Armor, 0.f, 86.f, 58));
 		Table.Add(MakeItem(TEXT("AshenPlate"), TEXT("Kul Zirhi"), S::Armor, 0.f, 99.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssPlate"), TEXT("Ucurum Zirhi"), S::Armor, 0.f, 114.f, 72));
+		Table.Add(MakeItem(TEXT("ThronePlate"), TEXT("Taht Zirhi"), S::Armor, 0.f, 131.f, 78));
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -85,6 +89,7 @@ namespace
 		Table.Add(MakeItem(TEXT("RiftHelm"), TEXT("Yarik Kaski"), S::Helmet, 0.f, 36.f, 58));
 		Table.Add(MakeItem(TEXT("AshenHelm"), TEXT("Kul Kaski"), S::Helmet, 0.f, 42.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssHelm"), TEXT("Ucurum Kaski"), S::Helmet, 0.f, 48.f, 72));
+		Table.Add(MakeItem(TEXT("ThroneHelm"), TEXT("Taht Kaski"), S::Helmet, 0.f, 55.f, 78));
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
@@ -100,6 +105,7 @@ namespace
 		Table.Add(MakeItem(TEXT("RiftBoots"), TEXT("Yarik Botu"), S::Boots, 0.f, 47.f, 58));
 		Table.Add(MakeItem(TEXT("AshenBoots"), TEXT("Kul Botu"), S::Boots, 0.f, 55.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssBoots"), TEXT("Ucurum Botu"), S::Boots, 0.f, 64.f, 72));
+		Table.Add(MakeItem(TEXT("ThroneBoots"), TEXT("Taht Botu"), S::Boots, 0.f, 74.f, 78));
 
 		return Table;
 	}
@@ -126,10 +132,12 @@ const FMMOItemDef* FMMOItemDatabase::Find(FName ItemId)
 	return nullptr;
 }
 
-int32 FMMOItemDatabase::GetUpgradeCost(int32 CurrentPlus)
+int32 FMMOItemDatabase::GetUpgradeCost(int32 CurrentPlus, int32 RequiredLevel)
 {
-	// +1 = 50, +2 = 100, ... dogrusal artis.
-	return 50 * (CurrentPlus + 1);
+	// Taban: +1 = 50, +2 = 100, ... dogrusal artis. Esya seviyesiyle (100 + Lv^2) / 100 carpaniyla buyur (tamsayi, tasma yok:
+	// Lv80 +9 = 50 x 10 x 65 = 32.500).
+	const int64 Lv = FMath::Clamp(RequiredLevel, 0, 100);
+	return static_cast<int32>(50ll * (CurrentPlus + 1) * (100ll + Lv * Lv) / 100ll);
 }
 
 int32 FMMOItemDatabase::GetUpgradeChancePct(int32 CurrentPlus)

@@ -57,6 +57,14 @@ Ceza, **öldürme eşdeğeri** olarak (mevcut eğri, gereken XP ÷ ortalama XP/�
 
 ## 3. Altın sink'i / `Q_Gold*` yeniden tasarımı
 
+> **UYGULANDI (2026-10-09, öneri (a)+(b) + satıcı kapısı; değerler placeholder, PIE'de denenmedi):**
+> (a) `Q_Gold5000/15000/30000/50000` artık teslimde altını **bağışlatır** (düşer; `MMOQuestComponent::GoldDonationMinTarget=5000`; `Q_Gold500/1000` erken altın kıtlığı yüzünden birikim kaldı).
+> (b) Yükseltme maliyeti eşya seviyesiyle ölçeklenir: `50 × (+N) × (100 + Lv²) / 100` (`FMMOItemDatabase::GetUpgradeCost(Plus, RequiredLevel)`; Lv1 ≈ eski, Lv30 10×, Lv78 ≈ 62×).
+> Satıcı: alıcı seviyesi + 3 ≥ eşyanın `RequiredLevel`'i (`UMMOInventoryComponent::VendorLevelSlack`), aksi halde "çok erken" reddi.
+> Yeni Lv78 **Taht seti** eklendi (`ThroneBlade/Plate/Helm/Boots`; Naib elit havuzu artık yalnız bunu düşürür, `Q_AbyssRegent` ödülü `ThroneBlade`).
+> Model (`EconomyModel.py`, bağış + ölçekli maliyet): Lv1→30 gelir/gider **12,4× → 6,8×** (+3 yükseltmede), +7'de **2,2×**; Lv78 kademesi +7'de 2,5×. Hâlâ erken kıt (Lv1–9: 0,4–1,1×) ve +3'te orta/yüksek seviyede 10–33× fazla: gerçek sink oyuncunun yüksek `+` peşinde olmasına bağlı.
+> Aşağıdaki bölüm uygulama öncesi analizdir.
+
 **Neden önemli:** Lv1→30 model geliri **~276.168 altın**, Lv≤30 kademe giderinin (4 parça + her biri +3) **11,3 katı** **[Kesin, model]** (yan öldürme tabanı kapalıyken ~269.883, 11,0x). Lv1–9 kıt (0,5–1,4x), Lv16'dan sonra 16–224x. Yükseltme `50 × (artı+1)` seviyeden bağımsız (`MMOItemDatabase.cpp:129-133`); şifacı sabit 100 (`MMOHealerNPC.h:28`), iksir sabit 20 (`MMOItemDatabase.h:36`) **[Kesin]**. `Q_Gold*` altını yalnız **taşımayı** ister, harcatmaz.
 
 | Seçenek | Ne değişir | Lv1→30 gelir/gider (model) |

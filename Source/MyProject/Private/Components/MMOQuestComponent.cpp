@@ -149,7 +149,20 @@ bool UMMOQuestComponent::RunRewardCapacitySelfTest(UWorld* World, FString& OutEr
 		if (!UnchangedClaim(*Equipment, TEXT("full equipment bag changed reward or quest"))) return false;
 		Inv->EquipmentBag.RemoveAt(0);
 		if (!CompleteClaim(*Equipment, 0, UMMOInventoryComponent::MaxBagSize, TEXT("freed equipment slot reward incomplete"))) return false;
-		return UnchangedClaim(*Equipment, TEXT("duplicate equipment reward changed state"));
+		if (!UnchangedClaim(*Equipment, TEXT("duplicate equipment reward changed state"))) return false;
+
+		// Altin sink'i (GoldDonationMinTarget): buyuk HaveGold gorevi teslimde altini dusurur, kucuk olan dusurmez.
+		const FMMOQuestDef* Donation = FMMOQuestDatabase::Find(TEXT("Q_Gold5000"));
+		const FMMOQuestDef* Hoard = FMMOQuestDatabase::Find(TEXT("Q_Gold1000"));
+		if (!Donation || !Hoard || Donation->Type != EMMOQuestType::HaveGold || Hoard->Type != EMMOQuestType::HaveGold
+			|| Donation->TargetCount < UMMOQuestComponent::GoldDonationMinTarget || Hoard->TargetCount >= UMMOQuestComponent::GoldDonationMinTarget)
+		{ OutError = TEXT("donation fixture data unavailable"); return false; }
+		Prepare(*Donation); Inv->Gold = Donation->TargetCount - 1;
+		if (!UnchangedClaim(*Donation, TEXT("insufficient gold claimed a donation quest"))) return false;
+		Inv->Gold = Donation->TargetCount + 700; Quests->ClaimReward(Donation->QuestId);
+		if (!Check(Inv->Gold == 700 + Donation->RewardGold && Quests->IsCompleted(Donation->QuestId), TEXT("donation quest did not deduct the gold"))) return false;
+		Prepare(*Hoard); Inv->Gold = Hoard->TargetCount + 5; Quests->ClaimReward(Hoard->QuestId);
+		return Check(Inv->Gold == Hoard->TargetCount + 5 + Hoard->RewardGold && Quests->IsCompleted(Hoard->QuestId), TEXT("hoard quest wrongly deducted gold"));
 	}();
 	for (AActor* Fixture : Fixtures) { if (IsValid(Fixture)) Fixture->Destroy(); }
 	// Controllersiz ve tek senkron kare: AutoLoadDeferred/oyuncu kaydi calismaz.
@@ -618,6 +631,13 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	const int32 RewardLevel = Owner->GetStats()->Level;
 	if (Owner)
 	{
+		// Altin sink'i (DECISIONS_NEEDED madde 3a): buyuk HaveGold gorevleri artik teslimde altini BAGISLATIR (dusurur);
+		// onceden yalnizca tasimayi isterdi, Lv1-30 geliri gideri 12 kat asiyordu. IsQuestComplete bakiyeyi dogruladi.
+		// Kucuk (Q_Gold500/1000) gorevler erken oyunda altin kitligi nedeniyle bagis degil, birikim olarak kalir.
+		if (Def->Type == EMMOQuestType::HaveGold && Def->TargetCount >= GoldDonationMinTarget && Owner->GetInventory())
+		{
+			Owner->GetInventory()->AddGoldFrom(-Def->TargetCount, TEXT("gorev_bagis"));
+		}
 		if (Owner->GetStats() && Def->RewardXP > 0)
 		{
 			Owner->GetStats()->GainExperience(Def->RewardXP);

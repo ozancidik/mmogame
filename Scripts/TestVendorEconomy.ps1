@@ -14,7 +14,7 @@ if (-not $process.WaitForExit(60000)) {
     exit 2
 }
 if (-not (Test-Path -LiteralPath $log)) { Write-Output 'Satici ekonomi test logu bulunamadi'; exit 1 }
-$pass = Select-String -LiteralPath $log -Pattern '\[MMO_VENDOR_ECONOMY_TEST\] PASS checks=14\b'
+$pass = Select-String -LiteralPath $log -Pattern '\[MMO_VENDOR_ECONOMY_TEST\] PASS checks=17\b'
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_VENDOR_ECONOMY_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 if ($pass -and -not $fail -and $process.ExitCode -eq 0) { Write-Output $pass.Line; exit 0 }
 Write-Output "Satici ekonomi testi KALDI (exit=$($process.ExitCode))"

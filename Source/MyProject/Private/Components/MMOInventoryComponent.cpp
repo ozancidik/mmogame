@@ -195,6 +195,21 @@ bool UMMOInventoryComponent::RunVendorEconomySelfTest(UWorld* World, FString& Ou
 		Inv->Items[0].ItemId = TEXT("HealthPotion"); Inv->Items[0].Count = MaxStackSize - 1;
 		Inv->BuyPotion(MAX_int32);
 		if (!Check(Inv->Gold == 100000 - FMMOItemDatabase::PotionPrice && Inv->Items.Num() == MaxItemStacks && Inv->GetItemCount(TEXT("HealthPotion")) == MaxStackSize, TEXT("existing stack at list limit rejected"))) return false;
+		// Seviye kapisi: alici seviyesi + VendorLevelSlack < RequiredLevel ise reddedilir (altin ve canta degismez);
+		// tam sinirda (RequiredLevel - Slack) alinir.
+		const FMMOItemDef* HighItem = FMMOItemDatabase::Find(TEXT("AbyssBlade"));
+		if (!HighItem || HighItem->RequiredLevel <= UMMOInventoryComponent::VendorLevelSlack + 1) { OutError = TEXT("level gate fixture item missing"); return false; }
+		Reset(); Stats->Level = HighItem->RequiredLevel - UMMOInventoryComponent::VendorLevelSlack - 1;
+		Inv->BuyEquipment(TEXT("AbyssBlade"));
+		if (!Check(Inv->Gold == 100000 && Inv->EquipmentBag.IsEmpty(), TEXT("level gate allowed an item above the slack"))) return false;
+		Stats->Level = HighItem->RequiredLevel - UMMOInventoryComponent::VendorLevelSlack;
+		Inv->BuyEquipment(TEXT("AbyssBlade"));
+		if (!Check(Inv->EquipmentBag.Num() == 1 && Inv->Gold == 100000 - FMMOItemDatabase::GetBuyPrice(*HighItem), TEXT("level gate rejected an item at the slack limit"))) return false;
+		Stats->Level = 1;
+		// Yukseltme maliyeti esya seviyesiyle olceklenir (altin sink'i): 50 x (+N) x (100 + Lv^2) / 100; Lv0 eski sabit maliyet.
+		if (!Check(FMMOItemDatabase::GetUpgradeCost(0) == 50 && FMMOItemDatabase::GetUpgradeCost(2, 0) == 150
+			&& FMMOItemDatabase::GetUpgradeCost(2, 30) == 1500 && FMMOItemDatabase::GetUpgradeCost(0, 78) == 3092
+			&& FMMOItemDatabase::GetUpgradeCost(8, 80) == 29250, TEXT("level-scaled upgrade cost wrong"))) return false;
 		Reset(); Inv->AddEquipmentInstance(TEXT("ShortSword"), 0);
 		const int32 FinalSaleId = Inv->EquipmentBag[0].InstanceId;
 		const int32 ExpectedGold = 100000 + FMMOItemDatabase::GetSellPrice(*Sword, 0);
@@ -777,7 +792,7 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 		return;
 	}
 
-	const int32 Cost = FMMOItemDatabase::GetUpgradeCost(Inst.Plus);
+	const int32 Cost = FMMOItemDatabase::GetUpgradeCost(Inst.Plus, Def->RequiredLevel);
 	if (Gold < Cost)
 	{
 		ClientUpgradeResult(false, false, NAME_None, 0); // "altin yetersiz" isareti
@@ -877,6 +892,20 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	{
 		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
+	}
+
+	// Seviye kapisi (CONTENT_PLAN_LV46_80.md G6/S3): satici fiyati seviyeden bagimsizdi, model geliri set fiyatinin 100+
+	// kati oldugu icin altinla tum kademeler atlanabiliyordu. Alicinin seviyesi gereken seviyenin en fazla
+	// VendorLevelSlack altinda olabilir (kusanmada RequiredLevel yine tam denetlenir). PLACEHOLDER; olcumle ayarlanir.
+	{
+		const AMMOCharacter* Buyer = Cast<AMMOCharacter>(GetOwner());
+		const UMMOStatsComponent* BuyerStats = Buyer ? Buyer->GetStats() : nullptr;
+		if (BuyerStats && BuyerStats->Level + VendorLevelSlack < Def->RequiredLevel)
+		{
+			MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Bu esya icin cok erken: Lv%d gerekir"), Def->RequiredLevel),
+				FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+			return;
+		}
 	}
 
 	const int32 Price = FMMOItemDatabase::GetBuyPrice(*Def);
