@@ -991,3 +991,31 @@ Summer49/Winter29/error0; Net1join/1welcome/error0. Source/Scripts151 hash
 fark0, exact backups aynı, fixture save0/engine0. ECC parent ve readonly
 Carver final review blocker0; remote/roster atomikliği ve diğer clan yolları
 §71/checklist sınırlarında açık.
+
+### O35 · ORTA · Eski klan daveti yeni source üyeliğinde tekrar kabul edilebilir
+
+O34 GUID'i pending source snapshot'a bağlı değildi. Aynı pawn/klan adıyla
+leader rejoin native baseline FAIL34/check35 verdi (05:44:46.211UTC).
+SetPendingInviteServer yalnız valid source membership'ten GUID yakalar;
+matching recipient accept captured valid/equal current source üyelik + leader
++ adı doğrular. Recipient nonce eşleşmeden snapshot tüketilmez; matching
+snapshot önce local'e alınıp tamamen temizlenir. Private server-only FGuid,
+save/JSON/RPC/replication/timer değişikliği yok. Ayrıntı §72.
+
+Native112 = component47 + controller65; eski97 +15 source kontrolü.
+Rejoin/valid same-name in-memory reload, invalid/foreign/zero GUID, nonce
+preserve/consume, recovery/inventory geçer. Gerçek compiled clear mutant FAIL0,
+exact restore actual DLL/PASS112. Değişen CPP NoPCH /W4 warning0; Sagan final
+read-only review blocker0. Native fixture gerçek disk login, elapsed expiry
+veya remote owner-only teslim değildir.
+
+Source membership revocation pending kilidini anında açmaz; mevcut30sn expiry
+ve matching consume policy sürer. Üyelikten ayrılmadan leader loss/regain epoch,
+account/controller rebinding, diğer /klan membership komutları, hedef kick/rejoin,
+UI atomikliği ve gerçek PIE/Shipping/Server ayrı açık kalır.
+
+O35 final: RunAllChecks -SkipBuild40/40 exit0; değişen CPP NoPCH/W4 warning0,
+klan112/chat65, parti104, arkadaş53/presence24/save26/DoT33/trade218.
+Parser576/576; Store468/schema2/negative111. Summer49/Winter30/error0;
+Net1join/1welcome/error0. Hash151 fark0/exact restore aynı; §72 ayrıntıları.
+Bu paket gerçek remote/disk login/PIE/Shipping/Server testini kapatmaz.

@@ -2940,3 +2940,88 @@ mmo_net_server_083612.log / mmo_net_client_083612.log; hash notu
 mmo_clan_membership_final_hashes_20261009.json. ZClanCtx fixture kayıt0;
 engine/UBT0, reviewer kapalı. StaticLint InitGameState whitelist ve Lv33+
 beceri aralığı uyarıları sürer. Gerçek PIE/disk login/Shipping/Server açık.
+
+## 72. O35 — Klan davetini davet edenin kaynak üyeliğine bağlama (9 Ekim 2026)
+
+### Doğrulanmış hata ve sınırlı plan
+
+O34 runtime üyelik GUID'i varken pending invite yalnız weak pawn/ad/zaman
+saklıyordu. Davet eden aynı pawn'da ayrılıp aynı klana tekrar lider olarak girince
+eski davet yeni üyelik yetkisiyle kabul edilebiliyordu. Derlenmiş baseline native
+FAIL34/check35 `old invitation accepted after source same-name rejoin`,
+05:44:46.211UTC; UE exit0, wrapper exit1. Re-entry bu fixture'da gerçek CmdLeave
+ardından component in-memory ApplySaveData'dır; disk login veya başarılı create değil.
+
+Küçük adımlar: fixture/source snapshot plumbing ile native reproduksiyon;
+matching accept'te source üyelik eşleşmesi; derlenmiş tüketim negatif deneyi;
+exact source restore + actual linked DLL; değişen CPP NoPCH/W4; mevcut otomatik
+paket ve salt okunur final inceleme. Kaynak/runner sonrasında donduruldu.
+
+### Uygulama
+
+Protected FGuid PendingInviterMembershipId yalnız sunucuda ve geçicidir.
+SetPendingInviteServer valid source ClanMembershipId ister ve GUID'i issuance
+anında yakalar. Eşleşen recipient nonce snapshot'ı local'e alıp weak/ad/zamanla
+birlikte tüketir; sonra captured valid/equal current source GUID + current
+leader + clan name doğrulanır. Aynı pawn/isim rejoin veya valid same-name reload
+eski daveti geçerli kılmaz. Zero/stale/future recipient nonce tüm snapshot'ı
+korur; geçersiz source issuance recipient nonce'u da değiştirmez.
+
+O34 dokuz parametreli RPC, owner-only recipient nonce/runtime membership ve
+save/JSON şeması aynı; yeni replicated alan, timer veya UObject sahipliği yok.
+Weak inviter life gate mevcut. Pending lock/cooldown/expiry policy aynı kalır:
+source revocation lock'ı anında açmaz, mevcut expiry/consume yolu gerekir.
+Liderliği üyelikten ayrılmadan kaybedip tekrar kazanma için ayrı authority epoch,
+account/controller identity rebinding ve diğer /klan komutlarının membership
+bağlamı bu işin kapsamı dışında; hedef kick/rejoin ve UI atomik sunumu açık.
+
+### Gerçek doğrulama ve sınırları
+
+Native97→112 (+15 source kontrolü); component32→47, controller65 aynı.
+Yeni15: issuance capture; aynı-ad source leave/rejoin generation; eski ret;
+fresh kabul; duplicate; same-name reload ret; zero/foreign captured GUID;
+invalid current GUID ret; invalid source issuance unchanged; stale/zero recipient
+nonce preserve; matching consumption; recovery; iki actor inventory unchanged.
+Önceki tüketim/snapshot assertion'ları yeni private GUID'i de içerir.
+
+Controllerless iki yeni actor, nonshipping standalone/unattended/NullRHI,
+synchronous doğrudan component call, tick/collision kapalı ve dış gruptan uzak.
+Gerçek remote RPC/paket/elapsed expiry/disk load çalıştırılmaz. Existing native
+controller65 testleri runner'da ayrı PASS şartı olmaya devam eder. Cleanup
+fixture clan/leader alanlarını sıfırlayıp actor'ları destroy eder; ilk load yok.
+
+Baseline UHT/module/component/lib/DLL11,23sn; source gate actual compile/link
+3,16sn ve PASS112 05:45:20.237UTC. Yeni pending source temizliğini kaldıran
+DERLENMİŞ mutant build3,14sn, FAIL0/check1 05:45:48.656UTC: eski assertion etiketi
+`demoted inviter accepted`; ret üyelikten değil Consumed() içindeki private
+source GUID'in temizlenmemesinden başarısız olur. Bu label tek başına join kanıtı değil.
+Final exact bytes yeniden yazıldı, actual compile/lib/DLL3,09sn ve
+PASS112 05:46:20.265UTC. NoPCH/NoLink/SingleFile8,84sn exit0/Succeeded,
+response /W4, warning C0. Tüm linked buildler exit0/Succeeded.
+TEMP mmo_clan_source_{baseline,fixed,negative_clear,restore,nopch_final}_20261009
+build/test/UE logları ve mmo_clan_source_final_restore_20261009.cpp byte backup.
+
+ECC plan/review/verify, mmo-feature/ue-build uygulandı. Parent authority,
+source writers/consume gates/save separation/replication/GC/RPC callers'ı
+inceledi. Salt okunur Sagan aynı final üç dosyayı iki kez hash'ledi;
+component git blob019889b14207, header58550f7aebd2, runner00744aa553c0:
+somut blocker yok, ek clear path yok. Ajan edit/build/test/commit yapmadı;
+Unreal/multiplayer/security/QA fallback rolleri, Agency provenance doğrulanmadı.
+Tamamlanınca kapatıldı. Gerçek PIE/Server/Shipping kutuları açık.
+
+### O35 final paket (9 Ekim 2026 UTC)
+
+RunAllChecks.ps1 -SkipBuild40/40 GECTI, exit0. Değişen ClanComponent CPP ayrıca
+NoPCH /W4 warning0; bu bounded private field için19 CPP FullCompile tekrar
+çalıştırılmadı (O34 geçmiş paketidir). Normal UHT/module rebuild ve linked DLL
+restore yukarıda; Source/Scripts151 before/after hash differences0, backup aynı.
+Klan112/chat65 05:49:02.356UTC; parti104 05:48:46.154, arkadaş53 05:48:00.526,
+presence24 05:47:54.488, save26 05:47:48.451, DoT33 05:49:57.374,
+trade218 05:51:00.949 PASS. Parser576/576, JSONschema2/negative111.
+Store468slots/468loaded; invalid/loadFailed/existsMismatch/jsonMismatch0,
+maxLevel6, writeorder1/roundtrip equal1. Yerel yuvalar oyuncu/Lv30 kanıtı değil.
+Summer49/Winter30 smoke exit0/error0; Net1join/1welcome/server-client error0,
+TEMP mmo_net_server_085128.log / mmo_net_client_085128.log. Paket logu
+mmo_all_clan_source_final_20261009.log; hash mmo_clan_source_final_hashes_20261009.json.
+ZClanCtx fixture save0; Sagan kapalı. StaticLint InitGameState whitelist ve
+Lv33+ skill-gap uyarıları sürer; gerçek PIE/disk login/Server/Shipping açık.

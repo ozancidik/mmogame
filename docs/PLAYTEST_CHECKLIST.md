@@ -4701,3 +4701,28 @@ O34 otomatik final: UHT/linked DLL + native97/chat65;
 RunAllChecks -SkipBuild -FullCompile41/41 exit0,19 NoPCH CPP /W4 warning0.
 Summer49/Winter29/error0; Net1join/1welcome/error0. Bu sonuçlar gerçek PIE,
 başarılı create UI veya disk login kutularını kapatmaz.
+
+## 2026-10-09 — Klan davet eden üyelik bağlamı (O35, gerçek PIE açık)
+
+Native112/component47/controller65 yalnız standalone headless doğrulamasıdır;
+source rejoin ve reload doğrudan component in-memory ApplySaveData kullanır.
+
+- [ ] Host + uzak istemci: lider A alıcı B'ye davet göndersin; A aynı pawn'da
+  klanından ayrılıp aynı klana tekrar lider olarak katılsın. B'nin eski davet
+  kabulü üyelik vermesin; matching ret eski pending snapshot'ı tüketsin. Sonraki
+  fresh davet/owner-only nonce geldikten sonra B kabul edebilsin.
+- [ ] Gerçek kayıt/re-login, travel ve aynı klanın yeniden yüklenmesi sırasında
+  eski source daveti kabul edilmesin. Normal fresh davet, continuous lider ve
+  vekil lider geçerli olsun; demoted/ayrılmış/yok olmuş lider reddedilsin.
+- [ ] Stale/zero recipient nonce yeni pending'i tüketmesin; source değişince
+  doğru nonce ret ve temizleme yapsın. UI davet metni/nonce birlikte görünsün;
+  gecikme/kayıp/tekrar istek ve host/uzak Canvas/Slate denensin.
+- [ ] Source revocation sonrası davet kilidi mevcut30sn sona erme politikasına
+  uysun; timer veya anında unlock bu düzeltmede eklenmedi. Account/controller
+  rebinding, leader loss/regain epoch ve gerçek Server/Shipping ayrıca denensin.
+
+O35 final: RunAllChecks -SkipBuild40/40 exit0; değişen CPP NoPCH/W4 warning0,
+klan112/chat65, parti104, arkadaş53/presence24/save26/DoT33/trade218.
+Parser576/576; Store468/schema2/negative111. Summer49/Winter30/error0;
+Net1join/1welcome/error0. Hash151 fark0/exact restore aynı; §72 ayrıntıları.
+Bu paket gerçek remote/disk login/PIE/Shipping/Server testini kapatmaz.

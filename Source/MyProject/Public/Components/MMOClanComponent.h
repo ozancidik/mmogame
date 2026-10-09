@@ -113,6 +113,8 @@ protected:
 	// Bekleyen davet (sunucu durumu, replike degil).
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
 	FString PendingInviteClan;
+	// Server-only source membership snapshot; never persisted or replicated.
+	FGuid PendingInviterMembershipId;
 	float PendingInviteTime = -1.f;
 	float LastInviteTime = -100.f;
 };
