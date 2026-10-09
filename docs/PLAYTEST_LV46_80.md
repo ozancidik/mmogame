@@ -66,7 +66,7 @@ sürdürülebilir kılıyor `[Hesap]`), alan becerileri ikinci hedefte tek hedef
   **denenmedi**, Zehir becerilerini (`Arc_PoisonArrow`, `Arc_DeathMark`, `Arc_ThornVolley`, `Arc_SpikeTrap`, `Arc_PoisonCloud`) mobda dene: hasar sayıları
   tick başına yaklaşık 8 + saldırı/10 olmalı. **Mob → oyuncu zehri hâlâ etkisiz** (bilerek; savunmaya karşı 1 hasar), bug değil.
 - **Yeni (2026-10-09, denenmedi):** Lv78 **Taht seti** (`ThroneBlade/Plate/Helm/Boots`; Naib elitinden düşer, `Q_AbyssRegent` ödülü `ThroneBlade`);
-  satıcıdan alım **alıcı seviyesi + 3 ≥ eşya seviyesi** ister ("Bu eşya için çok erken"); yükseltme maliyeti eşya seviyesiyle büyür (Lv78'de +1 ≈ 3.100 altın);
+  satıcıdan alım **alıcı seviyesi + 3 ≥ eşya seviyesi** ister ("Bu eşya için çok erken"); Taht seti **satıcıda listelenmez** ("Bu eşya satıcıda satılmaz"); yükseltme maliyeti eşya seviyesiyle büyür (Lv78'de +1 ≈ 3.100 altın);
   `Q_Gold5000+` görevleri teslimde altını **düşürür** (bağış). Kontrol: satıcı reddi mesajı, yükseltme maliyeti HUD'da doğru mu, bağış sonrası bakiye.
 - Kül mobları lore'da "yakar", kodda yavaşlatır/vurur; `Burn` efekti yok.
 - Elit/boss karşılaşmaları hâlâ "daha çok can + Öfke"; fazlı boss yok.

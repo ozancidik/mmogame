@@ -56,9 +56,10 @@ namespace
 		Table.Add(MakeItem(TEXT("AshenBlade"), TEXT("Kul Kilici"), S::Weapon, 164.f, 0.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssBlade"), TEXT("Ucurum Kilici"), S::Weapon, 188.f, 0.f, 72));
 		// Lv78 Taht kademesi (CONTENT_PLAN_LV46_80.md 2.6; Lv73-80 ekipman hedefi yoktu). Onceki kademe farklari +26/+17/+7/+10; gecici deger.
-		// Naib (Lv80 elit) elit havuzu MaxReq=78 oldugu icin elit ganimeti artik bu seti dusurur; ANCAK satici tum esya tablosunu satar
-		// (alici Lv75'ten itibaren alabilir) ve Lv75+ normal moblar da dusurur: set munhasir degildir (QA ORTA-2, Abyss seti gorev odulu/satici/normal mobda kalir).
+		// Naib (Lv80 elit) elit havuzu MaxReq=78 oldugu icin elit ganimeti artik bu seti dusurur; satici bu seti SATMAZ (satilmama bayragi her parcanin altinda);
+		// Lv75+ normal moblar da dusurur (RequiredLevel <= MobLevel + 3), takas/depo seviye denetlemez. Abyss seti gorev odulu/satici/normal mobda kalir (QA ORTA-2).
 		Table.Add(MakeItem(TEXT("ThroneBlade"), TEXT("Taht Kilici"), S::Weapon, 214.f, 0.f, 78));
+		Table.Last().bVendorSold = false; // boss/odul seti: satilmaz (Naib/Lv75+ dususu + Q_AbyssRegent odulu)
 
 		// Zirhlar
 		Table.Add(MakeItem(TEXT("LeatherArmor"), TEXT("Deri Zirh"), S::Armor, 0.f, 5.f, 1));
@@ -75,6 +76,7 @@ namespace
 		Table.Add(MakeItem(TEXT("AshenPlate"), TEXT("Kul Zirhi"), S::Armor, 0.f, 99.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssPlate"), TEXT("Ucurum Zirhi"), S::Armor, 0.f, 114.f, 72));
 		Table.Add(MakeItem(TEXT("ThronePlate"), TEXT("Taht Zirhi"), S::Armor, 0.f, 131.f, 78));
+		Table.Last().bVendorSold = false;
 
 		// Kasklar
 		Table.Add(MakeItem(TEXT("LeatherCap"), TEXT("Deri Baslik"), S::Helmet, 0.f, 3.f, 1));
@@ -91,6 +93,7 @@ namespace
 		Table.Add(MakeItem(TEXT("AshenHelm"), TEXT("Kul Kaski"), S::Helmet, 0.f, 42.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssHelm"), TEXT("Ucurum Kaski"), S::Helmet, 0.f, 48.f, 72));
 		Table.Add(MakeItem(TEXT("ThroneHelm"), TEXT("Taht Kaski"), S::Helmet, 0.f, 55.f, 78));
+		Table.Last().bVendorSold = false;
 
 		// Botlar
 		Table.Add(MakeItem(TEXT("LeatherBoots"), TEXT("Deri Bot"), S::Boots, 0.f, 2.f, 1));
@@ -107,6 +110,7 @@ namespace
 		Table.Add(MakeItem(TEXT("AshenBoots"), TEXT("Kul Botu"), S::Boots, 0.f, 55.f, 66));
 		Table.Add(MakeItem(TEXT("AbyssBoots"), TEXT("Ucurum Botu"), S::Boots, 0.f, 64.f, 72));
 		Table.Add(MakeItem(TEXT("ThroneBoots"), TEXT("Taht Botu"), S::Boots, 0.f, 74.f, 78));
+		Table.Last().bVendorSold = false;
 
 		return Table;
 	}
