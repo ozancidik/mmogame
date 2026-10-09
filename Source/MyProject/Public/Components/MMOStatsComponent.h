@@ -219,6 +219,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MMO|Combat")
 	float ApplyDamage(float RawDamage, AActor* DamageInstigator);
 
+	/** ApplyDamage ile ayni, ama Defense dusulmez (yalniz oyuncu -> mob DoT tick'i; bkz. UMMODotDamageType). Sadece otorite. */
+	float ApplyDamageIgnoringDefense(float RawDamage, AActor* DamageInstigator);
+
+	/** ApplyDamage / ApplyDamageIgnoringDefense ortak govdesi (dogrudan cagirma). */
+	float ApplyDamageCommon(float RawDamage, AActor* DamageInstigator, bool bIgnoreDefense);
+
 	/** Can yeniler (clamp'li). Sadece otorite. */
 	UFUNCTION(BlueprintCallable, Category = "MMO|Combat")
 	void Heal(float Amount);

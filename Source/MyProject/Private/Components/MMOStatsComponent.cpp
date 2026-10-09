@@ -15,6 +15,14 @@
 #include "Components/MMOSkillComponent.h"
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
+#include "Effects/MMODotDamageType.h"
+
+namespace
+{
+	// Oyuncu -> mob DoT tick'ine eklenen saldiri payi (tick = efekt tabani + AttackPower x bu). PLACEHOLDER; PIE'de
+	// dogrulanmadi (DOT_SCALING_DESIGN.md, onerilen 0,08-0,12).
+	constexpr float DotPlayerAttackScale = 0.10f;
+}
 
 #if !UE_BUILD_SHIPPING
 #include "Misc/CoreMisc.h"
@@ -169,7 +177,7 @@ void UMMOStatsComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		return;
 	}
 
-	// Aktif buff/debuff'lari isle (moblar dahil herkes icin — DoT moba da vurabilmeli).
+	// Aktif buff/debuff'lari isle (moblar dahil herkes icin â€” DoT moba da vurabilmeli).
 	ProcessEffects(DeltaTime);
 
 	// DoT karakteri oldurmus olabilir; oyleyse yenilenme yapma.
@@ -264,7 +272,7 @@ void UMMOStatsComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Eşik Level'dan deterministik türetilir; hem sunucu hem istemci hesaplayabilir.
+	// EÅŸik Level'dan deterministik tÃ¼retilir; hem sunucu hem istemci hesaplayabilir.
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
 	// Sahibin varsayilan yurume hizini cache'le (hiz buff'lari bunun ustune oranlanir).
 	if (const ACharacter* Ch = Cast<ACharacter>(GetOwner()))
@@ -277,7 +285,7 @@ void UMMOStatsComponent::BeginPlay()
 
 	if (HasAuthorityInternal())
 	{
-		// Spawn anında statları ana statlardan hesapla ve can/manayı doldur.
+		// Spawn anÄ±nda statlarÄ± ana statlardan hesapla ve can/manayÄ± doldur.
 		RecalculateDerivedStats(/*bRefill=*/true);
 	}
 }
@@ -301,8 +309,8 @@ bool UMMOStatsComponent::HasAuthorityInternal() const
 
 int32 UMMOStatsComponent::ComputeExperienceForLevel(int32 InLevel) const
 {
-	// Basit üstel eğri: level yükseldikçe gereken exp artar.
-	// L1->L2 = 100, sonrasında her seviyede ~%25 artış.
+	// Basit Ã¼stel eÄŸri: level yÃ¼kseldikÃ§e gereken exp artar.
+	// L1->L2 = 100, sonrasÄ±nda her seviyede ~%25 artÄ±ÅŸ.
 	// GUVENLIK/BUG-HUNT: bu egri MaxLevel=80'e kadar tasarlanmis araligin ICINDE bile
 	// int32'yi tasiyordu (100*1.25^76 ~= 1.85 milyar, 1.25^77 ~= 2.32 milyar > INT32_MAX).
 	// Tasan deger negatife donuyor -> GainExperience'daki "Experience >= ExperienceToNextLevel"
@@ -380,7 +388,7 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill, bool bPreserveCur
 	}
 	else
 	{
-		// Maks değiştiyse anlık değerleri orantılı koru, sonra clamp'le.
+		// Maks deÄŸiÅŸtiyse anlÄ±k deÄŸerleri orantÄ±lÄ± koru, sonra clamp'le.
 		if (OldMaxHealth > 0.f)
 		{
 			Health = FMath::Clamp(Health + (MaxHealth - OldMaxHealth), 0.f, MaxHealth);
@@ -391,12 +399,22 @@ void UMMOStatsComponent::RecalculateDerivedStats(bool bRefill, bool bPreserveCur
 		}
 	}
 
-	// Sunucuda değişiklikleri hemen dinleyicilere bildir (istemcide OnRep yapar).
+	// Sunucuda deÄŸiÅŸiklikleri hemen dinleyicilere bildir (istemcide OnRep yapar).
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 	OnManaChanged.Broadcast(Mana, MaxMana);
 }
 
-float UMMOStatsComponent::ApplyDamage(float RawDamage, AActor* /*DamageInstigator*/)
+float UMMOStatsComponent::ApplyDamage(float RawDamage, AActor* DamageInstigator)
+{
+	return ApplyDamageCommon(RawDamage, DamageInstigator, /*bIgnoreDefense=*/false);
+}
+
+float UMMOStatsComponent::ApplyDamageIgnoringDefense(float RawDamage, AActor* DamageInstigator)
+{
+	return ApplyDamageCommon(RawDamage, DamageInstigator, /*bIgnoreDefense=*/true);
+}
+
+float UMMOStatsComponent::ApplyDamageCommon(float RawDamage, AActor* /*DamageInstigator*/, bool bIgnoreDefense)
 {
 	if (!HasAuthorityInternal() || bIsDead || RawDamage <= 0.f)
 	{
@@ -408,8 +426,8 @@ float UMMOStatsComponent::ApplyDamage(float RawDamage, AActor* /*DamageInstigato
 		LastCombatActivityTime = World->GetTimeSeconds();
 	}
 
-	// Defense hasarı azaltır ama en az 1 hasar geçer.
-	const float Mitigated = FMath::Max(1.f, RawDamage - Defense);
+	// Defense hasarÄ± azaltÄ±r ama en az 1 hasar geÃ§er.
+	const float Mitigated = bIgnoreDefense ? RawDamage : FMath::Max(1.f, RawDamage - Defense);
 	const float ActualDamage = FMath::Min(Mitigated, Health);
 	LastAppliedDamage = ActualDamage; // OnDeath'ten once: olumcul vurusun hasari HandleDeath'te okunur
 
@@ -535,7 +553,7 @@ void UMMOStatsComponent::HandleLevelUp()
 	UnspentStatPoints += StatPointsPerLevel;
 	UnspentSkillPoints += SkillPointsPerLevel;
 
-	// Level başına küçük otomatik stat artışı + can/mana yenile.
+	// Level baÅŸÄ±na kÃ¼Ã§Ã¼k otomatik stat artÄ±ÅŸÄ± + can/mana yenile.
 	RecalculateDerivedStats(/*bRefill=*/true);
 
 	OnLevelUp.Broadcast(Level);
@@ -759,11 +777,26 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	const float EffectNow = EffectGS ? EffectGS->GetServerWorldTimeSeconds() : (EffectWorld ? EffectWorld->GetTimeSeconds() : 0.f);
 	const float EffectEnd = EffectNow + Def->Duration;
 
+	// Oyuncunun mob uzerindeki DoT'u buyuklugunu kaynagin saldirisina baglar (DOT_SCALING_DESIGN.md A): sabit 8/sn
+	// Lv31+ hedefte anlamsizdi. Tick = taban + saldiri x DotPlayerAttackScale. Mob -> oyuncu DoT'u degismez (ayri karar).
+	float EffectMagnitude = Def->Magnitude;
+	if (Def->Type == EMMOEffectType::PeriodicDamage && bPlayerSource && Cast<AMMOMob>(GetOwner()))
+	{
+		if (const AMMOCharacter* SourcePlayer = Cast<AMMOCharacter>(EffectInstigator))
+		{
+			if (const UMMOStatsComponent* SourceStats = SourcePlayer->GetStats())
+			{
+				EffectMagnitude += SourceStats->AttackPower * DotPlayerAttackScale;
+			}
+		}
+	}
+
 	// Ayni efekt zaten varsa: suresini tazele (KO tarzi yenileme; ust uste yigilmaz).
 	for (FMMOActiveEffect& E : ActiveEffects)
 	{
 		if (E.EffectId == EffectId)
 		{
+			E.Magnitude = EffectMagnitude;
 			E.RemainingTime = Def->Duration;
 			E.EndServerTime = EffectEnd;
 			E.TimeSinceLastTick = 0.f;
@@ -779,7 +812,7 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 	FMMOActiveEffect A;
 	A.EffectId = Def->EffectId;
 	A.Type = Def->Type;
-	A.Magnitude = Def->Magnitude;
+	A.Magnitude = EffectMagnitude;
 	A.RemainingTime = Def->Duration;
 	A.EndServerTime = EffectEnd;
 	A.Duration = Def->Duration;
@@ -909,7 +942,7 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 		{
 			Heal(P.Magnitude);
 		}
-		else // PeriodicDamage (DoT) — oldurme XP kredisi icin sahibin TakeDamage akisindan gecir.
+		else // PeriodicDamage (DoT) â€” oldurme XP kredisi icin sahibin TakeDamage akisindan gecir.
 		{
 			// Mob zehiri guvenli bolgeye giren oyuncuyu oldurmemeli. Oyuncunun moba
 			// uyguladigi DoT bu kapidan etkilenmez.
@@ -935,7 +968,11 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 			{
 				InstController = InstPawn->GetController();
 			}
-			UGameplayStatics::ApplyDamage(GetOwner(), P.Magnitude, InstController, Instigator, nullptr);
+			// Oyuncunun mob uzerindeki DoT'u savunmayi atlar (TakeDamage UMMODotDamageType'i taniyip
+			// ApplyDamageIgnoringDefense'e yonlendirir); diger tum DoT'lar eskisi gibi savunmadan dusulur.
+			const bool bPlayerDotOnMob = P.bPlayerSource && Cast<AMMOMob>(GetOwner()) != nullptr;
+			UGameplayStatics::ApplyDamage(GetOwner(), P.Magnitude, InstController, Instigator,
+				bPlayerDotOnMob ? TSubclassOf<UDamageType>(UMMODotDamageType::StaticClass()) : TSubclassOf<UDamageType>());
 		}
 	}
 
@@ -1042,7 +1079,7 @@ void UMMOStatsComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 }
 
 // ----------------------------------------------------------------------
-// OnRep — istemci tarafında değer replike olunca UI delegate'lerini tetikle
+// OnRep â€” istemci tarafÄ±nda deÄŸer replike olunca UI delegate'lerini tetikle
 // ----------------------------------------------------------------------
 
 void UMMOStatsComponent::OnRep_Health()
@@ -1077,7 +1114,7 @@ void UMMOStatsComponent::OnRep_Experience()
 
 void UMMOStatsComponent::OnRep_Level()
 {
-	// Eşiği istemcide de Level'a göre tazele (ExperienceToNextLevel replike edilmiyor).
+	// EÅŸiÄŸi istemcide de Level'a gÃ¶re tazele (ExperienceToNextLevel replike edilmiyor).
 	ExperienceToNextLevel = ComputeExperienceForLevel(Level);
 	OnLevelUp.Broadcast(Level);
 	OnExperienceChanged.Broadcast(Experience, ExperienceToNextLevel);
@@ -1085,7 +1122,7 @@ void UMMOStatsComponent::OnRep_Level()
 
 void UMMOStatsComponent::OnRep_PrimaryStats()
 {
-	// Ana statlar değişince UI'ın türetilmiş değerleri tazelemesi için tetikle.
+	// Ana statlar deÄŸiÅŸince UI'Ä±n tÃ¼retilmiÅŸ deÄŸerleri tazelemesi iÃ§in tetikle.
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 	OnManaChanged.Broadcast(Mana, MaxMana);
 }
@@ -1242,6 +1279,16 @@ bool UMMOStatsComponent::RunDotSourceLifecycleSelfTest(UWorld* World, FString& O
 #else
 		OutError = TEXT("editor callback fixture required"); return false;
 #endif
+		// DOT_SCALING_DESIGN.md A: oyuncu -> mob DoT'u savunmayi atlar ve saldiriyla olceklenir (8 + AttackPower x 0,10);
+		// mob -> oyuncu ve oyuncu -> oyuncu DoT'u eskisi gibi savunmadan dusulur (tek tick 8, Defense 50 -> en az 1).
+		Reset(MobTarget); MobTarget->Defense = 50.f; V->AttackPower = 100.f; MobTarget->ApplyEffect(TEXT("Poison"), Victim);
+		MobTarget->ProcessEffects(1.f);
+		if (!Check(MobTarget->Health == 82.f && MobTarget->ActiveEffects.Num() == 1 && MobTarget->ActiveEffects[0].Magnitude == 18.f,
+			TEXT("player DoT on mob did not ignore defense / scale with attack"))) return false;
+		Reset(V); V->Defense = 50.f; V->ApplyEffect(TEXT("Poison"), Pawns[4]); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 99.f && V->ActiveEffects[0].Magnitude == 8.f, TEXT("mob DoT on player lost defense mitigation or got scaled"))) return false;
+		GM->SetPvPAllowed(false); Reset(V); V->Defense = 50.f; V->ApplyEffect(TEXT("Poison"), Victim); V->ProcessEffects(1.f);
+		if (!Check(V->Health == 99.f && V->ActiveEffects[0].Magnitude == 8.f, TEXT("player-on-player DoT ignored defense or got scaled"))) return false;
 		Reset(V, 5.f); V->ApplyEffect(TEXT("Poison"), Victim); V->ProcessEffects(2.f);
 		if (!Check(V->Health == 0.f && V->bIsDead && V->ActiveEffects.IsEmpty(), TEXT("fatal catch-up DoT reentrancy changed"))) return false;
 		return true;

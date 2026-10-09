@@ -3,6 +3,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Core/MMONotify.h"
 #include "Characters/MMOMob.h"
+#include "Effects/MMODotDamageType.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOSkillComponent.h"
@@ -1699,7 +1700,13 @@ float AMMOCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEv
 	}
 
 	LastDamageInstigator = DamageCauser;
-	const float ActualDamage = Stats->ApplyDamage(DamageAmount, DamageCauser);
+	// Oyuncunun mob uzerindeki DoT'u savunmayi atlar (UMMODotDamageType; DOT_SCALING_DESIGN.md A). Yalniz mob hedefte:
+	// oyuncu -> oyuncu (PvP) ve mob -> oyuncu DoT'u eskisi gibi savunmadan dusulur.
+	const bool bDotIgnoresDefense = Cast<AMMOMob>(this) != nullptr && DamageEvent.DamageTypeClass
+		&& DamageEvent.DamageTypeClass->IsChildOf(UMMODotDamageType::StaticClass());
+	const float ActualDamage = bDotIgnoresDefense
+		? Stats->ApplyDamageIgnoringDefense(DamageAmount, DamageCauser)
+		: Stats->ApplyDamage(DamageAmount, DamageCauser);
 
 	if (ActualDamage > 0.f)
 	{

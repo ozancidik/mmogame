@@ -62,7 +62,9 @@ sürdürülebilir kılıyor `[Hesap]`), alan becerileri ikinci hedefte tek hedef
 
 ## Bilinen açıklar (test etmeden önce bil)
 
-- **Zehir DoT'u etkisiz** (savunmaya karşı fiilen 1 hasar): `DOT_SCALING_DESIGN.md`. Zehir veren mob/beceri hasarı boştur, bug değil.
+- **Zehir DoT'u:** oyuncunun mob üzerindeki Zehir'i artık savunmayı atlıyor ve saldırıyla ölçekleniyor (tick = 8 + saldırı×0,10; `DOT_SCALING_DESIGN.md`);
+  **denenmedi**, Zehir becerilerini (`Arc_PoisonArrow`, `Arc_DeathMark`, `Arc_ThornVolley`, `Arc_SpikeTrap`, `Arc_PoisonCloud`) mobda dene: hasar sayıları
+  tick başına yaklaşık 8 + saldırı/10 olmalı. **Mob → oyuncu zehri hâlâ etkisiz** (bilerek; savunmaya karşı 1 hasar), bug değil.
 - Lv73–80 için **yeni ekipman yok**; satıcı seviye kapısı kararı bekliyor (`DECISIONS_NEEDED.md` madde 3, CONTENT_PLAN G6).
 - Kül mobları lore'da "yakar", kodda yavaşlatır/vurur; `Burn` efekti yok.
 - Elit/boss karşılaşmaları hâlâ "daha çok can + Öfke"; fazlı boss yok.

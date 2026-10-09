@@ -1,6 +1,14 @@
-# Zehir / DoT ölçekleme tasarımı (karar bekliyor, kod yazılmadı)
+# Zehir / DoT ölçekleme tasarımı
 
-**Tarih:** 2026-10-09. **Durum:** tasarım notu. Kod değişmedi; karar sahibi proje sahibi, değerler ölçümle ayarlanır.
+**Tarih:** 2026-10-09. **Durum: A'nın OYUNCU → MOB kısmı UYGULANDI** (aynı gün; "mob → oyuncu" kısmı bilerek yapılmadı). Değerler placeholder, ölçümle ayarlanır.
+
+> **Uygulama:** oyuncunun mob üzerindeki DoT'u (1) savunmayı atlar: yeni `UMMODotDamageType` (`Public/Effects/MMODotDamageType.h`), DoT tick'i bu türle
+> `ApplyDamage` çağırır, `AMMOCharacter::TakeDamage` türü görüp `UMMOStatsComponent::ApplyDamageIgnoringDefense`'e yönlendirir (yalnız hedef mobsa);
+> (2) büyüklüğü `taban + kaynak AttackPower × 0,10` olur (`DotPlayerAttackScale`, `MMOStatsComponent.cpp` en üstü; `ApplyEffect` içinde uygulama anında hesaplanır, yenilemede
+> da). Mob → oyuncu ve oyuncu → oyuncu DoT'u **değişmedi** (savunmadan düşer, sabit 8). Güvenlik kapıları (hub, PvP, parti/klan, kaynak yoksa atla) dokunulmadı.
+> Test: `TestDotSourceLifecycle.ps1` 33 → **36 kontrol** (üç yeni: oyuncu→mob 18 sabit hasar/tick, mob→oyuncu ve oyuncu→oyuncu eski davranış); `k`yi 0'a çekince
+> ilk yeni kontrolde başarısız olduğu mutasyonla gösterildi. Gerçek PIE'de zehir becerisinin hissi **denenmedi**; `k=0,10` tahmin.
+> Aşağıdaki "Neden şimdi uygulanmadı" bölümü uygulama öncesi yazılmıştı.
 Etiketler: **[Kesin]** kodda okundu · **[Hesap]** elle hesaplandı · **[Tahmin]** ölçülmedi.
 
 ## Sorun

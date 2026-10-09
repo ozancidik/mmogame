@@ -160,7 +160,7 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
 
 ## Yeni karar adaylari (2026-10-09: Lv46-80 icerik ve beceri dolgusu; KOD kararla degismedi)
 
-- **Zehir/DoT olcekleme:** `Poison` 8/sn x 8 sn, savunmaya karsi fiilen 1 hasar; 10+ mob ve 6 beceri etkisiz. Secenekler (A: savunma atlayan + kaynak vurusuna bagli, onerilen `k~0,10`): `DOT_SCALING_DESIGN.md`. Savas dengesini degistirir, olcum ister.
+- **Zehir/DoT olcekleme:** `Poison` 8/sn x 8 sn, savunmaya karsi fiilen 1 hasar. A secenegi (savunma atlayan + `taban + AttackPower x 0,10`) YALNIZ oyuncu -> mob icin UYGULANDI (2026-10-09, `TestDotSourceLifecycle` 36 kontrol); mob -> oyuncu zehri bilerek eskisi gibi (etkisiz) kaldi. Karar: mob -> oyuncu yonu de acilsin mi, `k` degeri ne olsun? Olcum ister: `DOT_SCALING_DESIGN.md`.
 - **Saticida seviye kapisi ve Lv73-80 ekipman (Taht seti):** `BuyEquipment` seviye sartini yalniz kusanmada denetler; yeni set/elit/gorev odulu altinla atlanabilir (CONTENT_PLAN_LV46_80.md G6, S3). Karar madde 3 ile birlikte; Lv73-80'e yeni ekipman, kapi karari verilene kadar eklenmedi.
 - **Kul mobu efekti (Burn):** Lore "kor gibi yakar" der, kod yavaslatma/zehir verir; yakma efekti DoT sorunu cozulmeden anlamsiz kalir, eklenmedi. Lore'u kodla mi, kodu Lore'la mi uyumlu tutalim?
 - **Lv46-80 yeni icerigin sayilari:** mob/gorev/beceri degerlerinin hepsi PLACEHOLDER; ilk oyun testi `PLAYTEST_LV46_80.md`. Yan gorev XP'leri bilerek ~%6-7 esikte (pace-notr); mevcut Lv61+ grind gorevleri ~%40-50 verir. Yeni yan gorevler de o kalibi mi izlesin?
