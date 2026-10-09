@@ -1,19 +1,24 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 9 Ekim 2026. Kaynak kod ve tamamlanan kontroller esas alınmıştır.
-Son doğrulanan kaynak snapshot `9fdd2ea` (§75): O37 parti kaynak lifetime
-koruması ile W1/W2/R içerik paketleri aynı izole checkout/DLL'de birlikte geçti.
-Temiz Editor UHT/module/lib/DLL build52,93sn; RunAllChecks -SkipBuild -FullCompile
-41/41 exit0,19 CPP NoPCH/W4 warning0.151 kaynak/runner hash ve linked DLL sabit.
-Parti149/klan138/arkadaş53/presence24/save26/DoT33/trade218, parser576/576,
-JSONschema2/negative111.489 yerel kayıt byte-eşit kopyalarda load/JSON/roundtrip
-uyumlu. Summer52/Winter29 smoke ve Net1join/1welcome/error0.
-56 mob/86 görev tanımı var; beş yeni mob ve yedi yan görevin denge/tek tek
-oynanış/ödül teslimi, gerçek uzak istemci/disk login/Shipping/Server açık.
-O37'nin stale issuing invite/kick, recipient grup niyeti, identity rebinding,
-leadership epoch/delegate reentrancy/UI atomikliği sınırları sürer.
-ECC +salt okunur Hilbert data review blocker0. Tamamlanan testler eski değişken
-paketin aggregate boşluğunu9fdd2ea için kapatır; sonraki kaynaklara mal edilmez.
+Önceki gameplay commit `66c504e` (§73/O36), klan yönetim isteğini gönderim
+üyeliğine bağladı. Son sınırlı düzeltme (§74/O37), eski parti davetinin davetçinin
+yeni grup/solo lifetime'ını takip etmesini keser. Sunucuya özel kaynak GUID'i
+issuance'da yakalanır; rejoin/transfer ve açık ayrılma/solo collapse yeniler.
+Continuous member roster/lider değişimi daveti korur. RPC/save/replication
+şeması aynı. Derlenmiş baseline FAIL58/case0; collapse renewal mutant FAIL93/case7;
+exact restored actual CPP/lib/DLL3,70sn PASS149. Native149=controller38+diğer111,
+sekiz source geçişi/duplicate/fresh recovery/invalid source/nonce-state kontrolleri.
+Party/PC NoPCH/W4 warning0, ECC ve Mencius scoped final review blocker0.
+Gerçek remote/PIE/disk login/Shipping/Server açık. Stale issuing invite/kick,
+recipient grup niyeti, identity rebinding, continuous leadership epoch,
+delegate reentrancy ve UI atomikliği ayrı açık kalır.
+40/40 paket exit0; parti149/klan138/arkadaş53/save26/DoT33/trade218,
+Store482/schema2/parser576, Summer52/Winter31/Net1join1welcome/error0.
+Paket sırasında dış database kaynakları değişti (W1 cdb95fa + pending W2);
+tüm database snapshot/DLL freeze garantisi yok. Kendi dört source/runner
+bytes sabit ve ayrı actual DLL/native149/negatif kanıtlarla doğrulandı.
+Dış içerik dosyalarına dokunulmadı; paket pending W2 için kanıt sayılmaz.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen

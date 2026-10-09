@@ -1080,18 +1080,3 @@ sayılmaz. Commit yalnız önceden actual DLL ile derlenip native149/compiled
 negatiflerle doğrulanmış O37 dört source/runner + dört kayıt belgesini içerir.
 Kendi dört source/runner SHA'ları ilk freeze ile aynı; exact Party backup aynı.
 Paralel beş dosya ne stage edilir ne commit edilir. Gerçek PIE/Server/Shipping açık.
-
-O37 stage/commit öncesi dış W2 işi 54de52b olarak ayrı commit oldu; başlangıçtaki
-beş dış dosya artık temiz. O37 stage seti yalnız kendi sekiz dosyasıydı. İlk
-40/40 paket içindeki revision değişimi sınırı geçerli; bu paket W2'nin final
-snapshot'ı için bütünsel doğrulama iddiası değildir.
-
-### 9 Ekim · 9fdd2ea sabit snapshot ağ/regresyon doğrulaması
-
-O37 +W1/W2/R izole checkout'ta normal Editor build ve41/41 FullCompile paketini
-geçti;19 CPP NoPCH/W4 warning0,151 source/runner ve linked DLL hash sabit.
-Parti149, klan138, arkadaş53/presence24/save26/DoT33/trade218 PASS.
-NetSmoke1join/1welcome/error0. Önceki değişen database paketi yerine bu sonuç
-9fdd2ea snapshot'ına bağlıdır; §75 kanıtları. Yeni içerik otorite/RPC/replikasyon
-şeması değiştirmez. Listen bağlantısı gerçek party/clan remote davranışı veya
-Dedicated Server/Shipping testi değildir; O37 açık niyet/epoch/PIE sınırları sürer.
