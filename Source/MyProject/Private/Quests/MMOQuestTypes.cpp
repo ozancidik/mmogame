@@ -269,6 +269,12 @@ namespace
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
 		Table.Last().RewardConsumableCount = 5;
 
+		// Lv62 kapi boslugu: Bekci cebinde (62-64) ek gorev. PLACEHOLDER (~%6,5 esik, pace-notr); PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_RiftSentries"), TEXT("Yarik Nobetcileri"), TEXT("Yarigin ic nobetini boz: 8 Yarik Bekcisi oldur."),
+			T::KillSpecificMob, TEXT("RiftKeeper"), 8, 66000, 20000, 62, TEXT("Q_RiftWatch")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		Table.Add(MakeQuest(TEXT("Q_RiftWalkers"), TEXT("Yarik Yuruyenleri"), TEXT("Yarigin derininden cikanlari durdur: 8 Yarik Yuruyeni oldur."),
 			T::KillSpecificMob, TEXT("RiftWalker"), 8, 72000, 22000, 64, TEXT("Q_RiftDepths")));
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));

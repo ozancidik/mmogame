@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 59 mob (13 elit), 89 gorev, 53 ekipman, 93 beceri.
+Toplam: 59 mob (13 elit), 90 gorev, 53 ekipman, 93 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -65,7 +65,7 @@ Toplam: 59 mob (13 elit), 89 gorev, 53 ekipman, 93 beceri.
 | 59 |  |  | Q_RiftWhispers |  |  |
 | 60 | RiftWhisperer |  | Q_RiftKeepers |  |  |
 | 61 |  |  | Q_RiftWatch, Q_RiftPurge |  |  |
-| 62 | RiftKeeper |  |  |  |  |
+| 62 | RiftKeeper |  | Q_RiftSentries |  |  |
 | 63 |  |  | Q_RiftDepths |  |  |
 | 64 | RiftWalker |  | Q_RiftWalkers |  | War_Obliterate, Arc_Multishot, Mag_GlacialSpike, Pri_HealingSurge |
 | 65 |  | RiftHerald | Q_RiftHerald, Q_Level80 |  |  |

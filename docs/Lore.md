@@ -652,6 +652,11 @@ Yolu'ndan Yaz'a geri iner; zincir, Buzbağlı Muhafız'ı devirenlere açılır.
   hareket ederler, dokunuşları adımını ağırlaştırır."
   - *Dönüşte:* "Fısıltılar kesildi… ama sessizlik daha da rahatsız edici, değil mi?
     Al şu Büyük Can İksirleri'ni; yarığa bir kez daha bakacaksın."
+- **Yarık Nöbetçileri** *(Q_RiftSentries)* — "Bekçiler düştükçe yerlerine yenileri
+  diziliyor, evlat; bu yarık kendi nöbetini kendisi tutuyor. Sekizini daha devir ki
+  iç hat çözülsün. Canları azaldıkça öfkelerine dikkat et."
+  - *Dönüşte:* "İç nöbet bozuldu. Al şu Büyük Can İksirleri'ni; yarığın derinine
+    inmeden önce yaralarını sar."
 - **Yarık Yürüyenleri** *(Q_RiftWalkers)* — "Yarığın en derininden yürüyerek çıkanlar
   var; ağır adımlı, öfkeli. Sekizini durdur, canları azalınca kudurduklarını unutma."
   - *Dönüşte:* "Yürüyenler durdu. Al şu Büyük Mana İksirleri'ni; yarığın ötesini
