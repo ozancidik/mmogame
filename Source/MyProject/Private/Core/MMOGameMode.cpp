@@ -943,7 +943,7 @@ void AMMOGameMode::SpawnMobArea()
 			WinterSpawner->MaxMobs = 6;
 			WinterSpawner->SpawnRadius = 225.f;
 			WinterSpawner->MinMobLevel = 42;
-			WinterSpawner->MaxMobLevel = 48;
+			WinterSpawner->MaxMobLevel = 49; // W1 yedek paketi: WinterWolf (47) + WinterBehemoth (49) bu cepte; ayri cep sonra probla
 			WinterSpawner->bValidateSpawnOnNavGround = true;
 			UGameplayStatics::FinishSpawningActor(WinterSpawner, WinterMobTM);
 		}

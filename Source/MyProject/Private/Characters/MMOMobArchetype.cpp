@@ -223,6 +223,20 @@ namespace
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.4f;
 
+		// --- W1 yedek paketi (docs/CONTENT_PLAN_LV46_80.md 2.2; koordinatsiz: Winter bandi 42-49'a genisler) ---
+		// Degerler PLACEHOLDER: komsu arketiplerin (Reaver 46 / Wraith 48 / Scout 51) arasinda ara deger.
+		// Don Kurdu hizli akinci (Lv47), Buz Devi yavas ve agir (Lv49, Warrok). Denge PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("WinterWolf"), TEXT("Don Kurdu"), 47, 117, 112, 165.f, 20500, 2800, 5050, 450.f, 600.f, 1.2f, FLinearColor(0.8f, 0.88f, 0.96f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+
+		Table.Add(MakeMob(TEXT("WinterBehemoth"), TEXT("Buz Devi"), 49, 123, 121, 175.f, 25000, 3150, 5600, 262.f, 600.f, 1.6f, FLinearColor(0.5f, 0.7f, 0.9f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- Sekizinci kademe NORMAL moblari (Lv51-55; Frostbound, Winter_scene) ---
 		// PROGRESSION_PLAN Lv51-57 dilimi. XP'ler plan hipotezi (seviye basina ~12-25 kill):
 		// 51->52 esigi ~543K / 30K ~= 19 kill. Denge PIE'de dogrulanmadi.

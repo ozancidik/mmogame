@@ -198,6 +198,18 @@ namespace
 			T::KillSpecificMob, TEXT("WinterWraith"), 5, 57000, 57000, 48, TEXT("Q_WinterReavers")));
 		Table.Last().RewardEquipmentId = FName(TEXT("WinterPlate"));
 
+		// W1 yan gorevleri (CONTENT_PLAN_LV46_80.md 2.2): ana zinciri kilitlemez, Q_WinterSovereign'a on kosul degildir.
+		// XP/altin PLACEHOLDER, ~%6 esik (pace-notr); PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_WinterHowls"), TEXT("Don Surusu"), TEXT("Surunun basini ez: 8 Don Kurdu oldur."),
+			T::KillSpecificMob, TEXT("WinterWolf"), 8, 26000, 8000, 47, TEXT("Q_WinterReavers")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_WinterColossus"), TEXT("Buz Devleri"), TEXT("Buzdan devleri yik: 6 Buz Devi oldur."),
+			T::KillSpecificMob, TEXT("WinterBehemoth"), 6, 30000, 9000, 49, TEXT("Q_WinterWraiths")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		Table.Add(MakeQuest(TEXT("Q_WinterSovereign"), TEXT("Kis Hukumdari"), TEXT("Kis hukumdarini devir."),
 			T::KillSpecificMob, TEXT("WinterSovereign"), 1, 68000, 68000, 50, TEXT("Q_WinterWraiths")));
 		Table.Last().RewardEquipmentId = FName(TEXT("WinterBlade"));

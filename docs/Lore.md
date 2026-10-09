@@ -873,6 +873,16 @@ Hükümdarı'nı devirenlere açılır.*
   evlat; dokunuşları kanı ağırlaştırır. Beşini kov, ama sayılarını sayma."
   - *Dönüşte:* "Ölüler yatışıyor. Kış Zırhı'nı giy; soğuk onlardan geliyor, senden
     değil."
+- **Don Sürüsü** *(Q_WinterHowls)* — "Fırtınanın içinde uluyanlar rüzgâr değil,
+  evlat; Hükümdar'ın sürüsü bu. Dişleri adımını ağırlaştırır, sekizini devir ki
+  sürü başsız kalsın."
+  - *Dönüşte:* "Uluma kesildi… Sürü dağıldı. Al şu Büyük Can İksirleri'ni; bu
+    soğukta kanı sıcak tutan her şey değerlidir."
+- **Buz Devleri** *(Q_WinterColossus)* — "Karın altında uyuyan buzdan devler var,
+  evlat; hantal ama bir kez öfkelendi mi durmaz. Altısını yık; canları azalınca
+  kudurduklarını unutma."
+  - *Dönüşte:* "Devler yıkıldı, yer sallandı biraz. Al şu Büyük Mana İksirleri'ni;
+    bu işte aklını sakin tutan kazanır."
 - **Kış Hükümdarı** *(Q_WinterSovereign)* — "Diyarın tahtında oturan, Uzun Kış'ın
   asıl sahibi. Buz Lordu bile bir vali sayılırmış yanında. Devir onu; dokunuşu
   bedenini ağırlaştırır, öfkesi fırtına gibi kabarır."
