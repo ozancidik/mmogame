@@ -23,6 +23,7 @@ SKILL_FIXTURE = os.path.join(HERE, "fixtures", "first_skill_metrics_sample.log")
 BASIC_ATTACK_FIXTURE = os.path.join(HERE, "fixtures", "first_basic_attack_metrics_sample.log")
 DEATH_FIXTURE = os.path.join(HERE, "fixtures", "first_death_metrics_sample.log")
 LEVELUP_FIXTURE = os.path.join(HERE, "fixtures", "first_levelup_metrics_sample.log")
+MOVE_FIXTURE = os.path.join(HERE, "fixtures", "first_move_metrics_sample.log")
 
 failures = []
 assertions = 0
@@ -101,6 +102,228 @@ def run_levelup_validator(pm, raw, expected):
     finally:
         sys.argv = previous_argv
         os.unlink(path)
+
+
+def run_move_validator(pm, raw, expected):
+    validator = load(os.path.join(HERE, "ValidateFirstMoveLog.py"))
+    validator.metrics = pm
+    with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False, encoding="utf-8") as fh:
+        fh.write(raw)
+        path = fh.name
+    previous_argv = sys.argv
+    buf = io.StringIO()
+    try:
+        sys.argv = ["ValidateFirstMoveLog.py", path, "--events", str(expected)]
+        with contextlib.redirect_stdout(buf):
+            code = validator.main()
+        return code, buf.getvalue()
+    finally:
+        sys.argv = previous_argv
+        os.unlink(path)
+
+
+def test_first_move(pm):
+    def marker(event):
+        return "[MMOMETRIC] " + " ".join("%s=%s" % item for item in event.items()) + "\n"
+
+    events = pm.parse_log(MOVE_FIXTURE)
+    check(len(events) == 28, "first move fixture: 28 parsed events; missing who skipped")
+    check("first_move" in pm.FIRST_ACTIONS, "first_move belongs to controller first actions")
+    players = pm.build_stats(events)
+    warrior = players["Warrior"]
+    first = {"seconds": 8, "lv": 1, "mode": "walking", "distance": 1.0}
+    check(warrior["first_actions"]["a" * 32]["first_move"] == first,
+          "first move preserves elapsed, level, mode and XY distance in cm")
+    check(warrior["first_duplicates"] == 1 and warrior["first_invalid"] == 0
+          and warrior["last_t"] == 15, "normalized move duplicate preserves payload and observation clock")
+    check(warrior["first_actions"]["b" * 32]["first_move"] == {
+        "seconds": 5, "lv": 1, "mode": "navwalking", "distance": 2.375},
+          "new controller SID accepts fractional distance and pre-progression observation level")
+    check(warrior["first_actions"]["a" * 32]["first_skill"]["skill"] == "War_PowerStrike",
+          "same who/SID different first actions remain independent")
+    check(players["Archer"]["first_actions"]["a" * 32]["first_move"] == {
+        "seconds": 10, "lv": 80, "mode": "falling", "distance": 17.125},
+          "same SID different who accepts independent falling observation")
+    check(players["Mage"]["first_actions"]["a" * 32]["first_move"] == {
+        "seconds": 15, "lv": 3, "mode": "walking", "distance": 1.5}, "independent mage move")
+    check(players["Priest"]["first_actions"]["b" * 32]["first_move"] == {
+        "seconds": 0, "lv": 5, "mode": "navwalking", "distance": 1.001},
+          "zero elapsed move is explicit, not unknown")
+    check(players["Bad"]["first_invalid"] == 13 and players["Bad"]["first_duplicates"] == 0
+          and players["Bad"]["first_actions"] == {} and not players["Bad"]["timing_started"]
+          and players["Bad"]["first_t"] == players["Bad"]["last_t"] == 0,
+          "13 malformed fixture moves neither consume first nor start timing")
+    check(sum("first_move" in a for p in players.values() for a in p["first_actions"].values()) == 5,
+          "five accepted who/controller first moves")
+    for index, bad in enumerate(e for e in events if e["who"] == "Bad"):
+        p = pm.build_stats([bad])["Bad"]
+        check(p["first_invalid"] == 1 and not p["timing_started"] and p["first_actions"] == {},
+              "independent move fixture rejection #%d" % (index + 1))
+    baseline = pm.build_stats([e for e in events if e["ev"] not in pm.FIRST_ACTIONS])["Warrior"]
+    for key in ("level", "start_level", "enter", "lv", "src", "mobs", "quests", "quest_start", "pending"):
+        check(warrior.get(key) == baseline.get(key), "first move must not alter gameplay state/counters: " + key)
+    check(warrior["level"] == 3 and warrior["lv"][1]["kills"] == 1 and warrior["lv"][1]["xp"] == 25
+          and warrior["lv"][1]["gold_in"] == 3 and warrior["lv"][1]["quest_xp_reward"] == 200
+          and warrior["lv"][3]["deaths"] == 1 and warrior["lv"][3]["xploss"] == 5
+          and warrior["lv"][3]["gold_in"] == 7,
+          "ordinary events alone own progression/XP/gold/kill/death/quest; lower move lv never regresses level")
+    for who in ("Archer", "Mage", "Priest", "Bad"):
+        p = players[who]
+        check(p["level"] is None and all(p[k] == {} for k in
+              ("enter", "dur", "lv", "src", "mobs", "quests", "quest_start")) and p["pending"] == [],
+              "first-only move creates no gameplay levels/counters: " + who)
+
+    valid = next(e for e in events if e["ev"] == "first_move")
+    malformed = [
+        ("scope", None), ("scope", ""), ("scope", "character"), ("scope", "Controller"),
+        ("sid", None), ("sid", ""), ("sid", "a" * 31), ("sid", "a" * 33), ("sid", "g" * 32),
+        ("sid", "a" * 31 + "-"), ("sid", "\uff41" * 32),
+        ("start", "9"), ("elapsed", "7"),
+    ]
+    for field in ("t", "start", "elapsed"):
+        malformed.extend((field, value) for value in (None, "", "-1", "NaN", "Inf", "-Inf", "1e309", "bad"))
+    malformed.extend(("lv", value) for value in
+                     (None, "", "0", "-1", "1.5", "NaN", "Inf", "-Inf", "1e309", "bad"))
+    malformed.extend(("mode", value) for value in
+                     (None, "", "Walking", "NavWalking", "Falling", "flying", "swimming", "none", "None", "0"))
+    malformed.extend(("distance", value) for value in
+                     (None, "", "0", "-0", "0.999", "0.5", "-1", "-1.5", "NaN", "nan", "Inf", "inf",
+                      "-Inf", "1e309", "-1e309", "1e-400", "bad", "1cm", "1,000", "--1"))
+    for field, value in malformed:
+        bad = dict(valid)
+        if value is None:
+            bad.pop(field)
+        else:
+            bad[field] = value
+        label = "%s=%s" % (field, value)
+        rejected = pm.build_stats([bad])["Warrior"]
+        check(rejected["first_invalid"] == 1 and rejected["first_duplicates"] == 0
+              and rejected["first_actions"] == {} and not rejected["timing_started"],
+              "move rejects malformed payload/common clock: " + label)
+        recovered = pm.build_stats([bad, valid])["Warrior"]
+        check(recovered["first_invalid"] == 1 and recovered["first_duplicates"] == 0
+              and recovered["first_actions"]["a" * 32]["first_move"] == first
+              and recovered["first_t"] == recovered["last_t"] == 8,
+              "invalid move cannot consume first or clocks before recovery: " + label)
+        code, out = run_move_validator(pm, marker(bad), 1)
+        check(code == 1 and "MMO_FIRST_MOVE_PARSER_TEST] FAIL" in out,
+              "native validator rejects malformed move: " + label)
+    # Numeric float schema: fractional distances >=1 are valid, no integer or
+    # three-decimal lexical restriction and no added upper bound on distance/level.
+    for mode in ("walking", "navwalking", "falling"):
+        for text in ("1", "1.000", "1.001", "1.5", "2.375", "123.456", "1e1", "1.7976931348623157e308"):
+            probe = dict(valid, mode=mode, distance=text)
+            p = pm.build_stats([probe])["Warrior"]
+            check(p["first_actions"]["a" * 32]["first_move"] == dict(first, mode=mode, distance=float(text))
+                  and p["level"] is None and p["lv"] == {}, "valid move float distance: %s %s" % (mode, text))
+            code, out = run_move_validator(pm, marker(probe), 1)
+            check(code == 0 and "PASS events=1" in out, "native accepts valid move float: %s %s" % (mode, text))
+    for level in ("1", "2.0", "80", "81"):
+        check(pm.build_stats([dict(valid, lv=level)])["Warrior"]["first_actions"]["a" * 32]["first_move"]["lv"]
+              == int(float(level)), "move preserves existing common integral level gate: " + level)
+    for timestamp in ("0", "10"):
+        check(pm.build_stats([dict(valid, t=timestamp, start=timestamp, elapsed="0")])["Warrior"]
+              ["first_actions"]["a" * 32]["first_move"]["seconds"] == 0,
+              "zero elapsed first move at clock " + timestamp)
+    check(pm.build_stats([dict(valid, t="8.125", start="2", elapsed="6.125")])["Warrior"]
+          ["first_actions"]["a" * 32]["first_move"]["seconds"] == 6.125, "move preserves fractional controller clocks")
+    for elapsed, accepted in (("8.009", True), ("8.011", False)):
+        check(bool(pm.build_stats([dict(valid, elapsed=elapsed)])["Warrior"]["first_actions"]) == accepted,
+              "move inherits 0.01 clock consistency tolerance: " + elapsed)
+    clock_base = [{"who": "Clock", "ev": "kill", "t": "10", "lv": "1", "xp": "25", "mob": "Goblin"}]
+    reference = pm.build_stats(clock_base)["Clock"]
+    for timestamp in ("0", "1000"):
+        for payload in ({"distance": "0.999"}, {"mode": "flying"}):
+            bad = dict(valid, who="Clock", t=timestamp, start="0", elapsed=timestamp, **payload)
+            for sequence in ([bad] + clock_base, clock_base + [bad]):
+                p = pm.build_stats(sequence)["Clock"]
+                check(p["first_invalid"] == 1 and all(p[k] == reference[k] for k in
+                      ("first_t", "last_t", "dur", "level", "enter", "lv")),
+                      "invalid move payload never expands observation/gameplay: %s %s" % (timestamp, payload))
+    bad_after = dict(valid, distance="0.999", t="1000", elapsed="1000")
+    p = pm.build_stats([valid, bad_after])["Warrior"]
+    check(p["first_invalid"] == 1 and p["first_duplicates"] == 0 and p["last_t"] == 8
+          and p["first_actions"]["a" * 32]["first_move"] == first,
+          "invalid after accepted move remains invalid and preserves payload/clock")
+
+    code, out = run_main(pm, ["x", MOVE_FIXTURE, "--who", "Warrior"])
+    check(code == 0 and "Olay sayisi: 28 (levelup=2 kill=1 death=1 gold=2)" in out
+          and "quest_accept=1 quest_claim=1" in out, "move report does not double gameplay event counts")
+    check("first_move sure=0:08 lv=1 mode=walking distance=1.000" in out
+          and "first_move sure=0:05 lv=1 mode=navwalking distance=2.375" in out
+          and "gecersiz=0 tekrar=1" in out, "move report shows mode, cm to three decimals, elapsed and diagnostics")
+    check(all("Oyuncu: " + who not in out for who in ("Archer", "Mage", "Priest", "Bad")), "move --who filter")
+    code, out = run_main(pm, ["x", MOVE_FIXTURE, "--who", "Priest"])
+    check(code == 0 and "first_move sure=0:00 lv=5 mode=navwalking distance=1.001" in out, "zero elapsed move report")
+    code, out = run_main(pm, ["x", MOVE_FIXTURE, "--who", "Bad"])
+    check(code == 0 and "gecersiz=13 tekrar=0" in out and "first_move sure=?" in out, "invalid move report")
+    code, out = run_main(pm, ["x", FIRST_FIXTURE, "--who", "Host"])
+    check(code == 0 and out.count("first_move sure=?") == 2, "old first-action sessions retain unknown move")
+    code, out = run_main(pm, ["x", FIXTURE, "--who", "Ozan"])
+    check(code == 0 and "first_move sure=?" in out and "first_* suresi bilinmiyor" in out
+          and pm.build_stats(pm.parse_log(FIXTURE))["Ozan"]["first_actions"] == {},
+          "old ordinary gameplay never implies controller movement or clock")
+
+    native_events = []
+    seen = set()
+    for e in events:
+        if e["ev"] != "first_move" or e["who"] == "Bad":
+            continue
+        key = (e["who"], e["sid"].lower())
+        if key not in seen:
+            seen.add(key)
+            native_events.append(dict(e, sid="%032x" % (len(native_events) + 1)))
+    native_raw = "".join(marker(e) for e in native_events[:4])
+    ordinary_raw = "".join(marker(e) for e in events if e["ev"] != "first_move")
+    for count in (1, 3, 4, 5):
+        raw = "".join(marker(e) for e in native_events[:count])
+        code, out = run_move_validator(pm, ordinary_raw + raw, count)
+        check(code == 0 and "PASS events=%d who/clock/payload accepted" % count in out,
+              "native validator accepts independent controller event count: %d" % count)
+    cross_who = dict(valid, who="Other", sid="A" * 32, t="1000", elapsed="1000", mode="falling", distance="2.375")
+    shared = pm.build_stats([valid, cross_who])
+    check(len(shared) == 2 and shared["Warrior"]["last_t"] == 8 and shared["Other"]["last_t"] == 1000
+          and shared["Other"]["first_actions"]["a" * 32]["first_move"] == dict(
+              first, seconds=1000, mode="falling", distance=2.375)
+          and all(p["first_invalid"] == p["first_duplicates"] == 0 for p in shared.values()),
+          "cross-who normalized SID retains independent payload/clocks; global uniqueness stays native-only")
+    missing_who = marker({k: v for k, v in valid.items() if k != "who"})
+    for label, raw, count in (
+        ("expected count", native_raw, 5),
+        ("negative count", native_raw, -1),
+        ("zero count with events", native_raw, 0),
+        ("duplicate", native_raw + marker(native_events[0]), 5),
+        ("case-insensitive duplicate", marker(valid) + marker(dict(valid, sid="A" * 32)), 2),
+        ("same sid different who", marker(valid) + marker(dict(valid, who="Other")), 2),
+        ("normalized same sid different who", marker(valid) + marker(cross_who), 2),
+        ("missing who", missing_who, 1),
+        ("missing who after valid markers", native_raw + missing_who, 5),
+        ("unparsed extra marker with expected accepted count", native_raw + missing_who, 4),
+        ("empty who", marker(dict(valid, who="")), 1),
+        ("None who", marker(dict(valid, who="None")), 1),
+        ("missing clocks", marker({k: v for k, v in valid.items() if k not in ("t", "start", "elapsed")}), 1),
+        ("overwritten event", marker(valid).rstrip() + " ev=kill\n", 1),
+        ("repeated raw event token", marker(valid).rstrip() + " ev=first_move\n", 1),
+        ("ordinary gameplay only", ordinary_raw, 1),
+    ):
+        code, out = run_move_validator(pm, raw, count)
+        check(code == 1 and "MMO_FIRST_MOVE_PARSER_TEST] FAIL" in out, "native move validator rejects " + label)
+        if label in ("same sid different who", "normalized same sid different who"):
+            check("raw=2 parsed=2 accepted=2 invalid=0 duplicates=0 sessions=1" in out,
+                  "native cross-who rejection requires global normalized SID uniqueness: " + label)
+    reordered = {k: v for k, v in valid.items() if k != "ev"}
+    reordered["ev"] = "first_move"
+    code, out = run_move_validator(pm, marker(reordered).rstrip(), 1)
+    check(code == 0 and "PASS events=1" in out, "native move token at EOF without newline")
+    code, out = run_move_validator(pm, "LogTemp: ev=first_move\n" + native_raw, 4)
+    check(code == 0 and "PASS events=4" in out, "nonmetric move text cannot add raw event count")
+    lookalikes = "[MMOMETRIC] ev=first_move_extra who=Other note=ev=first_move\n"
+    code, out = run_move_validator(pm, lookalikes + native_raw, 4)
+    check(code == 0 and "PASS events=4" in out, "event suffixes and embedded values are not raw first_move tokens")
+    with open(MOVE_FIXTURE, encoding="utf-8") as fh:
+        code, out = run_move_validator(pm, fh.read(), 20)
+    check(code == 1 and "raw=20 parsed=19 accepted=5 invalid=13 duplicates=1 sessions=4" in out,
+          "adversarial move fixture exposes missing who, malformed payloads, duplicates and shared SIDs")
 
 
 def test_first_levelup(pm):
@@ -912,6 +1135,7 @@ def main(argv):
           "full adversarial fixture validator rejects raw missing-who, malformed and duplicate markers")
 
     test_first_levelup(pm)
+    test_first_move(pm)
 
     # Rejected duplicate first markers must not extend observation or level duration.
     # Same controller SID/action keeps its accepted payload, even across casing and clocks.
@@ -925,6 +1149,7 @@ def main(argv):
         "first_basic_attack": {"target": "mob", "targetid": "Goblin", "tlv": "1"},
         "first_death": {"by": "Goblin", "xploss": "0"},
         "first_levelup": {"from": "1", "to": "2", "lv": "2"},
+        "first_move": {"mode": "walking", "distance": "1.000"},
     }
     check(set(first_payloads) == set(pm.FIRST_ACTIONS), "duplicate clock coverage includes every first action")
     before = {"ev": "kill", "who": "Clock", "t": "5", "lv": "1", "mob": "Goblin", "xp": "10"}

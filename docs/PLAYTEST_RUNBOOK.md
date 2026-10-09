@@ -182,6 +182,38 @@ bu değişiklik okçu/büyücüye yeni menzil veya oyun kuralı eklemez.
 öldürücü vuruş/XP öncesi seviye ve ret kapıları; log ayrıca ortak parser'dan geçer.
 Gerçek uzak RPC, kullanıcı giriş süresi, seamless travel ve 20 dk koşu PIE'de açık.
 
+## İlk sunucu hareket gözlemi (10 Ekim 2026, O46)
+
+`first_move mode=walking|navwalking|falling distance=<cm>` sunucunun mevcut
+CharacterMovement güncellemesi sonunda yazılır: canlı sahip olunan pawn,
+pozitif sonlu delta, en az 1 cm gerçek XY yer değiştirme ve sıfırdan farklı
+güncel XY acceleration gerekir. Mesafe tek güncellemenin mesafesidir;
+kümülatif yol, ilk tuş/tıklama anı veya input'un tek başına hareketi yarattığı
+iddiası değildir. İstemci işareti/RPC eklenmez; uzak hareket sunucunun mevcut
+MoveAutonomous yolunda gözlenir. WASD ve mevcut AddMovementInput kullanan
+tikla-git aynı gözleme ulaşır; gerçek giriş/transport PIE'de doğrulanmalıdır.
+
+Gözlenebilen teleport bayrakları, hareketli base, aktif root-motion kaynağı,
+zorlanmış acceleration, fizik simülasyonu ve normal dışı hareket modu elenir.
+Walking/falling içinde bJustTeleported sıfırlanabilir; dış konum değişimini
+bTeleportedSinceLastUpdate da süzer. Terminal animasyon/sona eren root source,
+platformdan ayrıldıktan sonra devralınan hız veya input basılıyken knockback
+kesin ayrıştırılmaz. Havada input varken etkisiz air control de qualify olabilir.
+Bu sınırlı gözlem anti-cheat veya tamamen teleport-free hareket kanıtı değildir.
+Bir güncellemede 1 cm'yi aşmayan yavaş hareketin toplamı biriktirilmez.
+
+Mevcut controller scope/sid/start/elapsed ve tekillik korunur. Pawn değişimi
+ve controller handoff sonucu sıfırlamaz; yeni controller yeni SID'dir. Spawn,
+kayıt konum restorasyonu ve input'suz düşme/sürüklenme ilk hareket sayılmaz.
+Shipping'de binding ve gözlem yürütülmez. Marker gameplay progression, XP,
+altın veya görev sayacı eklemez; eski logdaki `sure=?` hiç hareket edilmediği
+sonucu değildir. Gerçek 20 dk oyuncu süresi halen ölçülmemiştir.
+
+`TestFirstMove.ps1` native engine walking/falling pozitifleri ve ayrı callback
+ret gözlemlerini kontrol eder. Ret gözlemlerinin bir kısmı synthetic delegate,
+client rollerinin testi aynı süreçte role değişimidir; gerçek remote replication,
+navwalking, root animation veya ServerTravel değildir. Bunlar checklist'te açık.
+
 ## İlk gerçek XP seviye geçişi (9 Ekim 2026, O44)
 
 `first_levelup` yalnız sunucunun `GainExperience -> HandleLevelUp` yolunda,

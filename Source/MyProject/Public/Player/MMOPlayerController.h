@@ -70,7 +70,10 @@ public:
 	bool RecordFirstDeathMetric(FName KillerMobId, int32 XPLoss);
 	// First adjacent authoritative XP level transition; lv/to are post-increment.
 	bool RecordFirstLevelUpMetric(int32 PreviousLevel);
+	// Server movement hook: actual XY centimeters in one qualifying update, not keypress timing.
+	bool RecordFirstMoveMetric(FName MovementMode, double Distance);
 #if !UE_BUILD_SHIPPING
+	static bool RunFirstMoveSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstLevelUpSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstQuestMetricsSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	// Native controller chat bodies/owning pawn context; no network transport or Slate input.

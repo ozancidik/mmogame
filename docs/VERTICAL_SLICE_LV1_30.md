@@ -257,6 +257,14 @@ KO/Rise tarzı beklenen döngü (yalnız genel referans, doğrulanmadı): hub �
 - **Dosya kapsamı:** `MMOStatsComponent.cpp` (seviye atlama, ölüm cezası), `MMOMob.cpp` (öldürme, altın), `MMOInventoryComponent.cpp` (altın giriş/çıkış kaynağı: ganimet, satış, satın alma, yükseltme, iksir), `MMOQuestComponent.cpp` (kabul/teslim), `MMOPlayerController.cpp` (Şifacı), yeni `Scripts/PlaytestMetrics.py`, `Scripts/BalanceReport.py` v2 (bölge sınırlı + görev XP'si + senaryo seçeneği).
 - **Kabul ölçütü:** (a) 20 dk'lık PIE koşusunda sunucu logunda `[MMOMETRIC]` satırları: `levelup`, `kill`, `death`, `gold`, `quest_accept`, `quest_claim`, `first_*`; (b) tek komutla seviye başına süre/öldürme/ölüm/altın giriş-çıkış/XP kaynağı tablosu; (c) yalnız sunucu, oyun davranışı değişmez (derleme + `SmokeTest.ps1` geçer); (d) BalanceReport v2 çıktısı §1.5 tablosunu ±1 öldürmeyle yeniden üretir.
 
+- **O46 güncellemesi (2026-10-10):** `first_move` controller oturumundaki
+  ilk sunucu movement update gözlemini ekler: en az 1 cm gerçek XY hareket ve
+  aktif XY acceleration, walking/navwalking/falling; gözlenebilen teleport,
+  hareketli base/root-motion ve geçersiz/ölü durum elenir. Bu ilk tuş anı,
+  kümülatif yol veya hareketin yalnız input'tan geldiği kanıtı değildir.
+  Eski log `sure=?`, gameplay sayaçları değişmez; kapsam ve sınırlar runbook'ta.
+  **Açık:** gerçek host/uzak input, navwalking, seamless travel ve 20 dk süre koşusu.
+
 ### 2. Başlangıç paketi ve doğuş doğrulaması — **S**
 - **Durum (2026-10-05): yapıldı (master, `AMMOCharacter::GrantStarterPack`; PIE'de doğrulanmadı).** Kısa Kılıç + Deri Zırh kuşanılı, 3 Can İksiri; yalnız kayıt dosyası olmayan yeni karakter dalında. Doğuşta 3 dk güvenlik testi `PLAYTEST_CHECKLIST.md`'de bekliyor.
 - **Oyuncu deneyimi:** İlk dakikada silahsız/iksirsiz kalmamak; ilk görev ödülünün (120 g) silaha yetmemesi çözülür.

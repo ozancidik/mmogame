@@ -4943,3 +4943,47 @@ korundu. Bu sonuçlar aşağıdaki gerçek oyuncu/Blueprint kutularını kapatma
 - [ ] Blueprint callback'inde pawn destruction, ApplySaveData veya ölüm
   cezası tetikleyen içerik varsa ayrıca incele; bu genel callback mutasyonları
   için transaction garantisi verilmedi. Shipping/Server hedef build yapılmadı.
+
+## 2026-10-10 — İlk sunucu hareket gözlemi (O46, §84)
+
+İzole paket44/44 geçti. Ana integration sonrasında11 ayrı kontrol geçti:
+native first_move36/4, first_levelup16/5, XP206, save26, Store621/621 ve
+JSON621/0/roundtrip, Summer56/Winter77, NetSmoke1/1/errors0, parser1516 ve
+Data/Lint. Ana UBT Succeeded/up-to-date; DLL ve173 girdi sabit. Ana wrapper'ın
+yanlış Winter script adı ayrı doğru smoke tekrarıyla doğrulandı. Önceki621
+.sav SHA'sı değişmedi; NetSmoke'un logla eşleşen2 yeni slotu korundu.
+Bu kontroller aşağıdaki gerçek PIE/input/ServerTravel kutularını kapatmaz.
+
+Headless native36/36 kontrol ve4 ayrı controller ilk hareket marker'ı geçti;
+positifler gerçek AddMovementInput -> CMC TickComponent -> PerformMovement
+walking/falling yoludur. Viewport/ULocalPlayer olmayan fixture controller'ları
+local olarak işaretlendi; bu gerçek host veya remote bağlantı kanıtı değildir.
+Ret kapılarının bir kısmı synthetic movement delegate; unsupported modların
+gözlemi gerçek physics olarak sunulmaz. NPC gerçekten XY hareket etti ve
+controller marker üretmedi. Bellek içi SID/pawn/handoff ve binding temizliği
+sınandı. Parser1516/1516 kontrolü eski1140 beklentiyi de korur.
+
+`first_move` bir güncellemede >=1 cm XY hareket + aktif XY acceleration
+gözlemidir. Tek tuş zamanı, kümülatif yol veya hareketin yalnız input'tan
+kaynaklandığı kanıtı değildir. Runbook'taki teleport/root/base sınırları geçerli.
+
+- [ ] Listen host ve uzak istemci için spawn/kayıt konum restorasyonu ve
+  input'suz bekleme/düşme ilk marker üretmesin. Sonra ayrı ayrı WASD ve
+  tikla-git ile yürü: sunucuda o SID için bir first_move yazılsın, istemci
+  kopyası yazmasın; mode/distance/elapsed doğru raporlansın.
+- [ ] Duvara sıfır yer değiştirmeyle basılı hareket, yalnız dikey düşme ve
+  sıfır-input sürüklenme marker üretmesin. 1 cm eşiği tek update içindir;
+  çok yavaş hareketin toplamından erken marker bekleme. Havada aktif input
+  ve XY hareket ilk gözleme sayılabilir, etkili air control garantisi verilmez.
+- [ ] Doğum/save/admin teleport'u, aktif root animasyonu/kaynağı ve hareketli
+  platform üstünde ilk gözlemi dene. Son root frame/sona eren kaynak,
+  platformdan ayrılma ve input basılı knockback için runbook'taki sınırlı
+  gözlem tanımını uygula; bunlar tamamen elendi diye sonuç yazma.
+- [ ] Navwalking varsa gerçek navmesh yolunu ayrıca dene (native olumlu
+  fixture walking/falling idi). Pawn değişimi ve gerçek Summer/Winter
+  seamless travel aynı SID/ilk sonucu korusun; reconnect yeni SID başlatsın.
+  Native SeamlessTravelTo doğrudan çağrısı tam ServerTravel değildir.
+- [ ] 20 dk rehbersiz dört sınıf koşusunda gerçek ilk hareket elapsed'ini
+  diğer first_* zamanlarıyla kaydet. XP/altın/görev ve HUD aynı kalsın;
+  eksik/eski logdaki sure=? hiç hareket edilmediği kanıtı değildir.
+  Shipping ve dedicated Server build bu turda yapılmadı.

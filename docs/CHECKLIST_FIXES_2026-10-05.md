@@ -3776,3 +3776,73 @@ paylaşılan private reflected probe tipi Shipping'de kalır.
 
 Kanıt: TEMP/mmo_o45_reentrant_xp_20261009 (eski/fixed build, native log,
 review, giriş/DLL freeze ve ana575 başlangıç kayıt SHA'ları).
+
+## 84. Controller oturumunun ilk sunucu hareket gözlemi (O46, 2026-10-10)
+
+Lv1–30 madde1/M9 için first_move ölçümü: authoritative
+OnCharacterMovementUpdated, canlı mevcut sahip pawn, sonlu pozitif delta,
+>=1 cm gerçek XY yer değiştirme ve pozitif güncel XY acceleration.
+Walking/navwalking/falling kabul edilir; gözlenebilen teleport bayrakları,
+dinamik base/root kaynakları, zorlanmış acceleration, fizik simülasyonu,
+geçersiz/dead durum elenir. Server-owned CMC durumundan okunur, istemci
+telemetry RPC'si eklenmez. Mevcut controller SID/start/elapsed tekilliği,
+pawn ve seamless controller kopyası kapsamı korunur. Binding BeginPlay'de
+otoritede, EndPlay'de unbind; Shipping'de binding/emission kapalı. Save veya
+replicated alan, yeni tick/timer ve progression mutasyonu yok.
+
+Bu server-observed hareket + aktif input durumudur; input'un tek neden olduğu
+veya anti-cheat garantisi değildir. Terminal root animation/sona eren kaynak,
+platformdan ayrılma hızı, input basılı knockback/etkisiz air control ve tek
+update eşiğinin sınırları runbook'ta açık. Blueprint graph değişmedi.
+
+Dirac yerel UE5.7 hareket sıralamasını salt okunur inceledi; Faraday yalnız
+parser/validator/fixture dosyalarını yazdı. Helmholtz ret fixture'ında
+SetMovementMode(None)'ın acceleration sıfırlayarak mode kontrolünü maskelemesini
+buldu: her synthetic mode gözleminde gerçek önceki input yeniden hazırlandı,
+pozitif acceleration ayrı doğrulandı. Son static review actionable0.
+Agency tool kökeni iddia edilmez; üç ajan kapatıldı.
+
+İlk UBT denemesi protected MoveAutonomous, Pawn local shadow ve olmayan
+dynamic delegate API nedeniyle FAIL; başarı sayılmadı. Fixture gerçek public
+AddMovementInput/CMC TickComponent yoluna geçti. İlk runtime fixture kontrol3
+FAIL: spawned PC'de ULocalPlayer olmadığı için local hareket çalışmıyordu.
+Yalnız disposable fixture controller SetAsLocalPlayerController ile düzeltildi;
+production otorite kapısı yerel controller şartı eklemez. Son gerçek fixture
+compile/link UBT2.84sn Succeeded/exit0; native36/36 ve4 marker + ortak parser
+PASS. Positive walking/falling ve hareket eden controllerless NPC gerçek CMC;
+retlerin bir kısmı synthetic delegate, client rol testi aynı süreçtedir.
+Handoff doğrudan SeamlessTravelTo, ServerTravel/remote movement değildir.
+Parser1516/1516 eski1140 beklentiyi korur; geçersiz/duplicate marker saat ve
+gameplay sayaçlarını değiştirmez, eski/eksik log sure=? gösterir.
+
+İzole `RunAllChecks.ps1 -SkipBuild -NetPort 17779`:44/44 adım, exit0.
+Data/Lint88 temiz; negatif Data14/Lint15 ve parser1516 geçti. Summer57 ve
+Winter80 doğum, iki smoke native exit0/errors0. NetSmoke script exit0,
+sunucu1join/client1welcome/errors0; kendi süreçlerini sonlandırır, native
+temiz çıkış veya gerçek hareket RPC'si kanıtı değildir. Store slots0 için
+mevcut kayıt okuma/JSON/roundtrip atlandı; writeorder geçti. İzole171 girdi
+ve DLL byte'ları paket boyunca sabit kaldı. Paralel worker fixed TEMP logları
+ile çakışmamak için dış wrapper'a ayrı kısa scratch TEMP verildi.
+
+Ana integration tamamlandı: ilk ana UBT paralel HUD değişikliğindeki protected
+GoldDonationMinTarget erişimi nedeniyle FAIL oldu; paralel ajan getter ile
+düzeltti, derleyip 4785ee9 commit'ine aldı. Biz onun dosyasına dokunmadık.
+Son ana UBT0.68sn Succeeded/exit0, up-to-date idi; bu deneme yeni compile/link
+iddiası değildir. Ana DLL ve173 source/script/config girdi SHA'sı doğrulama
+boyunca sabitti. Ana native36/36 ve4 marker yeni kodun DLL'de olduğunu doğruladı.
+
+Ana workspace'te11 ayrı kontrol exit0: first_move36, first_levelup16/5,
+reentrant XP206, SaveLifecycle26, CharacterStore621/621 load ve JSON621/0,
+writeorder ve gerçek save/load roundtrip, Summer56/Winter77 smoke, NetSmoke
+1join/1welcome/errors0, parser1516, ValidateData ve StaticLint. İlk dış
+wrapper yanlış SmokeTestWinter.ps1 adı nedeniyle exit1 verdi; mevcut
+SmokeTest.ps1 -Map Winter_scene ile ayrı tekrar exit0/native exit0/errors0
+oldu. Bu ana44/44 iddiası değildir;44/44 izole paket sonucudur.
+
+Integration öncesi621 .sav'ın tamamı SHA ile değişmeden korundu; başlangıç609
+kayıt da aynı. Paralel soak12 ek slot, ana NetSmoke ise logda eşleşen
+Gezgin201696/Gezgin469008 için2 yeni slot oluşturdu: toplam623. Bu test
+bağlantı kayıtları silinmedi. Kanıt TEMP/mmo_o46_first_move_20261010 altında
+build/native/aggregate/ana kontrol logları, freeze, save SHA ve
+main_verified.json'dadır. Paralel ajanın aktif dosyaları/süreçleri
+değiştirilmedi. Gerçek PIE kutuları açık.

@@ -760,6 +760,13 @@ void AMMOCharacter::BeginPlay()
 	bEndPlayStarted = false;
 	Super::BeginPlay();
 
+#if !UE_BUILD_SHIPPING
+	if (HasAuthority())
+	{
+		OnCharacterMovementUpdated.AddDynamic(this, &AMMOCharacter::HandleFirstMovementMetric);
+	}
+#endif
+
 	if (Stats)
 	{
 		Stats->OnDeath.AddDynamic(this, &AMMOCharacter::HandleDeath);
@@ -768,6 +775,36 @@ void AMMOCharacter::BeginPlay()
 	}
 
 	ApplyCameraSettings();
+}
+
+void AMMOCharacter::HandleFirstMovementMetric(float DeltaSeconds, FVector InitialLocation, FVector InitialVelocity)
+{
+#if !UE_BUILD_SHIPPING
+	AMMOPlayerController* PC = Cast<AMMOPlayerController>(GetController());
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (bEndPlayStarted || !HasAuthority() || !IsValid(PC) || !PC->HasAuthority() || PC->GetPawn() != this
+		|| !IsValid(Stats) || Stats->GetOwner() != this || Stats->bIsDead
+		|| !FMath::IsFinite(Stats->Health) || Stats->Health <= 0.f
+		|| !IsValid(Move) || !Move->IsActive() || Move->UpdatedComponent != GetCapsuleComponent()
+		|| GetCapsuleComponent()->IsSimulatingPhysics() || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.f
+		|| InitialLocation.ContainsNaN() || InitialVelocity.ContainsNaN()
+		|| Move->bForceMaxAccel || Move->bJustTeleported || Move->bTeleportedSinceLastUpdate
+		|| Move->HasRootMotionSources() || MovementBaseUtility::IsDynamicBase(GetMovementBase())) return;
+	const EMovementMode Mode = Move->MovementMode;
+	if (Mode != MOVE_Walking && Mode != MOVE_NavWalking && Mode != MOVE_Falling) return;
+	const FVector Location = Move->UpdatedComponent->GetComponentLocation();
+	const FVector Acceleration = Move->GetCurrentAcceleration();
+	if (Location.ContainsNaN() || Acceleration.ContainsNaN()) return;
+	const double DistanceSquared = (Location - InitialLocation).SizeSquared2D();
+	const double AccelerationSquared = Acceleration.SizeSquared2D();
+	if (!FMath::IsFinite(DistanceSquared) || DistanceSquared < 1.0
+		|| !FMath::IsFinite(AccelerationSquared) || AccelerationSquared <= 0.0) return;
+	const FName ModeName = Mode == MOVE_Walking ? TEXT("walking") : (Mode == MOVE_NavWalking ? TEXT("navwalking") : TEXT("falling"));
+	// Observable state is a filter, not proof that input exclusively caused the displacement.
+	PC->RecordFirstMoveMetric(ModeName, FMath::Sqrt(DistanceSquared));
+#else
+	static_cast<void>(DeltaSeconds); static_cast<void>(InitialLocation); static_cast<void>(InitialVelocity);
+#endif
 }
 
 void AMMOCharacter::ApplyCameraSettings()
@@ -1037,6 +1074,9 @@ void AMMOCharacter::RetrySavedLocationRestore()
 void AMMOCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	bEndPlayStarted = true;
+#if !UE_BUILD_SHIPPING
+	OnCharacterMovementUpdated.RemoveDynamic(this, &AMMOCharacter::HandleFirstMovementMetric);
+#endif
 	// Oyundan cikis/level bitiminde otomatik kaydet (otorite + oyuncu).
 	if (HasAuthority() && IsPlayerControlled())
 	{

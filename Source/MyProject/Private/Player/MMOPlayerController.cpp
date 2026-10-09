@@ -250,13 +250,27 @@ bool AMMOPlayerController::RecordFirstLevelUpMetric(int32 PreviousLevel)
 #endif
 }
 
+bool AMMOPlayerController::RecordFirstMoveMetric(FName MovementMode, double Distance)
+{
+#if !UE_BUILD_SHIPPING
+	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
+	const UMMOStatsComponent* Stats = IsValid(MetricPawn) ? MetricPawn->GetStats() : nullptr;
+	if (!IsValid(Stats) || Stats->bIsDead || !FMath::IsFinite(Stats->Health) || Stats->Health <= 0.f
+		|| Stats->Level < 1 || Stats->Level > 80 || !FMath::IsFinite(Distance) || Distance < 1.0
+		|| (MovementMode != TEXT("walking") && MovementMode != TEXT("navwalking") && MovementMode != TEXT("falling"))) return false;
+	return RecordFirstActionMetric(TEXT("move"), FString::Printf(TEXT("mode=%s distance=%.3f"), *MovementMode.ToString(), Distance));
+#else
+	static_cast<void>(MovementMode); static_cast<void>(Distance); return false;
+#endif
+}
+
 bool AMMOPlayerController::RecordFirstActionMetric(FName Action, const FString& Payload)
 {
 #if !UE_BUILD_SHIPPING
 	const AMMOCharacter* MetricPawn = Cast<AMMOCharacter>(GetPawn());
 	if (!HasAuthority() || !MetricPawn || !MetricPawn->HasAuthority() || !MetricPawn->IsPlayerControlled()
 		|| !MetricPawn->GetStats() || !FirstActionMetricsSession.IsValid() || FirstActionMetricsStart < 0.0
-		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot") && Action != TEXT("kill") && Action != TEXT("equip") && Action != TEXT("skill") && Action != TEXT("basic_attack") && Action != TEXT("death") && Action != TEXT("levelup"))
+		|| (Action != TEXT("quest_accept") && Action != TEXT("quest_claim") && Action != TEXT("loot") && Action != TEXT("kill") && Action != TEXT("equip") && Action != TEXT("skill") && Action != TEXT("basic_attack") && Action != TEXT("death") && Action != TEXT("levelup") && Action != TEXT("move"))
 		|| RecordedFirstActionMetrics.Contains(Action))
 	{
 		return false;

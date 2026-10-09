@@ -170,6 +170,11 @@ Step "Ilk gorev kontrolcu oturumu ve tekillik" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Ilk sunucu hareket gozlemi ve kontrolcu tekilligi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstMove.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ilk gercek XP seviye gecisi ve kontrolcu tekilligi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstLevelUp.ps1") | Out-Host
     $LASTEXITCODE -eq 0

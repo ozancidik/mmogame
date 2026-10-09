@@ -31,6 +31,9 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
     (first authoritative GainExperience -> HandleLevelUp transition before refill/level delegates)
     (integer from=1..79, to=from+1=2..80, lv=to; first adjacent step of a multi-level award)
     (excludes save load, direct Level edits, dead/capped/no threshold/NPC; no gameplay counters)
+  first_move who lv mode=walking|navwalking|falling distance scope=controller sid start elapsed
+    (finite distance >=1: actual XY cm at an engine movement update, emitted %.3f)
+    (controller lifetime observation; no gameplay counters or anti-cheat guarantee)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
 t = surec baslangicindan beri saniye.
 """
@@ -41,7 +44,7 @@ import sys
 from collections import defaultdict
 
 LINE_RE = re.compile(r"\[MMOMETRIC\]\s+(.*)$")
-FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill", "first_basic_attack", "first_death", "first_levelup")
+FIRST_ACTIONS = ("first_quest_accept", "first_quest_claim", "first_loot", "first_kill", "first_equip", "first_skill", "first_basic_attack", "first_death", "first_levelup", "first_move")
 
 
 def project_root():
@@ -184,6 +187,10 @@ def build_stats(events):
                                  and post_level is not None and to_level == from_level + 1
                                  and post_level == to_level)
                 level = float(post_level) if post_level is not None else float("nan")
+            elif ev == "first_move":
+                distance = to_num(e.get("distance"), float("nan"))
+                payload_valid = (e.get("mode") in ("walking", "navwalking", "falling")
+                                 and math.isfinite(distance) and distance >= 1)
             else:
                 payload_valid = bool(e.get("quest"))
             if ev != "first_levelup":
@@ -215,6 +222,8 @@ def build_stats(events):
                 sample.update(by=e["by"], xploss=int(xp_loss))
             elif ev == "first_levelup":
                 sample.update({"from": from_level, "to": to_level})
+            elif ev == "first_move":
+                sample.update(mode=e["mode"], distance=distance)
             else:
                 sample["quest"] = e["quest"]
             session[ev] = sample
@@ -360,6 +369,8 @@ def print_player(who, p):
                         detail = "by=%s xploss=%d" % (sample["by"], sample["xploss"])
                     elif action == "first_levelup":
                         detail = "from=%d to=%d" % (sample["from"], sample["to"])
+                    elif action == "first_move":
+                        detail = "mode=%s distance=%.3f" % (sample["mode"], sample["distance"])
                     else:
                         detail = "quest=%s" % sample["quest"]
                     print("  sid=%s %s sure=%s lv=%d %s" % (
@@ -372,6 +383,7 @@ def print_player(who, p):
         print("  first_basic_attack sure=? (bu logda olay yok)")
         print("  first_death sure=? (bu logda olay yok)")
         print("  first_levelup sure=? (bu logda olay yok)")
+        print("  first_move sure=? (bu logda olay yok)")
     if p["first_invalid"] or p["first_duplicates"]:
         print("Ilk olay atlanan: gecersiz=%d tekrar=%d" % (p["first_invalid"], p["first_duplicates"]))
 

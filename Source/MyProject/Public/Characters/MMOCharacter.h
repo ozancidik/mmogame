@@ -345,6 +345,9 @@ protected:
 	static constexpr float NpcTalkDebugCooldown = 2.f;
 
 	virtual void BeginPlay() override;
+	// Development telemetry: post-physics displacement with active server input.
+	UFUNCTION()
+	void HandleFirstMovementMetric(float DeltaSeconds, FVector InitialLocation, FVector InitialVelocity);
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	// Sunucuda possession aninda calisir: oyuncuysa sinif kurulumunu yapar (MP-guvenli).
