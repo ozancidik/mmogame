@@ -1562,6 +1562,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		FString Label;
 		FLinearColor Fill;
 		float TextScale = 0.72f;
+		FLinearColor RowTextColor = FLinearColor::White;
 		if (Index == 0)
 		{
 			R.SkillId = FName(TEXT("__POTION__"));
@@ -1585,11 +1586,18 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 			R.Slot = 2;
 			Label = FString::Printf(TEXT("%s  -  %d altin (Lv%d)"), *Def.Name, FMMOItemDatabase::GetBuyPrice(Def), Def.RequiredLevel);
 			Fill = FLinearColor(0.1f, 0.13f, 0.2f, 0.9f);
+			// Seviye kapisi (UMMOInventoryComponent::VendorLevelSlack): sunucu "cok erken" der; burada satir sonuk gosterilir.
+			const UMMOStatsComponent* BuyerStats = PlayerChar->GetStats();
+			if (BuyerStats && BuyerStats->Level + UMMOInventoryComponent::VendorLevelSlack < Def.RequiredLevel)
+			{
+				Fill = FLinearColor(0.07f, 0.07f, 0.09f, 0.9f);
+				RowTextColor = FLinearColor(0.5f, 0.5f, 0.55f);
+			}
 		}
 		DrawRect(Fill, LeftX, LY, ColW, RowH - 4.f);
 		R.Rect = FBox2D(FVector2D(LeftX, LY), FVector2D(LeftX + ColW, LY + RowH - 4.f));
 		ShopBuyRegions.Add(R);
-		DrawText(Label, FLinearColor::White, LeftX + 6.f, LY + 4.f, nullptr, TextScale);
+		DrawText(Label, RowTextColor, LeftX + 6.f, LY + 4.f, nullptr, TextScale);
 	}
 
 	const float NavY = BuyStartY + ShopBuyPageSize * RowH + 12.f;
