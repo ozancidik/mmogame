@@ -3116,3 +3116,82 @@ Commit öncesi paralel belge işi gözlendi:0874531 yalnız SKILL_PLAN_LV31_45.m
 ve DECISIONS_NEEDED.md'yi değiştirdi; O36'nın altı dosyasıyla kesişim yok.
 Bu dosyalara dokunulmadı;151 kaynak/runner hash hâlâ aynı. O36 doğrulama
 kanıtı aynı gameplay bytes için geçerli, belge değişikliği oyun derlemesi istemez.
+
+## 74 · O37 · Parti daveti kaynak bağlamının ömrü (9 Ekim 2026)
+
+Alıcı PendingInviteId yalnız alıcının davet neslini ayırıyordu. Aynı davetçi
+pawn A→B/rejoin/merge veya solo→parti geçince eski davetin kabulü davetçinin
+şimdiki grubunu kullanabiliyordu. Compiled baseline DLL11,37sn ve native
+FAIL58/case0 06:19:08.608UTC, wrapper1 (UE exit0) ile yanlış gruba katılım yakalandı.
+
+Protected, server-only PartyInviteContextId ve PendingInviterContextId eklendi.
+İlk issuance lazy GUID üretir; yeni üyelik/session, açık ayrılma ve son kalan
+üyenin solo olması bağlamı yeniler. Devam eden üyede roster/liderlik değişimi
+bağlamı korur. Matching accept pending GUID'i kopyalayıp weak/time/GUID'i temizler;
+Mevcut süre/mesafe ve valid/equal kaynak GUID kontrolleri sonrası
+yetki/kapasite akışı FormOrJoin ile uygulanır. Matching decline GUID'i de temizler. Stale/zero
+recipient nonce mevcut pending durumunu değiştirmez. RPC, save ve replikasyon
+şemaları değişmedi; GUID'ler sunucuda kalır, yeni UObject referansı/timer yok.
+
+Native149 = önceki104 +45 (controller38 + component/lifecycle111). Sekiz kaynak
+geçişi: A→B, aynı surviving session'a rejoin, group→solo açık ayrılma,
+solo→group, iki ayrı solo→group→solo yolu, merge ile session transferi ve
+partner ayrıldığında grouped source'un solo last-survivor olması. Her geçişte
+issuance, zero response, matching eski kabulün grup/üyelik/inventory/diğer pending
+ve tüm nonce'ları koruması, consumed duplicate ve fresh davet recovery denetlenir.
+Ek continuous member/lider değişimi pozitif, decline clear ve zero/random kaynak
+GUID ret kontrolleri var. Native PC testlerinde manuel pending setup production
+SetPendingInviteServer kullanır; replacement-pawn numeric nonce seed bilinçli
+izolasyondur. Test-only friend Shipping'de yok; normal issuer protected kalır.
+
+İlk final8case DLL3,42sn PASS149 06:21:54.104UTC. Son snapshot helper yalnız
+matching alıcının tüketilen pending alanlarını dışlar; diğer alıcıları ve tüm
+recipient nonce'larını tam kıyaslar. Bu frozen final bytes ile OP collapse GUID
+renewal eksiltilen compiled mutant3,64sn FAIL93/case7 06:22:53.199UTC, wrapper1.
+Exact restore write_bytes ardından actual CPP/lib/DLL3,70sn, PASS149
+06:23:06.854UTC, wrapper0. TEMP mmo_party_source_{baseline,final,mutant,restore}
+20261009 build/test/UE logları ve final backup/freeze151 dosyası.
+
+ECC plan/review/verify + mmo-feature/ue-build akışı. Gerçek remote RPC, HUD/Slate,
+owner-only teslim gecikmesi, Shipping/Server, disk login ve PIE açık. Kaynak
+hesap/controller rebinding, kesintisiz üyelikte leader loss/regain authority epoch,
+recipient'in grup değiştirmesi, eski issuing InviteNearest veya kick niyeti,
+ApplyPartySet delegate reentrancy/UI atomikliği bu sınırlı düzeltmede kapanmadı.
+
+O37 scoped final review: Mencius salt okunur Unreal/multiplayer/security fallback
+rolleriyle dört kaynak/runner dosyasını inceledi, blocker0. Agency provenance
+mevcut değil. Own dört SHA freeze151 kaydıyla eşleşti; Party CPP exact backup
+aynı. Ajan build/test/edit yapmadı ve kapatıldı. Değişen Party/PC CPP NoPCH,
+NoLink/SingleFile /W4 exit0/Succeeded9,68/10,35sn, warning C0. Header UHT+normal
+Editor build geçti; gerçek Shipping/Server veya19 CPP FullCompile yapılmadı.
+
+Paralel dış ajan d452994 ile yalnız CONTENT_PLAN_LV46_80.md ekledi; dokunulmadı.
+Sonrasında aktif MMOMobArchetype.cpp, MMOGameMode.cpp, MMOQuestTypes.cpp,
+MMOQuestDialogue.cpp ve Lore.md işine dokunulmadı. Freeze151 karşılaştırması
+bu dört dış CPP'de fark gösterir, kendi dört source/runner bytes hâlâ eşleşir.
+Bu nedenle eski database DLL ile süren paket, yeni dış içerik kaynaklarının
+derlenip doğrulandığı olarak sunulamaz; dış değişiklikler bu commit kapsamı değil.
+
+### O37 paket sonucu ve paralel çalışma sınırı
+
+RunAllChecks -SkipBuild40/40 GECTI, exit0. Native parti149 06:27:42.852UTC,
+klan138 06:28:05.883, arkadaş53 06:26:28.737, presence24 06:26:18.467,
+save26 06:26:06.371, DoT33 06:29:44.617, trade218 06:30:51.130 PASS.
+JSONschema2/negative111; parser576/576. Store482slots/482loaded,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Summer52/Winter31 exit0/error0; Net1join/1welcome/error0.
+TEMP mmo_all_party_source_final_20261009.log ve mmo_net_{server,client}_093120.log.
+
+Paket sürerken dış ajan cdb95fa ile W1 içerik işini ayrı commit etti ve aynı
+beş dosyada W2 işine başladı. Bu dosyaların değişmesine müdahale edilmedi.
+Kaynakların tamamı/DLL paket boyunca tek bir frozen database revision değildi;
+40/40 sonucu yeni W2 kaynakları veya aggregate snapshot için doğrulama kanıtı
+sayılmaz. Commit yalnız önceden actual DLL ile derlenip native149/compiled
+negatiflerle doğrulanmış O37 dört source/runner + dört kayıt belgesini içerir.
+Kendi dört source/runner SHA'ları ilk freeze ile aynı; exact Party backup aynı.
+Paralel beş dosya ne stage edilir ne commit edilir. Gerçek PIE/Server/Shipping açık.
+
+O37 stage/commit öncesi dış W2 işi 54de52b olarak ayrı commit oldu; başlangıçtaki
+beş dış dosya artık temiz. O37 stage seti yalnız kendi sekiz dosyasıydı. İlk
+40/40 paket içindeki revision değişimi sınırı geçerli; bu paket W2'nin final
+snapshot'ı için bütünsel doğrulama iddiası değildir.

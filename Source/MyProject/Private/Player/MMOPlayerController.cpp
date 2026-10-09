@@ -508,11 +508,12 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 		auto RejectedUnchanged = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Id, const FGuid& SeenMembership = FGuid())
 		{
 			TArray<TObjectPtr<AMMOCharacter>> Members[3]; TObjectPtr<AMMOCharacter> Leaders[3];
-			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3]; FGuid Sessions[3], Memberships[3];
+			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3]; FGuid Sessions[3], Memberships[3], SourceContexts[3], PendingSourceContexts[3];
 			for (int32 I = 0; I < 3; ++I)
 			{
 				Members[I] = Parties[I]->Members; Leaders[I] = Parties[I]->Leader;
 				Sessions[I] = Parties[I]->PartySessionId; Memberships[I] = Parties[I]->PartyMembershipId;
+				SourceContexts[I] = Parties[I]->PartyInviteContextId; PendingSourceContexts[I] = Parties[I]->PendingInviterContextId;
 				Pending[I] = Parties[I]->PendingInviteFrom; Ids[I] = Parties[I]->PendingInviteId; Times[I] = Parties[I]->PendingInviteTime;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
@@ -522,7 +523,8 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 				if (Parties[I]->Members != Members[I] || Parties[I]->Leader != Leaders[I]
 					|| Parties[I]->PendingInviteFrom != Pending[I] || Parties[I]->PendingInviteId != Ids[I]
 					|| Parties[I]->PendingInviteTime != Times[I] || Parties[I]->PartySessionId != Sessions[I]
-					|| Parties[I]->PartyMembershipId != Memberships[I]) return false;
+					|| Parties[I]->PartyMembershipId != Memberships[I] || Parties[I]->PartyInviteContextId != SourceContexts[I]
+					|| Parties[I]->PendingInviterContextId != PendingSourceContexts[I]) return false;
 			}
 			return InventoryUnchanged();
 		};
@@ -536,12 +538,13 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 		if (!Check(RejectedUnchanged(TEXT("/parti decline"), Pawns[1], Old), TEXT("party chat stale decline"))) return false;
 		// Real native possession switch; matching numeric generation is deliberately seeded in the new pawn.
 		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[0]);
-		Parties[0]->PendingInviteId = Fresh; Parties[0]->PendingInviteFrom = Pawns[2];
-		Parties[0]->PendingInviteTime = World->GetTimeSeconds();
+		if (!Parties[0]->SetPendingInviteServer(Pawns[2])) return false;
+		Parties[0]->PendingInviteId = Fresh;
 		const bool ReplacementRejected = PCs[1]->GetPawn() == Pawns[0]
 			&& RejectedUnchanged(TEXT("/parti kabul"), Pawns[1], Fresh);
 		PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[1]); PCs[0]->Possess(Pawns[0]);
 		Parties[0]->PendingInviteFrom.Reset(); Parties[0]->PendingInviteTime = -1.f;
+		Parties[0]->PendingInviterContextId.Invalidate();
 		if (!Check(ReplacementRejected, TEXT("party chat replaced pawn matching generation"))) return false;
 		if (!Check(RejectedUnchanged(TEXT("/parti ret"), nullptr, Fresh), TEXT("party chat null context no fallback"))) return false;
 		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/parti kabul"));
@@ -554,8 +557,7 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 			&& Parties[2]->Leader == nullptr && InventoryUnchanged(), TEXT("party current leave unchanged"))) return false;
 		// New leave cases seed native invite context, not delayed network delivery.
 		auto FormPair = [&](int32 From, int32 To) {
-			Parties[To]->PendingInviteFrom = Pawns[From]; Parties[To]->PendingInviteTime = World->GetTimeSeconds();
-			++Parties[To]->PendingInviteId; Parties[To]->RequestAccept();
+			if (Parties[To]->SetPendingInviteServer(Pawns[From])) Parties[To]->RequestAccept();
 		};
 		auto PairMatches = [&](int32 A, int32 B) {
 			return Parties[A]->Members.Num() == 1 && Parties[A]->Members.Contains(Pawns[B])

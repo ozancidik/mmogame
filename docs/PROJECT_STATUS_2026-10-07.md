@@ -1,20 +1,24 @@
 # MyProject — yaptık / yapacağız
 
 **Güncelleme:** 9 Ekim 2026. Kaynak kod ve tamamlanan kontroller esas alınmıştır.
-Önceki gameplay commit `e812fa9` (§72/O35), davet kabulünde davet eden source üyeliğini
-korudu. Son sınırlı düzeltme (§73/O36), aynı pawn'da gecikmiş /klan davet,
-at ve liste isteğinin yeni üyelikte çalışmasını keser. Mevcut observed
-ClanMembershipId her üç dispatch öncesinde aktif üyeliğe eşleşir; recipient
-kabul nonce'u, ortak throttle, component yetki/mesafe/cooldown ve klansız hint
-korunur. RPC/save/replication şeması değişmedi. Derlenmiş baseline112 eski kick,
-kick-gate113 eski invite, iki gate114 eski liste hatalarını yakaladı.
-Final actual DLL4,78sn/PASS138; native138 = controller91 + component47.
-Değişen PC NoPCH/W4 warning0; paket40/40 exit0, Store475/schema2, parser576/576,
-Summer49/Winter32 ve Net1join/1welcome/error0.151 kaynak/runner hash fark0,
-exact backup aynı;19 CPP FullCompile bu bounded işte tekrar yok. ECC ve
-salt okunur Euler final incelemesi blocker0; gerçek remote/PIE/disk login,
-UI atomikliği, source identity rebinding, leader epoch, continuous sender'da
-hedef kick/rejoin niyeti, solo create ve Server/Shipping açık.
+Önceki gameplay commit `66c504e` (§73/O36), klan yönetim isteğini gönderim
+üyeliğine bağladı. Son sınırlı düzeltme (§74/O37), eski parti davetinin davetçinin
+yeni grup/solo lifetime'ını takip etmesini keser. Sunucuya özel kaynak GUID'i
+issuance'da yakalanır; rejoin/transfer ve açık ayrılma/solo collapse yeniler.
+Continuous member roster/lider değişimi daveti korur. RPC/save/replication
+şeması aynı. Derlenmiş baseline FAIL58/case0; collapse renewal mutant FAIL93/case7;
+exact restored actual CPP/lib/DLL3,70sn PASS149. Native149=controller38+diğer111,
+sekiz source geçişi/duplicate/fresh recovery/invalid source/nonce-state kontrolleri.
+Party/PC NoPCH/W4 warning0, ECC ve Mencius scoped final review blocker0.
+Gerçek remote/PIE/disk login/Shipping/Server açık. Stale issuing invite/kick,
+recipient grup niyeti, identity rebinding, continuous leadership epoch,
+delegate reentrancy ve UI atomikliği ayrı açık kalır.
+40/40 paket exit0; parti149/klan138/arkadaş53/save26/DoT33/trade218,
+Store482/schema2/parser576, Summer52/Winter31/Net1join1welcome/error0.
+Paket sırasında dış database kaynakları değişti (W1 cdb95fa + pending W2);
+tüm database snapshot/DLL freeze garantisi yok. Kendi dört source/runner
+bytes sabit ve ayrı actual DLL/native149/negatif kanıtlarla doğrulandı.
+Dış içerik dosyalarına dokunulmadı; paket pending W2 için kanıt sayılmaz.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -345,3 +349,8 @@ RunAllChecks, baseline/üç negatif/restore ve son38 paketi yürüttü. 148 Sour
 Scripts hash sabit; geçici GUID kayıt yuvası0 ve sonunda engine process0.
 .agents/.codex/AGENTS.md diğer sohbetten korunup commit'e alınmadı. ECC plan,
 review, verify mevcut mmo-feature/ue-build ile uygulandı; gerçek PIE açık kalır.
+
+O37 stage/commit öncesi dış W2 işi 54de52b olarak ayrı commit oldu; başlangıçtaki
+beş dış dosya artık temiz. O37 stage seti yalnız kendi sekiz dosyasıydı. İlk
+40/40 paket içindeki revision değişimi sınırı geçerli; bu paket W2'nin final
+snapshot'ı için bütünsel doğrulama iddiası değildir.

@@ -83,6 +83,14 @@ public:
 #endif
 
 protected:
+	// Test-only access: native controller fixtures use the production invitation issuer.
+#if !UE_BUILD_SHIPPING
+	friend class AMMOPlayerController;
+#endif
+	// Server-only runtime context also distinguishes separate solo lifetimes. Never saved/replicated.
+	FGuid PartyInviteContextId;
+	FGuid PendingInviterContextId;
+
 	UFUNCTION()
 	void OnRep_Members();
 
