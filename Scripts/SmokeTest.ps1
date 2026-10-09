@@ -21,4 +21,19 @@ $errs = (Select-String -Path $log -Pattern "Error:|Fatal error|Ensure condition|
 $spawn = (Select-String -Path $log -Pattern "SpawnOne:.*result=MMOMob" | Measure-Object).Count
 Write-Output "Harita: $Map  Cikis: $($p.ExitCode)  Hata satiri: $errs  Mob dogumu: $spawn"
 Select-String -Path $log -Pattern "layout spawned|skipping spawn|SpawnMobArea" | Select-Object -First 6 | ForEach-Object { $_.Line.Substring(0, [Math]::Min(200, $_.Line.Length)) }
+
+# Cep kalitesi (UYARI, cikis kodunu etkilemez): normal spawner 5+ deneme yapip yarisindan azini doguruyorsa cep
+# engebeli/hatali olabilir. MMOProbeSurface 64/64 verip gercek doguma 1/6 veren bir cep olmustu (probe yalan soyler);
+# gercek doguma sayisi olcuttur. Elit spawner'lar tek denemelik oldugu icin (60 sn'de bir yeniden dener) elenir.
+$blocks = @(); $cur = $null
+foreach ($line in (Get-Content $log)) {
+    if ($line -match "Spawner BeginPlay @ (V\([^)]*\))") { $cur = @{ Loc = $Matches[1]; Tries = 0; Live = -1 }; $blocks += $cur }
+    elseif ($cur -and $line -match "SpawnOne: requested") { $cur.Tries++ }
+    elseif ($cur -and $line -match "Spawner after TopUp: live=(\d+)") { $cur.Live = [int]$Matches[1]; $cur = $null }
+}
+foreach ($b in $blocks) {
+    if ($b.Tries -ge 5 -and $b.Live -ge 0 -and $b.Live * 2 -lt $b.Tries) {
+        Write-Output "UYARI: cep $($b.Loc) gercek doguma $($b.Live)/$($b.Tries) (yarisindan az; zemin engebeli olabilir, MMOProbeSurface'e guvenme)"
+    }
+}
 if ($errs -gt 0 -or $p.ExitCode -ne 0) { exit 1 } else { exit 0 }
