@@ -279,6 +279,10 @@ bool UMMOPartyComponent::SetPendingInviteServer(AMMOCharacter* Inviter)
 	const UWorld* World = GetWorld();
 	if (!HasAuthorityInternal() || !Self || !World || !Inviter || Inviter == Self
 		|| !Inviter->HasAuthority() || Inviter->GetWorld() != World || PendingInviteId == MAX_uint64) return false;
+	UMMOPartyComponent* Source = Inviter->GetPartyComponent();
+	if (!Source) return false;
+	if (!Source->PartyInviteContextId.IsValid()) Source->PartyInviteContextId = FGuid::NewGuid();
+	PendingInviterContextId = Source->PartyInviteContextId;
 	++PendingInviteId; // Do not reuse a consumed invitation during this pawn's lifetime.
 	PendingInviteFrom = Inviter;
 	PendingInviteTime = World->GetTimeSeconds();
@@ -293,6 +297,7 @@ void UMMOPartyComponent::ServerDecline_Implementation(uint64 SeenInviteId)
 	const float InviteTime = PendingInviteTime;
 	PendingInviteFrom = nullptr;
 	PendingInviteTime = -1.f;
+	PendingInviterContextId.Invalidate();
 	if (!Self)
 	{
 		return;
@@ -316,8 +321,10 @@ void UMMOPartyComponent::ServerAccept_Implementation(uint64 SeenInviteId)
 	AMMOCharacter* Invitee = GetOwnerCharacter();
 	AMMOCharacter* Inviter = PendingInviteFrom.Get();
 	const float InviteTime = PendingInviteTime;
+	const FGuid SourceContext = PendingInviterContextId;
 	PendingInviteFrom = nullptr;
 	PendingInviteTime = -1.f;
+	PendingInviterContextId.Invalidate();
 
 	if (!Invitee || !Inviter || Invitee == Inviter)
 	{
@@ -337,6 +344,13 @@ void UMMOPartyComponent::ServerAccept_Implementation(uint64 SeenInviteId)
 	if (FVector::Dist(Invitee->GetActorLocation(), Inviter->GetActorLocation()) > InviteAcceptMaxDistance)
 	{
 		MMONotify::ToOwner(Invitee, TEXT("Davet eden cok uzakta"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+
+	const UMMOPartyComponent* Source = Inviter->GetPartyComponent();
+	if (!Source || !SourceContext.IsValid() || SourceContext != Source->PartyInviteContextId)
+	{
+		MMONotify::ToOwner(Invitee, TEXT("Davet edenin parti durumu degisti; yeni davet isteyin."), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -426,6 +440,7 @@ void UMMOPartyComponent::ApplyPartySet(const TArray<AMMOCharacter*>& FullSet, AM
 		if (PC->PartySessionId != SessionId || !PC->PartyMembershipId.IsValid())
 		{
 			PC->PartyMembershipId = FGuid::NewGuid();
+			PC->PartyInviteContextId = FGuid::NewGuid();
 		}
 		PC->PartySessionId = SessionId;
 		PC->Leader = NewLeader;
@@ -560,6 +575,7 @@ void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
 	LP->Leader = nullptr;
 	LP->PartySessionId.Invalidate();
 	LP->PartyMembershipId.Invalidate();
+	LP->PartyInviteContextId = FGuid::NewGuid();
 	LP->OnPartyChanged.Broadcast();
 
 	// Kalanlari yeniden ayarla (tek kisi kalirsa o da partisiz olur).
@@ -575,6 +591,7 @@ void UMMOPartyComponent::LeavePartyServer(AMMOCharacter* Leaver)
 			OP->Leader = nullptr;
 			OP->PartySessionId.Invalidate();
 			OP->PartyMembershipId.Invalidate();
+			OP->PartyInviteContextId = FGuid::NewGuid();
 			OP->OnPartyChanged.Broadcast();
 		}
 	}
@@ -676,11 +693,11 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 			TObjectPtr<AMMOCharacter> Leader;
 			TWeakObjectPtr<AMMOCharacter> Pending;
 			uint64 Id;
-			FGuid Session, Membership;
+			FGuid Session, Membership, SourceContext, PendingSourceContext;
 			float Time, LastInvite;
 			FMMOCharacterSaveData Inventory;
 		};
-		auto ActionUnchanged = [&](auto Action)
+		auto ActionUnchanged = [&](auto Action, const UMMOPartyComponent* ConsumedRecipient = nullptr)
 		{
 			TArray<FPartySnapshot> Before;
 			for (AMMOCharacter* Character : Actors)
@@ -689,6 +706,7 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 				FPartySnapshot& S = Before.AddDefaulted_GetRef();
 				S.Members = P->Members; S.Leader = P->Leader; S.Pending = P->PendingInviteFrom;
 				S.Session = P->PartySessionId; S.Membership = P->PartyMembershipId;
+				S.SourceContext = P->PartyInviteContextId; S.PendingSourceContext = P->PendingInviterContextId;
 				S.Id = P->PendingInviteId; S.Time = P->PendingInviteTime; S.LastInvite = P->LastInviteTime;
 				Character->GetInventory()->FillSaveData(S.Inventory);
 			}
@@ -696,11 +714,13 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 			for (int32 I = 0; I < Actors.Num(); ++I)
 			{
 				const UMMOPartyComponent* P = Actors[I]->GetPartyComponent(); const FPartySnapshot& S = Before[I];
+				const bool CheckPending = P != ConsumedRecipient;
 				FMMOCharacterSaveData After; Actors[I]->GetInventory()->FillSaveData(After);
 				TArray<FString> Differences; FMMOCharacterSaveJson::FindDifferences(S.Inventory, After, Differences);
-				if (P->Members != S.Members || P->Leader != S.Leader || P->PendingInviteFrom != S.Pending
+				if (P->Members != S.Members || P->Leader != S.Leader || (CheckPending && P->PendingInviteFrom != S.Pending)
 					|| P->PartySessionId != S.Session || P->PartyMembershipId != S.Membership
-					|| P->PendingInviteId != S.Id || P->PendingInviteTime != S.Time || P->LastInviteTime != S.LastInvite
+					|| P->PartyInviteContextId != S.SourceContext || (CheckPending && P->PendingInviterContextId != S.PendingSourceContext)
+					|| P->PendingInviteId != S.Id || (CheckPending && P->PendingInviteTime != S.Time) || P->LastInviteTime != S.LastInvite
 					|| !Differences.IsEmpty()) return false;
 			}
 			return true;
@@ -805,6 +825,62 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 		if (!Check(Matches({ Actors[0], Actors[1], Actors[2], Actors[3] }, Actors[0]) && P0->PartySessionId == SessionA
 			&& P0->PartyMembershipId != A0 && P1->PartyMembershipId == Survivor1 && P2->PartyMembershipId == Survivor2
 			&& P3->PartyMembershipId == Survivor3, TEXT("solo inviter replaced continuing group identities"))) return false;
+		// A recipient nonce cannot authorize a different lifetime of the sender's party/solo context.
+		for (int32 Case = 0; Case < 8; ++Case)
+		{
+			ClearGroups();
+			if ((Case < 3 || Case == 6 || Case == 7) && !Accept(0, 1)) return false;
+			if (Case == 1 && !Accept(0, 2)) return false;
+			if (Case == 6 && !Accept(2, 3)) return false;
+			UMMOPartyComponent* Recipient = Actors[4]->GetPartyComponent();
+			if (!Check(Recipient->SetPendingInviteServer(Actors[0]), TEXT("source context invite setup"))) return false;
+			const uint64 Seen = Recipient->PendingInviteId;
+			if (Case < 3) P0->RequestLeave();
+			if (Case == 0 && !Accept(0, 2)) return false; // A -> B.
+			if (Case == 1 && !Accept(0, 1)) return false; // Rejoin the surviving session.
+			// Case 2 remains solo after the original group dissolved.
+			if (Case >= 3 && Case < 6 && !Accept(0, 1)) return false;
+			if (Case == 6 && !Accept(2, 0)) return false; // Source transferred by a leader-consented merge.
+			if (Case == 7) P1->RequestLeave(); // Grouped sender becomes the solo last survivor.
+			if (Case == 5) P0->RequestLeave(); // Roundtrip by explicit departure.
+			if (Case == 4) P1->RequestLeave(); // Solo -> group -> solo via last survivor collapse.
+			if (!Check(ActionUnchanged([&]() { Recipient->RequestAcceptSeen(0); }), TEXT("zero source response changed pending state"))) return false;
+			const bool Unchanged = ActionUnchanged([&]() { Recipient->RequestAcceptSeen(Seen); }, Recipient);
+			if (!Check(Unchanged && Solo(4) && !Recipient->PendingInviteFrom.IsValid()
+				&& Recipient->PendingInviteTime == -1.f && Recipient->PendingInviteId == Seen && !Recipient->PendingInviterContextId.IsValid(),
+				*FString::Printf(TEXT("old party invite followed source context case=%d"), Case))) return false;
+			if (!Check(ActionUnchanged([&]() { Recipient->RequestAcceptSeen(Seen); }), TEXT("consumed source response repeated"))) return false;
+			if (!Accept(0, 4)) return false;
+			TArray<AMMOCharacter*> Expected { Actors[0], Actors[4] };
+			if (Case == 0 || Case == 1) Expected.Add(Actors[2]);
+			if (Case == 1 || Case == 3 || Case == 6) Expected.Add(Actors[1]);
+			if (Case == 6) { Expected.Add(Actors[2]); Expected.Add(Actors[3]); }
+			if (!Check(Matches(Expected, Actors[Case == 6 ? 2 : 0]) && Recipient->PendingInviteId > Seen,
+				TEXT("fresh source context invite recovery"))) return false;
+		}
+		ClearGroups();
+		if (!Accept(0, 1)) return false;
+		UMMOPartyComponent* ContextRecipient = Actors[4]->GetPartyComponent();
+		if (!Check(ContextRecipient->SetPendingInviteServer(Actors[1]), TEXT("continuous member invite setup"))) return false;
+		if (!Accept(0, 2)) return false;
+		P0->RequestLeave(); // Roster/leadership changes preserve a continuing member's invitation.
+		ContextRecipient->RequestAccept();
+		if (!Check(Matches({ Actors[1], Actors[2], Actors[4] }, Actors[1]), TEXT("continuous member source invite invalidated"))) return false;
+		ClearGroups();
+		if (!ContextRecipient->SetPendingInviteServer(Actors[0])) return false;
+		ContextRecipient->RequestDecline();
+		if (!Check(!ContextRecipient->PendingInviteFrom.IsValid() && ContextRecipient->PendingInviteTime == -1.f && !ContextRecipient->PendingInviterContextId.IsValid(),
+			TEXT("source decline consumption"))) return false;
+		for (const FGuid& InvalidSource : { FGuid(), FGuid::NewGuid() })
+		{
+			if (!ContextRecipient->SetPendingInviteServer(Actors[0])) return false;
+			ContextRecipient->PendingInviterContextId = InvalidSource;
+			const uint64 Seen = ContextRecipient->PendingInviteId;
+			const bool Unchanged = ActionUnchanged([&]() { ContextRecipient->RequestAcceptSeen(Seen); }, ContextRecipient);
+			if (!Check(Unchanged && Solo(4) && !ContextRecipient->PendingInviteFrom.IsValid()
+				&& !ContextRecipient->PendingInviterContextId.IsValid() && ContextRecipient->PendingInviteTime == -1.f,
+				TEXT("invalid source context accepted"))) return false;
+		}
 		if (!AMMOPlayerController::RunPartyChatContextSelfTest(World, OutError, OutChecks)) return false;
 		ClearGroups();
 		// Real native UnPossess/Destroy/RouteEndPlay. Same frame: no AutoLoad/save/remote logout proof.

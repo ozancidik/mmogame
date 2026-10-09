@@ -1045,3 +1045,38 @@ klan138/chat91, parti104, arkadaş53/presence24/save26/DoT33/trade218;
 Store475/schema2/negative111, parser576/576. Summer49/Winter32/error0,
 Net1join/1welcome/error0;151 hash fark0/exact backup aynı, fixture save0/engine0.
 Euler read-only final review blocker0. §73; gerçek PIE kutuları açık.
+
+### O37 · ORTA · Eski parti daveti kaynak grubunu takip eder
+
+Recipient nonce aynı kalırken davetçinin A→B/rejoin/merge veya solo lifetime
+geçişi eski kabulü şimdiki gruba uygulayabiliyordu. Actual compiled baseline
+FAIL58/case0. Server-only runtime kaynak GUID'i issuance'da capture edilir;
+new membership/session ve iki solo leave/collapse yolunda yenilenir. Matching
+accept captured valid/equal GUID'i doğrular; matching accept/decline snapshot'ı
+silip generation'ı korur. Continuous roster/liderlik değişimi daveti korur.
+RPC/save/replication şeması değişmedi. Native149 (38 controller +111 diğer),
+sekiz source geçişi/fresh recovery/nonce/diğer pending/inventory; OP renewal
+mutant FAIL93/case7, exact restored DLL PASS149. Ayrıntı §74.
+
+Gerçek remote RPC/PIE/Shipping/Server açık. Recipient grup niyeti, stale issuing
+InviteNearest/kick, source identity rebinding, continuous authority epoch,
+delegate reentrancy ve UI atomikliği ayrı açık kalır.
+
+### O37 paket sonucu ve paralel çalışma sınırı
+
+RunAllChecks -SkipBuild40/40 GECTI, exit0. Native parti149 06:27:42.852UTC,
+klan138 06:28:05.883, arkadaş53 06:26:28.737, presence24 06:26:18.467,
+save26 06:26:06.371, DoT33 06:29:44.617, trade218 06:30:51.130 PASS.
+JSONschema2/negative111; parser576/576. Store482slots/482loaded,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Summer52/Winter31 exit0/error0; Net1join/1welcome/error0.
+TEMP mmo_all_party_source_final_20261009.log ve mmo_net_{server,client}_093120.log.
+
+Paket sürerken dış ajan cdb95fa ile W1 içerik işini ayrı commit etti ve aynı
+beş dosyada W2 işine başladı. Bu dosyaların değişmesine müdahale edilmedi.
+Kaynakların tamamı/DLL paket boyunca tek bir frozen database revision değildi;
+40/40 sonucu yeni W2 kaynakları veya aggregate snapshot için doğrulama kanıtı
+sayılmaz. Commit yalnız önceden actual DLL ile derlenip native149/compiled
+negatiflerle doğrulanmış O37 dört source/runner + dört kayıt belgesini içerir.
+Kendi dört source/runner SHA'ları ilk freeze ile aynı; exact Party backup aynı.
+Paralel beş dosya ne stage edilir ne commit edilir. Gerçek PIE/Server/Shipping açık.
