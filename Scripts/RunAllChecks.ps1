@@ -44,6 +44,11 @@ Step "Soak runner hata/cikis/log regresyonu (UE baslatmaz)" {
     $LASTEXITCODE -eq 0
 }
 
+Step "NetSmoke runner surec/log/cleanup regresyonu (UE baslatmaz)" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestNetSmokeRunner.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "PlaytestMetrics fixture testi (TestPlaytestMetrics.py)" {
     & $py (Join-Path $PSScriptRoot "TestPlaytestMetrics.py") | Out-Host
     $LASTEXITCODE -eq 0

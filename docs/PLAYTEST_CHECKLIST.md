@@ -5000,3 +5000,20 @@ oyun derlemesi ve tam RunAllChecks yapılmadı. Önceki PIE kutuları açık kal
 
 - [ ] İlgili cepte gerçek PIE hareket/dövüş koşusunu ve daha uzun soak logunu
   birlikte incele; runner exit0 olduğunda takılma/eksik dolumu ayrıca değerlendir.
+
+## 2026-10-10 — Ağ smoke erken kapanma reddi (O48, §86)
+
+52 mock senaryo/678 kontrol geçti; mid-observation native0/1 erken çıkışları,
+port/World/log kapılarını ve her iki owned process cleanup'ını kapsar.
+Önceki623 .sav değişmedi; kendi loglarıyla eşleşen2 yeni NetSmoke slotu korundu.
+
+Gerçek Summer bağlantısı20sn server +20sn client koşusunda1join/1welcome ve
+iki logda0 hata ile geçti. Ayrı koşuda yalnız runner'ın sahip olduğu istemci,
+`Welcomed by server` görüldükten sonra kapatıldı; native exit=-1 için runner
+exit1 verdi ve kendi sunucusunu temizledi. Native exit0 erken kapanma mock
+kontrolüdür; gerçek nazik istemci kapanışı bu turda yapılmadı.
+
+Bu süreç/log kontrolü sürekli bağlantı, uzak gameplay RPC, UI/replication,
+seamless travel veya dedicated Server build sonucu değildir. Mevcut gerçek
+host + uzak istemci PIE kutuları açık kalır. C++/config/DLL değişmedi; oyun
+derlemesi ve tam aggregate bu script düzeltmesinde başlatılmadı.

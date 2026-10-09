@@ -3884,3 +3884,49 @@ olduğu için UBT başlatılmadı. Başlangıç623 .sav'ın tamamı byte byte ko
 yeni kayıt oluşmadı. Kanıt TEMP/mmo_o47_soak_results_20261010 altında.
 Paralel ajanların aktif dosya/süreçleri değiştirilmedi; QA Lagrange salt
 okunur runner incelemesi yaptı. Gerçek PIE/uzun cep değerlendirmesi açık.
+
+## 86. Ağ smoke gözleminde erken process kapanışı (O48, 2026-10-10)
+
+Eski NetSmokeTest, join/welcome/hata sayılarına bakıyor, erken kapanışı
+sonuçta değerlendirmiyordu. İzole mock'ta native exit1 ile zaten kapanmış
+istemci ve geçerli1join/1welcome/errors0 logları eski runner'ı exit0 yaptı.
+Bu somut yanlış başarı false_success_before.log/exit.txt ile doğrulandı.
+
+Runner artık sunucu açılışı ve istemci gözleminde her250ms iki sahip olunan
+process'in yaşamını kontrol eder; interval sonunda tekrar kontrol eder.
+Erken native exit0 bile başarısızdır. Sunucu taze logda seçilen portu ve
+istenen harita World yüklenmesini doğrulamadan istemci açılmaz. Parametreler
+Map/timer/port için doğrulanır; varsayılan30sn/45sn süre ve rastgele boş port
+yolu korunur. Sürelere yükleme/bağlantı kurulması dahildir.
+
+Try/finally yalnız kendi client/server Process nesnelerini durdurur ve her
+biri için5sn bekler; client cleanup hatası server cleanup'ı atlamaz. Eksik,
+boş, okunamayan log veya Error/Fatal/Ensure/Access violation exit1 verir.
+Fresh GUID/tırnaklı log yolları ve önceki sayısal çıktı korunur. Bu geçmiş
+bağlantı + process yaşamı sözleşmesidir; kesintisiz bağlantı, cevap verebilirlik,
+native temiz kapanış, gameplay RPC veya dedicated target kanıtı değildir.
+
+Ohm yalnız TestNetSmokeRunner.ps1 yazdı. İlk ajan raporu51/668 idi; son
+server launch failure senaryosu sonrası ana süreç nihai52/678 kontrolü
+bağımsız çalıştırdı: failures0/exit0.
+İkinci gözlem sleep'inde başarılı join/welcome kanıtı korunarak client/server
+native0/1 kapanışı enjekte edilir. Başlatma/sleep/iki process için Kill/Wait
+hatları, kilitli loglar, port/World kapısı, yabancı process'e dokunmama,
+tırnaklı loglar ve aynı TEMP içinde log tekilliği kontrol edilir. Otomatik
+port seçimi dalı ve tam elapsed süre mock ölçümü bu kapsamda değildir.
+Bohr salt okunur review'da actionable0 bildirdi; bu review runtime değildir.
+
+Gerçek Summer20sn server +20sn client iki ayrı koşuda1join/1welcome/errors0,
+script exit0 verdi; son koşu nihai World kapısını içeriyordu. Ayrı gerçek
+koşuda Welcomed satırından sonra yalnız sahip olunan client pid24132 Kill
+edildi: native exit=-1, script exit1, own server cleanup tamamlandı.
+Gerçek nazik client exit0 kapanışı yapılmadı; bu durum mock'ta sınandı.
+Boşluk içeren özel TEMP kullanıldı; yabancı process'ler sonlandırılmadı.
+
+RunAllChecks yeni mock adımını çağırır; tam aggregate bu turda çalıştırılmadı.
+ValidateData exit0 (mevcut Lv33+ beceri boşluğu uyarıları), StaticLint88 temiz.
+C++/config96 dosya ve DLL değişmedi, script/belge işi olduğu için UBT yok.
+Başlangıç623 .sav byte'ları korundu; kendi NetSmoke loglarıyla eşleşen
+Gezgin351695/Gezgin849269 için2 yeni slot korundu (toplam625).
+Kanıt TEMP/mmo_o48_net_survival_20261010 altında. Gerçek gameplay/PIE
+kontrolleri açık; kod incelemesi veya bağlantı smoke'u bu kutuları kapatmaz.

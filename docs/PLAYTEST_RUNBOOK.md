@@ -258,3 +258,24 @@ başka spawner'ın dolumu eksik bloğa atanmaz.
 `TestSoakTest.ps1` Unreal açmadan25 sahte process/log senaryosunda98 kontrol
 çalıştırır. `RunAllChecks.ps1` bunu çağırır. O47'de tam aggregate tekrar
 çalıştırılmadı; gerçek30sn Summer/Winter ve erken quit koşuları ayrı doğrulandı.
+
+## Ağ smoke gözlem sözleşmesi (O48, 2026-10-10)
+
+`powershell -NoProfile -File Scripts/NetSmokeTest.ps1 -Port 17779`
+30sn sunucu açılış süresi ve ardından45sn istemci gözlem süresi kullanır.
+`-ServerSeconds` (1..300) ve `-ClientSeconds` (1..3600) bu süreleri değiştirir;
+istemci süresine yükleme/bağlantı kurulması da dahildir. Map Summer_scene veya
+Winter_scene'dir. Varsayılan port mevcut boş rastgele port yolunu korur.
+
+Sunucunun taze logu seçilen portu ve istenen World yüklenmesini göstermeden
+istemci başlatılmaz. Join/welcome satırları tek başına yeterli değildir:
+sunucu ve istemci gözlem sonuna kadar yaşamalıdır. Erken native exit0 da
+başarısızdır. Log okuma/başlatma/bekleme/cleanup hatası exit1 üretir; cleanup
+yalnız runner'ın sahip olduğu process nesnelerini durdurur ve her biri için
+en çok5sn bekler. İlk cleanup hatası diğer process'in temizliğini atlamaz.
+
+Exit0 geçmiş bağlantı kanıtı, process yaşamı ve sıfır log hatasıdır. Sürekli
+bağlantı, cevap verebilirlik, temiz native kapanış, dedicated server target
+ve gameplay RPC doğruluğu bu sonuçtan çıkarılmaz. Bunlar mevcut PIE ve ağ
+kontrolleriyle ayrıca değerlendirilir. `TestNetSmokeRunner.ps1` gerçek Unreal
+açmadan süreç/log/UDP durumlarını mock eder; RunAllChecks buna ayrı adım ayırır.
