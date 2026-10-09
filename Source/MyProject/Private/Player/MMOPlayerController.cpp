@@ -508,13 +508,14 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 		auto RejectedUnchanged = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Id, const FGuid& SeenMembership = FGuid())
 		{
 			TArray<TObjectPtr<AMMOCharacter>> Members[3]; TObjectPtr<AMMOCharacter> Leaders[3];
-			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3]; FGuid Sessions[3], Memberships[3], SourceContexts[3], PendingSourceContexts[3];
+			TWeakObjectPtr<AMMOCharacter> Pending[3]; uint64 Ids[3]; float Times[3], InviteTimes[3]; FGuid Sessions[3], Memberships[3], SourceContexts[3], PendingSourceContexts[3];
 			for (int32 I = 0; I < 3; ++I)
 			{
 				Members[I] = Parties[I]->Members; Leaders[I] = Parties[I]->Leader;
 				Sessions[I] = Parties[I]->PartySessionId; Memberships[I] = Parties[I]->PartyMembershipId;
 				SourceContexts[I] = Parties[I]->PartyInviteContextId; PendingSourceContexts[I] = Parties[I]->PendingInviterContextId;
 				Pending[I] = Parties[I]->PendingInviteFrom; Ids[I] = Parties[I]->PendingInviteId; Times[I] = Parties[I]->PendingInviteTime;
+				InviteTimes[I] = Parties[I]->LastInviteTime;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
 			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0, SeenMembership, 0, FGuid());
@@ -524,7 +525,8 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 					|| Parties[I]->PendingInviteFrom != Pending[I] || Parties[I]->PendingInviteId != Ids[I]
 					|| Parties[I]->PendingInviteTime != Times[I] || Parties[I]->PartySessionId != Sessions[I]
 					|| Parties[I]->PartyMembershipId != Memberships[I] || Parties[I]->PartyInviteContextId != SourceContexts[I]
-					|| Parties[I]->PendingInviterContextId != PendingSourceContexts[I]) return false;
+					|| Parties[I]->PendingInviterContextId != PendingSourceContexts[I]
+					|| Parties[I]->LastInviteTime != InviteTimes[I]) return false;
 			}
 			return InventoryUnchanged();
 		};
@@ -681,6 +683,68 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 			&& HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1 && HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num() + 1
 			&& HUDs[1]->GetChatLinesForTests().Last().Text == FString::Printf(TEXT("[%s adli oyuncuya] ordinary_alias"), *Names[2])
 			&& HUDs[2]->GetChatLinesForTests().Last().Text == FString::Printf(TEXT("[%s fisildiyor] ordinary_alias"), *Names[1]), TEXT("normal whisper alias routing changed"))) return false;
+		// Delayed chat invitations must not acquire the replacement pawn/group's context.
+		Parties[0]->RequestLeave();
+		auto ClearInvites = [&]() {
+			for (UMMOPartyComponent* P : Parties) {
+				P->PendingInviteFrom.Reset(); P->PendingInviteTime = -1.f;
+				P->PendingInviterContextId.Invalidate(); P->LastInviteTime = -100.f;
+			}
+		};
+		auto FreshInvite = [&](const TCHAR* Text, bool bCommitted) {
+			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+			if (bCommitted) PCs[1]->OnChatCommitted(FText::FromString(Text), ETextCommit::OnEnter);
+			else PCs[1]->Say(Text);
+		};
+		Pawns[0]->SetActorLocation(FVector(1800000, 1800000, 5000));
+		Pawns[1]->SetActorLocation(FVector(1800100, 1800000, 5000));
+		Pawns[2]->SetActorLocation(FVector(1800400, 1800000, 5000));
+		ClearInvites();
+		if (!Check(Solo(0) && Solo(1) && Solo(2), TEXT("invite chat solo setup"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti"), nullptr, 0), TEXT("invite chat null pawn applied"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti davet"), Pawns[2], 0), TEXT("invite chat foreign pawn applied"))) return false;
+		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[0]); PCs[0]->Possess(Pawns[1]);
+		const bool ReplacedInviteRejected = RejectedUnchanged(TEXT("/parti"), Pawns[1], 0);
+		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[1]); PCs[0]->Possess(Pawns[0]);
+		if (!Check(ReplacedInviteRejected, TEXT("invite chat replacement pawn applied"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti davet"), Pawns[1], 0, FGuid::NewGuid()), TEXT("invite chat solo stale group applied"))) return false;
+		const uint64 SoloNonce = Parties[0]->PendingInviteId;
+		FreshInvite(TEXT("/parti"), false);
+		if (!Check(Parties[0]->PendingInviteId > SoloNonce && Parties[0]->PendingInviteFrom.Get() == Pawns[1]
+			&& Solo(1) && InventoryUnchanged(), TEXT("invite chat fresh solo Say"))) return false;
+		Parties[0]->RequestDecline();
+		if (!Check(!Parties[0]->PendingInviteFrom.IsValid() && Solo(0) && Solo(1), TEXT("invite chat fresh solo decline"))) return false;
+		FormPair(1, 0); const FGuid IssuingMembership = Parties[1]->PartyMembershipId;
+		Pawns[0]->SetActorLocation(FVector(1801000, 1800000, 5000));
+		Pawns[2]->SetActorLocation(FVector(1800200, 1800000, 5000));
+		ClearInvites();
+		if (!Check(PairMatches(1, 0) && Parties[1]->IsPartyLeader(), TEXT("invite chat grouped setup"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti"), Pawns[1], 0), TEXT("invite chat zero grouped membership applied"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti davet"), Pawns[1], 0, Parties[0]->PartyMembershipId), TEXT("invite chat foreign grouped membership applied"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti"), Pawns[1], 0, FGuid::NewGuid()), TEXT("invite chat random grouped membership applied"))) return false;
+		const uint64 GroupNonce = Parties[2]->PendingInviteId;
+		FreshInvite(TEXT("/parti davet"), true);
+		if (!Check(Parties[2]->PendingInviteId > GroupNonce && Parties[2]->PendingInviteFrom.Get() == Pawns[1]
+			&& PairMatches(1, 0) && Solo(2), TEXT("invite chat fresh grouped committed"))) return false;
+		Parties[2]->RequestAccept();
+		if (!Check(Parties[1]->Members.Num() == 2 && Parties[2]->Members.Num() == 2
+			&& Parties[2]->Leader == Pawns[1] && InventoryUnchanged(), TEXT("invite chat fresh grouped accept"))) return false;
+		Parties[2]->RequestLeave(); ClearInvites();
+		if (!Check(PairMatches(1, 0) && Parties[1]->PartyMembershipId == IssuingMembership && Solo(2), TEXT("invite chat continuous membership"))) return false;
+		Parties[1]->RequestLeave(); ClearInvites();
+		if (!Check(RejectedUnchanged(TEXT("/parti"), Pawns[1], 0, IssuingMembership), TEXT("invite chat departed group applied to solo"))) return false;
+		FormPair(0, 1); ClearInvites();
+		if (!Check(PairMatches(0, 1) && Parties[1]->PartyMembershipId != IssuingMembership, TEXT("invite chat replacement group setup"))) return false;
+		if (!Check(RejectedUnchanged(TEXT("/parti davet"), Pawns[1], 0, IssuingMembership), TEXT("invite chat old group applied to replacement"))) return false;
+		Parties[1]->RequestLeave(); FormPair(1, 0); ClearInvites();
+		if (!Check(RejectedUnchanged(TEXT("/parti"), Pawns[1], 0, IssuingMembership), TEXT("invite chat rejoined leader old membership applied"))) return false;
+		const uint64 RecoveryNonce = Parties[2]->PendingInviteId;
+		FreshInvite(TEXT("/parti"), true);
+		if (!Check(Parties[2]->PendingInviteId > RecoveryNonce && Parties[2]->PendingInviteFrom.Get() == Pawns[1]
+			&& Parties[1]->IsPartyLeader(), TEXT("invite chat fresh rejoined leader recovery"))) return false;
+		Parties[2]->RequestAccept();
+		if (!Check(Parties[0]->Members.Num() == 2 && Parties[1]->Members.Num() == 2 && Parties[2]->Members.Num() == 2
+			&& Parties[1]->Leader == Pawns[1] && InventoryUnchanged(), TEXT("invite chat recovery accept"))) return false;
 		return Check(InventoryUnchanged(), TEXT("party routing changed inventory"));
 	}();
 	for (int32 I = 0; I < 3; ++I) { if (Parties[I]) Parties[I]->RequestLeave(); }
@@ -1266,6 +1330,11 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.IsEmpty() || Sub.Equals(TEXT("davet"), ESearchCase::IgnoreCase))
 		{
+			// Bind issuing chat intent before nearest selection, cooldown, or pending mutation.
+			if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
+			if (Party->IsInParty()
+				? (!SeenPartyMembershipId.IsValid() || SeenPartyMembershipId != Party->PartyMembershipId)
+				: SeenPartyMembershipId.IsValid()) return;
 			Party->RequestInviteNearest();
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))

@@ -3190,3 +3190,132 @@ sayılmaz. Commit yalnız önceden actual DLL ile derlenip native149/compiled
 negatiflerle doğrulanmış O37 dört source/runner + dört kayıt belgesini içerir.
 Kendi dört source/runner SHA'ları ilk freeze ile aynı; exact Party backup aynı.
 Paralel beş dosya ne stage edilir ne commit edilir. Gerçek PIE/Server/Shipping açık.
+
+## 75 · Sabit snapshot entegrasyon doğrulaması (9 Ekim 2026)
+
+Önceki O37 paketinde paralel database/DLL değişimi bütünsel doğrulama sınırı
+oluşturmuştu. O37 (163c86d), W1 (cdb95fa), W2 (54de52b) ve R (9fdd2ea)
+bu kez 9fdd2ea0d6ac8d14cbd3ccd5cd7e2d30edb9a38e snapshot'ında birlikte doğrulandı.
+Managed worktree aggregate-ue-verification, aynı snapshot'tan temiz checkout;
+ana ajanların edit/build dosyaları paylaşılmadı. UBT global mutex beklemesi vardı.
+
+Temiz UHT +6 unity module +lib/DLL Editor build exit0/Succeeded52,93sn.
+RunAllChecks.ps1 -SkipBuild -FullCompile41/41 GECTI, exit0: normal build ayrı
+adımda tamamlandığı için SkipBuild kullanıldı.19 CPP NoPCH/NoLink/SingleFile
+/W4 compile OK, warning C0. SingleFile/*.cpp.rsp ve Shared.rsp'lerde /W4 ve
+/Yu yokluğu ayrıca kontrol edildi;19 nonempty object üretildi.151 Source/Scripts
+hash başlangıç/son eşit, tracked temiz; native paket boyunca linked DLL hash aynı:
+1ffefb85dd6182805cd104489e9603d4018157b1c26b4a59e857ee08a2115fe1.
+
+| Kontrol | Sabit snapshot sonucu (UTC) |
+|---|---|
+| Veri/negatif testler | 56 mob,53 item,86 görev,81 skill,12 efekt,29 spawner; ValidateData/StaticLint/14 veri +15 lint negatif temiz |
+| Native parti / klan | 149 06:45:52.786 /138 06:46:07.944 PASS |
+| Arkadaş / presence / save | 53 06:44:35.769 /24 06:44:27.655 /26 06:44:19.630 PASS |
+| DoT / trade | 33 06:47:15.806 /218 06:48:41.650 PASS |
+| Parser / JSON | 576/576; schema2, negative111 |
+| Store kopya uyumluluğu | 489 yuva/489 load/489 JSON; invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1, roundtrip equal1 |
+| Summer / Winter smoke | 52 /29 mob doğumu; exit0/error0 |
+| NetSmoke | 1join/1welcome; server/client error0;094920 logları |
+
+Ana Saved/SaveGames içindeki489 MMOSave kopyası byte/SHA eşitlikle izole Saved'e
+okunarak aktarıldı; testler izole kopyalarda çalıştı. Bu489 gerçek eşzamanlı
+oyuncu veya Lv30/Lv65 oynanış kanıtı değil. Ana projeye save yazılmadı.
+TEMP/mmo_aggregate_9fdd2ea altında build.log, all_checks.log, observed_stdout.txt,
+source_hashes.json, dll_frozen.json, save_import_hashes.json, verification_result.json,
+19 response +shared response kopyası ve gerçek UE test/smoke/net logları korunur.
+Host çıktıları parent tool stdout'tan ayrıca kaydedildi;19 ayrı tam UBT logu
+üretilmedi. Worktree kaynaklarına test sırasında edit yapılmadı.
+
+ECC plan/review/verify + ue-build/mmo-feature kullanıldı. Salt okunur Hilbert,
+immutable W1/W2/R data diff'i için Unreal/QA/ekonomi fallback rollerinde blocker0:
+yeni referanslar/ödüller/bantlar ve altı parametreli SpawnRift negatif test çapası.
+Ajan test/build/edit yapmadı ve kapatıldı; Agency provenance mevcut değildi.
+
+Bu, eski O37 paketinin aggregate revision belirsizliğini yalnız9fdd2ea snapshot'ı
+için kapatır. Yeni beş mob/yedi görev otomatik veri/derleme kapsamına girer;
+hepsinin gerçek sahnede görülmesi, yedi ödülün tek tek oyuncuyla teslimi, denge,
+yeni havuzların seyrelmesi, render/Slate, gerçek uzak istemci, disk login,
+Shipping/Server ve uçtan uca Lv1–30/Lv46–65 PIE doğrulaması açık kalır.
+InitGameState whitelist ve Lv33+ skill-gap uyarıları devam eder.
+
+Son kontrol:489 ana save dosyası import hash'ına hâlâ eşit (fark0);
+save_source_postcheck.json kaydedildi. İzole testler sonrası engine/UBT0.
+Managed worktree archive talebi gönderildi; log/response/hash kanıtları TEMP'te
+korundu. Belge güncellemesi için oyun derlemesi tekrar çalıştırılmadı.
+
+
+## 76 · Parti davet chat gönderen pawn/üyelik bağlamı (9 Ekim 2026, O38)
+
+59723c8 tabanından izole managed worktree party-chat-invite-context'te
+sınırlı düzeltme: /parti ve /parti davet üretimi SeenCommandPawn veya
+SeenPartyMembershipId kullanmadığı için eski istek güncel pawn/grup adına
+yeni davet/cooldown oluşturabiliyordu. Component/console issuing RPC değişmedi.
+
+Önce20 yeni native assertion eski production ile gerçek CPP/lib/DLL build
+40,27sn sonrası FAIL139/null pawn (07:04:33.463UTC); wrapper exit1, UE exit0.
+Production dispatch öncesi valid/current pawn; aktif üyelikte valid/equal GUID,
+solo durumda invalid GUID kapısı. Ek RPC/property/save alanı yok.
+Normal CPP/lib/DLL5,08sn ve PASS16907:05:31.321UTC;169 =149 +20,
+controller58 +diğer111. Ret snapshot'ı LastInviteTime dahil üç karakterin
+pending source/time/nonce/context/roster/üyelik ve envanterini karşılaştırır.
+
+Null/foreign pawn, gerçek possession replacement, solo stale group GUID,
+aktif zero/foreign/random GUID, group→solo, replacement grup ve aynı üyeliğe
+rejoin eski GUID retleri; fresh solo Say, grouped Enter, matching accept ve
+fresh rejoin recovery pozitifleri vardır. Cooldown reset fixture detayıdır;
+gerçek elapsed cooldown/replication/Slate testi değildir.
+
+Controller CPP NoPCH/NoLink/SingleFile12,65sn Succeeded; /W4 ve /Yu yokluğu
+response dosyalarında doğrulandı, warning C0.19 CPP FullCompile bu dar işte
+tekrarlanmadı; önceki §75 sonucu önceki snapshot'a aittir.
+
+Derlenmiş negatifler: yalnız grouped equality kapısı çıkarılınca4,83sn build
+sonrası FAIL147/foreign membership07:08:07.828; tüm issuing isteklerini kesen
+negatif4,69sn build sonrası FAIL143/fresh solo Say07:08:41.468. İkisinde
+wrapper1/UE0; negatifler commit edilmedi. Exact reviewed byte backup write ile
+restore +gerçek CPP/lib/DLL4,67sn Succeeded; bu DLL final pakete temel oldu.
+Mutant hazırlığında global needle iki eşleştiği için ilk script assert ile
+edit yapmadan durdu; o unmutated9,89sn build/PASS169 ayrı preflight loglarında,
+negatif kanıt olarak kullanılmadı.
+
+ECC plan/review/verify +mmo-feature/ue-build akışı; readonly Herschel
+Unreal/QA/security fallback review blocker0, önce/son iki hash aynı; agent
+build/test/edit yapmadı, kapatıldı. Agency plugin provenance yok.
+Reviewed/final worktree raw byte SHA256:
+- Controller:29da92a8748d5c648c5625fc9e351ea7333584b9a020a116016bac1b6a59a7f1
+- Runner:d1eb5bb183849056264182a98a94eaf60c8286d03645d6336f65b1d453978348
+
+Sınırlar: aynı pawn solo→group→solo invalid sentinel ile ayrışmaz;
+parametresiz component/console MMOInvite stale context, leadership epoch,
+recipient grup niyeti, hedef kick/rejoin, account rebinding ve UI atomikliği
+ayrı açık. Nearest uygun olmayan ilk kişiyi atlamaz; kural değişmedi.
+Gerçek remote RPC/PIE/disk login/Shipping/Server yapılmış sayılmaz.
+
+Final izole RunAllChecks -SkipBuild40/40 GECTI, exit0: parti16907:12:13.341UTC,
+klan13807:12:27.262, arkadaş53/presence24/save26, DoT33/trade218;
+JSONschema2/negative111, parser576/576. Store496 loaded496/JSON496,
+invalid/loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1,
+roundtrip equal1. Summer51/Winter34 exit0/error0; Net1join/1welcome/error0,
+101517 server/client logları.151 tracked source/runner hash aynı, linked DLL:
+eaef3f18ddb7c3eab8249c12c8e9a7c810db2ad418d4daa5698872026f30e879.
+Üç ignored Python bytecode cache oluştu; tracked kaynak freeze kapsamına girmez.
+496 ana save byte-eşit kopyada test edildi; son kontrol bu496 orijinalde fark0.
+
+Bu40/40 paket yalnız59723c8+O38 sabit worktree sürümüne aittir. Arada dış ajan
+ana branch'e yeni içerik, ekonomi, DoT ve spawner commitleri ekledi; bunlara
+eski paket sonucu mal edilmedi. bd98c36 tabanındaki ana checkout'a own iki
+source/runner patch Git içerik eşitliğiyle taşındı; son gerçek controller +6
+module/lib/DLL build10,17sn Succeeded, native16910:39:34.610UTC PASS/exit0.
+Bu son ana çalışmada152 tracked source/runner SHA aynı. ValidateData/Lint exit0:
+59 mob/57 item/90 görev/93 skill/12 efekt/35 spawner; mevcut Lv33+ gap uyarıları
+var, InitGameState whitelist uyarısı dış0014f9c commitinde kaldırılmış.
+Yeni ana snapshot üzerinde tam paket/Shipping/Server/gerçek PIE tekrar yapılmadı.
+
+Dış merge eski §75 belge bölümünü kaldırmıştı; historical9fdd2ea kanıtı burada
+geri eklendi, diğer güncel dış belge içeriği korundu. Son sonuçları gösteren
+durum metni ve O38 açık PIE maddeleri güncellendi; belge sonrası oyun build yok.
+TEMP/mmo_party_chat_invite_20261009: baseline/fixed/mutant/restore build+native,
+NoPCH response ve log, reviewed_hashes/review_scope, source_hashes/dll_frozen,
+save_import_hashes, all_checks, verification_result, primary_current_source_hashes,
+primary_current_build/native/data/lint, primary_current_verification kanıtları.

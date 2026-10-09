@@ -4785,3 +4785,22 @@ sayılmaz. Commit yalnız önceden actual DLL ile derlenip native149/compiled
 negatiflerle doğrulanmış O37 dört source/runner + dört kayıt belgesini içerir.
 Kendi dört source/runner SHA'ları ilk freeze ile aynı; exact Party backup aynı.
 Paralel beş dosya ne stage edilir ne commit edilir. Gerçek PIE/Server/Shipping açık.
+
+## 2026-10-09 — Parti davet chat gönderen bağlamı (O38, gerçek PIE açık)
+
+Native169 içinde20 yeni kontrol, production ServerSendChat endpoint'i ve
+Say/OnChatCommitted yolları kullanıldı. Standalone NullRHI; gerçek ağ/Slate
+veya gecikme ölçümü değildir. Önceki O37 stale issuing maddesi yalnız aşağıdaki
+chat pawn/üyelik alt kapsamında ele alındı; component/console yolu açık kalır.
+
+- [ ] Host + uzak istemcide `/parti`/`/parti davet` gönderiminden sonra pawn
+  replacement veya grup değişimi/ayrılıp rejoin olsa eski gönderim yeni üyelik
+  adına davet üretmesin; hedef pending/nonce ve invite cooldown değişmesin.
+- [ ] Güncel solo `/parti` ve grup/rejoin `/parti davet` Enter gönderimi yakın
+  uygun oyuncuya davet üretsin; fresh kabul doğru gruba eklesin. Üyeliği devam
+  eden oyuncuda roster değişimi normal fresh daveti engellemesin.
+- [ ] Nearest kişi mevcut üye/uygunsuzken davet başka kişiye otomatik atlamaz;
+  mevcut bu davranış ve gerçek cooldown/owner-only bildirim teslimi gözlensin.
+- [ ] Aynı pawn solo→group→solo issuing niyeti, parametresiz component/console
+  MMOInvite, leadership epoch ve kick hedef rejoin ayrı açık değerlendirmeler;
+  bu native sonucu gerçek remote/Shipping/Server testi saymayın.

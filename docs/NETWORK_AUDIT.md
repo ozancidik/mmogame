@@ -1080,3 +1080,29 @@ sayılmaz. Commit yalnız önceden actual DLL ile derlenip native149/compiled
 negatiflerle doğrulanmış O37 dört source/runner + dört kayıt belgesini içerir.
 Kendi dört source/runner SHA'ları ilk freeze ile aynı; exact Party backup aynı.
 Paralel beş dosya ne stage edilir ne commit edilir. Gerçek PIE/Server/Shipping açık.
+
+### O38 · ORTA · Eski parti davet chat isteği yeni pawn/grup adına gönderilir
+
+O37 kaynak bağlamını davet oluşturulduğunda yakalıyordu; `/parti` ve
+`/parti davet` dalı ise SeenCommandPawn/SeenPartyMembershipId alanlarını
+kullanmadan o anki pawn'ın RequestInviteNearest yolunu çağırıyordu.
+Gecikmiş istek replacement pawn veya yeniden katılmış üyelik adına yeni
+pending davet ve cooldown üretebiliyordu. Eski üretim kodu yeni native
+fixture ile FAIL139/null pawn; grup eşitlik kapısı kaldırılan derlenmiş
+negatif FAIL147/foreign membership. Bütün issuing istekleri reddeden
+negatif FAIL143/fresh solo Say pozitifini yakaladı; final kanıt §76'da.
+
+Yalnız chat issuing dalında dispatch öncesi geçerli/current pawn, aktif grupta
+valid/equal kişisel membership, solo durumda invalid membership kapısı var.
+Chat throttle retleri saymaya devam eder; recipient nonce/source lifetime,
+nearest seçim, authority, leader/merge rızası, cooldown ve save kuralları aynı.
+Yeni RPC/property/save alanı yok. Native169 = önceki149 +20; ret snapshot'ı
+LastInviteTime dahil üç karakterin pending/context/roster/nonces/envanterini korur.
+
+Bu kapı konsol MMOInvite veya parametresiz component ServerInviteNearest
+üzerindeki stale issuing bağlamını kapatmaz. Aynı pawn solo→group→solo roundtrip
+invalid sentinel ile ayrışmaz; continuous leadership epoch, hedef kick/rejoin,
+recipient grup niyeti, UI atomikliği ve gerçek remote/Shipping/Server ayrı açık.
+Nearest mevcut uygun olmayan ilk kişiyi seçip durabilir; hedefleme kuralı değişmedi.
+
+O38 izole59723c8+patch40/40,169 native ve Summer51/Winter34/Net1join1welcome/error0. Ana bd98c36+patch ayrıca gerçek build10,17sn/169 native/Data/Lint ile doğrulandı; yeni dış commitlere eski tam paket sonucu mal edilmez (§76).
