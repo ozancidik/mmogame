@@ -1,5 +1,5 @@
 # Tum otomatik kontrolleri sirayla calistirir ve ozet verir. Editor KAPALI olmali. Kullanim:
-#   powershell -File Scripts/RunAllChecks.ps1 [-SkipBuild] [-SkipNet] [-FullCompile] [-NetPort 7777]
+#   powershell -File Scripts/RunAllChecks.ps1 [-SkipBuild] [-SkipNet] [-FullCompile] [-NetPort 17779] (verilmezse bos rastgele port)
 # Sirasi: veri denetimi -> derleme -> (istege bagli -FullCompile: PCH siz tek-dosya /W4) -> Summer duman -> Winter duman -> cok oyunculu baglanti.
 # Cikis 0 = hepsi gecti.
 param(
@@ -7,13 +7,15 @@ param(
     [switch]$SkipNet,
     [switch]$FullCompile,
     [ValidateRange(1, 65535)]
-    [int]$NetPort = 7777
+    [int]$NetPort
 )
 
 $root = Split-Path -Parent $PSScriptRoot
 $py = "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\ThirdParty\Python3\Win64\python.exe"
 $ue = "C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat"
 $results = [ordered]@{}
+$netArgs = @()
+if ($PSBoundParameters.ContainsKey("NetPort")) { $netArgs = @("-Port", "$NetPort") }
 
 function Step($name, [scriptblock]$body) {
     Write-Output ">> $name"
@@ -262,7 +264,7 @@ foreach ($map in @("Summer_scene", "Winter_scene")) {
 
 if (-not $SkipNet) {
     Step "Cok oyunculu baglanti (NetSmokeTest)" {
-        & powershell -NoProfile -File (Join-Path $PSScriptRoot "NetSmokeTest.ps1") -Port $NetPort | Out-Host
+        & powershell -NoProfile -File (Join-Path $PSScriptRoot "NetSmokeTest.ps1") @netArgs | Out-Host
         $LASTEXITCODE -eq 0
     }
 }
