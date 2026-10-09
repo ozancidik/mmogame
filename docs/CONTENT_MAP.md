@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 57 mob (13 elit), 87 gorev, 53 ekipman, 93 beceri.
+Toplam: 59 mob (13 elit), 89 gorev, 53 ekipman, 93 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -75,13 +75,13 @@ Toplam: 57 mob (13 elit), 87 gorev, 53 ekipman, 93 beceri.
 | 69 | AshMarcher |  | Q_AshMarchers |  |  |
 | 70 |  | AshTyrant | Q_AshTyrant |  | War_TitanWrath, Arc_ArrowTempest, Mag_MeteorShower, Pri_DivineJudgment |
 | 71 |  |  | Q_AbyssStriders, Q_AbyssPatrol |  |  |
-| 72 | AbyssStrider |  |  | AbyssBlade, AbyssPlate, AbyssHelm, AbyssBoots |  |
+| 72 | AbyssStrider |  | Q_AbyssEchoes | AbyssBlade, AbyssPlate, AbyssHelm, AbyssBoots |  |
 | 73 |  |  | Q_AbyssEdge |  |  |
-| 74 |  |  | Q_AbyssGuardians |  |  |
+| 74 | AbyssEcho |  | Q_AbyssGuardians |  |  |
 | 75 |  |  | Q_AbyssLine, Q_AbyssVigil |  | War_WorldBreaker, Arc_SunderingArrow, Mag_CosmicBlast, Pri_Sanctify |
-| 76 | AbyssGuardian |  |  |  |  |
+| 76 | AbyssGuardian |  | Q_AbyssEnvoys |  |  |
 | 77 |  |  | Q_AbyssDescent |  |  |
-| 78 |  |  | Q_AbyssBastion |  |  |
+| 78 | AbyssEnvoy |  | Q_AbyssBastion |  |  |
 | 79 |  |  | Q_AbyssRegent |  |  |
 | 80 |  | AbyssRegent |  |  | War_DoomsdayBlow, Arc_HuntersReckoning, Mag_AbsoluteAnnihilation, Pri_HandOfHeaven |
 

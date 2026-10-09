@@ -315,6 +315,19 @@ namespace
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
 		Table.Last().EnrageHealthPct = 0.4f;
 
+		// U paketi (CONTENT_PLAN_LV46_80.md 2.6): Gezgin (72) / Koruyucu (76) / Naib (80) arasi iki kademe, ayri
+		// ceplerde (P74, P78; 2026-10-09 taramasi). PLACEHOLDER; PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("AbyssEcho"), TEXT("Ucurum Yankisi"), 74, 216, 236, 311.f, 88000, 7500, 12200, 440.f, 600.f, 1.3f, FLinearColor(0.18f, 0.16f, 0.4f)));
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.4f;
+
+		Table.Add(MakeMob(TEXT("AbyssEnvoy"), TEXT("Naibin Elcisi"), 78, 235, 268, 336.f, 104000, 8500, 13800, 280.f, 600.f, 1.6f, FLinearColor(0.14f, 0.1f, 0.28f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
+		Table.Last().OnHitEffectChance = 0.35f;
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.4f;
+
 		// --- ELIT / BOSS'lar (rastgele spawn olmaz; sadece ArchetypeId ile cagrilinca) ---
 		// Orumcek Ana: vurusta yuksek sansla yavaslatir.
 		Table.Add(MakeMob(TEXT("SpiderQueen"), TEXT("Orumcek Ana"), 5, 15, 20, 16.f, 260, 40, 110, 300.f, 1100.f, 1.5f, FLinearColor(0.35f, 0.1f, 0.5f)));

@@ -707,6 +707,16 @@ Tiranı'nı devirenlere açılır.*
   durdur. Dokunuşları adımını ağırlaştırır, kenarda ağır adım tehlikelidir."
   - *Dönüşte:* "Kenar temiz. Uçurum Botu'nu giy; dibi görünmeyen yerde sağlam
     basmak her şeydir."
+- **Uçurum Yankıları** *(Q_AbyssEchoes)* — "Uçurumdan yükselen ses yalnızca ses
+  değil, evlat; geri dönen her yankı bir şey eksilterek döner. Sekizini sustur;
+  dokunuşları adımını ağırlaştırır."
+  - *Dönüşte:* "Yankılar dindi, ama sessizlik bir şey söylüyor gibi, değil mi?
+    Al şu Büyük Mana İksirleri'ni; zihnini sağlam tut."
+- **Naibin Elçileri** *(Q_AbyssEnvoys)* — "Naip yeryüzünde kendi sesiyle
+  konuşmaz; yerine bu elçiler konuşur. Sekizini durdur ki sesi eksilsin; canları
+  azalınca öfkeleri artar."
+  - *Dönüşte:* "Elçiler sustu. Naibe giden yol artık daha az gürültülü. Al şu
+    Büyük Can İksirleri'ni; ardında tek bir kapı kaldı."
 - **Uçurum Koruyucuları** *(Q_AbyssGuardians)* — "Yaylanın öbür ucunda
   koruyucular bekler; uçuruma inen yolu tutarlar. Beşini devir. Kolay
   devrilmezler, son nefeslerinde öfkelenirler — geri çekilme."

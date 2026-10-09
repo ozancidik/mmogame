@@ -1024,6 +1024,13 @@ void AMMOGameMode::SpawnMobArea()
 		SpawnFrostbound(FVector(-4000.f, -6000.f, 50.f), 69, 69, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
 		SpawnFrostbound(FVector(-5500.f, 4500.f, -92.f), 72, 72, 225.f, 6, NAME_None, 0.f);
+		// U paketi (2026-10-09 ince tarama, 500u arali, 273 nokta):
+		//  P74 Lv74 (AbyssEcho)  (-5500,2500,-120) 64/64: Gezgin cebine 2000u, hub'dan 6801u
+		//  P78 Lv78 (AbyssEnvoy) (-2000,2500,151): probda 64/64, GERCEK doguma 4/6; hub'dan 4472u, Nobetci cebine 1581u
+		//  (aggro 600 + gezinme 450 + yaricap 225 = 1275 < 1581). Ilk aday (-7000,500,1092) probda 64/64 ama gercek
+		//  doguma 1/6 verdi (engebeli yayla, probe yalan soyledi) ve reddedildi.
+		SpawnFrostbound(FVector(-5500.f, 2500.f, -120.f), 74, 74, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-2000.f, 2500.f, 151.f), 78, 78, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(6800.f, 2000.f, 629.f), 0, 0, 150.f, 1, FName(TEXT("AbyssRegent")), 60.f);
 

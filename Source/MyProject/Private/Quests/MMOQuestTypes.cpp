@@ -320,6 +320,18 @@ namespace
 			T::KillSpecificMob, TEXT("AbyssRegent"), 1, 350000, 350000, 79, TEXT("Q_AbyssLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("AbyssBlade"));
 
+		// U yan gorevleri (CONTENT_PLAN_LV46_80.md 2.6): kapi 72 ve 76; ana zinciri kilitlemez, Q_AbyssRegent'e on kosul
+		// degil. XP/altin PLACEHOLDER (~%6,5 esik, pace-notr); PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_AbyssEchoes"), TEXT("Ucurum Yankilari"), TEXT("Yaylanin yankilarini sustur: 8 Ucurum Yankisi oldur."),
+			T::KillSpecificMob, TEXT("AbyssEcho"), 8, 100000, 30000, 72, TEXT("Q_AbyssStriders")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_AbyssEnvoys"), TEXT("Naibin Elcileri"), TEXT("Naibin sesini tasiyanlari durdur: 8 Naibin Elcisi oldur."),
+			T::KillSpecificMob, TEXT("AbyssEnvoy"), 8, 120000, 36000, 76, TEXT("Q_AbyssEchoes")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		// --- Lv61-80 grind araligi yan gorevleri (QA 2026-10-03: Lv61->65 ~80, Lv71->74 ~48,
 		// Lv75->80 ~92 gorevsiz kill). Ana zincirden dallanir, zinciri kilitlemez; her biri
 		// bir sonrakini acar. Odul XP'si o seviyenin ihtiyacinin ~%40-50'si, kill'lerle birlikte
