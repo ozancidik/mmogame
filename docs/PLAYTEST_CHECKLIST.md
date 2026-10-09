@@ -4823,3 +4823,27 @@ kontrolü yapılmadı; sabit37d829c+patch42/42 bağlantı smoke'u bu maddeleri k
 - [ ] Her iki istemcide efekt süresi/hedef HP/hasar sayıları yenilemeyi yansıtsın;
   gerçek5sn Poison Arrow cooldown ve8sn etki süresiyle deneyin. PvP, parti/klan,
   spawn koruması, kaynak yok oluşu ve ölüm sonrası cleanup regresyonlarını gözleyin.
+
+## 2026-10-09 — Takas davet chat gönderen pawn bağlamı (O40, gerçek PIE açık)
+
+Native230 içinde12 yeni kontrol, production ServerSendChat endpoint'i ile
+Say/OnChatCommitted yollarını standalone NullRHI fixture'da kullandı.
+Aynı frame'deki doğrudan endpoint/Enter handler çağrıları gerçek gecikme,
+remote RPC/Slate input veya replication teslimi değildir (§78).
+
+- [ ] Host + uzak istemci: A `/trade` göndersin; işlenmeden controller B'yi
+  possess etsin. Eski A isteği B adına davet üretmesin; invite cooldown'u,
+  yakındaki hedefin pending kaynak/ID/zamanı ve mevcut takas değişmesin.
+- [ ] Null/foreign context ve aktif takastaki eski issuing isteği cooldown
+  tüketmesin. Ortak chat throttle işlemeye devam etsin; ekonomi değişmesin.
+- [ ] B current pawn bağlamı geldikten sonra fresh Say ve fiziksel Enter
+  `/trade` yakın uygun hedefe davet versin; kabul/iptal iki oyuncuda doğru
+  HUD/pending/session/revision gösterimiyle çalışsın. Gerçek3sn cooldown,
+  invite expiry, tekrar/paket gecikmesi ve ret bildirimi gözlensin.
+- [ ] Component/console issuing RPC, aynı-pawn unpossess/repossess veya
+  inactive→active→inactive niyeti ve görülen nearest hedef bağlamı ayrı
+  değerlendirilsin. Shipping/Server build ve gerçek kayıt/login açık.
+
+O40: compiled baseline FAIL201/check202; native230 PASS,19 NoPCH/W4 warning0,
+42/42 genel paket ve Summer/Winter/Net bağlantı kontrolleri geçti.
+Bu sonuçlar yukarıdaki PIE kutularını kapatmaz.

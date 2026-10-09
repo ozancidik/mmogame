@@ -41,6 +41,7 @@
 #if !UE_BUILD_SHIPPING
 #include "Save/MMOCharacterSaveJson.h"
 #include "Misc/CommandLine.h"
+#include "TimerManager.h"
 #endif
 
 AMMOPlayerController::AMMOPlayerController()
@@ -403,6 +404,7 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
 	{ OutError = TEXT("trade chat requires server game world"); return false; }
 	AMMOPlayerController* PCs[3] = {}; AMMOCharacter* Pawns[3] = {}; UMMOTradeComponent* Trades[3] = {};
+	AMMOCharacter* RetiredPawn = nullptr; UMMOTradeComponent* RetiredTrade = nullptr; FMMOCharacterSaveData RetiredInventory;
 	const bool Passed = [&]()
 	{
 		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -437,6 +439,51 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
 			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0, FGuid(), 0, FGuid());
 		};
+		auto OffersEqual = [](const FMMOTradeOffer& A, const FMMOTradeOffer& B)
+		{
+			if (A.Gold != B.Gold || A.bConfirmed != B.bConfirmed || A.Items.Num() != B.Items.Num()) return false;
+			for (int32 I = 0; I < A.Items.Num(); ++I)
+			{
+				const auto& X = A.Items[I]; const auto& Y = B.Items[I];
+				if (X.InstanceId != Y.InstanceId || X.ItemId != Y.ItemId || X.Plus != Y.Plus || X.Rarity != Y.Rarity) return false;
+			}
+			return true;
+		};
+		auto RejectInviteUnchanged = [&](AMMOCharacter* SeenPawn)
+		{
+			struct FState
+			{
+				bool Active; FString Name; FMMOTradeOffer Mine, Theirs; int32 Revision; uint64 Session, Invite;
+				TWeakObjectPtr<AMMOCharacter> Partner, Pending;
+				float PendingTime, InviteTime, OfferTime, TradeTime, ConfirmTime; bool TimerActive;
+			};
+			UMMOTradeComponent* Components[4] = {Trades[0], Trades[1], Trades[2], RetiredTrade};
+			FState States[4];
+			for (int32 I = 0; I < 4; ++I) if (const auto* T = Components[I])
+			{
+				States[I] = {T->bTradeActive, T->PartnerName, T->MyOffer, T->TheirOffer, T->OfferRevision,
+					T->TradeSessionId, T->PendingInviteId, T->Partner, T->PendingInviteFrom,
+					T->PendingInviteTime, T->LastInviteTime, T->LastOfferChangeTime, T->LastTradeChangeTime,
+					T->LastConfirmTime, World->GetTimerManager().IsTimerActive(T->ValidateTimerHandle)};
+			}
+			Chat(TEXT("/trade"), SeenPawn, 0, 0);
+			for (int32 I = 0; I < 4; ++I) if (const auto* T = Components[I])
+			{
+				const auto& S = States[I];
+				if (T->bTradeActive != S.Active || T->PartnerName != S.Name || !OffersEqual(T->MyOffer, S.Mine)
+					|| !OffersEqual(T->TheirOffer, S.Theirs) || T->OfferRevision != S.Revision || T->TradeSessionId != S.Session
+					|| T->PendingInviteId != S.Invite || T->Partner != S.Partner || T->PendingInviteFrom != S.Pending
+					|| T->PendingInviteTime != S.PendingTime || T->LastInviteTime != S.InviteTime
+					|| T->LastOfferChangeTime != S.OfferTime || T->LastTradeChangeTime != S.TradeTime || T->LastConfirmTime != S.ConfirmTime
+					|| World->GetTimerManager().IsTimerActive(T->ValidateTimerHandle) != S.TimerActive) return false;
+			}
+			if (RetiredPawn)
+			{
+				FMMOCharacterSaveData After; RetiredPawn->GetInventory()->FillSaveData(After); TArray<FString> Differences;
+				FMMOCharacterSaveJson::FindDifferences(RetiredInventory, After, Differences); if (!Differences.IsEmpty()) return false;
+			}
+			return Unchanged();
+		};
 		Trades[0]->RequestInviteNearest();
 		const uint64 Old = Trades[1]->PendingInviteId;
 		if (!Check(Old != 0 && !Trades[1]->bTradeActive && Unchanged(), TEXT("chat first real nearest invite"))) return false;
@@ -461,9 +508,46 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 		if (!Check(Trades[1]->bTradeActive && Trades[2]->bTradeActive && Unchanged(), TEXT("chat null context has no current-state fallback"))) return false;
 		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
 		PCs[1]->Say(TEXT("/trade iptal"));
-		return Check(!Trades[1]->bTradeActive && !Trades[2]->bTradeActive && Unchanged(), TEXT("chat fresh Say active cancel cleans both/no transfer"));
+		if (!Check(!Trades[1]->bTradeActive && !Trades[2]->bTradeActive && Unchanged(), TEXT("chat fresh Say active cancel cleans both/no transfer"))) return false;
+		// Issuing chat must bind to its sending pawn BEFORE invite cooldown or target mutation.
+		Pawns[2]->SetActorLocation(FVector(1501000, 1500000, 5000));
+		Trades[1]->LastInviteTime = World->GetTimeSeconds() - 4.f;
+		if (!Check(RejectInviteUnchanged(nullptr), TEXT("trade issuing null pawn mutated invite state"))) return false;
+		if (!Check(RejectInviteUnchanged(Pawns[0]), TEXT("trade issuing foreign pawn mutated invite state"))) return false;
+		const uint64 BeforeInvite = Trades[0]->PendingInviteId;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/trade"));
+		if (!Check(Trades[0]->PendingInviteId > BeforeInvite && Trades[0]->PendingInviteFrom.Get() == Pawns[1]
+			&& Trades[1]->LastInviteTime == World->GetTimeSeconds() && Unchanged(), TEXT("trade issuing fresh Say failed"))) return false;
+		Trades[0]->RequestAccept();
+		if (!Check(Trades[0]->bTradeActive && Trades[1]->bTradeActive && Unchanged(), TEXT("trade issuing fresh invite acceptance failed"))) return false;
+		Trades[1]->LastInviteTime = World->GetTimeSeconds() - 4.f;
+		if (!Check(RejectInviteUnchanged(Pawns[0]), TEXT("trade issuing stale pawn consumed active trade cooldown"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/trade iptal"));
+		if (!Check(!Trades[0]->bTradeActive && !Trades[1]->bTradeActive && Unchanged(), TEXT("trade issuing fresh pair cancel failed"))) return false;
+		RetiredPawn = Pawns[1]; RetiredTrade = Trades[1]; RetiredPawn->SetTravelSaveCommitted(true);
+		RetiredPawn->GetInventory()->FillSaveData(RetiredInventory);
+		AMMOCharacter* Replacement = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), RetiredPawn->GetActorLocation(), FRotator::ZeroRotator, Params);
+		if (!Replacement) { OutError = TEXT("trade issuing replacement spawn failed"); return false; }
+		Pawns[1] = Replacement; Trades[1] = Replacement->GetTradeComponent();
+		PCs[1]->Possess(Replacement); Replacement->SetActorTickEnabled(false); Replacement->SetActorEnableCollision(false);
+		Replacement->GetInventory()->FillSaveData(Before[1]);
+		if (!Check(PCs[1]->GetPawn() == Replacement && RetiredPawn->GetController() == nullptr && Trades[1] && Unchanged(),
+			TEXT("trade issuing actual replacement possession failed"))) return false;
+		if (!Check(RejectInviteUnchanged(RetiredPawn), TEXT("trade issuing retired pawn invited on replacement"))) return false;
+		if (!Check(RejectInviteUnchanged(nullptr), TEXT("trade issuing null context invited on replacement"))) return false;
+		const uint64 ReplacementBeforeInvite = Trades[0]->PendingInviteId;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/trade")), ETextCommit::OnEnter);
+		if (!Check(Trades[0]->PendingInviteId > ReplacementBeforeInvite && Trades[0]->PendingInviteFrom.Get() == Replacement
+			&& Unchanged(), TEXT("trade issuing fresh replacement Enter failed"))) return false;
+		Trades[0]->RequestAccept();
+		if (!Check(Trades[0]->bTradeActive && Trades[1]->bTradeActive && Unchanged(), TEXT("trade issuing fresh replacement accept failed"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/trade iptal"));
+		return Check(!Trades[0]->bTradeActive && !Trades[1]->bTradeActive && Unchanged(), TEXT("trade issuing replacement cleanup changed inventory"));
 	}();
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
 	for (int32 I = 0; I < 3; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
+	if (IsValid(RetiredPawn)) RetiredPawn->Destroy();
 	return Passed;
 }
 #endif
@@ -1368,9 +1452,10 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		{
 			ClientReceiveChat(FString(), TEXT("Ticaret su an kullanilamaz."), 2);
 		}
-		else if (Sub.IsEmpty())
-		{
-			Trade->RequestInviteNearest();
+			else if (Sub.IsEmpty())
+			{
+				if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
+				Trade->RequestInviteNearest();
 		}
 		else if (Sub.Equals(TEXT("kabul"), ESearchCase::IgnoreCase) || Sub.Equals(TEXT("accept"), ESearchCase::IgnoreCase))
 		{

@@ -1121,3 +1121,19 @@ kaynak çözümleme ve replicated effects yolu korunur. Yeni RPC/save alanı yok
 Ölüm/detach sahipliği politikası ayrı açık; XP/loot, elapsed tick ve uzak UI
 gerçek PIE gerektirir. §77: sabit37d829c+patch42/42;19 NoPCH/W4 warning0;
 Summer57/Winter75, Net1join1welcome/hata0; ana gerçek build8,99sn/native46.
+
+### O40 · ORTA · Eski takas davet chat isteği replacement pawn adına gönderilir
+
+Bare `/trade` SeenCommandPawn kontrolü olmadan güncel pawn trade component'ine
+dispatch ediyordu. Geciken eski/null/foreign context, yeni pawn cooldown'unu
+tüketebilir ve yakın uygun hedefte pending generation/source/time üretebilirdi.
+Issuing altın/eşya transferi yapmaz. Dispatch öncesi IsValid/current pawn
+kontrolü eklendi; ortak chat throttle, authority ve recipient/session/revision
+kuralları korunur. Yeni RPC/reflected/save alanı yok.
+
+Compiled baseline FAIL201/check202; fix native230=218+12. Ret snapshot'ı
+cooldown/pending/offer/timer/envanteri korur; actual replacement ve fresh
+Say/Enter kabul/iptal çalışır. §78: sabit bb4ab1c+patch42/42,19 NoPCH/W4
+warning0, Summer/Winter ve Net1join1welcome/error0; ana DLL/native230 geçti.
+Doğrudan component/console issuing, aynı-pawn session/possession roundtrip,
+görülen nearest hedef niyeti, gerçek remote/PIE/HUD ve Server/Shipping açık.

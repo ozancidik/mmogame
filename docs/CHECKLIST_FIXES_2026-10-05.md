@@ -3390,3 +3390,65 @@ ana actual Stats+Module.5/lib/DLL build8,99sn Succeeded, native46
 oyun build başlatılmadı. TEMP/mmo_dot_hub_refresh_20261009 altında baseline,
 fixed/primary build+native, frozen_inputs, nopch_proof/response, all_checks,
 review_scope, verification_result/primary_verification ve save hash kanıtı var.
+
+## 78 · Takas davet chat gönderen pawn bağlamı (9 Ekim 2026, O40)
+
+bb4ab1c üzerinde bare `/trade`, SeenCommandPawn doğrulaması yapmadan güncel
+pawn'ın RequestInviteNearest yolunu çağırıyordu. A adına geciken istek,
+aynı controller B'yi possess edince B'nin3sn invite cooldown'unu tüketebilir;
+uygun yakın hedefe B kaynaklı yeni pending kimliği/zamanı üretebilirdi.
+Issuing tek başına altın/eşya transferi yapmaz. Readonly Bacon fallback
+Unreal multiplayer/QA incelemesi ORTA bulguyu doğruladı; Agency kökeni yok.
+
+Yalnız chat issuing dalına dispatch öncesi IsValid/current pawn kapısı eklendi.
+Ortak chat throttle retleri sayar; trade cooldown/pending mutasyonu başlamaz.
+Authority, recipient nonce, session/revision, nearest seçimi ve ekonomi
+kuralları korunur. Yeni RPC/reflected/save alanı yok. Non-Shipping friend,
+native fixture'ın server-only state snapshot'ına erişimini sağlar.
+
+Native230=önceki218+12; controller chat20. Null/foreign/retired pawn retleri,
+aktif takasta cooldown koruması, gerçek replacement possession, fresh Say
+ve Enter issuing, kabul ve iptal kontrol edildi. Üç current ve retired
+component için pending kimliği/kaynak/zaman, cooldownlar, partner/session,
+offer/revision, timer activity ve envanter snapshot'ı retlerde değişmedi.
+Enter doğrudan handler çağrısıdır; physical Slate/remote RPC testi değildir.
+Fixture aynı frame'de çalışır; elapsed expiry veya gerçek ağ gecikmesi ölçmez.
+
+Temiz izole Editor UHT/compile/lib/DLL42,47sn Succeeded. Eski üretim ile
+yeni fixture FAIL checks201/check202, null issuing state;11:20:40.244UTC,
+runner1/UE0. Guard actual CPP/lib/DLL4,77sn; PASS23011:21:34.885UTC.
+İlk genel paket StaticLint'te fixture için TimerManager.h eksikliğini yakaladı;
+paket durduruldu, aborted_missing_include.log saklandı. Explicit include
+eklendi, actual compile/link10,38sn Succeeded ve yeni freeze ile paket baştan
+çalıştırıldı. Drop-all mutant çalıştırılmadı. Bacon son üç dosya review
+actionable0; include sonrasında parent diff incelemesi ve kontroller geçti.
+Ajan test/build/dosya yazmadı; paket öncesi kapatıldı.
+
+### O40 sabit entegrasyon paketi
+
+RunAllChecks -SkipBuild -FullCompile42/42 GECTI, exit0; yalnız bb4ab1c+üç
+source/runner patch snapshot'ına aittir.159 tracked Source/Scripts/Config/
+uproject/docs/Lore.md input + linked DLL =160 SHA önce/son aynı.19 CPP
+NoPCH/NoLink/SingleFile, response/shared /W4 var /Yu yok,19 nonempty object,
+warning C0; response kopyaları ve object SHA/size saklandı. Bireysel UBT
+logları ayrı kaydedilmedi; paket çıktısı saklandı.
+
+Trade23011:35:52.040UTC; parti169/klan138/DoT46, arkadaş53/presence24/save26,
+vendor17/questCapacity13, JSONschema2/negative111 ve parser576/576 geçti.
+Lint84 temiz; Data59mob/57item/90görev/93skill/12efekt/35spawner; mevcut
+Lv33+ beceri boşluğu uyarıları sürüyor. Store553loaded/JSON553, invalid/
+loadFailed/existsMismatch/jsonMismatch0, maxLevel6, writeorder1/roundtrip
+equal1.553 ana orijinal save byte-eşit kopyalandı; paket ve ana native
+sonrasında orijinal SHA fark0. Gerçek Lv30+ save uyumu bu örnekle kanıtlanmaz.
+Summer56/Winter75 doğum, exit0/error0; Net1join1welcome/hata0.
+
+Ana checkout'a aynı Git-normalized üç dosya patch taşındı; actual Editor
+compile/lib/DLL12.58sn Succeeded, native230 PASS.159 input+ana linked DLL
+SHA aynı. TEMP/mmo_trade_issuer_20261009: baseline/fixed/final_include/primary
+build+native, aborted log, full_checks, freeze/check, primary-freeze/check,
+verified.patch, original_saves, responses/nopch_proof ve review.md kanıtları.
+Belge sonrası oyun derlemesi başlatılmadı.
+
+Gerçek host+uzak istemci PIE/HUD/replication, Shipping/Server ayrı açık.
+Component/console issuing RPC, aynı-pawn possession/session roundtrip ve
+görülen nearest hedef niyeti bu chat pawn düzeltmesinin dışında kalır.

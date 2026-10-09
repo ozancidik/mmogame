@@ -140,6 +140,10 @@ protected:
 	UFUNCTION(Server, Reliable)
 	void ServerConfirm(uint64 SeenSessionId, int32 SeenRevision);
 
+#if !UE_BUILD_SHIPPING
+	friend class AMMOPlayerController; // Native issuing-context fixture snapshots server-only state.
+#endif
+
 	// --- Sunucu durumu (replike degil) ---
 	TWeakObjectPtr<AMMOCharacter> Partner;
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
