@@ -63,6 +63,9 @@ protected:
 	TArray<TWeakObjectPtr<AMMOMob>> LiveMobs;
 
 	FTimerHandle TopUpTimer;
+	// Art arda hic mob dogurmayan TopUp turu sayisi: kalici kotu cepte (QA 2026-10-09 DUSUK-4) 5 turdan sonra tur basina yeniden
+	// deneme kapatilir (her 4 sn'de mob basina 4 kat iz/nav maliyeti olmasin); bir mob dogunca sayac sifirlanir.
+	int32 ConsecutiveEmptyTopUps = 0;
 	bool bInvalidBandReported = false;
 	bool bSpawnLocationWarningReported = false;
 

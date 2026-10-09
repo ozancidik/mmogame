@@ -62,9 +62,12 @@ void AMMOMobSpawner::TopUp()
 	// Cakisma/kotu nokta yuzunden dogmayan mob ayni turda baska bir noktada birkac kez daha denenir (onceden 4 sn beklerdi;
 	// engebeli veya iri kapsullu mob cepleri ilk doldurmada 1-3/6 veriyordu). Tavan: Needed x (1 + MaxSpawnRetries).
 	constexpr int32 MaxSpawnRetries = 3;
+	constexpr int32 EmptyTopUpsBeforeBackoff = 5;
+	const int32 Retries = ConsecutiveEmptyTopUps >= EmptyTopUpsBeforeBackoff ? 0 : MaxSpawnRetries;
+	const int32 LiveBefore = LiveMobs.Num();
 	for (int32 i = 0; i < Needed; ++i)
 	{
-		for (int32 Try = 0; Try <= MaxSpawnRetries; ++Try)
+		for (int32 Try = 0; Try <= Retries; ++Try)
 		{
 			if (SpawnOne())
 			{
@@ -72,6 +75,7 @@ void AMMOMobSpawner::TopUp()
 			}
 		}
 	}
+	ConsecutiveEmptyTopUps = (Needed > 0 && LiveMobs.Num() == LiveBefore) ? ConsecutiveEmptyTopUps + 1 : 0;
 }
 
 bool AMMOMobSpawner::FindSafeSpawnLocation(UWorld* World, const AActor* Ignore, const FVector& Base, float InSpawnRadius,
