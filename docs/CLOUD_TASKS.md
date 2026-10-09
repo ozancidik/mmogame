@@ -24,6 +24,13 @@ Bu dosya, Claude Code **bulut oturumunun** (claude.ai/code) bu depoda neyi yapı
 3. **Denge tabloları**: `docs/PROGRESSION_PLAN.md` içindeki XP/altın/mob verilerinden seviye başına öldürme sayısı ve ekonomi tabloları üret (hesapları betikle göster).
 4. **Dokümantasyon**: `CLAUDE.md` ile `docs/` arasındaki tutarsızlıkları ve eski bilgileri listele; düzeltmeyi PR'da öner.
 
+## Güncel öncelikler (2026-10-09; yerel oturum bunları derleyemez/ölçemez, bulut yalnız okur ve yazar)
+
+1. **Bağımsız kod incelemesi (yalnız okuma):** Codex'in son ~50 commit'i (`git log --since="2026-10-06"`): parti/klan/arkadaş/takas/sohbet "gönderim kimliği" bağlama serisi (`MMOPlayerController.cpp`, `MMOPartyComponent.cpp`, `MMOClanComponent.cpp`, `MMOTradeComponent.cpp`, `MMOFriendsComponent.cpp`). Bakılacaklar: sunucu otoritesi, RPC doğrulama boşlukları, yarış/yeniden giriş durumları, testlerin sahte-geçme riski. Çıktı: `docs/QA_ROUND_<tarih>_BULUT.md` (kod değiştirme).
+2. **Yeni Lv46–80 metinleri (yalnız Lore/diyalog):** `docs/Lore.md` içindeki yeni görev metinleri (Q_WinterHowls, Q_WinterColossus, Q_FrostboundSworn/Watch/Oath, Q_RiftWhispers/Sentries/Walkers, Q_AshMarchers, Q_AbyssEchoes/Envoys) ton, tekrar ve yazım açısından gözden geçir; ASCII Türkçe kuralını bozma. `Scripts/GenQuestDialogue.py --check` yerelde doğrular, bu yüzden Lore değiştirirsen PR açıklamasında "diyalog yeniden üretilmeli" yaz.
+3. **Belge tutarlılığı:** `CLAUDE.md`, `docs/GUNLUK_OZET_2026-10-09.md`, `docs/DECISIONS_NEEDED.md`, `docs/PLAYTEST_*.md` arasında çelişki/bayat sayı listesi.
+4. **Zaman çizelgesi tablosu:** `Scripts/ProgressionModel.py` ve `EconomyModel.py` çıktılarından Lv1–80 için "kaç dakikada hangi seviye" tahmin tablosu (varsayımlar açık yazılsın; model, oyun verisi değil).
+
 ## Yapılmayacaklar
 
 - Derleme gerektiren büyük özellik (yeni bileşen, RPC, UI penceresi) yazılmaz; bunlar yerel oturumda yapılır.
