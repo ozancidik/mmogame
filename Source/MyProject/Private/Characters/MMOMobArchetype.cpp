@@ -244,6 +244,13 @@ namespace
 		Table.Last().OnHitEffectId = FName(TEXT("Slow"));
 		Table.Last().OnHitEffectChance = 0.35f;
 
+		// W2 yedek paketi (CONTENT_PLAN_LV46_80.md 2.3): Gozcu (51) ile Nobetci (55) arasi denge kademesi.
+		// PLACEHOLDER; PIE'de dogrulanmadi.
+		Table.Add(MakeMob(TEXT("FrostboundSworn"), TEXT("Buzbagli Yeminli"), 53, 133, 131, 190.f, 33000, 3550, 6200, 350.f, 600.f, 1.4f, FLinearColor(0.58f, 0.74f, 0.92f)));
+		SetWarrokVisual(Table.Last());
+		Table.Last().EnrageEffectId = FName(TEXT("Rage"));
+		Table.Last().EnrageHealthPct = 0.45f;
+
 		Table.Add(MakeMob(TEXT("FrostboundSentinel"), TEXT("Buzbagli Nobetci"), 55, 138, 140, 198.f, 36000, 3800, 6600, 260.f, 600.f, 1.55f, FLinearColor(0.45f, 0.62f, 0.85f)));
 		SetWarrokVisual(Table.Last());
 		Table.Last().EnrageEffectId = FName(TEXT("Rage"));

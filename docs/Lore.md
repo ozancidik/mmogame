@@ -606,6 +606,20 @@ eder. Her görev bir öncekinin ardından açılır.*
   giden yol açılsın. Hat dediğin, son halkası kırılınca hat olmaktan çıkar."
   - *Dönüşte:* "Hat kırıldı. Buzbağlı Zırh artık senin; onu giyen yeminli
     değildir, ama yeminlilerden de geri kalmaz."
+- **Buzbağlı Yeminliler** *(Q_FrostboundSworn)* — "Gözcülerle nöbetçiler arasında
+  bir kademe daha var, evlat: yeminini bozmayanlar. Ne hızlıdırlar ne ağır;
+  dengeli, bu yüzden tehlikeli. Altısını durdur."
+  - *Dönüşte:* "Yeminliler geri çekildi. Al şu Büyük Can İksirleri'ni; yemin
+    ne kadar ağırsa yara da o kadar derin olur."
+- **Buz Nöbeti** *(Q_FrostboundWatch)* — "Nöbet bozulmadı, yalnızca el değiştirdi.
+  Sekiz nöbetçi daha devir; sabırlı ol, yerlerinden kolay kımıldamazlar."
+  - *Dönüşte:* "Nöbet bozuldu. Bu Büyük Mana İksirleri'ni al; sabır da bir
+    güçtür, ama aklı yenilemek için içeceğin bir şey gerekir."
+- **Son Yemin** *(Q_FrostboundOath)* — "Yeminliler hâlâ kapıya sarılıyor. Sekiz
+  tanesini daha dağıt; canları azaldığında yeminlerine daha sıkı tutunurlar,
+  dikkat et."
+  - *Dönüşte:* "Son yemin de bozuldu. Al şu Büyük Can İksirleri'ni; Buz Kapısı'na
+    varmadan yaralarını sar."
 - **Buzbağlı Muhafız** *(Q_FrostboundWarden)* — "Kapının önünde son bir bekçi
   var. Bil ki o fısıltıya değil, kapıya sadıktır; belki de bu diyarın en dürüst
   askeridir. Yine de yolumuz onun ardından geçiyor. Devir onu — ama düştüğünde

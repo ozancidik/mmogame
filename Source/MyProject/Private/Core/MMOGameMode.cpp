@@ -998,7 +998,9 @@ void AMMOGameMode::SpawnMobArea()
 		// 23/64 verdi (iz surme baslangicinda cokus: dag cikintisinin basit carpismasi). Yeni konumlar
 		// MMOProbeSurface gridiyle olculdu: Nobetci (-3500,3000) 64/64, Gezgin (-5500,4500) 59/64;
 		// hub'dan tam navmesh yolu var; Kis Hukumdari'ndan 3041u, birbirinden 2500u.
-		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 6, NAME_None, 0.f);
+		// W2 yedek paketi (CONTENT_PLAN_LV46_80.md 2.3): Gozcu cebi 51-53 -> FrostboundSworn (Lv53) burada
+		// dogar; ayri cep sonra MMOProbeSurface ile. Bedel: Gozcu/Yeminli 1/2.
+		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 53, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-3500.f, 3000.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(2000.f, 2800.f, 236.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
 

@@ -228,6 +228,23 @@ namespace
 			T::KillSpecificMob, TEXT("FrostboundSentinel"), 6, 88000, 88000, 54, TEXT("Q_FrostboundSentinels")));
 		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundPlate"));
 
+		// W2 yan gorevleri (CONTENT_PLAN_LV46_80.md 2.3): Lv52/55/56 kapi bosluklarini kapatir; Q_FrostboundWarden'a
+		// on kosul degildir. XP/altin PLACEHOLDER (~%6-7 esik, pace-notr); PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_FrostboundSworn"), TEXT("Buzbagli Yeminliler"), TEXT("Sinirin yeminli askerlerini durdur: 6 Buzbagli Yeminli oldur."),
+			T::KillSpecificMob, TEXT("FrostboundSworn"), 6, 40000, 12000, 52, TEXT("Q_FrostboundScouts")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_FrostboundWatch"), TEXT("Buz Nobeti"), TEXT("Nobeti bozma: 8 Buzbagli Nobetci oldur."),
+			T::KillSpecificMob, TEXT("FrostboundSentinel"), 8, 45000, 13500, 55, TEXT("Q_FrostboundSentinels")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_FrostboundOath"), TEXT("Son Yemin"), TEXT("Yeminlerini bozdur: 8 Buzbagli Yeminli daha oldur."),
+			T::KillSpecificMob, TEXT("FrostboundSworn"), 8, 48000, 14500, 56, TEXT("Q_FrostboundSworn")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
 		Table.Add(MakeQuest(TEXT("Q_FrostboundWarden"), TEXT("Buzbagli Muhafiz"), TEXT("Buz kapisinin muhafizini devir."),
 			T::KillSpecificMob, TEXT("FrostboundWarden"), 1, 100000, 100000, 57, TEXT("Q_FrostboundLine")));
 		Table.Last().RewardEquipmentId = FName(TEXT("FrostboundBlade"));
