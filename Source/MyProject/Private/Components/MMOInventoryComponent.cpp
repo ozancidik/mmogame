@@ -205,6 +205,12 @@ bool UMMOInventoryComponent::RunVendorEconomySelfTest(UWorld* World, FString& Ou
 		Stats->Level = HighItem->RequiredLevel - UMMOInventoryComponent::VendorLevelSlack;
 		Inv->BuyEquipment(TEXT("AbyssBlade"));
 		if (!Check(Inv->EquipmentBag.Num() == 1 && Inv->Gold == 100000 - FMMOItemDatabase::GetBuyPrice(*HighItem), TEXT("level gate rejected an item at the slack limit"))) return false;
+		// bVendorSold=false (boss/odul seti): seviye yeterli ve altin bol olsa bile satilmaz.
+		const FMMOItemDef* Throne = FMMOItemDatabase::Find(TEXT("ThroneBlade"));
+		if (!Throne || Throne->bVendorSold) { OutError = TEXT("non-vendor fixture item missing"); return false; }
+		Reset(); Stats->Level = Throne->RequiredLevel;
+		Inv->BuyEquipment(TEXT("ThroneBlade"));
+		if (!Check(Inv->Gold == 100000 && Inv->EquipmentBag.IsEmpty(), TEXT("vendor sold a non-vendor item"))) return false;
 		Stats->Level = 1;
 		// Yukseltme maliyeti esya seviyesiyle olceklenir (altin sink'i): 50 x (+N) x (100 + Lv^2) / 100; Lv0 eski sabit maliyet.
 		if (!Check(FMMOItemDatabase::GetUpgradeCost(0) == 50 && FMMOItemDatabase::GetUpgradeCost(2, 0) == 150
@@ -891,6 +897,13 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 	if (!IsOwnerNearVendor())
 	{
 		MMONotify::ToOwner(GetOwner(), TEXT("Satici yakininda degilsin"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return;
+	}
+
+	// Boss/odul setleri (bVendorSold=false, orn. Taht) satilmaz: yalniz ganimet ve gorev odulu.
+	if (!Def->bVendorSold)
+	{
+		MMONotify::ToOwner(GetOwner(), TEXT("Bu esya saticida satilmaz"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 

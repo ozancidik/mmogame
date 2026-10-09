@@ -1549,7 +1549,15 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 	DrawText(TEXT("SATIN AL (sol tik)"), FLinearColor(0.6f, 0.9f, 0.6f), LeftX, PY + 68.f, nullptr, 0.95f);
 	const float BuyStartY = PY + 90.f;
 	const TArray<FMMOConsumableDef>& Consumables = FMMOConsumableDatabase::GetAll();
-	const TArray<FMMOItemDef>& Equipment = FMMOItemDatabase::GetAll();
+	// Satilmayan (bVendorSold=false: boss/odul setleri) esyalar listelenmez; sunucu zaten reddeder.
+	TArray<const FMMOItemDef*> Equipment; // tablo statik; gosterici kopya/ayirma maliyeti olmadan filtreler
+	for (const FMMOItemDef& ItemDef : FMMOItemDatabase::GetAll())
+	{
+		if (ItemDef.bVendorSold)
+		{
+			Equipment.Add(&ItemDef);
+		}
+	}
 	const int32 BuyRowCount = 1 + Consumables.Num() + Equipment.Num();
 	const int32 BuyPageCount = FMath::DivideAndRoundUp(BuyRowCount, ShopBuyPageSize);
 	ShopBuyPage = FMath::Clamp(ShopBuyPage, 0, BuyPageCount - 1);
@@ -1581,7 +1589,7 @@ void AMMOHUD::DrawShop(AMMOCharacter* PlayerChar)
 		}
 		else
 		{
-			const FMMOItemDef& Def = Equipment[Index - 1 - Consumables.Num()];
+			const FMMOItemDef& Def = *Equipment[Index - 1 - Consumables.Num()];
 			R.SkillId = Def.ItemId;
 			R.Slot = 2;
 			Label = FString::Printf(TEXT("%s  -  %d altin (Lv%d)"), *Def.Name, FMMOItemDatabase::GetBuyPrice(Def), Def.RequiredLevel);

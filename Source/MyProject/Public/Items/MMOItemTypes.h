@@ -52,6 +52,11 @@ struct FMMOItemDef
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Item")
 	int32 RequiredLevel = 1;
 
+	// Satici bu esyayi satar mi? false = yalniz ganimet/gorev odulu (boss/odul setleri; DECISIONS_NEEDED, QA 2026-10-09 ORTA-2).
+	// Sunucuda BuyEquipment reddeder, satici penceresi listelemez. Takas/depo bu bayragi gormez.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MMO|Item")
+	bool bVendorSold = true;
+
 	bool IsValidDef() const { return !ItemId.IsNone(); }
 };
 

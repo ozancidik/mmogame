@@ -185,7 +185,7 @@ otorite gibi davrandığı yol bulunmadı. `MMOTeleport` yönetici + Shipping-d�
 | Bulgu | Durum |
 |---|---|
 | ORTA-1 | **Düzeltildi:** `GenQuestDialogue.py` yeniden çalıştırıldı (4 satır); teslim bildirimi artık `-N altin bagislandi` yazıyor; `GenQuestDialogue.py --check` (üretilmiş diyalog Lore.md ile eşleşiyor mu) `RunAllChecks.ps1`'e adım olarak eklendi, bayat dosyada başarısız olduğu elle gösterildi. |
-| ORTA-2 | **Belgeler/yorum düzeltildi** (Taht seti münhasır değil; satıcı tüm tabloyu satıyor, Lv75+ normal mob düşürür, takas/depo denetlemez). **Tasarım sorusu açık:** satıcı stoğunu sınırlamak (`DECISIONS_NEEDED.md`). |
+| ORTA-2 | **Sonradan kodla da çözüldü:** FMMOItemDef::bVendorSold eklendi, Taht seti satıcıdan çıkarıldı (sunucu reddi + HUD filtresi + ValidateData/EconomyModel; TestVendorEconomy 18). Önce: **Belgeler/yorum düzeltildi** (Taht seti münhasır değil; satıcı tüm tabloyu satıyor, Lv75+ normal mob düşürür, takas/depo denetlemez). **Tasarım sorusu açık:** satıcı stoğunu sınırlamak (`DECISIONS_NEEDED.md`). |
 | ORTA-3 | **Düzeltildi:** daha zayıf oyuncu yenilemesi mobdaki daha güçlü oyuncu DoT'unun büyüklüğünü ve kredisini ezmez (yalnız süre tazelenir); `TestDotSourceLifecycle` 36 → **38** kontrol, korumayı kapatan mutant ilgili kontrolde başarısız oldu. |
 | DÜŞÜK-1 | **Düzeltildi:** gerçek PvP DoT kontrolü eklendi (kaynak ≠ hedef, savunma 50 → tick 1 hasar, büyüklük 8); eski kontrol "self DoT" diye yeniden adlandırıldı. |
 | DÜŞÜK-2 | **Düzeltildi:** `SmokeTest.ps1` `no nearby ground/nav location` satırlarını da uyarı olarak basar; ayrıca ilk dolumda 5+ denemede 4'ten az mob uyarısı. |

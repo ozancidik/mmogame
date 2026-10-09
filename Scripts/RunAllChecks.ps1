@@ -1,11 +1,13 @@
 # Tum otomatik kontrolleri sirayla calistirir ve ozet verir. Editor KAPALI olmali. Kullanim:
-#   powershell -File Scripts/RunAllChecks.ps1 [-SkipBuild] [-SkipNet] [-FullCompile]
+#   powershell -File Scripts/RunAllChecks.ps1 [-SkipBuild] [-SkipNet] [-FullCompile] [-NetPort 7777]
 # Sirasi: veri denetimi -> derleme -> (istege bagli -FullCompile: PCH siz tek-dosya /W4) -> Summer duman -> Winter duman -> cok oyunculu baglanti.
 # Cikis 0 = hepsi gecti.
 param(
     [switch]$SkipBuild,
     [switch]$SkipNet,
-    [switch]$FullCompile
+    [switch]$FullCompile,
+    [ValidateRange(1, 65535)]
+    [int]$NetPort = 7777
 )
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -260,7 +262,7 @@ foreach ($map in @("Summer_scene", "Winter_scene")) {
 
 if (-not $SkipNet) {
     Step "Cok oyunculu baglanti (NetSmokeTest)" {
-        & powershell -NoProfile -File (Join-Path $PSScriptRoot "NetSmokeTest.ps1") | Out-Host
+        & powershell -NoProfile -File (Join-Path $PSScriptRoot "NetSmokeTest.ps1") -Port $NetPort | Out-Host
         $LASTEXITCODE -eq 0
     }
 }

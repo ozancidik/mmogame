@@ -313,6 +313,10 @@ for qid, q in quests.items():
 # Satici: tum ekipman tablosu satilir (AMMOHUD shop = FMMOItemDatabase::GetAll). Yuva basina kapsama.
 slot_levels = {}
 for m in re.finditer(r'MakeItem\(TEXT\("([^"]+)"\),\s*TEXT\("[^"]*"\),\s*S::(\w+),\s*[\d.]+f,\s*[\d.]+f,\s*(\d+)', item_src):
+    # bVendorSold = false olan boss/odul setleri (orn. Taht) saticida listelenmez; kapsamaya sayilmaz.
+    nxt = item_src.find("Table.Add(", m.end())
+    if re.search(r"bVendorSold\s*=\s*false", item_src[m.end(): nxt if nxt > 0 else len(item_src)]):
+        continue
     slot_levels.setdefault(m.group(2), []).append(int(m.group(3)))
 for slot, lvls in sorted(slot_levels.items()):
     lvls = sorted(lvls)

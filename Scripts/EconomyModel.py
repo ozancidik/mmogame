@@ -47,6 +47,10 @@ for m in re.finditer(
 GOLD_DONATION_MIN = 5000  # MMOQuestComponent.h GoldDonationMinTarget ile ayni tut\n\n# Ekipman: MakeItem(Id, Ad, Slot, Atk, Def, ReqLv)
 items = []
 for m in re.finditer(r'MakeItem\(TEXT\("([^"]+)"\),\s*TEXT\("[^"]*"\),\s*S::(\w+),\s*([\d.]+)f,\s*([\d.]+)f,\s*(\d+)', item_src):
+    # bVendorSold = false (boss/odul seti): saticidan alinmaz, altin giderine sayilmaz.
+    nxt = item_src.find("Table.Add(", m.end())
+    if re.search(r"bVendorSold\s*=\s*false", item_src[m.end(): nxt if nxt > 0 else len(item_src)]):
+        continue
     items.append(dict(id=m.group(1), slot=m.group(2), atk=float(m.group(3)), df=float(m.group(4)), lv=int(m.group(5))))
 
 

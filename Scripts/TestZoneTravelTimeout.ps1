@@ -11,7 +11,8 @@ $summer = "/Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene"
 $args = @("`"$project`"", $summer, "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash",
     "-stdout", "-ABSLOG=$log", '-ExecCmds="MMOTestZoneTravelTimeout"')
 $process = Start-Process -FilePath $exe -ArgumentList $args -PassThru -WindowStyle Hidden
-$deadline = (Get-Date).AddSeconds(20)
+# Motor acilisi ve Winter yuklemesi de bu butcede; fixture'in 0.75s kayit timeout'u degismez.
+$deadline = (Get-Date).AddSeconds(60)
 $loadedWinter = $false
 while ((Get-Date) -lt $deadline -and -not $process.HasExited) {
     Start-Sleep -Milliseconds 250
