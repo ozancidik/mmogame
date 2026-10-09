@@ -66,6 +66,8 @@ public:
 	void RequestDeclineSeen(uint64 SeenInviteId);
 	// Bir uyeyi partiden cikarir (sunucu sadece lider cagirdiysa uygular).
 	void RequestKick(AMMOCharacter* Target);
+	// Binds the sender membership observed before RPC dispatch.
+	void RequestKickSeen(AMMOCharacter* Target, const FGuid& SeenMembershipId);
 
 	// Bekleyen daveti (sadece sunucu) ve daveti gonderen.
 	TWeakObjectPtr<AMMOCharacter> PendingInviteFrom;
@@ -144,7 +146,7 @@ protected:
 
 	// Uye cikarma; sunucu Leader == cagiran mi diye dogrular.
 	UFUNCTION(Server, Reliable)
-	void ServerKick(AMMOCharacter* Target);
+	void ServerKick(AMMOCharacter* Target, const FGuid& SeenMembershipId);
 
 	// Davet edilene ekranda bildirim gonder.
 	UFUNCTION(Client, Reliable)

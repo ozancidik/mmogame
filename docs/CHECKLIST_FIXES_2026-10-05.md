@@ -3452,3 +3452,65 @@ Belge sonrası oyun derlemesi başlatılmadı.
 Gerçek host+uzak istemci PIE/HUD/replication, Shipping/Server ayrı açık.
 Component/console issuing RPC, aynı-pawn possession/session roundtrip ve
 görülen nearest hedef niyeti bu chat pawn düzeltmesinin dışında kalır.
+
+## 79 · Parti kick gönderen üyelik bağlamı (9 Ekim 2026, O41)
+
+5d101fb üzerinde ServerKick(Target) yalnız güncel lider/roster kontrolü yapıyordu.
+Eski üyelikte verilen istek, gönderen ayrılıp aynı çifti yeniden kurduğunda veya
+devam eden session'a lider olarak geri katıldığında yeni üyelikte hedefi çıkarabiliyordu.
+Readonly Banach fallback Unreal multiplayer/güvenlik QA, ecc-mmo-review ile ORTA
+bulguyu doğruladı; Agency plugin kökeni yok. Gerçek uzak RPC sırası yeniden üretilmedi.
+
+RequestKick(Target) mevcut çağrıları koruyarak kişisel PartyMembershipId yakalar;
+RequestKickSeen ve reliable ServerKick bu görülen GUID'i taşır. Sunucu handler'ı
+önce authority ve geçerli/eşit gönderen üyeliğini, ardından mevcut lider/hedef
+kurallarını doğrular. Mevcut owner-only üyelik replikasyonu kullanılır. Yeni
+reflected/save alanı yok; RPC payload değiştiğinden UHT ve eşleşen client/server
+binaries gerekir. AMMOCharacter::MMOPartyKick çağrısı değişmedi.
+
+Native185=169+16. Reform edilmiş çift ve aynı-session source rejoin eski isteği,
+invalid/foreign/random ID, null/self hedef, nonleader, duplicate/solo niyeti
+retleri; fresh explicit ve mevcut wrapper kick pozitifleri kontrol edildi.
+Retler dokuz aktörün party/pending/context/cooldown/envanter snapshot'ını korur;
+fresh çıkarma survivor session/membership ve envanterlerini korur. Hedefin kendi
+rejoin nesli veya continuous leadership/ownership epoch bu değişiklikte taşınmaz.
+
+Eski üretim endpoint'i değişmeden yeni fixture derlendi: adapter Seen niyetini
+bilerek atıp eski ServerKick(Target) çağırdı; FAIL102 11:48:30.014UTC,
+runner1/UE0. Fix adapter RequestKickSeen'e aktarır: actual UHT/compile/link11,51sn,
+PASS185 11:50:05.566UTC. Unconditional return negatif denemesi C4702 ile
+derlenmedi (exit6), bunun için native sonuç iddiası yok. Runtime GetOwner return
+negatifi gerçekten derlendi3,89sn; fresh kick FAIL109 11:51:56.201UTC,
+runner1/UE0. Exact fixed CPP byte-eşit geri yüklendi; final actual CPP/lib/DLL
+3,92sn Succeeded. Final paket native185 11:58:54.373UTC PASS.
+
+### O41 sabit izole doğrulama
+
+RunAllChecks -SkipBuild -FullCompile42/42, exit0; yalnız 5d101fb+O41 üç
+source/runner patch snapshot'ına aittir.159 tracked Source/Scripts/Config/
+uproject/docs/Lore.md input+linked DLL=160 SHA önce/son aynı.19 CPP NoPCH/
+NoLink/SingleFile /W4, /Yu yok;19 nonempty object, warning C0. Response kopyaları
+ve object SHA/size saklandı; bireysel UBT logları ayrı saklanmadı.
+
+Parti185/Trade230/klan138/DoT46, arkadaş53/presence24/save26/vendor17/
+questCapacity13, JSONschema2/negative111 ve parser576/576 geçti. Lint84 temiz;
+Data59mob/57item/90görev/93skill/12efekt/35spawner; mevcut Lv33+ beceri boşluğu
+uyarıları sürüyor. Store553 loaded/JSON553, mismatch0/maxLevel6/writeorder1/
+roundtrip equal1.553 ana save byte-eşit kopyalandı; paket sonrası ana ve izole
+orijinal SHA fark0. Lv30+ gerçek save/login bu örnekle doğrulanmaz.
+Summer57/Winter78 doğuş, exit0/error0; Net150534 server logunda2 "Join succeeded"
+eşleşmesi/client1welcome/error0. Test istemcisinin welcome saati12:06:17.684UTC
+ilk server login/join ile eşleşir.12:06:43.774UTC ikinci login de görüldü;
+bu ek bağlantının kaynağı doğrulanmadı, iki ayrı uzak istemci test iddiası yok.
+
+Ana checkout'ta dış ajan satıcı/ekonomi/HUD dosyalarına yazmaya başladığı için
+O41 codex/o41-party-kick-membership dalında doğrulandı. Ana kaynaklar/DLL için
+bu izole paket sonucu kullanılmaz; ortak checkout entegrasyonu ve yeni aggregate
+derleme/test bekler. Yalnız bu dalın sekiz dosyası commit kapsamındadır.
+TEMP/mmo_party_kick_sender_20261009: baseline/fixed/negative/restored build/native,
+full_checks, freeze/check, original_saves, reviewed_hashes/review.md,
+responses/nopch_proof kanıtları. Belge sonrası oyun build başlatılmadı.
+
+Gerçek host+uzak istemci PIE, RPC serialization/owner-only teslim/HUD/XP,
+Shipping/Server açık. Hedef kick/rejoin, authority epoch, roster/metin/ID
+atomikliği; component davet issuing ve solo roundtrip ayrı açık kapsamlar.

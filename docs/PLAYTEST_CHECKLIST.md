@@ -4847,3 +4847,28 @@ remote RPC/Slate input veya replication teslimi değildir (§78).
 O40: compiled baseline FAIL201/check202; native230 PASS,19 NoPCH/W4 warning0,
 42/42 genel paket ve Summer/Winter/Net bağlantı kontrolleri geçti.
 Bu sonuçlar yukarıdaki PIE kutularını kapatmaz.
+
+## 2026-10-09 — Parti kick gönderen üyeliği (O41, gerçek PIE açık)
+
+Native185 (169+16) standalone NullRHI authority RequestKickSeen/RequestKick
+handler yollarını kontrol etti. Eski signature adapter'ı Seen ID'yi atarak
+compiled baseline FAIL102 verdi; fixed wrapper actual RPC declaration ile
+derlendi. Gerçek uzak RPC serialization/sıralama/owner-only teslim testi değildir.
+
+- [ ] Host+uzak istemci: lider A kick göndersin, işlenmeden ayrılıp aynı B ile
+  yeni grup kursun. Eski A üyelik isteği yeni gruptaki B'yi çıkarmasın.
+- [ ] A ayrılıp yaşayan session'a tekrar lider olarak katılsın; eski A
+  membership ile kick reddedilsin. Yeni owner-only ID geldikten sonra fresh
+  kick kabul edilsin; survivor ID/session ve envanterler korunsun.
+- [ ] Invalid/foreign membership, null/self hedef ve nonleader kick grubu
+  değiştirmesin; duplicate eski istek solo veya yeni gruba taşınmasın.
+- [ ] A'nın üyeliği sürerken normal roster ekleme/çıkarma fresh wrapper kick'i
+  engellemesin. İki kişilik grupta fresh kick iki oyuncuyu solo yapsın;
+  büyük grupta lider/survivor HUD ve XP paylaşımı doğru güncellensin.
+- [ ] Hedefin ayrılıp yeniden katılması, continuous leadership/ownership epoch,
+  roster/metin/ID ortak görünümü ayrı açık kontrollerdir. RPC payload değişti:
+  eşleşen client/server binaries ile gerçek gecikme/kayıp testi yapılsın.
+
+§79: izole5d101fb+O41 paket42/42,19 NoPCH/W4 warning0,Party185 ve bağlantı
+smoke'ları geçti. Ana checkout entegrasyonu/yeni aggregate ve Shipping/Server
+açık; bu sonuçlar yukarıdaki PIE kutularını kapatmaz.

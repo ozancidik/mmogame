@@ -1137,3 +1137,22 @@ Say/Enter kabul/iptal çalışır. §78: sabit bb4ab1c+patch42/42,19 NoPCH/W4
 warning0, Summer/Winter ve Net1join1welcome/error0; ana DLL/native230 geçti.
 Doğrudan component/console issuing, aynı-pawn session/possession roundtrip,
 görülen nearest hedef niyeti, gerçek remote/PIE/HUD ve Server/Shipping açık.
+
+### O41 · ORTA · Eski kick isteği gönderenin yeni parti üyeliğine taşınır
+
+ServerKick(Target) eski kaynak üyeliği taşımadığı için source ayrılıp yeniden
+lider olduğunda eski isteği güncel roster'a uyguluyordu. RequestKick mevcut
+wrapper'da kişisel membership GUID'i yakalar; RequestKickSeen/reliable RPC
+GUID'i taşır. Handler önce authority+valid/equal source ID, sonra güncel
+leader/target kurallarını doğrular. Yeni save/property yok; RPC payload değişti,
+UHT ve matching client/server build gerekir.
+
+Compiled eski endpoint FAIL102; fix native185=169+16. Derlenmiş drop-all
+negatif fresh kick FAIL109; exact restore build/native185 geçti. §79: sabit
+5d101fb+patch42/42,19 NoPCH/W4 warning0,160 input/DLL SHA sabit;
+Summer57/Winter78 ve Net2join eşleşmesi/1welcome/error0. Ana checkout'taki dış satıcı/ekonomi
+yazımı ayrı; bu dalın izole doğrulaması ana aggregate kanıtı değildir.
+Gerçek remote RPC sırası/serialization/replication ve PIE test edilmedi.
+
+Source rejoin ve reform çifti kapsandı. Continuous sender hedef rejoin,
+leader/ownership epoch ve roster/UI atomikliği, Server/Shipping ayrı açık.

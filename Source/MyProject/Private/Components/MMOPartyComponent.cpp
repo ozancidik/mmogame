@@ -199,13 +199,18 @@ void UMMOPartyComponent::RequestLeaveSeen(const FGuid& SeenMembershipId)
 
 void UMMOPartyComponent::RequestKick(AMMOCharacter* Target)
 {
+	RequestKickSeen(Target, PartyMembershipId);
+}
+
+void UMMOPartyComponent::RequestKickSeen(AMMOCharacter* Target, const FGuid& SeenMembershipId)
+{
 	if (HasAuthorityInternal())
 	{
-		ServerKick_Implementation(Target);
+		ServerKick_Implementation(Target, SeenMembershipId);
 	}
 	else
 	{
-		ServerKick(Target);
+		ServerKick(Target, SeenMembershipId);
 	}
 }
 
@@ -364,8 +369,9 @@ void UMMOPartyComponent::ServerLeave_Implementation(const FGuid& SeenMembershipI
 	LeavePartyServer(GetOwnerCharacter());
 }
 
-void UMMOPartyComponent::ServerKick_Implementation(AMMOCharacter* Target)
+void UMMOPartyComponent::ServerKick_Implementation(AMMOCharacter* Target, const FGuid& SeenMembershipId)
 {
+	if (!HasAuthorityInternal() || !SeenMembershipId.IsValid() || SeenMembershipId != PartyMembershipId) return;
 	AMMOCharacter* Self = GetOwnerCharacter();
 	if (!Self || !Target || Target == Self)
 	{
@@ -881,6 +887,61 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 				&& !ContextRecipient->PendingInviterContextId.IsValid() && ContextRecipient->PendingInviteTime == -1.f,
 				TEXT("invalid source context accepted"))) return false;
 		}
+		// Kick intent belongs to the sender's observed personal membership, not a later group.
+		ClearGroups();
+		if (!Accept(0, 1)) return false;
+		const FGuid KickOldSession = P0->PartySessionId, KickOldSource = P0->PartyMembershipId;
+		P0->RequestLeave();
+		if (!Accept(0, 1)) return false;
+		if (!Check(Matches(A, Actors[0]) && P0->PartySessionId != KickOldSession && P0->PartyMembershipId != KickOldSource,
+			TEXT("kick reformed pair did not renew source membership"))) return false;
+		auto Kick = [&](int32 From, AMMOCharacter* To, const FGuid& Seen) {
+			Actors[From]->GetPartyComponent()->RequestKickSeen(To, Seen);
+		};
+		TArray<FMMOCharacterSaveData> KickInventories;
+		for (AMMOCharacter* C : Actors) C->GetInventory()->FillSaveData(KickInventories.AddDefaulted_GetRef());
+		auto KickInventoryUnchanged = [&]() {
+			for (int32 I = 0; I < Actors.Num(); ++I)
+			{
+				FMMOCharacterSaveData After; Actors[I]->GetInventory()->FillSaveData(After);
+				TArray<FString> Differences; FMMOCharacterSaveJson::FindDifferences(KickInventories[I], After, Differences);
+				if (!Differences.IsEmpty()) return false;
+			}
+			return true;
+		};
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[1], KickOldSource); }), TEXT("old kick removed reformed party member"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[1], FGuid()); }), TEXT("zero kick mutated party"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[1], P1->PartyMembershipId); }), TEXT("foreign source kick identity accepted"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[1], FGuid::NewGuid()); }), TEXT("unknown source kick identity accepted"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, nullptr, P0->PartyMembershipId); }), TEXT("null kick target changed state"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[0], P0->PartyMembershipId); }), TEXT("self kick target changed state"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(1, Actors[0], P1->PartyMembershipId); }), TEXT("ordinary member kicked leader"))) return false;
+		const FGuid KickFresh = P0->PartyMembershipId;
+		Kick(0, Actors[1], KickFresh);
+		if (!Check(Solo(0) && Solo(1) && KickInventoryUnchanged(), TEXT("fresh kick failed to dissolve pair safely"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[1], KickFresh); }), TEXT("duplicate kick mutated solo state"))) return false;
+		const FGuid KickSolo = P0->PartyMembershipId;
+		if (!Accept(0, 2)) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[2], KickSolo); }), TEXT("solo kick intent followed new group"))) return false;
+		const FGuid KickContinuous = P0->PartyMembershipId, KickContinuousSession = P0->PartySessionId, KickSurvivor2 = P2->PartyMembershipId;
+		if (!Accept(0, 3)) return false;
+		if (!Check(P0->PartyMembershipId == KickContinuous && Matches({Actors[0], Actors[2], Actors[3]}, Actors[0]),
+			TEXT("roster addition changed continuous kick sender identity"))) return false;
+		P0->RequestKick(Actors[3]);
+		if (!Check(Solo(3) && Matches({Actors[0], Actors[2]}, Actors[0]) && P0->PartyMembershipId == KickContinuous
+			&& P0->PartySessionId == KickContinuousSession && P2->PartyMembershipId == KickSurvivor2 && KickInventoryUnchanged(),
+			TEXT("fresh kick wrapper changed survivor identities or inventory"))) return false;
+		if (!Accept(0, 1)) return false;
+		P0->RequestLeave();
+		if (!Accept(0, 2)) return false; // Source rejoins the surviving session as leader.
+		if (!Check(Matches({Actors[0], Actors[1], Actors[2]}, Actors[0]) && P0->PartySessionId == KickContinuousSession
+			&& P0->PartyMembershipId != KickContinuous, TEXT("kick rejoin failed to renew source within continuing session"))) return false;
+		if (!Check(ActionUnchanged([&]() { Kick(0, Actors[2], KickContinuous); }), TEXT("old kick removed same-session rejoin member"))) return false;
+		const FGuid KickCurrent0 = P0->PartyMembershipId, KickCurrent1 = P1->PartyMembershipId;
+		Kick(0, Actors[2], KickCurrent0);
+		if (!Check(Solo(2) && Matches(A, Actors[0]) && P0->PartySessionId == KickContinuousSession
+			&& P0->PartyMembershipId == KickCurrent0 && P1->PartyMembershipId == KickCurrent1 && KickInventoryUnchanged(),
+			TEXT("fresh rejoin kick failed or changed survivor identities"))) return false;
 		if (!AMMOPlayerController::RunPartyChatContextSelfTest(World, OutError, OutChecks)) return false;
 		ClearGroups();
 		// Real native UnPossess/Destroy/RouteEndPlay. Same frame: no AutoLoad/save/remote logout proof.
