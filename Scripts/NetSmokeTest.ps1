@@ -14,9 +14,24 @@ $slog = Join-Path $env:TEMP "mmo_net_server_$stamp.log"
 $clog = Join-Path $env:TEMP "mmo_net_client_$stamp.log"
 $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
 
-$srv = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "${mapPath}?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$slog", "-port=7777") -PassThru -WindowStyle Hidden
+# Sabit 7777 yerine bos rastgele port: 2026-10-09'da 7777 baska bir sureçte (esanli test kosusu) doluydu, sunucu 7778'e
+# kaydi ve istemci 7777'deki YABANCI sunucuya baglanip testi yaniltti. Port bos mu diye UDP uclarina bakilir.
+$used = @{}
+try { Get-NetUDPEndpoint -ErrorAction Stop | ForEach-Object { $used[[int]$_.LocalPort] = $true } } catch {}
+$port = 0
+for ($i = 0; $i -lt 50 -and $port -eq 0; $i++) { $cand = Get-Random -Minimum 17000 -Maximum 17999; if (-not $used.ContainsKey($cand)) { $port = $cand } }
+if ($port -eq 0) { $port = 17777 }
+
+$srv = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "${mapPath}?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$slog", "-port=$port") -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
-$cli = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "127.0.0.1:7777", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$clog") -PassThru -WindowStyle Hidden
+# Sunucu gercekten istenen portu dinlemiyorsa (port yine doldu ve motor bir sonrakine kaydi) istemciyi baslatma: yanlis sunucuya baglanirdi.
+$listening = Select-String -Path $slog -Pattern "listening on port $port\b" -Quiet
+if (-not $listening) {
+    if (-not $srv.HasExited) { $srv.Kill() }
+    Write-Output "KALDI: sunucu port $port dinlemiyor (port dolu ya da sunucu acilmadi). Log: $slog"
+    exit 1
+}
+$cli = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "127.0.0.1:$port", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$clog") -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds $ClientSeconds
 if (-not $cli.HasExited) { $cli.Kill() }
 Start-Sleep -Seconds 3
