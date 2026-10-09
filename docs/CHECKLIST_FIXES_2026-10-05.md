@@ -2754,3 +2754,89 @@ StaticLint InitGameState whitelist ve Lv33+ skill uyari sinirlari surer.
 | RunAllChecks -SkipBuild -FullCompile | Gecti 41/41; 19 PCH'siz CPP warning0 | Net baglanti davet UI/replication kaniti degil |
 | ECC + readonly rol incelemesi | Final diff'te blocker yok | Parent actual build/log/hash/exit dogruladi |
 | Gercek PIE | Yapilmadi | O32 remote/mesaj-ID/kimlik/reconnect maddeleri acik |
+
+
+## 70. Parti sohbetinin gönderim pawn/üyelik bağlamı ve kanal gizliliği (O33)
+
+O32 HEAD `13bf615` sonrası iki davranış gerçek UE dünyasında yeniden üretildi:
+aynı pawn A partisinden çıkıp B'ye geçtiğinde gecikmiş `/p` metni B'ye gidiyordu;
+`/p /w DışOyuncu sır` ise parti gövdesini tekrar komut olarak ayrıştırıp parti
+üyesi olmayan kişiye fısıldıyordu. `/f` takma adı aynı parser yolunu kullanır.
+
+### Sınırlı uygulama ve ECC incelemesi
+
+ServerSendChat'in parti fanout dalı artık IsValid(SeenCommandPawn), güncel sahip
+pawn eşleşmesi ve mevcut PartyMembershipId ile sıfır olmayan gönderim ID'si
+eşleşmesini doğrular. Say ve Enter zaten ortak SendChatWithContext üzerinden
+owner-only görülen ID'yi taşır; sunucudan son ID'yi seçen fallback eklenmedi.
+Fısıltı parser'ı yalnız genel kanal0'da çalışır: `/p` gövdesi literal parti
+metnidir. Güncel partisiz oyuncunun yalnız kendi sistem yanıtı korunur.
+
+Yeni RPC alanı, header, save şeması, replike alan, Tick veya timer yok. Ortak
+0,7sn throttle retleri de sayar; uzunluk/sanitizasyon, mevcut menzil ve üyeye
+ClientReceiveChat teslimi değişmedi. Sürekli üyelikte başka kişinin katılması
+ID'yi döndürmez; güncel sunucu roster'ına gönderim tasarım olarak sürer.
+
+ECC plan/review/verify ve mmo-feature/ue-build akışı uygulandı. Parent final
+header/çağıranlar, owner-only ID issuance, parser sırası, ret snapshot'ları,
+UObject cleanup ve initial-load/save kapılarını inceledi; bu diff'te somut
+blocker bulunmadı. Salt okunur Sartre incelemesi kullanım sınırında hata verdi,
+sonuç üretmedi ve ajan kapatıldı; bağımsız başarılı inceleme iddia edilmiyor.
+Agency plugin kökeni doğrulanmadı. Native fixture nonshipping, yalnız
+standalone + unattended + NullRHI dünyasında çalışır; HUDlar/tick kapalı,
+sonunda party leave ve save-committed cleanup yapılır. Oyun SaveCharacter
+başlatılmadan synchronous çalışır; UI/remote kanıtı değildir.
+
+### Native kanıt: 83 → 104
+
+Parti toplam104 kontrol = önceki83 +21 yeni routing assertion. Controller chat
+altkümesi17→38; diğer66 kontrol component/lifecycle'dır. Üç native PC/pawn/HUD
+ile A→B, zero/foreign/random ID, null/foreign/eski pawn, gerçek possession swap,
+fresh Say/Enter, büyük harf `/P`, boş prefix, literal `/w` ve `/f`, stale nested
+body, sürekli üyeye üçüncü kişi join, solo hint, genel/fısıltı regresyonu çalışır.
+Rette üç partinin tüm üyelik/davet alanları, inventory ve HUD Text/Color/Time
+aynıdır. Grup setup native pending seed + accept kullanır; gerçek davet gecikmesi
+veya network paket sırası ölçülmez.
+
+İlk baseline normal linked build12,20sn: FAIL75/check76
+`old party message leaked into replacement group` (8 Ekim21:43:02.625UTC).
+Yalnız üyelik/pawn kapısı build4,49sn: FAIL85/check86
+`party body escaped to outside whisper recipient` (21:43:39.511UTC).
+Kanal kapısı + iki alias kontrolü build4,48sn: PASS10421:44:34.652UTC.
+Derlenmiş pawn kapısı kaldırma negatifi FAIL79/check80 `null pawn party message
+delivered`21:45:28.239UTC; kanal kapısı kaldırma negatifi FAIL85/check86
+21:46:07.399UTC. Negatiflerde UE exit0 olsa da wrapper FAIL ile exit1 verdi.
+Final PC bytes TEMP backup'tan geri yazıldı; actual CPP compile/lib/DLL link
+Succeeded4,46sn/exit0, PASS10421:46:51.307UTC; mevcut byte equality doğrulandı.
+
+İki değişen CPP ayrı NoPCH/NoLink/SingleFile /W4: Party9,50sn ve Controller10,73sn,
+her biri Succeeded/exit0/warning C0. O32'nin19 CPP çalışması bu işe mal edilmez.
+TEMP loglar: mmo_party_routing_baseline*, mmo_party_routing_nested_baseline*,
+mmo_party_routing_negative_pawn*, mmo_party_routing_negative_channel*,
+mmo_party_routing_restore*, mmo_party_routing_nopch_<CPP>_20261009.log.
+Baseline/negatif/restore sonuçları8 EkimUTC; geniş final paket9 EkimUTC'dir.
+
+### Açık sınırlar
+
+Gerçek host + uzak istemci, owner-only ID teslimi, paket gecikmesi/kaybı ve
+Slate/Canvas yapılmadı. Görünen roster/metin/gönderim ID'sinin atomik sunumu,
+source controller/account/name rebinding, target kick sonrası yeniden katılım,
+reconnect/offline kalıcılık ve Server/Shipping ayrı açık işlerdir. Sonuçlar
+PLAYTEST_CHECKLIST O33 kutularını kapatmaz.
+
+
+### O33 final paket (9 Ekim 2026 UTC)
+
+`RunAllChecks.ps1 -SkipBuild`: 40/40 GECTI, exit0. Normal DLL restore/link ve
+iki değişen CPP NoPCH zaten geçti; FullCompile19 bu pakette çalıştırılmadı.
+Native parti104 05:15:49.772UTC; arkadaş53 05:14:58.827, presence24 05:14:52.795,
+save26 05:14:46.623, klan73 05:16:02.091, DoT33 05:16:58.305,
+trade218 05:18:05.608 PASS. Parser576/576; JSONschema2/negative111.
+Store454 yuva/454loaded, invalid/loadFailed/existsMismatch/jsonMismatch0,
+maxLevel6, writeorder1/roundtrip equal1; gerçek oyuncu veya Lv1–30 koşusu değil.
+Summer49/Winter31 random mob smoke exit0/error0; Net1join/1welcome, iki taraferror0.
+TEMP mmo_all_party_routing_final_20261009.log; mmo_net_server_081831.log /
+mmo_net_client_081831.log. Source/Scripts151 SHA256 paket önce/sonra differences0;
+mmo_party_routing_final_hashes_20261009.json. FinalPC backup bytes aynı,
+MMOSave_ZPC*.sav0; engine/UBT0. StaticLint InitGameState whitelist ve Lv33+
+beceri aralığı uyarıları sürer. Gerçek PIE ve Server/Shipping yapılmadı.

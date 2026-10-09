@@ -471,9 +471,11 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 #if !UE_BUILD_SHIPPING
 bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
-	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
-	{ OutError = TEXT("party chat requires server game world"); return false; }
+	if (!World || !World->IsGameWorld() || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended")) || !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{ OutError = TEXT("party chat requires disposable standalone headless world"); return false; }
 	AMMOPlayerController* PCs[3] = {}; AMMOCharacter* Pawns[3] = {}; UMMOPartyComponent* Parties[3] = {};
+	AMMOHUD* HUDs[3] = {};
 	const bool Passed = [&]()
 	{
 		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -582,10 +584,107 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 		if (!Check(RejectedUnchanged(TEXT("/parti leave"), Pawns[1], 0, OldMembership), TEXT("leave chat old membership removed replacement"))) return false;
 		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
 		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/parti ayril")), ETextCommit::OnEnter);
-		return Check(Solo(0) && Solo(1) && InventoryUnchanged(), TEXT("leave chat fresh commit"));
+		if (!Check(Solo(0) && Solo(1) && InventoryUnchanged(), TEXT("leave chat fresh commit"))) return false;
+		// Late HUD setup avoids unrelated invite/leave notifications in routing assertions.
+		const FString NamePrefix = TEXT("ZPC") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(16);
+		FString Names[3];
+		for (int32 I = 0; I < 3; ++I)
+		{
+			if (!PCs[I]->PlayerState) { OutError = TEXT("party routing PlayerState missing"); return false; }
+			Names[I] = NamePrefix + FString::FromInt(I); PCs[I]->PlayerState->SetPlayerName(Names[I]);
+			PCs[I]->ClientSetHUD(AMMOHUD::StaticClass()); HUDs[I] = Cast<AMMOHUD>(PCs[I]->GetHUD());
+			if (!HUDs[I]) { OutError = TEXT("party routing HUD missing"); return false; }
+			HUDs[I]->SetActorTickEnabled(false);
+		}
+		auto CopyLines = [&]()
+		{
+			TArray<TArray<FMMOChatLine>> Lines;
+			for (AMMOHUD* HUD : HUDs) Lines.Add(HUD->GetChatLinesForTests());
+			return Lines;
+		};
+		auto LinesEqual = [&](const TArray<TArray<FMMOChatLine>>& BeforeLines)
+		{
+			for (int32 I = 0; I < 3; ++I)
+			{
+				const auto& After = HUDs[I]->GetChatLinesForTests(); const auto& Was = BeforeLines[I];
+				if (After.Num() != Was.Num()) return false;
+				for (int32 L = 0; L < Was.Num(); ++L)
+					if (After[L].Text != Was[L].Text || After[L].Color != Was[L].Color || After[L].Time != Was[L].Time) return false;
+			}
+			return true;
+		};
+		auto RejectRouting = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, const FGuid& Membership)
+		{
+			const auto Lines = CopyLines();
+			return RejectedUnchanged(Message, SeenPawn, 0, Membership) && LinesEqual(Lines);
+		};
+		auto Say = [&](const FString& Text) { PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(Text); };
+		auto PartyDelivered = [&](const TArray<TArray<FMMOChatLine>>& BeforeLines, const FString& Text, bool bAll)
+		{
+			for (int32 I = 0; I < 3; ++I)
+			{
+				const auto& Lines = HUDs[I]->GetChatLinesForTests(); const bool Receives = bAll || I != 2;
+				if (Lines.Num() != BeforeLines[I].Num() + (Receives ? 1 : 0)) return false;
+				if (Receives && (Lines.Last().Text != FString::Printf(TEXT("[Parti] %s: %s"), *Names[1], *Text)
+					|| Lines.Last().Color != FLinearColor(0.45f, 0.85f, 1.f))) return false;
+			}
+			return InventoryUnchanged();
+		};
+		FormPair(2, 1); const FGuid SendingMembership = Parties[1]->PartyMembershipId;
+		if (!Check(PairMatches(1, 2), TEXT("party routing old group setup"))) return false;
+		Parties[1]->RequestLeave(); FormPair(0, 1); const FGuid CurrentMembership = Parties[1]->PartyMembershipId;
+		if (!Check(PairMatches(0, 1) && CurrentMembership != SendingMembership && Solo(2), TEXT("party routing replacement group"))) return false;
+		if (!Check(RejectRouting(TEXT("/p old_group_secret"), Pawns[1], SendingMembership), TEXT("old party message leaked into replacement group"))) return false;
+		if (!Check(RejectRouting(TEXT("/p zero_secret"), Pawns[1], FGuid()), TEXT("zero party membership message delivered"))) return false;
+		if (!Check(RejectRouting(TEXT("/p foreign_secret"), Pawns[1], Parties[0]->PartyMembershipId), TEXT("foreign party membership message delivered"))) return false;
+		if (!Check(RejectRouting(TEXT("/p random_secret"), Pawns[1], FGuid::NewGuid()), TEXT("unknown party membership message delivered"))) return false;
+		if (!Check(RejectRouting(TEXT("/p null_secret"), nullptr, CurrentMembership), TEXT("null pawn party message delivered"))) return false;
+		if (!Check(RejectRouting(TEXT("/p foreign_pawn_secret"), Pawns[2], CurrentMembership), TEXT("foreign pawn party message delivered"))) return false;
+		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[0]); PCs[0]->Possess(Pawns[1]);
+		const bool OldPawnRejected = PCs[1]->GetPawn() == Pawns[0]
+			&& RejectRouting(TEXT("/p old_pawn_secret"), Pawns[1], Parties[0]->PartyMembershipId);
+		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[1]); PCs[0]->Possess(Pawns[0]);
+		if (!Check(OldPawnRejected, TEXT("old pawn party message matching replacement membership delivered"))) return false;
+		auto Lines = CopyLines(); Say(TEXT("/P fresh_secret"));
+		if (!Check(PartyDelivered(Lines, TEXT("fresh_secret"), false) && PairMatches(0, 1), TEXT("fresh Say party routing"))) return false;
+		Lines = CopyLines(); PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/p committed_secret")), ETextCommit::OnEnter);
+		if (!Check(PartyDelivered(Lines, TEXT("committed_secret"), false), TEXT("fresh committed party routing"))) return false;
+		Lines = CopyLines(); Say(TEXT("/p")); Say(TEXT("/p   "));
+		if (!Check(LinesEqual(Lines), TEXT("empty party prefix leaked to general chat"))) return false;
+		const FString Nested = TEXT("/w ") + Names[2] + TEXT(" party_literal");
+		Lines = CopyLines(); Say(TEXT("/p ") + Nested);
+		if (!Check(PartyDelivered(Lines, Nested, false), TEXT("party body escaped to outside whisper recipient"))) return false;
+		const FString NestedAlias = TEXT("/f ") + Names[2] + TEXT(" party_alias_literal");
+		Lines = CopyLines(); Say(TEXT("/p ") + NestedAlias);
+		if (!Check(PartyDelivered(Lines, NestedAlias, false), TEXT("party body escaped to outside alias whisper"))) return false;
+		if (!Check(RejectRouting(*FString(TEXT("/p ") + Nested), Pawns[1], SendingMembership), TEXT("stale nested party body bypassed membership"))) return false;
+		FormPair(0, 2); Lines = CopyLines(); Say(TEXT("/p continuing_membership"));
+		if (!Check(Parties[1]->PartyMembershipId == CurrentMembership && PartyDelivered(Lines, TEXT("continuing_membership"), true), TEXT("continuous member after join party routing"))) return false;
+		Parties[1]->RequestLeave(); Lines = CopyLines(); Say(TEXT("/p solo_secret"));
+		if (!Check(Solo(1) && HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1
+			&& HUDs[1]->GetChatLinesForTests().Last().Text == TEXT("Bir partide degilsin; mesaj gonderilmedi.")
+			&& HUDs[0]->GetChatLinesForTests().Num() == Lines[0].Num() && HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num(), TEXT("fresh solo party feedback/routing"))) return false;
+		Lines = CopyLines(); Say(TEXT("ordinary_general")); bool GeneralOK = true;
+		for (int32 I = 0; I < 3; ++I) GeneralOK &= HUDs[I]->GetChatLinesForTests().Num() == Lines[I].Num() + 1
+			&& HUDs[I]->GetChatLinesForTests().Last().Text == Names[1] + TEXT(": ordinary_general");
+		if (!Check(GeneralOK, TEXT("normal general routing changed"))) return false;
+		Lines = CopyLines(); Say(TEXT("/w ") + Names[2] + TEXT(" ordinary_whisper"));
+		if (!Check(HUDs[0]->GetChatLinesForTests().Num() == Lines[0].Num()
+			&& HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1 && HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num() + 1
+			&& HUDs[1]->GetChatLinesForTests().Last().Text == FString::Printf(TEXT("[%s adli oyuncuya] ordinary_whisper"), *Names[2])
+			&& HUDs[2]->GetChatLinesForTests().Last().Text == FString::Printf(TEXT("[%s fisildiyor] ordinary_whisper"), *Names[1]), TEXT("normal whisper routing changed"))) return false;
+		Lines = CopyLines(); Say(TEXT("/f ") + Names[2] + TEXT(" ordinary_alias"));
+		if (!Check(HUDs[0]->GetChatLinesForTests().Num() == Lines[0].Num()
+			&& HUDs[1]->GetChatLinesForTests().Num() == Lines[1].Num() + 1 && HUDs[2]->GetChatLinesForTests().Num() == Lines[2].Num() + 1
+			&& HUDs[1]->GetChatLinesForTests().Last().Text == FString::Printf(TEXT("[%s adli oyuncuya] ordinary_alias"), *Names[2])
+			&& HUDs[2]->GetChatLinesForTests().Last().Text == FString::Printf(TEXT("[%s fisildiyor] ordinary_alias"), *Names[1]), TEXT("normal whisper alias routing changed"))) return false;
+		return Check(InventoryUnchanged(), TEXT("party routing changed inventory"));
 	}();
 	for (int32 I = 0; I < 3; ++I) { if (Parties[I]) Parties[I]->RequestLeave(); }
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
 	for (int32 I = 0; I < 3; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
+	for (AMMOHUD* HUD : HUDs) if (IsValid(HUD)) HUD->Destroy();
 	return Passed;
 }
 #endif
@@ -1203,7 +1302,8 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 	}
 
 	// Fisilti: "/w Isim mesaj" (ya da /f). Hedef ada gore bulunur; yalniz hedefe ve gondericiye gider.
-	if (Msg.StartsWith(TEXT("/w "), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/f "), ESearchCase::IgnoreCase))
+	// A party message body is literal text; it cannot select a different recipient/channel.
+	if (Channel == 0 && (Msg.StartsWith(TEXT("/w "), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/f "), ESearchCase::IgnoreCase)))
 	{
 		FString Rest = Msg.RightChop(3).TrimStart();
 		FString TargetName, WhisperText;
@@ -1249,6 +1349,8 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 
 	if (Channel == 1)
 	{
+		// The party observed while sending may have ended or the controller may own another pawn.
+		if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
 		AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn());
 		UMMOPartyComponent* Party = Me ? Me->GetPartyComponent() : nullptr;
 		if (!Party || !Party->IsInParty())
@@ -1256,6 +1358,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 			ClientReceiveChat(FString(), TEXT("Bir partide degilsin; mesaj gonderilmedi."), 2);
 			return;
 		}
+		if (!SeenPartyMembershipId.IsValid() || SeenPartyMembershipId != Party->PartyMembershipId) return;
 		TArray<AMMOCharacter*> Members;
 		Party->GetPartyInRange(Me->GetActorLocation(), 1.0e7f, Members);
 		Members.AddUnique(Me);

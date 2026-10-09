@@ -939,3 +939,28 @@ O32 final: UHT + actual restore DLL/PASS53; RunAllChecks -SkipBuild -FullCompile
 store447/schema2, presence24/save26/party83/clan73/DoT33/trade218. Summer50/
 Winter29/error0 ve Net1join/1welcome/error0. ECC readonly review blocker0;
 Shipping/Server/gercekPIE ve notification-ID ortakgorunumu acik. §69 kanitlari.
+
+
+### O33 · ORTA · Parti metni replacement gruba veya dış fısıltıya gider
+
+Gerçek UE baseline: aynı pawn A→B sonrası eski `/p` B'ye fanout (FAIL75).
+İlk context gate sonrası nested `/p /w DışOyuncu` dış kişiye whisper (FAIL85).
+Parti dalında geçerli güncel sahip pawn + observed owner-only üyelik ID eşleşir;
+fısıltı parser yalnız Channel0'da çalışır, `/p` gövdesi literal kalır. Mevcut
+RPC context kullanılır, yeni replicated/save alanı veya timer yok. Güncel
+partisiz hint, genel/normal /w ve /f, throttle/sanitizasyon korunur.
+
+Parti104 = eski83 +21 routing; controller38 + diğer66. Compiled pawn/channel
+negatifleri FAIL79/85; actual final restore link4,46sn/PASS104, değişen ikiCPP
+NoPCH/W4 warning0 (9,50/10,73sn). Parent ECC review somut blocker0; readonly
+ajan kullanım limiti nedeniyle sonuç üretmedi. Ayrıntılı kanıt §70.
+
+NativeHUD buffer ve possession actual remote paket/replication kanıtı değildir.
+Sürekli üyenin current roster'ı değişebilir; UI roster/metin/ID atomikliği,
+source identity rebinding, target kick rejoin ve gerçek PIE/Shipping/Server açık.
+
+O33 final: RunAllChecks -SkipBuild40/40 exit0, parti104, arkadaş53,
+presence24/save26/klan73/DoT33/trade218; Store454/schema2, parser576/576.
+Summer49/Winter31/error0; Net1join/1welcome/error0. Değişen iki CPP NoPCH/W4
+warning0; FullCompile19 yeniden yok. 151 kaynak/runner hash fark0, fixture save0,
+engine/UBT0. Final paket9 EkimUTC; baseline/negatif/restore8 EkimUTC. §70.

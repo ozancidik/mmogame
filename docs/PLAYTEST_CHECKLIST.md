@@ -4647,3 +4647,29 @@ O32 otomatik final: linked restore DLL + native53;
 `RunAllChecks.ps1 -SkipBuild -FullCompile`: 41/41 exit0, 19 NoPCH CPP /W4
 warning0; Summer50/Winter29/error0,
 Net1join/1welcome/error0. Bunlar yukarıdaki gerçek PIE kutularını kapatmaz.
+
+
+## 2026-10-09 — Parti sohbeti gizliliği (O33, gerçek PIE açık)
+
+Native104 authority/HUD buffer kontrolüdür; controller38 + diğer66.
+Grup setup pending seed + native accept; gerçek davet/packet gecikmesi değildir.
+
+- [ ] Host + uzak istemci + dış oyuncu: A'da yazılmış gecikmiş `/p` isteği aynı
+  pawn A'dan çıkıp B'ye geçtiğinde B'ye gitmemeli; B owner-only ID ulaştığında
+  fresh Say/Enter yalnız B üyelerine gitmeli. Sıfır/yanlış ID sessiz ret.
+- [ ] Possession değişiminde eski/null/foreign pawn ve güncel replacement ID
+  birleşimi fanout yapmamalı. İlk ret throttle'a sayılır; 0,7sn sonrası fresh
+  bağlam çalışmalı. Başka oyuncu üyelik ID'sini owner-only dışında almamalı.
+- [ ] `/p /w DışOyuncu sır` ve `/p /f DışOyuncu sır` literal parti metni olarak
+  yalnız partiye gitmeli; dış oyuncuda whisper veya sistem yanıtı olmamalı.
+  Eski üyelik ID'siyle aynı nested gövde hiç teslim edilmemeli.
+- [ ] Sürekli üyeye üçüncü kişi katılınca fresh mesaj güncel roster'a gitmeli;
+  ayrılan oyuncu yalnız kendi partisiz hint'ini görmeli. `/P`, boş `/p`, normal
+  genel sohbet ve `/w`/`/f`, host HUD ve uzak istemci Canvas/Slate tekrar denensin.
+- [ ] Roster/metin/gönderim ID atomikliği, account/name/controller rebinding,
+  disconnect/travel/yeniden giriş ve eski hedef kick sonrası rejoin ayrı açık
+  işlerdir. Shipping ve gerçek Server hedefi ayrıca derlenip çalıştırılmalı.
+
+O33 otomatik final: actual linked restore DLL/PASS104, iki değişen CPP
+NoPCH/W4 warning0; RunAllChecks -SkipBuild40/40 exit0. Summer49/Winter31/error0,
+Net1join/1welcome/error0. Bu sonuçlar gerçek PIE kutularını kapatmaz.

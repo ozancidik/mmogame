@@ -15,6 +15,7 @@
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
+#include "Misc/CommandLine.h"
 #endif
 
 namespace
@@ -584,9 +585,10 @@ bool UMMOPartyComponent::RunMergeConsentSelfTest(UWorld* World, FString& OutErro
 {
 	OutChecks = 0;
 	OutError.Reset();
-	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
+	if (!World || !World->IsGameWorld() || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended")) || !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
 	{
-		OutError = TEXT("server game world required");
+		OutError = TEXT("disposable standalone headless world required");
 		return false;
 	}
 	TArray<AMMOCharacter*> Actors;
