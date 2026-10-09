@@ -4987,3 +4987,16 @@ kaynaklandığı kanıtı değildir. Runbook'taki teleport/root/base sınırlar�
   diğer first_* zamanlarıyla kaydet. XP/altın/görev ve HUD aynı kalsın;
   eksik/eski logdaki sure=? hiç hareket edilmediği kanıtı değildir.
   Shipping ve dedicated Server build bu turda yapılmadı.
+
+## 2026-10-10 — Soak runner sonuç doğruluğu (O47, §85)
+
+Runner regresyonu25 mock senaryo/98 kontrol geçti; gerçek30sn Summer ve Winter
+boşluk içeren TEMP ile exit0 verdi. Summer stuck=1/errors0/spawners18/cep6/9;
+Winter stuck=0/errors0/spawners17/cep1/1. Gerçek `-Cmds quit` native exit0 ile
+erken kapandı, runner bunu exit1 olarak reddetti. Takılma uyarısı başarı
+koşulu değildir; bu kısa koşular oynanabilir cep veya görsel kalite kanıtı değil.
+C++/config/DLL ve623 mevcut .sav byte'ları değişmedi. Bu script düzeltmesinde
+oyun derlemesi ve tam RunAllChecks yapılmadı. Önceki PIE kutuları açık kalır.
+
+- [ ] İlgili cepte gerçek PIE hareket/dövüş koşusunu ve daha uzun soak logunu
+  birlikte incele; runner exit0 olduğunda takılma/eksik dolumu ayrıca değerlendir.

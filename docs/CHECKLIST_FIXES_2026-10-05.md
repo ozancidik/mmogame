@@ -3846,3 +3846,41 @@ bağlantı kayıtları silinmedi. Kanıt TEMP/mmo_o46_first_move_20261010 altın
 build/native/aggregate/ana kontrol logları, freeze, save SHA ve
 main_verified.json'dadır. Paralel ajanın aktif dosyaları/süreçleri
 değiştirilmedi. Gerçek PIE kutuları açık.
+
+## 85. Soak runner yanlış başarı ve erken çıkış reddi (O47, 2026-10-10)
+
+Somut bug: eski SoakTest hata sayısını yalnız yazdırıyor, exit1 üretmiyordu.
+Mock process ve `LogTemp: Error:` satırı ile eski runner `errors=1` yazıp
+exit0 verdi (legacy_false_success.log/exit.txt). Ayrıca `-ABSLOG=$log`
+boşluk içeren TEMP yolunu native argümanda korumuyordu; süre dolmadan kapanma
+ve eksik harita/spawner kanıtı başarıyı engellemiyordu.
+
+SoakTest artık yalnız kendi process nesnesini try/finally içinde durdurur,
+en çok5sn kapanma bekler; gözlem süresini yaşamayan process native exit0 bile
+olsa reddedilir. GUID logları birbirini ezmez, ABSLOG tırnaklıdır. İstenen
+harita/spawner kanıtı, okunabilir log ve sıfır Error/Fatal/Ensure/Access violation
+gerekir. Eksik istenen cep/ilk dolum bloğu başka spawner'a kaydırılmaz.
+Tag güvenli karakterlerle sınırlı, varsayılan `soak`; unattended prompt yok.
+Takılma sayısı ölçüm olarak kalır, exit0 oynanabilirlik garantisi değildir.
+
+Yeni TestSoakTest process/logları mock eder; UE açmadan25 senaryoda98 kontrol
+geçti. Hata imzaları, eksik/boş/locked/yanlış harita logu, native0/1 erken
+çıkış, launch/sleep/kill/wait hataları, default/invalid parametreler, aynı Tag
+log tekilliği ve cep sınırları kapsanır. Harness ilk sürümünde PS scope,
+exit propagation ve beklenen stderr yakalama hataları giderildi; bu ilk
+denemeler başarı sayılmadı. Önceki runner'a karşı23 senaryolu89 kontrol
+51 hata buldu; final25 senaryolu runner sonucu98/98'dir.
+
+Gerçek30sn Summer (18 spawner, cep6/9, stuck1/errors0) ve Winter (17 spawner,
+cep1/1, stuck0/errors0) ayrı koşular script exit0 verdi; TEMP özellikle
+boşluk içeriyordu. Gerçek Summer `-Cmds quit` native exit0 ile erken kapandı,
+script exit1 verdi. Bunlar bağlantı RPC'si veya oynanmış PIE değildir.
+ValidateData exit0 (mevcut Lv33+ beceri boşluğu uyarıları), StaticLint88 temiz,
+üç PS script AST parse ve diff whitespace kontrolü temiz. RunAllChecks yeni
+mock adımı çağırır; tam aggregate bu turda çalıştırılmadı.
+
+C++/config96 dosya ve ana DLL SHA'sı değişmedi; yalnız script/belge işi
+olduğu için UBT başlatılmadı. Başlangıç623 .sav'ın tamamı byte byte korundu,
+yeni kayıt oluşmadı. Kanıt TEMP/mmo_o47_soak_results_20261010 altında.
+Paralel ajanların aktif dosya/süreçleri değiştirilmedi; QA Lagrange salt
+okunur runner incelemesi yaptı. Gerçek PIE/uzun cep değerlendirmesi açık.

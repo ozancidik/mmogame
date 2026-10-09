@@ -237,3 +237,24 @@ aynı SID/action tekrarı ilk payload'ı ve ölçüm saatini değiştirmez.
 çalıştırır; gerçek health delegate üzerinden iç içe XP içerir. Handoff doğrudan
 `SeamlessTravelTo` çağrısıdır. Gerçek uzak oyuncu progression/replication,
 ServerTravel, reconnect ve 20 dk süre/model karşılaştırması PIE'de açıktır.
+
+## Cep soak kontrolü (O47, 2026-10-10)
+
+`powershell -NoProfile -File Scripts/SoakTest.ps1 -Tag cep1 -Map Winter_scene -Seconds 90`
+haritayı NullRHI ile gözlemler. Süre process başlatmadan itibaren, yükleme dahil
+sayılır; kısa süre içinde harita yüklenmezse sonuç başarısızdır. Tag verilmezse
+`soak` kullanılır. Her koşu GUID içeren ayrı log oluşturur; `SpawnAudit.py`'ye
+çıktıdaki tam `Log:` yolunu ver. TEMP içinde boşluk desteklenir.
+
+Exit0 için süre boyunca process yaşamalı, istenen haritanın `Bringing World`
+ve spawner satırları bulunmalı, Error/Fatal/Ensure/Access violation olmamalı.
+Eksik/boş/okunamayan log ve erken çıkış (native exit0 olsa bile) exit1'dir.
+`-Cmds quit` erken çıkış testidir; başarılı soak değildir. Runner yalnız kendi
+process'ini durdurup en çok5sn bekler; bu native temiz çıkış kanıtı değildir.
+Takılma sayısı ölçüm olarak raporlanır: sıfır hata/exit0, iyi cep veya oynanabilir
+deneyim anlamına gelmez. `-PocketPrefix` verilirse ilk dolum bloğu tam olmalı;
+başka spawner'ın dolumu eksik bloğa atanmaz.
+
+`TestSoakTest.ps1` Unreal açmadan25 sahte process/log senaryosunda98 kontrol
+çalıştırır. `RunAllChecks.ps1` bunu çağırır. O47'de tam aggregate tekrar
+çalıştırılmadı; gerçek30sn Summer/Winter ve erken quit koşuları ayrı doğrulandı.
