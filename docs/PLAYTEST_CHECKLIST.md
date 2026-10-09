@@ -4804,3 +4804,22 @@ chat pawn/üyelik alt kapsamında ele alındı; component/console yolu açık ka
 - [ ] Aynı pawn solo→group→solo issuing niyeti, parametresiz component/console
   MMOInvite, leadership epoch ve kick hedef rejoin ayrı açık değerlendirmeler;
   bu native sonucu gerçek remote/Shipping/Server testi saymayın.
+
+## 2026-10-09 — Hub'a dönen güçlü DoT kaynağı (O39, gerçek PIE açık)
+
+Native46 (38+8) gerçek authority ApplyEffect→ProcessEffects→TakeDamage yolunu
+standalone NullRHI fixture'da kontrol etti. Timer/elapsed ağ ve görsel oyun
+kontrolü yapılmadı; sabit37d829c+patch42/42 bağlantı smoke'u bu maddeleri kapatmaz.
+
+- [ ] Host + uzak istemcide güçlü A ve zayıf B Okçu ile aynı canlı mobu zehirle:
+  A önce hub dışında Poison uygulasın, sonra mobun güvenli hub'ına girsin.
+  B dışarıda kalıp yenilediğinde DoT B'nin kendi saldırı ölçeğiyle tekrar
+  hasar versin. A'nın hub içinden hasar vermesine izin verilmesin.
+- [ ] B tekrar Poison tazelerken doğru süre/hasar sürsün; mob öldüğünde XP,
+  katkı, görev ve ganimet kredisi gerçek hasar katkılarıyla uyumlu olsun.
+  Bu native test ölüm/XP/loot dağıtımını O39 senaryosunda ölçmedi.
+- [ ] İki oyuncu hub dışında kaldığında zayıf B güçlü A'nın DoT hasarını/kaynağını
+  ezmesin. Tam hub sınırı ve güvenli alanı kapalı mob aynı kuralı korusun.
+- [ ] Her iki istemcide efekt süresi/hedef HP/hasar sayıları yenilemeyi yansıtsın;
+  gerçek5sn Poison Arrow cooldown ve8sn etki süresiyle deneyin. PvP, parti/klan,
+  spawn koruması, kaynak yok oluşu ve ölüm sonrası cleanup regresyonlarını gözleyin.

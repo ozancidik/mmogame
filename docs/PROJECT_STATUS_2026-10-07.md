@@ -1,26 +1,29 @@
 # MyProject — yaptık / yapacağız
 
-**Güncelleme:** 9 Ekim 2026. Son sınırlı düzeltme O38 (§76): `/parti` ve
-`/parti davet` issuing isteği gönderilen pawn/üyelik bağlamına bağlı. Eski isteğin
-replacement pawn veya yeni grup adına davet üretmesi engellendi. Yeni RPC/save
-alanı yok; chat throttle ve mevcut authority/leader/merge kuralları korunur.
+**Güncelleme:** 9 Ekim 2026. Son sınırlı düzeltme O39 (§77): güçlü DoT
+kaynağı hedef mobun güvenli hub'ına girince, dışarıdaki zayıf oyuncunun
+Poison yenilemesi artık kendi hasarını/kaynağını kullanıyor. Hub içinden
+hasar kapısı, sınır ve kapalı hubda güçlü kaynak koruması sürüyor.
 
-Native169 = önceki149 +20, controller58 +diğer111. Compiled baseline FAIL139,
-equality negatif147, drop-all negatif143; exact restore DLL/PASS169.
-İzole59723c8+O38:40/40 paket,151 tracked kaynak ve DLL sabit;496 kayıt kopyası,
-Summer51/Winter34 ve Net1join1welcome/error0. Tek değişen CPP NoPCH/W4 warning0.
-19 CPP bu işte tekrar derlenmedi; önceki9fdd2ea aggregate41/41 kanıtı §75'te.
+Native46=önceki38+8; eski üretim compiled FAIL7, fix PASS46. Temiz izole
+Editor build40,60sn ve final CPP/lib/DLL3,67sn;19 NoPCH/W4 warning C0.
+Sabit37d829c+O39:RunAllChecks -SkipBuild -FullCompile42/42, exit0;
+152 Source/Scripts+5 Config+uproject SHA ve linked DLL aynı; Lore Git blob'u
+base ile eşit. Parti169/klan138/DoT46/vendor17/questCapacity13; parser576/576.
+Store553 loaded/JSON553, tüm mismatch0, writeorder1/roundtrip equal1/maxLevel6.
+Summer57/Winter75 ve Net1join1welcome/hata0. Ana checkout aynı Git patch ile
+actual build8,99sn +native46 PASS;158 input/DLL ve553 orijinal kayıt SHA aynı.
 
-Paralel dış ajan ana branch'e içerik/ekonomi/DoT/spawner ekledi. Son bd98c36
-üzerindeki O38 patch ana Editor build10,17sn +native169 +Data/Lint exit0 ile
-ayrıca doğrulandı;152 kaynak/runner SHA aynı. Güncel veri tanımları59 mob,
-57 item,90 görev,93 skill,12 efekt,35 spawner. Eski40/40 sonucunu bu yeni
-ana kaynakların tam paket doğrulaması olarak kullanmayın.
+Bu paket güncel dış içerik/ekonomi/DoT/spawner ile O38/O39'un birlikte
+bulunduğu snapshot'ı doğrular. §75/76 eski kanıtları tarihsel kapsamındadır.
+Readonly Meitner fallback Unreal/QA/economy incelemesi final blocker0;
+ECC plan/review/verify, mmo-feature ve ue-build kullanıldı.
 
-ECC +readonly Herschel scoped review blocker0. Gerçek uzak istemci/PIE,
-Shipping/Server, disk login ve uçtan uca Lv1–30 oynanışı açık. Parametresiz
-component/console issuing yolu, aynı pawn solo roundtrip niyeti, recipient
-grup niyeti, kick hedef rejoin, leadership epoch ve UI atomikliği ayrı açık.
+Gerçek host+uzak istemci PIE, elapsed tick, HUD/XP/loot kredisi,
+Shipping/Server, Lv30+ gerçek disk login ve uçtan uca Lv1–30 oynanışı açık.
+Parametresiz component/console parti issuing yolu, aynı pawn solo roundtrip
+niyeti, recipient grup niyeti, kick hedef rejoin, leadership epoch ve UI
+atomikliği ayrı açık. DoT source ölüm/detach sahipliği politikası ayrı açık.
 
 **Ulaştığımız aşama:** UE 5.7 üzerinde C++ MMORPG sistemleri ve Lv1–80 içerik
 tanımları bulunan, yerel kayıt ve iki haritalı çok oyunculu bağlantısı test edilen
@@ -32,15 +35,15 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 
 | Katman / sistem | Yaptık | Mevcut kanıt | Yapacağız |
 | --- | --- | --- | --- |
-| Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | Editor hedefi UHT/compile/link ile derlendi; O36 değişen PC NoPCH /W4 warning0; normal module/compile/link geçti; O34 geçmiş19 CPP kontrolü | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
+| Motor ve kod yapısı | UE 5.7, `Source/MyProject` C++ modülü; Blueprint görsel/içerik katmanı; Enhanced Input | O39 sabit snapshot Editor UHT/compile/link; güncel19 CPP NoPCH /W4 warning0; ana Stats/module/lib/DLL derlendi | Gerçek Server hedefi ve Shipping paketini ayrı derlemek |
 | Karakter ve statlar | STR/DEX/INT/VIT, can/mana, XP/seviye, stat puanı, ölüm/diriliş; sunucu otoritesi | Kayıt stat/XP/puan bütçesi ve dört sınıf için 15 UE kontrolü; ölüm kuralları ayrı fixture'larda | Gerçek ölüm/respawn, kayıt sonrası istemci stat paneli ve uzun oturum |
 | Savaş ve PvP | Hedefleme, normal saldırı, beceriler, güvenli hub, PvP/parti/klan kuralları; hasar/şifa bildirimi; tek cooldown kapısı ve double damga | Temel saldırı 21 kontrol; yeni cooldown 89 kontrol, yedi sentetik uptime/eşik sınırları; eski RPC önce UE'de FAIL0 verdi | İki oyuncuda gerçek hasar, gecikme, güvenli bölge ve görsel sayı kontrolü; gerçek uzun oturum |
 | Sınıf ve beceri | Dört sınıf, mastery/rütbe, öğrenme, hotbar, mana/cooldown; rütbe + bakiye bütçesi; kayıtlı ücretli beceriyi minimum ağaç rütbesine taşıma | 93 beceri; 12 bütçe/iade + 12 yeni öğrenilmiş-beceri kontrolü; hata önce UE'de yeniden üretildi | Gerçek legacy dosya göçü, yatırım/kayıt/sınıf RPC ve HUD; sınıf dengesi, Lv33+ beceri boşlukları |
-| Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Native DoT33: lost player source/callback/refresh; live policy, mob hub, Regen/expiry; önce FAIL10, negatif32/15 | Gerçek elapsed tick/expiry, istemci efekt süresi/HUD, source rebinding ve Network Profiler bant ölçümü |
+| Efekt ve yenilenme | 12 buff/debuff tanımı; replike bitiş zamanı; can/mana yenilenmesinde 0,5 sn adım | Native DoT46: lost source/callback/refresh, hub kaynak yenilemesi; O39 eski üretim FAIL7; final paket PASS46 | Gerçek elapsed tick/expiry, istemci efekt süresi/HUD, source rebinding ve Network Profiler bant ölçümü |
 | Ekipman ve envanter | 57 ekipman; InstanceId ile kuşanma/satış/yükseltme; çanta/yığın sınırları; nadirlik/+; ilk başarılı istek ölçümü | Kayıtlı ekipman seviye şartı: 11 kontrol; yeni kuşanma ölçümü: 8 kontrol, otomatik/restore hariç | Gecikmeli çift tıklama, uzak HUD, gerçek dosyadan yeniden giriş |
-| Satıcı ve ekonomi | Ekipman/iksir alış-satışı; yalnız teslim edilen adet kadar ücret; ölü/uzak işlem reddi | Yeni satıcı regresyonu: 14 kontrol geçti | Gelir/harcama dengesi, uzun oturum, gerçek RPC ve kayıt kalıcılığı |
+| Satıcı ve ekonomi | Ekipman/iksir alış-satışı; yalnız teslim edilen adet kadar ücret; ölü/uzak işlem reddi | Güncel satıcı regresyonu: 17 kontrol geçti (sabit O39 paketi) | Gelir/harcama dengesi, uzun oturum, gerçek RPC ve kayıt kalıcılığı |
 | İksir/parşömen | Ortak bekleme, ölümde ret; dolu can/manada faydasız saf iksir korunur | 11 UE kontrolü | Gecikmeli sahip-istemci kullanımı ve HUD/adet eşleşmesi |
-| Görev | 90 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + 10 kapasite/tek teslim UE kontrolü; 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
+| Görev | 90 tanım, NPC kabul/teslim, ön koşul/ilerleme/ödül; ölüm/kapasite korumaları ve kabul/teslim telemetrisi | 8 yaşam durumu + güncel13 kapasite/tek teslim UE kontrolü (O39 paketi); 2 başarılı kabul / 1 teslim telemetrisi | Lv1–30 zincirini gerçek avla tamamlamak; dolu çanta/yığın HUD'ı, uzak istemci ölçümü |
 | Mob, elit ve ganimet | 59 arketip (13 elit), 35 spawner tanımı; XP/katkı paylaşımı; loot rezervasyonu/kapasite; ilk gerçek pozitif teslim ölçümü | Ganimet ölüm/tek grant için 10 kontrol + ilk loot için 6 kontrol ve üç türde teslim logu | Fiziksel overlap/timer, gerçek parti kredi ve boss/loot oynanışı |
 | Haritalar | Summer ve Winter; hub/NPC/spawner yerleşimleri, nav/doğuş çalışmaları | Son smoke: Summer49, Winter32 mob doğumu; iki haritada 0 hata | Cep rotaları, zemin, erişim, leash/aggro ve Lv1 doğuş güvenliği |
 | Başlangıç ve rehber | Yeni kayıt dalında Kısa Kılıç + Deri Zırh + 3 can iksiri; sınıf seçimi ve 8 bağlamsal HUD ipucu | Kodda mevcut; ipucu maskesi yerel oyuncunun oturumunda tutulur | İlk 10 dakika kullanıcı koşusu; kalıcı rehber ilerlemesi gerekiyorsa kayıt tasarımı |
@@ -48,7 +51,7 @@ Toplam tamamlanma yüzdesi hesaplanmadı; içerik tanımı ile oynanarak doğrul
 | Ticaret ve depo | Görülen session/revision teklif/onay; session cancel/X; recipient invite generation accept/decline; chat gönderim pawn/kimlik/iptal niyeti; kimlik/kapasite/altın tavanı ve NPC depo | 218 native kontrol: önceki182 +28 invite +8 controller chat; eski decline önce FAIL165/check166; tam component ret snapshot'ı ve native Say/OnChatCommitted/endpoint kanıtı | Gerçek davet/RPC/HUD; bildirimle kimliğin ortak görünümü; reentrant rollback; ortak kalıcı işlem/çökme/yeniden giriş; gerçek depo RPC |
 | Klan, arkadaş ve sohbet | Recipient davet nesli/source üyelik GUID; bütün /klan-/g-/arkadas pawn bağlamı; /g-ayril-davet-at-liste üyelik bağlamı; mutual Friends/owner-only | Klan138/component47/chat91; O36 derlenmiş baseline112/113/114, final PASS138. Arkadaş presence24 + chat/generation53; native authority/HUD | Gerçek remote; roster/metin/ID ortak sunumu; solo create/leader authority epoch, source identity rebinding, continuous sender hedef kick rejoin; hesap/offline rıza/yeniden giriş |
 | NPC diyalog / LLM kota | Sunucu NPC isteği, yedek replik, günlük/oturum/oyuncu/dakika/eş-zamanlı bütçe; 4096 takip anahtarı dolunca yeni anahtar reddi | Hata önce UE FAIL11; 25 bellek kontrolü PASS, API/HTTP/disk kullanılmadı | Gerçek HTTP/hata/callback, UTC/gece yarısı, dosya yeniden giriş; hesap kimliği ve çoklu sunucuda ortak kota |
-| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; son paket475 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
+| Yerel kayıt / JSON | Store arayüzü, yerel .sav, JSON v2 ve sıkı giriş doğrulaması; yazım numarası takibi | 111 JSON negatif test; sabit O39 paketi553 yuva okundu; 26 native detach/save kontrolü; JSON eşleşmesi/roundtrip geçti | Gerçek Lv30+ kayıtlar; bulut adaptörü, depoda sıra garantisi/iptal ve işlem bütünlüğü |
 | Bölge geçişi | Asenkron onay bariyeri, timeout/iptal, eski/çift callback koruması; son XP/altını yeniden yazma | Normal/timeout/durum/yazım hatası/ilerleme testleri + callback için 9 kontrol | Son kayıt–pawn yok oluş penceresi; gerçek gecikmeli mağaza ve motor yükleme hatası |
 | Ağ / replikasyon | Sunucuda mutasyon; kişisel alanlarda owner-only; 1 host + 1 istemci bağlantısı | NetSmoke: 1 join, 1 welcome, iki tarafta 0 hata | Gerçek iki oyunculu oyun, paket gecikmesi/kaybı, yük ve bant ölçümü |
 | Hesap ve güvenlik | Yükleme/işlem doğrulamaları, debug Shipping kapıları ve çeşitli kötüye kullanım düzeltmeleri | Derleme + sınırlı regresyon kanıtları | Ad bağımlı kayıt kimliğini hesap/karakter kimliğine ayırmak; kayıt imzası/yetkilendirme |

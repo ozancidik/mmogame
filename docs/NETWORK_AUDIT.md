@@ -1106,3 +1106,18 @@ recipient grup niyeti, UI atomikliği ve gerçek remote/Shipping/Server ayrı a�
 Nearest mevcut uygun olmayan ilk kişiyi seçip durabilir; hedefleme kuralı değişmedi.
 
 O38 izole59723c8+patch40/40,169 native ve Summer51/Winter34/Net1join1welcome/error0. Ana bd98c36+patch ayrıca gerçek build10,17sn/169 native/Data/Lint ile doğrulandı; yeni dış commitlere eski tam paket sonucu mal edilmez (§76).
+
+### O39 · ORTA · Hub içinde tutulan güçlü DoT kaynağı izinli yenilemeyi susturur
+
+A güçlü Poison uyguladıktan sonra hedef mobun hub'ına döndüğünde, dışarıdaki
+zayıf B'nin yenilemesi eski A/108 kaynağını tutuyordu. Mob hasar kapısı A'yı
+reddediyor; B'nin8 saniyelik yenilemesi hasarsız etkiyi sürdürebiliyordu.
+Eski üretim yeni compiled native fixture'da FAIL7; fix PASS46 (38+8).
+
+ApplyEffect güçlü-kaynak korumasına hedef mobun mevcut hub hasar koşulu
+uygulandı. Hub içindeki A yerine B'nin kendi büyüklüğü ve kaynağı yazılır;
+strict radius sınırı ve kapalı hub A'yı korur. Sunucu authority, mevcut weak
+kaynak çözümleme ve replicated effects yolu korunur. Yeni RPC/save alanı yok.
+Ölüm/detach sahipliği politikası ayrı açık; XP/loot, elapsed tick ve uzak UI
+gerçek PIE gerektirir. §77: sabit37d829c+patch42/42;19 NoPCH/W4 warning0;
+Summer57/Winter75, Net1join1welcome/hata0; ana gerçek build8,99sn/native46.

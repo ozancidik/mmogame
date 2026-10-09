@@ -3319,3 +3319,74 @@ TEMP/mmo_party_chat_invite_20261009: baseline/fixed/mutant/restore build+native,
 NoPCH response ve log, reviewed_hashes/review_scope, source_hashes/dll_frozen,
 save_import_hashes, all_checks, verification_result, primary_current_source_hashes,
 primary_current_build/native/data/lint, primary_current_verification kanıtları.
+
+## 77 · Hub'a dönen güçlü kaynak zayıf oyuncunun DoT'unu susturuyor (9 Ekim 2026, O39)
+
+37d829c üzerindeki de99bf6 güçlü DoT koruması yalnız weak kaynağın varlığını
+kontrol ediyordu. A güçlü Poison uygulayıp hedef mobun hub'ına girdikten sonra
+B dışarıdan daha zayıf Poison tazelerse kaynak A/108 olarak kalıyordu;
+MMOMob::TakeDamage hub kapısı her tick'i reddediyordu. B yeniledikçe süre
+uzayabilir, izinli B'nin kendi 16 hasarlık DoT'u hiç uygulanmayabilirdi.
+
+ECC plan/review/verify + mmo-feature/ue-build kullanıldı. Readonly Meitner
+Unreal/QA/economy fallback, ebaf532/de99bf6/85952f9 incelemesinde bu ORTA
+regresyonu buldu; donation atomicity ve TopUp için ek orta/yüksek bulgu yok.
+Son iki dosyalık patch review blocker0; iki SHA başlangıç/son eşit. Agency
+plugin kökeni yok; ajan dosya/test/build yazmadı ve kapatıldı.
+
+ApplyEffect içindeki güçlü kaynak koruması artık hedef mobun gerçek hub
+hasar koşulunu kullanır: oyuncu kontrollü kaynak, etkin hub, radius>0,
+Dist2D<radius. Bu kaynak hub içinde ise mevcut yenileme dalı B'nin kendi
+büyüklüğünü ve kaynağını birlikte yazar. Authority kapısı, replicated
+ActiveEffects/EndServerTime ve broadcast yolu korunur; yeni RPC/save alanı yok.
+Tam sınır ve kapalı hub güçlü A'yı korur. Ölüm/detach sonrası kaynak sahipliği
+politikası bu düzeltmenin kapsamı dışında; per-pending-tick weak çözümleme aynı.
+
+Native46=önceki38+8: A dışarıda uygulayıp içeri girince tick0; B'ye kaynak,
+bPlayerSource, magnitude16 ve timer reset aktarımı; gerçek tick200→184;
+tekrar tazeleme184→168; tam radius ve radius0 için A/108 korunması ve tick200→92.
+Önceki PvP/party/clan/spawn/mob hub, lost-source, callback destruction,
+Regen/expiry/defense ve ölüm reentrancy kontrolleri de geçti. Fixture world
+zamanı/timer ilerletmez; ProcessEffects çağrıları elapsed PIE kanıtı değildir.
+
+Sabit37d829c worktree'de temiz UHT/module/lib/DLL build40,60sn Succeeded;
+fixture konumlarını netleştiren ikinci actual CPP/lib/DLL build3,72sn.
+Eski üretim kodu yeni fixture'da FAIL checks7 / hub-blocked stronger source,
+10:49:42.434UTC (runner1/UE0). Fix actual build3,67sn Succeeded;
+PASS46 10:50:30.302UTC, runner/UE0. Derlenmiş eski üretim başarısızlığı
+regresyon kanıtıdır; tüm testleri reddeden ayrı mutant bu işte çalıştırılmadı.
+
+### O39 sabit entegrasyon paketi
+
+RunAllChecks -SkipBuild -FullCompile42/42 GECTI, exit0. Bu sonuç yalnız
+37d829c+O39 iki source/runner patch'inin birlikte bulunduğu sabit snapshot'a
+aittir. 152 tracked Source/Scripts +5 Config +uproject =158 dosya SHA ve
+linked DLL paket önce/son aynı. docs/Lore.md Git blob'u iki checkout'ta
+37d829c ile aynı; GenQuestDialogue --check90 girdi eşleşti.
+19 CPP NoPCH/NoLink/SingleFile, response/shared /W4 var /Yu yok,
+19 nonempty object ve toplam warning C0. Bireysel UBT logları ayrı
+saklanmadı; paket çıktısı ile19 response/shared ve object metadata kaydedildi.
+Linked izole DLL:6d966d9a794199b835e626a6fb7196ccab334406055e28fc3f9dde056c7b162f.
+
+Parti169 10:55:39.745UTC, klan138 10:55:53.990, DoT46 10:57:23.222;
+arkadaş53/presence24/save26/trade218/vendor17/questCapacity13;
+JSONschema2 negative111, parser576/576; StaticLint84 temiz,
+ValidateData59 mob/57 item/90 görev/93 skill/12 efekt/35 spawner, mevcut
+Lv33+ beceri boşluğu uyarıları var. Store553 loaded553/JSON553,
+invalid/loadFailed/existsMismatch/jsonMismatch0,maxLevel6,writeorder1,
+roundtrip saved1/loaded1/equal1.553 ana kayıt byte-eşit kopyada kullanıldı;
+son native sonrası bu553 ana orijinalde hash fark0. Lv30+ gerçek kayıt
+uyumu bu maxLevel6 örnekleriyle doğrulanmış sayılmaz.
+
+Summer57/Winter75 doğum, exit0/error0. Net140031 server/client1join1welcome,
+hata0. Bağlantı ve harita doğuşları test edildi; gerçek uzak gameplay/PIE,
+UI/XP/loot kredisi, Shipping ve Server hedefleri açık. Güncel dış ekonomi,
+DoT, spawner ve O38 kodu bu snapshot'ta birlikte derlendi/test edildi;
+§75/76 tarihsel snapshot kanıtlarının kapsamı korunur.
+
+İki patch ana checkout'a Git-normalized diff byte eşitliğiyle taşındı;
+ana actual Stats+Module.5/lib/DLL build8,99sn Succeeded, native46
+11:03:12.377UTC PASS/exit0.158 input ve ana DLL SHA sabit. Belge sonrası
+oyun build başlatılmadı. TEMP/mmo_dot_hub_refresh_20261009 altında baseline,
+fixed/primary build+native, frozen_inputs, nopch_proof/response, all_checks,
+review_scope, verification_result/primary_verification ve save hash kanıtı var.

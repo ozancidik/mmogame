@@ -15,7 +15,7 @@ if (-not $process.WaitForExit(60000)) {
     exit 2
 }
 if (-not (Test-Path -LiteralPath $log)) { Write-Output 'DoT source testi logu bulunamadi'; exit 1 }
-$pass = Select-String -LiteralPath $log -Pattern '\[MMO_DOT_SOURCE_TEST\] PASS checks=38\b'
+$pass = Select-String -LiteralPath $log -Pattern '\[MMO_DOT_SOURCE_TEST\] PASS checks=46\b'
 $fail = Select-String -LiteralPath $log -Pattern '\[MMO_DOT_SOURCE_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation'
 if ($pass -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $pass.Line

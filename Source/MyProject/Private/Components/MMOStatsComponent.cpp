@@ -798,8 +798,15 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 		{
 			// QA 2026-10-09 ORTA-3: buyukluk artik kaynagin saldirisina bagli; daha zayif bir OYUNCU, mobdaki daha guclu oyuncu
 			// DoT'unu yeniledigi icin tick'i dusuremez ve kalan tick'lerin olduruden kredisini alamaz: yalniz sure tazelenir.
+			// Match the target mob's damage hub guard: a retained source may have entered safety since applying DoT.
+			// Replace both magnitude and credit with the incoming effect when that source's ticks are blocked.
+			const AMMOMob* TargetMob = Cast<AMMOMob>(GetOwner());
+			const APawn* RetainedSource = Cast<APawn>(E.Instigator.Get());
+			const bool bRetainedSourceInHub = TargetMob && RetainedSource && RetainedSource->IsPlayerControlled()
+				&& TargetMob->bHasHub && TargetMob->HubSafeRadius > 0.f
+				&& FVector::Dist2D(RetainedSource->GetActorLocation(), TargetMob->HubLocation) < TargetMob->HubSafeRadius;
 			if (Def->Type == EMMOEffectType::PeriodicDamage && bPlayerSource && E.bPlayerSource && E.Instigator.IsValid()
-				&& EffectMagnitude < E.Magnitude)
+				&& !bRetainedSourceInHub && EffectMagnitude < E.Magnitude)
 			{
 				E.RemainingTime = Def->Duration;
 				E.EndServerTime = EffectEnd;
@@ -1216,6 +1223,44 @@ bool UMMOStatsComponent::RunDotSourceLifecycleSelfTest(UWorld* World, FString& O
 		MobTarget->ApplyEffect(TEXT("Poison"), Source); MobTarget->ApplyEffect(TEXT("Poison"), Pawns[2]);
 		if (!Check(MobTarget->ActiveEffects.Num() == 1 && MobTarget->ActiveEffects[0].Magnitude == 108.f
 			&& MobTarget->ActiveEffects[0].Instigator.Get() == Source, TEXT("weaker player refresh overwrote the stronger DoT"))) return false;
+		// A stronger source entering this mob's hub must not suppress a valid weaker refresh.
+		AMMOMob* RefreshTarget = CastChecked<AMMOMob>(Pawns[4]);
+		const bool bOriginalHub = RefreshTarget->bHasHub;
+		const FVector OriginalHubLocation = RefreshTarget->HubLocation;
+		const float OriginalHubRadius = RefreshTarget->HubSafeRadius;
+		RefreshTarget->bHasHub = true; RefreshTarget->HubLocation = Far; RefreshTarget->HubSafeRadius = 500.f;
+		Pawns[2]->SetActorLocation(Far + FVector(1000., 0., 0.));
+		Source->SetActorLocation(Far + FVector(600., 0., 0.));
+		Reset(MobTarget, 200.f); MobTarget->ApplyEffect(TEXT("Poison"), Source);
+		Source->SetActorLocation(Far + FVector(200., 0., 0.)); MobTarget->ProcessEffects(1.f);
+		if (!Check(MobTarget->Health == 200.f && MobTarget->LastAppliedDamage == -1.f,
+			TEXT("strong source inside mob hub dealt DoT"))) return false;
+		MobTarget->ApplyEffect(TEXT("Poison"), Pawns[2]);
+		if (!Check(MobTarget->ActiveEffects.Num() == 1 && MobTarget->ActiveEffects[0].Magnitude == 16.f
+			&& MobTarget->ActiveEffects[0].Instigator.Get() == Pawns[2] && MobTarget->ActiveEffects[0].bPlayerSource
+			&& MobTarget->ActiveEffects[0].RemainingTime == 8.f && MobTarget->ActiveEffects[0].TimeSinceLastTick == 0.f,
+			TEXT("hub-blocked stronger source suppressed eligible weaker refresh"))) return false;
+		MobTarget->ProcessEffects(1.f);
+		if (!Check(MobTarget->Health == 184.f && MobTarget->LastAppliedDamage == 16.f,
+			TEXT("replacement source DoT failed to damage mob"))) return false;
+		MobTarget->ApplyEffect(TEXT("Poison"), Pawns[2]); MobTarget->ProcessEffects(1.f);
+		if (!Check(MobTarget->Health == 168.f && MobTarget->ActiveEffects[0].Instigator.Get() == Pawns[2],
+			TEXT("repeated weaker refresh restored hub-blocked credit"))) return false;
+		// Exact radius boundary is allowed (<), and a disabled hub must not reduce a stronger DoT.
+		for (bool bEnabledHub : {true, false})
+		{
+			RefreshTarget->HubSafeRadius = bEnabledHub ? 500.f : 0.f;
+			Source->SetActorLocation(Far + FVector(bEnabledHub ? 500. : 200., 0., 0.));
+			Reset(MobTarget, 200.f); MobTarget->ApplyEffect(TEXT("Poison"), Source); MobTarget->ApplyEffect(TEXT("Poison"), Pawns[2]);
+			if (!Check(MobTarget->ActiveEffects.Num() == 1 && MobTarget->ActiveEffects[0].Magnitude == 108.f
+				&& MobTarget->ActiveEffects[0].Instigator.Get() == Source,
+				TEXT("hub boundary or disabled hub overwrote eligible stronger source"))) return false;
+			MobTarget->ProcessEffects(1.f);
+			if (!Check(MobTarget->Health == 92.f && MobTarget->LastAppliedDamage == 108.f,
+				TEXT("eligible stronger source failed boundary/disabled-hub tick"))) return false;
+		}
+		RefreshTarget->bHasHub = bOriginalHub; RefreshTarget->HubLocation = OriginalHubLocation; RefreshTarget->HubSafeRadius = OriginalHubRadius;
+		Source->SetActorLocation(Far + FVector(200., 0., 0.)); Pawns[2]->SetActorLocation(Far + FVector(400., 0., 0.));
 		Reset(V); V->ApplyEffect(TEXT("Poison"), Source); Source->GetPartyComponent()->Members.Add(Victim); V->ProcessEffects(1.f);
 		if (!Check(V->Health == 100.f, TEXT("live source bypassed party"))) return false;
 		Source->GetPartyComponent()->Members.Reset();
