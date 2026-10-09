@@ -1,6 +1,8 @@
 # İçerik planı: Lv46–80 (Winter Lv41–57 + Lv66–80, Summer dış cepleri Lv58–65)
 
-**Tarih:** 2026-10-09, `master` e812fa9 üzerinde. **Durum:** yalnız plan. Kod, veri, betik, `Content/`, `Config/` ve git'e dokunulmadı; tek çıktı bu dosya. Biçim ve üslup `CONTENT_PLAN_LV11_45.md` ile aynı.
+**Tarih:** 2026-10-09, `master` e812fa9 üzerinde. **Durum (plan yazıldığında):** yalnız plan. Biçim ve üslup `CONTENT_PLAN_LV11_45.md` ile aynı.
+
+> **UYGULAMA DURUMU (2026-10-09, aynı gün):** W1 (Lv46–50), W2 (Lv51–57), R (Lv58–65), A (Lv66–70) paketlerinin mob/görev/Lore kısımları ve G11 beceri dolgusu (12 beceri: Lv52/64/75) kodda; ayrı Winter cepleri P46 (-5000,-3000), P48 (5000,0), P53 (6000,-4000), P69 (-4000,-6000) 289 noktalı runtime taramayla seçildi (hepsi ≥63/64). Lv58–65 Summer bandları genişledi (yeni koordinat yok). **Yapılmayanlar:** U (Lv71–80) paketi ve Lv73–80 ekipmanı, Burn efekti (DoT savunmaya karşı etkisiz: `SKILL_PLAN_LV31_45.md`), elit/boss fikirleri, S1–S4 sistemik işler, Lv62 görev boşluğu. Tüm sayılar `[PLACEHOLDER]`; PIE'de doğrulanmadı. Aşağıdaki bölümler plan metnidir ve uygulamayı birebir yansıtmayabilir (ör. Efekt Zehir yerine Slow).
 
 **Yöntem (sayılar nereden):**
 - Bugünkü durum sayıları, gerçek depoda **salt okunur** çalıştırılan `Scripts/ValidateData.py`, `ProgressionModel.py`, `BalanceReport.py`, `EconomyModel.py`, `ContentMap.py` çıktılarından ve kaynak okumadan gelir (2026-10-09).

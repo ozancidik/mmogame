@@ -943,7 +943,7 @@ void AMMOGameMode::SpawnMobArea()
 			WinterSpawner->MaxMobs = 6;
 			WinterSpawner->SpawnRadius = 225.f;
 			WinterSpawner->MinMobLevel = 42;
-			WinterSpawner->MaxMobLevel = 49; // W1 yedek paketi: WinterWolf (47) + WinterBehemoth (49) bu cepte; ayri cep sonra probla
+			WinterSpawner->MaxMobLevel = 44; // Lv46-49 mobu ayri ceplerde (asagidaki P46/P48, 2026-10-09 grid taramasi)
 			WinterSpawner->bValidateSpawnOnNavGround = true;
 			UGameplayStatics::FinishSpawningActor(WinterSpawner, WinterMobTM);
 		}
@@ -998,11 +998,18 @@ void AMMOGameMode::SpawnMobArea()
 		// 23/64 verdi (iz surme baslangicinda cokus: dag cikintisinin basit carpismasi). Yeni konumlar
 		// MMOProbeSurface gridiyle olculdu: Nobetci (-3500,3000) 64/64, Gezgin (-5500,4500) 59/64;
 		// hub'dan tam navmesh yolu var; Kis Hukumdari'ndan 3041u, birbirinden 2500u.
-		// W2 yedek paketi (CONTENT_PLAN_LV46_80.md 2.3): Gozcu cebi 51-53 -> FrostboundSworn (Lv53) burada
-		// dogar; ayri cep sonra MMOProbeSurface ile. Bedel: Gozcu/Yeminli 1/2.
-		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 53, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(3000.f, 0.f, 210.f), 51, 51, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-3500.f, 3000.f, -120.f), 55, 55, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(2000.f, 2800.f, 236.f), 0, 0, 150.f, 1, FName(TEXT("FrostboundWarden")), 60.f);
+
+		// 2026-10-09 grid taramasi (SmokeTest.ps1 + MMOProbeSurface, 289 nokta, 1000u arali; ok = 64 ornekte gecen):
+		// CONTENT_PLAN_LV46_80.md paketlerinin ayri cepleri. Hepsi hub'dan >=5200u, onceki Winter ceplerinden >=1800u.
+		//  P46 Lv46-47 (WinterReaver + WinterWolf)    (-5000,-3000,50)  64/64  W1 cebine 2500u
+		//  P48 Lv48-49 (WinterWraith + WinterBehemoth) (5000,0,114)     63/64  Gozcu cebine 2000u
+		//  P53 Lv53   (FrostboundSworn)                (6000,-4000,240) 64/64  Kul Tirani'na 2000u
+		SpawnFrostbound(FVector(-5000.f, -3000.f, 50.f), 46, 47, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(5000.f, 0.f, 114.f), 48, 49, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(6000.f, -4000.f, 240.f), 53, 53, 225.f, 6, NAME_None, 0.f);
 
 		// Lv66-80 Kul + Ucurum dilimleri. Winter NavMeshBoundsVolume 2026-10-03'te
 		// Scripts/ExtendWinterNavigation.py ile X+-8000 / Y -8500..5500'e genisletildi.
@@ -1012,8 +1019,9 @@ void AMMOGameMode::SpawnMobArea()
 		//  Ucurum Gezgini Lv72 (-5500,4500) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
 		//  (Naib ilk (-7600,-1200)'deydi; gezinmeyle navmesh sinirini -8000 asiyordu, QA ile tasindi.)
 		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
-		// A paketi (CONTENT_PLAN_LV46_80.md 2.5): Baglayici cebi 68-69 -> AshMarcher (Lv69) burada dogar (yedek, koordinatsiz).
-		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 69, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
+		//  P69 Lv69 (AshMarcher) (-4000,-6000,50) 64/64: Baglayici cebine 2154u, hub'dan 6021u (2026-10-09 taramasi)
+		SpawnFrostbound(FVector(-4000.f, -6000.f, 50.f), 69, 69, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, -5200.f, 340.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
 		SpawnFrostbound(FVector(-5500.f, 4500.f, -92.f), 72, 72, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4400.f, 3600.f, 550.f), 76, 76, 225.f, 6, NAME_None, 0.f);
