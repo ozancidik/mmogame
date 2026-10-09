@@ -2579,9 +2579,12 @@ void AMMOHUD::DrawQuestWindow(AMMOCharacter* PlayerChar)
 			R.Rect = FBox2D(FVector2D(RowX, RowY), FVector2D(RowX + RowW, RowY + CellH));
 			QuestClaimRegions.Add(R);
 		}
+		// Bagis gorevi (GoldDonationMinTarget): teslimde altin dusulur; eski kayitta aktif tasiyan oyuncu da odulu almadan gorsun
+		// (QA 2026-10-09 DUSUK-6).
+		const bool bDonation = Def->Type == EMMOQuestType::HaveGold && Def->TargetCount >= UMMOQuestComponent::GoldDonationMinTarget;
 		DrawQuestRowText(FString::Printf(TEXT("%s   %d/%d %s"), *Def->Name, Q->GetProgress(*Def), Def->TargetCount,
 			bDone ? TEXT("- TAMAM, tikla!") : TEXT("")),
-			FString(),
+			bDonation ? FString::Printf(TEXT("Teslimde %d altin bagislanir (bakiyeden dusulur)"), Def->TargetCount) : FString(),
 			FString::Printf(TEXT("Odul: %d XP, %d altin%s"), Def->RewardXP, Def->RewardGold, *BuildQuestRewardItemSuffix(*Def)), RowY);
 		RowY += RowH;
 	}

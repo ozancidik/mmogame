@@ -2,13 +2,16 @@
 # istege bagli bir cebin ilk doldurmasini sayar. Cep kalitesini olcmek icin (MMOProbeSurface yalan soyleyebilir). Editor KAPALI olmali.
 # Ornek: powershell -File Scripts/SoakTest.ps1 -Tag t1 -Map Winter_scene -Seconds 90 -PocketPrefix "V(X=4750.00, Y=-5750.00" -Cx 4750 -Cy -5750
 # Tum spawner'larin ozeti: python Scripts/SpawnAudit.py %TEMP%\mmo_soak_<Tag>.log [...]
-param([string]$Tag, [int]$Seconds = 90, [string]$Map = "Summer_scene", [string]$PocketPrefix = "", [double]$Cx = [double]::NaN, [double]$Cy = 0, [double]$Radius = 1200)
+# -Cmds "MMOSpawnMob OrcWarlord,MMOSpawnMob OrcWarlord": baslangicta calisan konsol komutlari (quit EKLEME; sure dolunca kapanir).
+param([string]$Tag, [int]$Seconds = 90, [string]$Map = "Summer_scene", [string]$PocketPrefix = "", [double]$Cx = [double]::NaN, [double]$Cy = 0, [double]$Radius = 1200, [string]$Cmds = "")
 $project = Join-Path (Split-Path -Parent $PSScriptRoot) "MyProject.uproject"
 $exe = "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $log = Join-Path $env:TEMP ("mmo_soak_" + $Tag + ".log")
 if ([IO.File]::Exists($log)) { [IO.File]::Delete($log) }
 $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
-$p = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", $mapPath, "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$log") -PassThru -WindowStyle Hidden
+$argList = @("`"$project`"", $mapPath, "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$log")
+if ($Cmds) { $argList += "-ExecCmds=`"$Cmds`"" }
+$p = Start-Process -FilePath $exe -ArgumentList $argList -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds $Seconds
 if (-not $p.HasExited) { $p.Kill() }
 Start-Sleep -Seconds 2
