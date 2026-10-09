@@ -4790,3 +4790,23 @@ O37 stage/commit öncesi dış W2 işi 54de52b olarak ayrı commit oldu; başlan
 beş dış dosya artık temiz. O37 stage seti yalnız kendi sekiz dosyasıydı. İlk
 40/40 paket içindeki revision değişimi sınırı geçerli; bu paket W2'nin final
 snapshot'ı için bütünsel doğrulama iddiası değildir.
+
+## 2026-10-09 — W1/W2/R sabit snapshot sonrası oynanış (açık)
+
+9fdd2ea snapshot'ı izole Editor build +41/41 FullCompile/19 CPP/W4 warning0 ile
+geçti.489 kayıt kopyası load/JSON/roundtrip uyumlu; Summer52/Winter29 ve Net1join/
+1welcome/error0. Kaynak/DLL hash'ları sabitti (§75). Bu sonuçlar aşağıdaki gerçek
+oynanış maddelerini kapatmaz.
+
+- [ ] Winter'da WinterWolf (Lv47), WinterBehemoth (Lv49), FrostboundSworn (Lv53);
+  Summer'da RiftWhisperer (Lv60), RiftWalker (Lv64) görünür/doğar/öldürülebilir olsun.
+  Warrok görseli, Slow/Rage, leash/navmesh ve iki istemcide vitals/ölüm gözlensin.
+- [ ] Q_WinterHowls/Q_WinterColossus, Q_FrostboundSworn/Q_FrostboundWatch/
+  Q_FrostboundOath, Q_RiftWhispers/Q_RiftWalkers: seviye/ön koşul kapıları, doğru
+  hedef kill kredisi, parti menzili ve beyan edilen iksir ödülü tek tek doğrulansın.
+  Dolu çanta/ölüm/tekrarlı claim retleri ve ana görev zincirinin devamı oynansın.
+- [ ] Mevcut ceplerin genişleyen tür havuzlarında eski/yeni hedef bulunabilirliği,
+  TTK/ölüm/iksir/XP ve yürüme süresi ölçülsün. Veri sayıları PLACEHOLDER kalır;
+  smoke mob sayısı rota veya denge ölçümü sayılmasın.
+- [ ] Gerçek uzak istemci, kopma/yeniden giriş, disk login; Server/Shipping ve
+  uçtan uca Lv1–30/Lv46–65 akışları mevcut runbook ile ayrıca doğrulansın.
