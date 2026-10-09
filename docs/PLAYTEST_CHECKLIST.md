@@ -4673,3 +4673,31 @@ Grup setup pending seed + native accept; gerçek davet/packet gecikmesi değildi
 O33 otomatik final: actual linked restore DLL/PASS104, iki değişen CPP
 NoPCH/W4 warning0; RunAllChecks -SkipBuild40/40 exit0. Summer49/Winter31/error0,
 Net1join/1welcome/error0. Bu sonuçlar gerçek PIE kutularını kapatmaz.
+
+
+## 2026-10-09 — Klan üyelik sohbeti/ayrılma bağlamı (O34, gerçek PIE açık)
+
+Native97 = önceki73 +24; controller65 + component32. Test load yalnız component
+in-memory ApplySaveData'dır. Native HUD buffer uzak RPC/Canvas/Slate kanıtı değil.
+
+- [ ] Host + uzak istemci aynı yeni build: aynı pawn A→B sonrası eski A ID'siyle
+  /g metni B'ye gitmesin; /klan ayril B'den çıkarmasın. B owner-only ID geldiğinde
+  fresh Say/Enter mesajı yalnız güncel B üyelerine, leave yalnız kendi üyeliğine
+  uygulansın. Sıfır/foreign/unknown ID ret, mevcut ortak0,7sn throttle korunsun.
+- [ ] Aynı B'den çıkıp tekrar katılınca veya atılıp tekrar katılınca sender
+  üyelik ID'si yenilensin; önceki /g ve ayril tekrar geçmesin. Başka üye katılır/
+  ayrılırken ve liderlik aktarılırken continuous sender ID korunmalı; yeni
+  roster'a fresh mesaj ulaşmalı. Target kick rejoin bağlamı bu işte çözülmedi.
+- [ ] Başarılı /klan kur, davet kabulü ve gerçek kayıt/re-login/load sonrasında
+  valid ID owner'a ulaşsın; boş/geçersiz clan kaydı/leave/kick ID'yi geçersiz
+  kılsın. Native test başarılı create/disk login çalıştırmadı; Server/Shipping
+  ayrı derlensin, owner dışındaki oyuncu ID'yi almamalı.
+- [ ] ID teslimi gecikirse sessiz ret sonrası fresh bağlamla tekrar dene;
+  klansız kişisel hint, host ve uzak /G, normal party/whisper/genel sohbet
+  regresyonu çalışsın. Görünen roster/metin/ID atomikliği, account/name/controller
+  rebinding, davet eden generation ve /klan davet/at/liste/kur bağlamı açık.
+
+O34 otomatik final: UHT/linked DLL + native97/chat65;
+RunAllChecks -SkipBuild -FullCompile41/41 exit0,19 NoPCH CPP /W4 warning0.
+Summer49/Winter29/error0; Net1join/1welcome/error0. Bu sonuçlar gerçek PIE,
+başarılı create UI veya disk login kutularını kapatmaz.

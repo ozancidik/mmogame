@@ -90,7 +90,7 @@ protected:
 #endif
 
 	UFUNCTION(Server, Reliable)
-	void ServerSendChat(const FString& Message, AMMOCharacter* SeenCommandPawn, uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId, uint64 SeenFriendInviteId);
+	void ServerSendChat(const FString& Message, AMMOCharacter* SeenCommandPawn, uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId, uint64 SeenFriendInviteId, const FGuid& SeenClanMembershipId);
 	// Capture party/trade/clan/friend command context before the owning client sends chat.
 	void SendChatWithContext(const FString& Message);
 

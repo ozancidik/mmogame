@@ -435,7 +435,7 @@ bool AMMOPlayerController::RunTradeChatContextSelfTest(UWorld* World, FString& O
 		auto Chat = [&](const TCHAR* Message, AMMOCharacter* SeenPawn, uint64 Invite, uint64 Session)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0, FGuid(), 0);
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, Invite, Session, 0, 0, FGuid(), 0, FGuid());
 		};
 		Trades[0]->RequestInviteNearest();
 		const uint64 Old = Trades[1]->PendingInviteId;
@@ -516,7 +516,7 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 				Pending[I] = Parties[I]->PendingInviteFrom; Ids[I] = Parties[I]->PendingInviteId; Times[I] = Parties[I]->PendingInviteTime;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0, SeenMembership, 0);
+			PCs[1]->ServerSendChat_Implementation(Message, SeenPawn, 0, 0, Id, 0, SeenMembership, 0, FGuid());
 			for (int32 I = 0; I < 3; ++I)
 			{
 				if (Parties[I]->Members != Members[I] || Parties[I]->Leader != Leaders[I]
@@ -692,8 +692,9 @@ bool AMMOPlayerController::RunPartyChatContextSelfTest(UWorld* World, FString& O
 #if !UE_BUILD_SHIPPING
 bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
-	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client)
-	{ OutError = TEXT("clan chat requires server game world"); return false; }
+	if (!World || !World->IsGameWorld() || World->GetNetMode() != NM_Standalone
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended")) || !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{ OutError = TEXT("clan chat requires disposable standalone headless world"); return false; }
 	const int32 InitialChecks = OutChecks;
 	AMMOPlayerController* PCs[4] = {}; AMMOCharacter* Pawns[4] = {}; UMMOClanComponent* Clans[4] = {}; AMMOHUD* HUDs[4] = {};
 	const bool Passed = [&]()
@@ -713,9 +714,9 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		const FString ClanA = TEXT("A") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(11);
 		const FString ClanB = TEXT("B") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(11);
 		const FString ClanC = TEXT("C") + FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(11);
-		Clans[0]->ClanName = ClanA; Clans[0]->bIsLeader = true;
-		Clans[2]->ClanName = ClanB; Clans[2]->bIsLeader = true;
-		Clans[3]->ClanName = ClanC; Clans[3]->bIsLeader = true;
+		Clans[0]->ClanName = ClanA; Clans[0]->ClanMembershipId = FGuid::NewGuid(); Clans[0]->bIsLeader = true;
+		Clans[2]->ClanName = ClanB; Clans[2]->ClanMembershipId = FGuid::NewGuid(); Clans[2]->bIsLeader = true;
+		Clans[3]->ClanName = ClanC; Clans[3]->ClanMembershipId = FGuid::NewGuid(); Clans[3]->bIsLeader = true;
 		auto InventoryUnchanged = [&]()
 		{
 			for (int32 I = 0; I < 4; ++I)
@@ -740,7 +741,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 				Leaders[I] = Clans[I]->bIsLeader; Ids[I] = Clans[I]->PendingInviteId;
 			}
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(TEXT("/klan kabul"), SeenPawn, 0, 0, 0, Id, FGuid(), 0);
+			PCs[1]->ServerSendChat_Implementation(TEXT("/klan kabul"), SeenPawn, 0, 0, 0, Id, FGuid(), 0, FGuid());
 			for (int32 I = 0; I < 4; ++I)
 			{
 				FMMOCharacterSaveData After; Clans[I]->FillSaveData(After);
@@ -774,7 +775,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		Clans[0]->CmdAccept();
 		if (!Check(Clans[0]->ClanName == ClanC && !Clans[0]->bIsLeader && Clans[0]->PendingInviteId == Fresh
 			&& InventoryUnchanged(), TEXT("replacement invitation preserved for current accept"))) return false;
-		Clans[0]->CmdLeave(); Clans[0]->ClanName = ClanA; Clans[0]->bIsLeader = true;
+		Clans[0]->CmdLeave(); Clans[0]->ClanName = ClanA; Clans[0]->ClanMembershipId = FGuid::NewGuid(); Clans[0]->bIsLeader = true;
 		if (!Check(RejectedUnchanged(nullptr, Fresh), TEXT("clan chat null pawn no fallback"))) return false;
 		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/klan kabul"));
 		if (!Check(Clans[1]->ClanName == ClanB && !Clans[1]->bIsLeader && Clans[1]->PendingInviteId == Fresh
@@ -798,15 +799,15 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		if (!Check(InventoryUnchanged(), TEXT("clan command HUD fixture"))) return false;
 		// Controller 1 now owns a different pawn with a different clan/leadership and valid nearby targets.
 		PCs[0]->UnPossess(); PCs[1]->UnPossess(); PCs[1]->Possess(Pawns[0]);
-		Clans[0]->ClanName = ClanB; Clans[0]->bIsLeader = true;
-		Clans[2]->ClanName = ClanB; Clans[2]->bIsLeader = false;
+		Clans[0]->ClanName = ClanB; Clans[0]->ClanMembershipId = FGuid::NewGuid(); Clans[0]->bIsLeader = true;
+		Clans[2]->ClanName = ClanB; Clans[2]->ClanMembershipId = FGuid::NewGuid(); Clans[2]->bIsLeader = false;
 		if (!Check(PCs[1]->GetPawn() == Pawns[0] && Pawns[0]->GetController() == PCs[1]
 			&& !Pawns[1]->GetController(), TEXT("clan command possession switch"))) return false;
 		PCs[0]->Possess(Pawns[1]); // Keep the previous pawn as a controlled nearest invite candidate.
 		auto Send = [&](const FString& Text, AMMOCharacter* SeenPawn)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid(), 0);
+			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid(), 0, Clans[0]->ClanMembershipId);
 		};
 		auto RejectCommand = [&](const FString& Text, AMMOCharacter* SeenPawn)
 		{
@@ -839,7 +840,7 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		const FString Create = TEXT("/klan kur ") + ClanA;
 		if (!Check(RejectCommand(Create, Pawns[1]), TEXT("stale clan creation routed to replacement"))) return false;
 		if (!Check(RejectCommand(Create, nullptr), TEXT("null clan creation used server fallback"))) return false;
-		Clans[0]->ClanName = ClanB; Clans[0]->bIsLeader = true;
+		Clans[0]->ClanName = ClanB; Clans[0]->ClanMembershipId = FGuid::NewGuid(); Clans[0]->bIsLeader = true;
 		const int32 CallerLines = HUDs[1]->GetChatLinesForTests().Num();
 		const int32 VictimLines = HUDs[2]->GetChatLinesForTests().Num();
 		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(TEXT("/G fresh message"));
@@ -867,11 +868,93 @@ bool AMMOPlayerController::RunClanChatContextSelfTest(UWorld* World, FString& Ou
 		if (!Check(!Clans[0]->IsInClan() && !Clans[0]->bIsLeader && InventoryUnchanged(), TEXT("fresh replacement clan leave"))) return false;
 		const int32 BeforeInvalidCreate = HUDs[1]->GetChatLinesForTests().Num();
 		Send(TEXT("/klan kur !"), Pawns[0]);
-		return Check(!Clans[0]->IsInClan() && HUDs[1]->GetChatLinesForTests().Num() == BeforeInvalidCreate + 1
-			&& InventoryUnchanged(), TEXT("fresh clan creation validation feedback"));
+		if (!Check(!Clans[0]->IsInClan() && HUDs[1]->GetChatLinesForTests().Num() == BeforeInvalidCreate + 1
+			&& InventoryUnchanged(), TEXT("fresh clan creation validation feedback"))) return false;
+		// Same pawn, different membership; valid load applies the actual runtime entry path without disk IO.
+		auto LoadClan = [&](int32 I, const FString& Name, bool Leader = false)
+		{
+			FMMOCharacterSaveData Data; Data.ClanName = Name; Data.bClanLeader = Leader; Clans[I]->ApplySaveData(Data);
+		};
+		auto LinesCopy = [&]()
+		{
+			TArray<TArray<FMMOChatLine>> Result; for (AMMOHUD* H : HUDs) Result.Add(H->GetChatLinesForTests()); return Result;
+		};
+		auto RejectMember = [&](const FString& Text, const FGuid& Seen)
+		{
+			FMMOCharacterSaveData Saved[4]; FGuid Ids[4]; uint64 Invites[4]; const auto Lines = LinesCopy();
+			for (int32 I = 0; I < 4; ++I) { Clans[I]->FillSaveData(Saved[I]); Ids[I] = Clans[I]->ClanMembershipId; Invites[I] = Clans[I]->PendingInviteId; }
+			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+			PCs[1]->ServerSendChat_Implementation(Text, Pawns[0], 0, 0, 0, 0, FGuid(), 0, Seen);
+			for (int32 I = 0; I < 4; ++I)
+			{
+				FMMOCharacterSaveData After; Clans[I]->FillSaveData(After); TArray<FString> Differences;
+				FMMOCharacterSaveJson::FindDifferences(Saved[I], After, Differences);
+				const auto& NewLines = HUDs[I]->GetChatLinesForTests();
+				if (!Differences.IsEmpty() || Ids[I] != Clans[I]->ClanMembershipId || Invites[I] != Clans[I]->PendingInviteId || NewLines.Num() != Lines[I].Num()) return false;
+				for (int32 L = 0; L < NewLines.Num(); ++L)
+					if (NewLines[L].Text != Lines[I][L].Text || NewLines[L].Color != Lines[I][L].Color || NewLines[L].Time != Lines[I][L].Time) return false;
+			}
+			return InventoryUnchanged();
+		};
+		auto FreshSay = [&](const FString& Text) { PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f; PCs[1]->Say(Text); };
+		auto Delivered = [&](const TArray<TArray<FMMOChatLine>>& BeforeLines, const FString& Text, bool Joined)
+		{
+			for (int32 I = 0; I < 4; ++I)
+			{
+				const auto& Lines = HUDs[I]->GetChatLinesForTests(); const bool Receives = I == 1 || I == 2 || (Joined && I == 0);
+				if (Lines.Num() != BeforeLines[I].Num() + (Receives ? 1 : 0)) return false;
+				if (Receives && (Lines.Last().Text != FString::Printf(TEXT("[Klan] %s: %s"), *PCs[1]->PlayerState->GetPlayerName(), *Text)
+					|| Lines.Last().Color != FLinearColor(0.4f, 0.9f, 0.4f))) return false;
+			}
+			return InventoryUnchanged();
+		};
+		LoadClan(0, ClanA, true); LoadClan(1, ClanA); LoadClan(2, ClanB, true); LoadClan(3, ClanC, true);
+		const FGuid OldA = Clans[0]->ClanMembershipId;
+		if (!Check(OldA.IsValid() && Clans[1]->ClanMembershipId.IsValid() && OldA != Clans[1]->ClanMembershipId && InventoryUnchanged(), TEXT("clan membership load identities"))) return false;
+		Clans[0]->CmdLeave(); const bool InvalidAfterLeave = !Clans[0]->ClanMembershipId.IsValid(); LoadClan(0, ClanB);
+		const FGuid CurrentB = Clans[0]->ClanMembershipId;
+		if (!Check(InvalidAfterLeave && CurrentB.IsValid() && CurrentB != OldA && !Clans[0]->bIsLeader && Clans[2]->bIsLeader, TEXT("clan membership A to B context"))) return false;
+		if (!Check(RejectMember(TEXT("/g old_A_secret"), OldA), TEXT("old clan message leaked into replacement clan"))) return false;
+		if (!Check(RejectMember(TEXT("/klan ayril"), OldA), TEXT("old clan leave removed replacement membership"))) return false;
+		for (const FGuid& Id : {FGuid(), Clans[2]->ClanMembershipId, FGuid::NewGuid()})
+		{
+			if (!Check(RejectMember(TEXT("/g wrong_context"), Id), TEXT("invalid clan chat context delivered"))) return false;
+			if (!Check(RejectMember(TEXT("/klan ayril"), Id), TEXT("invalid clan leave context mutated"))) return false;
+		}
+		auto Lines = LinesCopy(); FreshSay(TEXT("/G fresh_B"));
+		if (!Check(Delivered(Lines, TEXT("fresh_B"), false), TEXT("fresh Say membership clan delivery"))) return false;
+		Lines = LinesCopy(); PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/g committed_B")), ETextCommit::OnEnter);
+		if (!Check(Delivered(Lines, TEXT("committed_B"), false), TEXT("fresh Enter membership clan delivery"))) return false;
+		LoadClan(1, ClanB); Lines = LinesCopy(); FreshSay(TEXT("/g continuing_B"));
+		if (!Check(Clans[0]->ClanMembershipId == CurrentB && Delivered(Lines, TEXT("continuing_B"), true), TEXT("continuous member clan join routing"))) return false;
+		Clans[0]->CmdLeave(); LoadClan(0, ClanB); const FGuid RejoinedB = Clans[0]->ClanMembershipId;
+		if (!Check(RejoinedB.IsValid() && RejoinedB != CurrentB, TEXT("same clan rejoin reused context"))) return false;
+		if (!Check(RejectMember(TEXT("/g old_B_secret"), CurrentB), TEXT("same clan rejoin accepted old message"))) return false;
+		if (!Check(RejectMember(TEXT("/klan ayril"), CurrentB), TEXT("same clan rejoin accepted old leave"))) return false;
+		PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
+		PCs[1]->OnChatCommitted(FText::FromString(TEXT("/klan ayril")), ETextCommit::OnEnter);
+		if (!Check(!Clans[0]->IsInClan() && !Clans[0]->ClanMembershipId.IsValid() && Clans[1]->ClanName == ClanB && Clans[2]->bIsLeader, TEXT("fresh Enter membership leave"))) return false;
+		LoadClan(0, ClanB); FreshSay(TEXT("/klan ayril"));
+		if (!Check(!Clans[0]->IsInClan() && !Clans[0]->ClanMembershipId.IsValid(), TEXT("fresh Say membership leave"))) return false;
+		LoadClan(0, ClanB); const FGuid BeforeKick = Clans[0]->ClanMembershipId, LeaderId = Clans[2]->ClanMembershipId;
+		Clans[2]->CmdKick(PCs[1]->PlayerState->GetPlayerName());
+		if (!Check(!Clans[0]->IsInClan() && !Clans[0]->ClanMembershipId.IsValid() && Clans[2]->ClanMembershipId == LeaderId, TEXT("kick context invalidation changed leader context"))) return false;
+		LoadClan(0, ClanB);
+		if (!Check(Clans[0]->ClanMembershipId.IsValid() && Clans[0]->ClanMembershipId != BeforeKick
+			&& RejectMember(TEXT("/g before_kick_secret"), BeforeKick) && RejectMember(TEXT("/klan ayril"), BeforeKick), TEXT("kick rejoin reused sender membership"))) return false;
+		LoadClan(0, TEXT("!"));
+		if (!Check(!Clans[0]->IsInClan() && !Clans[0]->ClanMembershipId.IsValid(), TEXT("invalid saved clan retained context"))) return false;
+		LoadClan(0, ClanB); LoadClan(0, FString());
+		if (!Check(!Clans[0]->IsInClan() && !Clans[0]->ClanMembershipId.IsValid(), TEXT("empty saved clan retained context"))) return false;
+		LoadClan(0, ClanB); const FGuid BeforeReload = Clans[0]->ClanMembershipId; LoadClan(0, ClanB);
+		if (!Check(Clans[0]->ClanMembershipId.IsValid() && Clans[0]->ClanMembershipId != BeforeReload
+			&& RejectMember(TEXT("/g before_reload"), BeforeReload) && RejectMember(TEXT("/klan ayril"), BeforeReload), TEXT("same clan reload retained stale context"))) return false;
+		return Check(InventoryUnchanged(), TEXT("clan membership routing changed inventory"));
 	}();
 	// Same synchronous frame: no load timer fires; erase fixture clans before teardown/leader election.
 	for (int32 I = 0; I < 4; ++I) { if (Clans[I]) { Clans[I]->ClanName.Reset(); Clans[I]->bIsLeader = false; } }
+	for (AMMOCharacter* Pawn : Pawns) if (IsValid(Pawn)) Pawn->SetTravelSaveCommitted(true);
 	for (int32 I = 0; I < 4; ++I) { if (PCs[I]) { PCs[I]->UnPossess(); PCs[I]->Destroy(); } if (Pawns[I]) Pawns[I]->Destroy(); }
 	for (AMMOHUD* HUD : HUDs) { if (IsValid(HUD)) HUD->Destroy(); }
 	if (Passed) UE_LOG(LogTemp, Log, TEXT("[MMO_CLAN_CHAT_CONTEXT_TEST] PASS checks=%d"), OutChecks - InitialChecks);
@@ -930,7 +1013,7 @@ bool AMMOPlayerController::RunFriendsChatContextSelfTest(UWorld* World, FString&
 		auto Send = [&](const FString& Text, AMMOCharacter* SeenPawn, uint64 SeenFriendId = 0)
 		{
 			PCs[1]->LastChatServerTime = World->GetTimeSeconds() - 1.f;
-			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid(), SeenFriendId);
+			PCs[1]->ServerSendChat_Implementation(Text, SeenPawn, 0, 0, 0, 0, FGuid(), SeenFriendId, FGuid());
 		};
 		auto Reject = [&](const FString& Text, AMMOCharacter* SeenPawn)
 		{
@@ -1047,11 +1130,11 @@ void AMMOPlayerController::SendChatWithContext(const FString& Message)
 	const UMMOFriendsComponent* Friends = Me ? Me->GetFriendsComponent() : nullptr;
 	ServerSendChat(Message, Me, Trade ? Trade->PendingInviteId : 0,
 		Trade && Trade->bTradeActive ? Trade->TradeSessionId : 0, Party ? Party->PendingInviteId : 0,
-		Clan ? Clan->PendingInviteId : 0, Party ? Party->PartyMembershipId : FGuid(), Friends ? Friends->GetPendingInviteId() : 0);
+		Clan ? Clan->PendingInviteId : 0, Party ? Party->PartyMembershipId : FGuid(), Friends ? Friends->GetPendingInviteId() : 0, Clan ? Clan->ClanMembershipId : FGuid());
 }
 
 void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message, AMMOCharacter* SeenCommandPawn,
-	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId, uint64 SeenFriendInviteId)
+	uint64 SeenTradeInviteId, uint64 SeenActiveTradeSessionId, uint64 SeenPartyInviteId, uint64 SeenClanInviteId, const FGuid& SeenPartyMembershipId, uint64 SeenFriendInviteId, const FGuid& SeenClanMembershipId)
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -1214,6 +1297,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		}
 		else if (Sub.Equals(TEXT("ayril"), ESearchCase::IgnoreCase))
 		{
+			if (Clan->IsInClan() && (!SeenClanMembershipId.IsValid() || SeenClanMembershipId != Clan->ClanMembershipId)) return;
 			Clan->CmdLeave();
 		}
 		else if (Sub.Equals(TEXT("at"), ESearchCase::IgnoreCase))
@@ -1288,6 +1372,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		{
 			if (UMMOClanComponent* Clan = Me->GetClanComponent())
 			{
+				if (Clan->IsInClan() && (!SeenClanMembershipId.IsValid() || SeenClanMembershipId != Clan->ClanMembershipId)) return;
 				Clan->CmdChat(ClanText);
 				return;
 			}

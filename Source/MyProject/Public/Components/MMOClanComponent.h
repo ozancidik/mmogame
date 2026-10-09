@@ -62,6 +62,9 @@ public:
 	// Owner-only runtime generation; retained after consumption, never saved or wrapped.
 	UPROPERTY(Replicated)
 	uint64 PendingInviteId = 0;
+	// Owner-only runtime membership context; never persisted, renewed on entry/load.
+	UPROPERTY(Replicated)
+	FGuid ClanMembershipId;
 	void CmdLeave();
 	void CmdKick(const FString& TargetName);
 	void CmdList();

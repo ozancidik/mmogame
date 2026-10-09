@@ -964,3 +964,30 @@ presence24/save26/klan73/DoT33/trade218; Store454/schema2, parser576/576.
 Summer49/Winter31/error0; Net1join/1welcome/error0. Değişen iki CPP NoPCH/W4
 warning0; FullCompile19 yeniden yok. 151 kaynak/runner hash fark0, fixture save0,
 engine/UBT0. Final paket9 EkimUTC; baseline/negatif/restore8 EkimUTC. §70.
+
+
+### O34 · ORTA · Aynı pawn eski /g veya klan ayrılmasını yeni üyeliğe uygular
+
+O30 pawn kapısı aynı pawn A→B/rejoin'i ayırt etmez. Baseline UE FAIL75 eski /g
+B'ye fanout; chat kapısı sonrası FAIL76 eski ayril B'yi sildi. Runtime owner-only
+FGuid ClanMembershipId başarılı create/accept/valid load'da yenilenir; leave/
+kick/empty-invalid load'da geçersiz olur. Same-name reload/rejoin de yenilenir,
+continuous members/liderlik aktarımında korunur. Save/JSON alanı değildir.
+
+Shared client chat observed ID'yi dokuzuncu RPC parametresiyle taşır; /g ve
+/klan ayril aktif üyelikte valid/equal ID ister. Pawn kapısı ve ortak throttle
+korunur, klansız kişisel hint sürer. Klan97/controller65; baseline75/76 ve
+compiled reload mutant95 yakalandı; exact restore DLL/PASS97. Ayrıntı §71.
+
+Davet eden source generation, /klan davet/at/liste/kur membership bağlamı,
+hedef kick/rejoin niyeti, roster/metin/ID atomikliği ve account rebinding açık.
+Native buffer/in-memory ApplySaveData gerçek network veya disk re-login
+kanıtı değildir. Yeni ServerSendChat imzası için aynı host/client build gerekir.
+
+O34 final: actual UHT/linked DLL/PASS97; RunAllChecks -SkipBuild -FullCompile
+41/41 exit0,19 CPP NoPCH/W4 warning0. Klan97/chat65, parti104, arkadaş53,
+presence24/save26/DoT33/trade218; Store461/schema2, parser576/576.
+Summer49/Winter29/error0; Net1join/1welcome/error0. Source/Scripts151 hash
+fark0, exact backups aynı, fixture save0/engine0. ECC parent ve readonly
+Carver final review blocker0; remote/roster atomikliği ve diğer clan yolları
+§71/checklist sınırlarında açık.
