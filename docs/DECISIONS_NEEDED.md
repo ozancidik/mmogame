@@ -113,6 +113,10 @@ Ceza, **öldürme eşdeğeri** olarak (mevcut eğri, gereken XP ÷ ortalama XP/�
 
 ## 6. Hız hedefi: Lv30 kaç saat
 
+> **Güncel model (2026-10-09, `Scripts/TimelineModel.py`, ayrıntı `TIMELINE_MODEL.md`):** 25 sn/öldürme + 90 sn/görev ile Lv30 **~3,0 sa**
+> (15–40 sn aralığında 2,2–4,3), Lv80 **~10,7 sa** (7,3–15,9). Lv30 hedefi tutuyor; **asıl yeni soru Lv80'in ~11 saat olması**:
+> KO/Rise tarzı bir oyun için tüm içerik bir hafta sonunda tükenir. Hedef "kısa yoğun PvE" mi, yoksa Lv30+ eğrisi bilerek yavaşlatılsın mı?
+
 **Neden önemli:** Bütün XP/ekonomi ayarı bu hedefe göre kalibre ediliyor; hedef yok. `VERTICAL_SLICE_LV1_30.md` üç seçenek veriyor ve B'yi varsayıyor.
 
 Süre = model öldürme sayısı × **20–30 sn/öldürme** (yürüyüş, mana, ganimet, teslim dahil; **ölçülmemiş varsayım**):
