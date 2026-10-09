@@ -16,7 +16,7 @@
 | 2 | Ölüm cezası | `max(%10 eşik, 2 öldürme XP'si)` | [Muhtemel] | Hayır, `death` olayı gerekli |
 | 3 | Altın sink'i / `Q_Gold*` | `Q_Gold*` altını harcatsın + yükseltme maliyeti seviyeyle ölçeklensin | [Muhtemel] | Kısmen (Q_Gold evet, ölçek hayır) |
 | 4 | Kimlik/hesap | İlk playtest için parola + tanıdık oyuncu yeter | [Muhtemel] | Evet |
-| 5 | Lv28–33 beceri boşluğu (asıl boşluk Lv33→45) | Lv31 ve Lv39 civarı yeni beceri | [Tahmin] | Evet (tasarım); değerler ölçümle |
+| 5 | Lv28–33 beceri boşluğu (asıl boşluk Lv33→45) | **UYGULANDI (`56de087`): Lv31 + Lv39 becerileri kodda**; denge/zehir/mana bulguları `SKILL_PLAN_LV31_45.md` | [Tahmin] | Evet (tasarım); değerler ölçümle |
 | 6 | Hız hedefi (Lv30 kaç saat) | 2–3 saat (B) | [Tahmin] | Evet (hedef); tutup tutmadığı ölçümle |
 | 7 | `CheckPrPaths` yalnız `claude/*` dallarına mı | Hayır, tüm PR'larda kalsın | [Muhtemel] | Evet |
 
@@ -86,6 +86,8 @@ Ceza, **öldürme eşdeğeri** olarak (mevcut eğri, gereken XP ÷ ortalama XP/�
 - **Gereken veri:** ölçüm değil, **karar girdisi**: test kaç kişiyle, kimlerle, internete açık mı? `[MMOMETRIC]` bunu ölçmez.
 
 ## 5. Lv28–33 beceri boşluğu
+
+> **GÜNCEL DURUM (2026-10-09): seçenek (c) kodda ZATEN UYGULANDI** (commit `56de087`; her sınıfta Lv31 ve Lv39 becerisi `MMOSkillDatabase.cpp:101-290` civarında). Bu bölümün aşağısı o commit öncesi analizdir; satır numaraları ve "8 satır ekle" önerisi bayat. Kalan açık konu 33→39 ve 39→45 (6'şar seviye) uyarısı ile yeni becerilerin dengesi/zehir/mana bulguları: bkz. `SKILL_PLAN_LV31_45.md`.
 
 **Neden önemli:** `ValidateData.py` dört sınıfta da "beceri boslugu Lv28 -> Lv33 (Lv29-32 arasi yeni beceri yok, 5 seviye)" UYARI basıyor **[Kesin]**. Lv28 ve Lv33 becerileri: `MMOSkillDatabase.cpp:99,101` (Savaşçı), `150,152` (Okçu), `201,203` (Büyücü), `270,272` (Rahip). Kod okununca daha büyük boşluk çıktı: dört sınıfta da Lv33'ten sonraki ilk beceri **Lv45** (12 seviye) **[Kesin]**; `ValidateData.py` artık bunu uyarıyor: denetim tüm seviye aralığına (Lv1 → tablodaki en yüksek beceri seviyesi) genişletildi, eşik `SKILL_GAP_LEVELS = 5` (fark ≥ 5), yalnız UYARI (CI kırmaz). Dört sınıfta da uyarılan aralıklar: 28→33 (5), 33→45 (12), 45→58 (13), 58→70 (12), 70→80 (10) **[Kesin]**. Lv30'da 49–51 harcanmamış beceri puanı birikiyor (`VERTICAL_SLICE_LV1_30.md`).
 
