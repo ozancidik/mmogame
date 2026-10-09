@@ -3581,3 +3581,44 @@ aggregate_checks, freeze/check, primary-freeze/check, original_saves,
 responses/nopch_proof, port_validation, review.md ve integration.json.
 Belge sonrası oyun build başlatılmadı. Gerçek PIE/remote/HUD/XP, hedef kick
 rejoin/authority epoch/roster atomikliği, Shipping/Server açık kalır.
+
+## 80 · Paralel ağ smoke log kimliği ve boşluk içeren TEMP (9 Ekim 2026, O42)
+
+NetSmokeTest yalnız HHmmss ile log adı üretiyordu. Aynı saniye/aynı TEMP,
+farklı port koşularında server/client yolları eşleşiyor; kanıtlar birbirini
+ezebilir veya başka koşunun bağlantısını okuyabilir. Eski gerçek initializer
+iki çağrıda aynı iki yolu verdi; bu bir isim üretim fixture'ıdır, eşzamanlı
+eski UE bağlantısının başarısızlığı olarak sunulmaz. Tarih/milisaniye ve her
+koşuya yeni GUID eklendi. Server/client ABSLOG argümanları tırnaklandı.
+
+Boşluk içeren TEMP ile ilk gerçek iki server denemesinde tırnaksız ABSLOG
+beklenen logları üretmedi; iki listening kontrolü KALDI. Dış test wrapper'ı
+script exit kodunu taşımadığından exit0 dönmüştü; bu deneme başarısız sayıldı.
+Wrapper kod taşıması ve kendi -File yolunun tırnaklaması kanıt sürücüsünde
+düzeltildi. Üretim NetSmoke başarı/ret, port seçimi, dinleme, süre, cleanup
+ve join/welcome/error kuralları değişmedi.
+
+Son betik: 1000 initializer çağrısı/2000 benzersiz yol, AST errors0.
+İzole b0be7fe+yalnız bu betik patch'i, ortak boşluklu TEMP ve aynı başlangıç
+saniyesinde iki Summer listen-server/client koşusu: 17779 ve17780, dört ayrı
+log, her koşu native exit0/server1join/client1welcome/iki taraf error0.
+Her server kendi portunu dinledi, client kendi portuna bağlandı; stderr boş.
+Parametresiz Winter koşusu rastgele17056: exit0/1join/1welcome/error0,
+stderr boş. Bu üç bağlantı smoke'u gerçek kick/takas/HUD/remote RPC PIE değildir.
+
+Ana ve izole159 tracked input+DLL160 SHA son test snapshot'ında sabit;
+ana checkout'taki başlangıç575 .sav SHA aynı. C++/asset değişmedi, ana
+matching DLL (BF61EE8B…) izole checkout'a kopyalandı; yeni UBT/FullCompile
+ve tam41 RunAllChecks yapılmadı. Ana ValidateData/Lint exit0,84 kaynak temiz;
+mevcut beceri boşluğu uyarıları sürer. Belge sonrası oyun build başlatılmadı.
+
+Kierkegaard kimlik, Parfit final ABSLOG diff'ini salt okunur fallback
+Unreal multiplayer QA/ecc-mmo-review ile inceledi: actionable0. Build/test
+ve yazım yapmadılar, kapatıldılar; Agency paket kökeni yok.
+Kanıt: TEMP/mmo_o42_net_log_identity_20261009 içinde baseline_log_paths,
+fixed_2000_log_paths, unquoted_temp_failed*, parallel_results/native_validation,
+default_validation, snapshot/check, AST, Data/Lint ve review.md.
+NetSmoke logları ortak TEMP'te ayrışır; aynı checkout'taki save/global UE
+kaynakları izole edilmiş sayılmaz. Tam RunAllChecks'taki diğer sabit TEMP
+dosyaları için ayrı TEMP/checkout gereği sürer. §79 gerçek PIE ve
+Shipping/Server kontrolleri açık kalır.

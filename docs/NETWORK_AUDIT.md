@@ -1163,3 +1163,17 @@ son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke geçt
 1join/1welcome/error0 (§79). Ana source aynı; actual build10.19sn,
 native185/18 ve Data/Lint geçti. Gerçek RPC/PIE/Shipping/Server açık.
 Parallel smoke için -NetPort/-Port ve ayrı TEMP kullanılabilir; default boş rastgele port.
+
+### O42 · Ağ smoke kanıtlarının koşu kimliği (oyun protokolü değişmez)
+
+HHmmss log adları aynı saniye/aynı TEMP koşularında çakışıyordu. NetSmoke
+artık tarih/milisaniye+GUID ile iki ayrı log üretir; boşluk içeren ABSLOG
+yolları tırnaklanır. Tırnaksız gerçek denemede iki listening KALDI;
+bu dış wrapper exit0 olsa da başarı sayılmadı (§80).
+Son betikte aynı saniye/ortak boşluklu TEMP, Summer17779+17780: dört ayrı
+log, her biri1join/1welcome/error0/native exit0. Parametresiz Winter17056
+aynı predicates ile geçti. 1000 initializer/2000 benzersiz yol; AST/Data/Lint
+temiz. Oyun DLL'i yeniden derlenmedi; C++/RPC/replication/save şeması değişmedi.
+Ana575 başlangıç .sav ve iki checkout input/DLL SHA sabit. Gerçek gameplay
+PIE/remote RPC açık; tam41 paket tekrarlanmadı. Diğer RunAllChecks logları ve
+eşzamanlı save/global kaynaklar için ayrı TEMP/checkout gereği sürer.

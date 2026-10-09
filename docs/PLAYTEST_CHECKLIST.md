@@ -4879,3 +4879,14 @@ son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke geçt
 185/18 geçti. Ana entegrasyon bekleme adımı tamamlandı. Gerçek uzak RPC/HUD/
 PIE, hedef rejoin/authority epoch ve Shipping/Server kutuları açık kalır.
 Parallel smoke: `-NetPort 17779` / `-Port 17779` ve ayrı TEMP; default boş rastgele port.
+
+## 2026-10-09 — Ağ smoke logları (O42, §80)
+
+O42 yalnız test betiğini değiştirir: her koşuya tarih/milisaniye+GUID log
+kimliği ve boşluklu ABSLOG yolu tırnaklaması. Ortak boşluklu TEMP'te aynı
+saniye Summer17779/17780 iki gerçek bağlantı koşusu dört farklı logla geçti;
+her biri1join/1welcome/error0/native exit0. Parametresiz Winter17056 da geçti.
+575 başlangıç ana .sav SHA sabit; yeni oyun build veya tam41 paket yapılmadı.
+Bu bağlantı sonucu §79 kick/remote RPC/HUD/PIE kutularını kapatmaz.
+NetSmoke için log adları ayrıdır; tam RunAllChecks'ın diğer sabit TEMP
+çıktıları ve checkout save/global kaynakları için izolasyon gereği sürer.

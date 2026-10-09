@@ -11,7 +11,8 @@ param(
 
 $exe = "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $project = Join-Path (Split-Path -Parent $PSScriptRoot) "MyProject.uproject"
-$stamp = Get-Date -Format HHmmss
+# Her kosuya ayri kimlik: ayni TEMP/saniyede paralel smoke loglari birbirini ezmesin.
+$stamp = (Get-Date -Format yyyyMMdd_HHmmss_fff) + '_' + [guid]::NewGuid().ToString('N')
 $slog = Join-Path $env:TEMP "mmo_net_server_$stamp.log"
 $clog = Join-Path $env:TEMP "mmo_net_client_$stamp.log"
 $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
@@ -32,7 +33,7 @@ if ($PSBoundParameters.ContainsKey('Port')) {
     if ($selectedPort -eq 0) { Write-Output 'KALDI: bos test portu bulunamadi.'; exit 1 }
 }
 
-$srv = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "${mapPath}?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$slog", "-port=$selectedPort") -PassThru -WindowStyle Hidden
+$srv = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "${mapPath}?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=`"$slog`"", "-port=$selectedPort") -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds 30
 # Sunucu gercekten istenen portu dinlemiyorsa (port yine doldu ve motor bir sonrakine kaydi) istemciyi baslatma: yanlis sunucuya baglanirdi.
 $listening = (Test-Path -LiteralPath $slog) -and (Select-String -Path $slog -Pattern "listening on port $selectedPort\b" -Quiet)
@@ -41,7 +42,7 @@ if (-not $listening) {
     Write-Output "KALDI: sunucu port $selectedPort dinlemiyor (port dolu ya da sunucu acilmadi). Log: $slog"
     exit 1
 }
-$cli = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "127.0.0.1:$selectedPort", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=$clog") -PassThru -WindowStyle Hidden
+$cli = Start-Process -FilePath $exe -ArgumentList @("`"$project`"", "127.0.0.1:$selectedPort", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=`"$clog`"") -PassThru -WindowStyle Hidden
 Start-Sleep -Seconds $ClientSeconds
 if (-not $cli.HasExited) { $cli.Kill() }
 Start-Sleep -Seconds 3
