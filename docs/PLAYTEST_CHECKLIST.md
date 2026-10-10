@@ -5221,3 +5221,27 @@ GC/async, remote RPC, rendering ve kalıcı transfer transaction kanıtı değil
   açık kontrollerdir; bu native fixture bunları çalıştırmaz.
 - [ ] Inventory aktarımı sırasında yeniden girişi ayrıca incele; bu sonuç
   tüm trade transferinin atomikliği olarak değerlendirilmemeli.
+
+
+## O57 — Tamamlanan takasın callback ve bildirim sırası (2026-10-10)
+
+Native authority NullRHI fixture326 case/2584 kontrol; ilk/ikinci endpoint ve
+completion teardown callback'i, iki plan ID retleri kapsanır. Controllerless
+fixture kalıcı kayıt başarısını, gerçek uzak RPC/HUD veya GC/async'yi kanıtlamaz.
+
+- [ ] Host + uzak istemcide gold-only, equipment-only ve karışık takas yap:
+  ilk envanter/altın güncellemesinde iki tarafta tam sonuç görünsün, ara/negatif
+  bakiye veya çift eşya olmasın; iki HUD takası kapatsın ve doğru değerleri göstersin.
+- [ ] İlk ve ikinci oyuncunun authority inventory/gold listener'ında bir kez
+  iptal veya aynı/farklı oyuncuyla yeni takas başlat. Eski tamamlanan çağrı yeni
+  onayı/teklifi silmesin; eski session confirm/cancel ek aktarım üretmesin.
+- [ ] Completion OnTradeChanged veya inventory/gold listener'ında self/peer
+  Destroy ve harita geçişi EndPlay dene: kapanan endpoint'e devam eden yayın/erişim
+  hatası olmasın; canlı oyuncu güncel ekonomi bildirimlerini alsın.
+- [ ] İlk/ikinci yayın callback'inde self/peer altın değiştir: sonraki gold
+  bildirimi güncel değeri taşısın; kayıt, UI ve replike bakiye tutarlı kalsın.
+- [ ] Gerçek iki kayıtlı oyuncuyla takas sonrası yeniden giriş ve harita geçişi
+  dene. İki bağımsız slot yazısından birinin başarısızlığı/çökme enjeksiyonu için
+  atomik kalıcı işlem ayrıca gerekir; native2584 sonucu bu riski kapatmaz.
+- [ ] Erken EndPlay parti callback'i içinden takas kapanış yayını, gerçek GC/async
+  ve dedicated/Shipping Server replication ayrı açık kontrollerdir.

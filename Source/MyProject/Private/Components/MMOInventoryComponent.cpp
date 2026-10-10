@@ -394,7 +394,7 @@ void UMMOInventoryComponent::AddGoldFrom(int32 Amount, const TCHAR* Source)
 	AddGoldInternal(Amount, Source);
 }
 
-void UMMOInventoryComponent::AddGoldInternal(int32 Amount, const TCHAR* Source)
+void UMMOInventoryComponent::AddGoldInternal(int32 Amount, const TCHAR* Source, bool bNotify)
 {
 	if (!HasAuthorityInternal() || Amount == 0)
 	{
@@ -416,6 +416,7 @@ void UMMOInventoryComponent::AddGoldInternal(int32 Amount, const TCHAR* Source)
 			MMOMetrics::Seconds(), *MMOMetrics::WhoName(OwnerPawn), Source ? Source : TEXT("diger"),
 			Gold - OldGold, Gold);
 	}
+	if (!bNotify) return; // Trade publishes current final balance after both sides settle.
 	OnGoldChanged.Broadcast(Gold);
 
 	// Tavan asimi sessiz olmasin: kazanc kirpildiysa sahibe haber ver (ticarette once reddedildigi icin

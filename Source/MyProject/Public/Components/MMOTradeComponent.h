@@ -109,6 +109,7 @@ public:
     static bool RunTradeStartSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
     static bool RunTradeConfirmSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
     static bool RunTradeOfferSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+    static bool RunTradeTransferSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
@@ -178,7 +179,7 @@ protected:
 	static void StartTradeServer(AMMOCharacter* A, AMMOCharacter* B);
 
 	// Bu bilesenin ve karsi tarafin ticaret durumunu temizler; Reason bos degilse ikisine bildirir.
-	void EndTradeServer(const FString& Reason);
+	void EndTradeServer(const FString& Reason, bool bSaveCompletedInventories = false);
 
 	// Silent local cleanup; EndTradeServer commits both sides before publishing.
 	void ResetLocalState();

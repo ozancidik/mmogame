@@ -650,7 +650,7 @@ void UMMOTradeComponent::ResetLocalState()
 	}
 }
 
-void UMMOTradeComponent::EndTradeServer(const FString& Reason)
+void UMMOTradeComponent::EndTradeServer(const FString& Reason, bool bSaveCompletedInventories)
 {
 	if (!HasAuthorityInternal() || !bTradeActive)
 	{
@@ -675,6 +675,18 @@ void UMMOTradeComponent::EndTradeServer(const FString& Reason)
 	// Commit both old states and timers before any synchronous observer can restart.
 	ResetLocalState();
 	if (bResetPeer) PC->ResetLocalState();
+	// Successful settlement is already committed on both inventories. Close the
+	// session before saving too: a store/notification must not reenter an old trade.
+	if (bSaveCompletedInventories)
+	{
+		for (const auto& Endpoint : Endpoints)
+		{
+			UMMOTradeComponent* T = Endpoint.Get();
+			AMMOCharacter* C = T ? T->GetOwnerCharacter() : nullptr;
+			if (IsValid(C) && !C->IsActorBeingDestroyed() && C->HasActorBegunPlay()
+				&& !C->HasStartedEndPlay() && C->HasAuthority()) C->SaveCharacter();
+		}
+	}
 
 	// An observer can replace a session or destroy an endpoint. Never publish an old
 	// teardown to that replacement; cleanup itself still runs during actor EndPlay.
@@ -826,47 +838,51 @@ void UMMOTradeComponent::TryExecuteTrade()
 		return;
 	}
 
-	// Atomik takas: once ikisinden de cikar, sonra karsiliklu ekle (ayni sunucu karesinde).
-	const TArray<FMMOEquipmentInstance> BagBackupA = IA->EquipmentBag;
-	const TArray<FMMOEquipmentInstance> BagBackupB = IB->EquipmentBag;
-	TArray<FMMOEquipmentInstance> FromA, FromB;
-	bool bTookAll = true;
-	for (const FMMOEquipmentInstance& I : OfferA.Items)
+	// Plan both bags on copies. No inventory delegate may observe a half trade,
+	// and a rejected allocation leaves bag contents and both ID counters intact.
+	const auto PlanBag = [](const UMMOInventoryComponent* Inv, const FMMOTradeOffer& Outgoing,
+		const FMMOTradeOffer& Incoming, int32 Next, TArray<FMMOEquipmentInstance>& Bag, int32& NewNext)
 	{
-		FMMOEquipmentInstance Taken;
-		if (IA->TakeEquipmentByInstanceId(I.InstanceId, Taken)) { FromA.Add(Taken); } else { bTookAll = false; }
-	}
-	for (const FMMOEquipmentInstance& I : OfferB.Items)
+		Bag = Inv->EquipmentBag;
+		NewNext = Next;
+		for (const auto& Item : Outgoing.Items)
+		{
+			if (Bag.RemoveAll([&Item](const FMMOEquipmentInstance& I) { return I.InstanceId == Item.InstanceId; }) != 1) return false;
+		}
+		for (const auto& Item : Incoming.Items)
+		{
+			if (NewNext <= 0 || NewNext == MAX_int32) return false;
+			const auto Used = [NewNext](const FMMOEquipmentInstance& I) { return I.InstanceId == NewNext; };
+			if (Bag.ContainsByPredicate(Used) || Inv->EquipmentBag.ContainsByPredicate(Used)
+				|| Inv->EquippedItems.ContainsByPredicate(Used) || Inv->Warehouse.ContainsByPredicate(Used)) return false;
+			FMMOEquipmentInstance Received = Item;
+			Received.InstanceId = NewNext++;
+			Bag.Add(Received);
+		}
+		return Bag.Num() <= UMMOInventoryComponent::MaxBagSize;
+	};
+	TArray<FMMOEquipmentInstance> NewBagA, NewBagB;
+	int32 NextA = IA->NextInstanceId, NextB = IB->NextInstanceId;
+	if (!PlanBag(IA, OfferA, OfferB, NextA, NewBagA, NextA)
+		|| !PlanBag(IB, OfferB, OfferA, NextB, NewBagB, NextB))
 	{
-		FMMOEquipmentInstance Taken;
-		if (IB->TakeEquipmentByInstanceId(I.InstanceId, Taken)) { FromB.Add(Taken); } else { bTookAll = false; }
-	}
-	if (!bTookAll)
-	{
-		// Dogrulamadan sonra olmamali; yine de geri al, kimse bir sey kaybetmesin.
-		for (const FMMOEquipmentInstance& I : FromA) { IA->ReceiveTradedEquipment(I); }
-		for (const FMMOEquipmentInstance& I : FromB) { IB->ReceiveTradedEquipment(I); }
-		EndTradeServer(TEXT("Ticaret iptal edildi: esya dogrulanamadi."));
-		return;
-	}
-
-	// Alma basarisiz olursa (beklenmez; on dogrulama kapasiteyi ve veritabanini kontrol etti)
-	// iki cantayi da takas oncesi haline dondur: kimse esya kaybetmesin.
-	bool bReceivedAll = true;
-	for (const FMMOEquipmentInstance& I : FromA) { bReceivedAll &= IB->ReceiveTradedEquipment(I); }
-	for (const FMMOEquipmentInstance& I : FromB) { bReceivedAll &= IA->ReceiveTradedEquipment(I); }
-	if (!bReceivedAll)
-	{
-		IA->EquipmentBag = BagBackupA;
-		IB->EquipmentBag = BagBackupB;
 		EndTradeServer(TEXT("Ticaret iptal edildi: esyalar teslim edilemedi."));
 		return;
 	}
-	IA->AddGold(-OfferA.Gold);
-	IB->AddGold(-OfferB.Gold);
-	IA->AddGold(OfferB.Gold);
-	IB->AddGold(OfferA.Gold);
-
+	const bool bBagChanged = !OfferA.Items.IsEmpty() || !OfferB.Items.IsEmpty();
+	const bool bGoldChanged = OfferA.Gold != 0 || OfferB.Gold != 0;
+	const TWeakObjectPtr<UMMOInventoryComponent> Inventories[] = {IA, IB};
+	IA->EquipmentBag = MoveTemp(NewBagA);
+	IB->EquipmentBag = MoveTemp(NewBagB);
+	IA->NextInstanceId = NextA;
+	IB->NextInstanceId = NextB;
+	// Preserve the four mutation metrics, suppress only synchronous observers.
+	IA->AddGoldInternal(-OfferA.Gold, nullptr, false);
+	IB->AddGoldInternal(-OfferB.Gold, nullptr, false);
+	IA->AddGoldInternal(OfferB.Gold, nullptr, false);
+	IB->AddGoldInternal(OfferA.Gold, nullptr, false);
+	const TArray<FMMOEquipmentInstance>& FromA = OfferA.Items;
+	const TArray<FMMOEquipmentInstance>& FromB = OfferB.Items;
 	// NETWORK_AUDIT O12: ekonomi mutasyonu tamamlaninca iki taraf, altin ve ekipman kimliklerini
 	// tek yapilandirilmis sunucu satirinda kaydet. Log mutasyondan sonra, state sifirlanmadan once
 	// yazilir; basarisiz/geri alinan denemeler trade_cancel olarak ayri izlenir.
@@ -875,10 +891,21 @@ void UMMOTradeComponent::TryExecuteTrade()
 		*TradeNameOf(A), *TradeNameOf(B), OfferA.Gold, OfferB.Gold,
 		*DescribeTradeItems(FromA), *DescribeTradeItems(FromB), IA->Gold, IB->Gold);
 
-	EndTradeServer(TEXT("Ticaret tamamlandi."));
+	EndTradeServer(TEXT("Ticaret tamamlandi."), true);
 
-	// Cokme/baglanti kopmasi halinde tek tarafli kayit (esya cogalmasi) kalmasin diye
-	// iki karakteri de hemen kaydet.
-	A->SaveCharacter();
-	B->SaveCharacter();
+	// These are inventory refreshes, not old trade publications. A listener may
+	// start a new session or mutate balances; publish current values and reacquire
+	// each endpoint before every callout. Never touch retired owners.
+	const auto LiveInventory = [](const TWeakObjectPtr<UMMOInventoryComponent>& Weak)
+	{
+		UMMOInventoryComponent* Inv = Weak.Get();
+		AMMOCharacter* C = Inv ? Cast<AMMOCharacter>(Inv->GetOwner()) : nullptr;
+		return IsValid(C) && !C->IsActorBeingDestroyed() && C->HasActorBegunPlay()
+			&& !C->HasStartedEndPlay() && C->HasAuthority() && C->GetInventory() == Inv ? Inv : nullptr;
+	};
+	for (const auto& Weak : Inventories)
+	{
+		if (bBagChanged) if (auto* Inv = LiveInventory(Weak)) Inv->OnInventoryChanged.Broadcast();
+		if (bGoldChanged) if (auto* Inv = LiveInventory(Weak)) Inv->OnGoldChanged.Broadcast(Inv->Gold);
+	}
 }

@@ -208,6 +208,7 @@ public:
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);
 
 protected:
+	friend class UMMOTradeComponent; // Silent paired settlement before any observer.
 	// Purchase commits delivery and payment before publishing either delegate.
 	int32 AddItemInternal(FName ItemId, int32 Count, bool bNotify);
 	bool AddEquipmentInstanceInternal(FName ItemId, int32 Plus, EMMOItemRarity Rarity, bool bNotify);
@@ -218,7 +219,7 @@ protected:
 	UFUNCTION()
 	void OnRep_Items();
 
-	void AddGoldInternal(int32 Amount, const TCHAR* Source);
+	void AddGoldInternal(int32 Amount, const TCHAR* Source, bool bNotify = true);
 
 	bool HasAuthorityInternal() const;
 	void EquipByInstanceIdInternal(int32 InstanceId, bool bRecordFirstEquip);

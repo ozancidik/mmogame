@@ -4509,3 +4509,77 @@ FullCompile ve uzun soak çalıştırılmadı; aggregate'e yalnız yeni adım ek
 Başlangıçtaki636 .sav byte hash'i ve kapsam dışındaki938 takipli dosya korundu.
 Net smoke bir yeni slot üretti; toplam637, yeni dosya da korundu. PIE maddeleri
 açık; görsel/uzak istemci takas doğrulandı olarak işaretlenmedi.
+
+
+## O57 — Takas aktarımını callback öncesi iki tarafta tamamla (2026-10-10)
+
+Doğrulanmış hata: TryExecuteTrade önce tek tek Take/Receive ve dört AddGold
+çağrısı yapıyordu; dynamic delegate ilk oyuncunun eksik veya ara bakiyeli
+aktarımını görüyordu. Callback iptal/yeniden takas başlatma veya Destroy/EndPlay
+yapınca eski stack kalan ekonomiyi değiştirebiliyor ve yeni oturumu kapatabiliyordu.
+Kabul ölçütü: ilk aktarım/kapanış bildiriminde iki envanter/ID/altın tamamlanmış ve eski takas
+kapalı; reddedilen plan iki envanteri ve ID sayaçlarını korur; callback sonrası
+eski stack yeni takası değiştirmez; her yayın öncesi endpoint yeniden doğrulanır.
+
+İki bag/ID planı kopyalarda hazırlanır, iki plan da geçince bag ve sayaçlar
+atanır. Dört altın mutasyonu mevcut telemetry sırasıyla, delegate bastırılarak
+uygulanır. İki takas state/timer reset edildikten sonra mevcut SaveCharacter
+çağrıları lifecycle/authority denetimiyle yapılır; ardından kapanış ve envanter
+bildirimleri yayımlanır. Final inventory/gold yayınları ayrı weak/lifecycle
+kontrolü kullanır, gold değeri yayın anında okunur. RPC, replication property,
+save şeması değişmedi; authority ve mevcut kapasite/teklif doğrulamaları korunur.
+
+Yeni MMOTestTradeTransfer / TestTradeTransfer.ps1: 326 case/2584 check.
+Dört teklif/hook türü × iki hook oyuncusu × ilk/ikinci yayın pozisyonu ×
+envanter/altın veya completion teardown callback'i ×10 aksiyon; ayrıca iki
+plan tarafında sıfır, MAX_int32 ve outgoing-ID çakışması için altı ret case'i.
+Aksiyonlar normal akış, stale cancel/confirm, aynı/farklı partnerle replacement,
+self/peer Destroy, self/peer RouteEndPlay, self/peer nested AddGold(7).
+Bağımsız full save-data ekonomi oracle'ı, fresh trade state/timer, gold payload
+dizileri/sırası, bildirim sayıları ve stale istek boyunca değişmezlik sınanır.
+RunAllChecks'e runner exit kodunu ileten adım eklendi. Runner GUID/quoted ABSLOG,
+60sn watchdog ve yalnız owned process cleanup kullanır.
+
+Final fixture ile baseline2584/844FAIL; gold-callout mutant2584/536FAIL;
+cached-gold mutant2584/34FAIL; fixed/restored2584/0FAIL. Gerçek compile/link:
+baseline3.88sn, gold-callout3.92sn, cached-gold3.97sn, restored3.87sn;
+hepsi Result:Succeeded. Native exit0; hata varyantlarında runner1,
+restored runner0. Baseline yalnız yeni header imzasına kullanılmayan bool
+parametreleriyle uyarlandı; eski davranış korundu. Mutantlar izole checkout'ta.
+Salt okuma QA üç notification oracle boşluğu önerdi; position/phase/payload
+matrisiyle kapatıldı, son kaynak incelemesinde yeni eyleme dönük bulgu yok.
+
+Sınırlar: controllerless fixture slot yüklemez; travel-save guard aktiftir.
+SaveCharacter initial-load kapısında döndüğünden bu fixture disk kaydını veya
+save/callout sırasını runtime kanıtlamaz; sıra kaynak incelemesidir. İki ayrı
+SaveCharacter atomik disk/DB işlemi değildir; birinin yazılamaması halinde
+çökme/yeniden bağlanma dupe riskinin tamamı çözülmüş sayılmaz. GC/async,
+uzak istemci HUD/RPC, dedicated/Shipping Server ve erken EndPlay parti callback'i
+burada doğrulanmaz. QA'nın EndTradeServer erken EndPlay publication şüphesi
+ayrı reproducer bekler. PIE maddeleri açıktır.
+
+Kanıt: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o57_trade_transfer_20261010.
+
+Ana checkout gerçek UBT:22 action/39.64sn, Result:Succeeded; yeni transfer
+fixture'ı, inventory/trade kaynakları ve header bağımlıları compile/link edildi.
+Paralel ajanın MMOGameMode.cpp değişikliği de mevcut çalışma snapshot'ında
+build'e girdi; o dosya ve iki belge bu commit'e alınmadı. Başlangıç HEAD85e8464,
+yeniden yönelim HEAD76e3edf; aradaki üç peer commit ve dirty dosyalar korundu.
+Kaynak/config/scripts+DLL frozen187 hash'i hem izole hem ana checkout'ta
+kontroller boyunca değişmedi. İzole10/10 seçilmiş runner geçti: Transfer2584,
+Offer480,Confirm352,Start208,Teardown124,Gold60,Purchase174,Upgrade132,
+Trade230,SaveLifecycle26. Ana19/19 exit0: aynı10 +Vendor18,QuestCallbacks112,
+QuestCapacity13,SavedEquipment11,FirstEquip8/2event,Store655/655,
+Summer57/Winter78 mob ve hata0,NetSummer port17799/server20sn+client20sn.
+Store JSON655/mismatch0/writeorder1/roundtrip1; net join1/welcome1/hata0,
+iki owned process gözlem boyunca yaşadı. Ağ smoke'u gerçek trade RPC veya
+Shipping/dedicated Server hedef derlemesi değildir.
+
+ValidateData exit0 (mevcut beceri boşluğu uyarıları),StaticLint102 dosya exit0,
+PlaytestMetrics1516/1516,iki PowerShell parser ve scoped diff-check geçti.
+FullCompile, full RunAllChecks ve uzun soak çalıştırılmadı. İlk637 .sav ve
+yeniden yönelimde mevcut655 .sav byte hash'i korundu; ağ smoke'un yeni
+MMOSave_Gezgin047761.sav dosyası da korundu, toplam656. Yeniden yönelim
+snapshot'ındaki kapsam dışı938 takipli dosyanın içeriği değişmedi.
+PIE maddeleri açık; görsel/uzak istemci takası ve kalıcı paired transaction
+başarılı olarak işaretlenmedi. QA alt ajanı kapatıldı.
