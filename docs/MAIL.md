@@ -1,6 +1,6 @@
 # Posta (2026-10-11)
 
-Durum: **kodda, derlendi ve headless test edildi (39 kontrol, mutasyonla sinandi); oyun icinde (PIE) denenmedi.** Basarim ve gunluk gorevlerle ayni kalip,
+Durum: **kodda, derlendi ve headless test edildi (41 kontrol, mutasyonla sinandi); oyun icinde (PIE) denenmedi.** Basarim ve gunluk gorevlerle ayni kalip,
 Codex'in dosyalarindan bagimsiz yeni dosyalarla eklendi.
 
 ## Ne yapar
@@ -16,7 +16,7 @@ Codex'in dosyalarindan bagimsiz yeni dosyalarla eklendi.
 |---|---|
 | `Public/Mail/MMOMailStore.h`, `Private/Mail/MMOMailStore.cpp` | disk deposu, ad temizleme, dogrulamali JSON, `TakeAll` (once bosalt) |
 | `Public/Components/MMOMailComponent.h`, `Private/Components/MMOMailComponent.cpp` | gonderim kurallari, toplama, `/posta` komutlari |
-| `Private/Tests/MMOMailSelfTest.cpp`, `Scripts/TestMail.ps1` | native test (39 kontrol) |
+| `Private/Tests/MMOMailSelfTest.cpp`, `Scripts/TestMail.ps1` | native test (41 kontrol) |
 
 Baglanti: `MMOCharacter.h/.cpp` (alt nesne), `MMOPlayerController.cpp` (`/posta` sohbet komutu).
 

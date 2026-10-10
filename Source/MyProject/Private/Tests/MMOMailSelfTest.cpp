@@ -38,7 +38,8 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	Check(FMMOMailStore::SanitizeName(TEXT("A b/c.d")) == TEXT("A_bcd"), TEXT("name_sanitize_chars"));
 	Check(FMMOMailStore::SanitizeName(FString()) == TEXT("Default") && !FMMOMailStore::IsDeliverableName(TEXT("???")) && !FMMOMailStore::IsDeliverableName(TEXT("Default")), TEXT("name_default_not_deliverable"));
 	Check(FMMOMailStore::SanitizeName(FString::ChrN(50, TEXT('x'))).Len() == FMMOMailStore::MaxNameLength, TEXT("name_length_cap"));
-	Check(FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail/A_b.json")) || FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail\\A_b.json")), TEXT("name_box_path"));
+	Check(FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail/a_b.json")) || FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail\\a_b.json")), TEXT("name_box_path"));
+	Check(FMMOMailStore::GetBoxPath(TEXT("ALI")) == FMMOMailStore::GetBoxPath(TEXT("ali")) && FMMOMailStore::GetBoxPath(TEXT("Al i")) == FMMOMailStore::GetBoxPath(TEXT("al_i")), TEXT("name_box_path_case_insensitive"));
 
 	// --- JSON dogrulama ---
 	{
@@ -69,6 +70,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(FMMOMailStore::Append(NameStore, M) && FMMOMailStore::Count(NameStore) == 1, TEXT("store_append_count"));
 		M.Text = TEXT("iki"); M.Gold = 0;
 		Check(FMMOMailStore::Append(NameStore, M) && FMMOMailStore::Count(NameStore) == 2, TEXT("store_append_second"));
+		Check(FMMOMailStore::Count(NameStore.ToUpper()) == 2 && FMMOMailStore::Count(NameStore.ToLower()) == 2, TEXT("store_case_variants_share_one_box"));
 		TArray<FMMOMail> Taken;
 		Check(FMMOMailStore::TakeAll(NameStore, Taken) && Taken.Num() == 2 && Taken[0].Text == TEXT("bir") && Taken[1].Text == TEXT("iki"), TEXT("store_take_all_in_order"));
 		Check(FMMOMailStore::Count(NameStore) == 0, TEXT("store_take_empties_box"));

@@ -34,7 +34,8 @@ FString FMMOMailStore::SanitizeName(const FString& Name)
 
 FString FMMOMailStore::GetBoxPath(const FString& Name)
 {
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOMail"), SanitizeName(Name) + TEXT(".json"));
+	// Kucuk harf: Linux sunucuda "Ali" ve "ali" ayri dosya olup altin kaybettirmesin (kimlik karsilastirmasi zaten harf duyarsiz).
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOMail"), SanitizeName(Name).ToLower() + TEXT(".json"));
 }
 
 bool FMMOMailStore::ToJson(const TArray<FMMOMail>& Mails, FString& OutJson)
