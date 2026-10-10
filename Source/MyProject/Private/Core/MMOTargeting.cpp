@@ -97,7 +97,8 @@ AMMOMob* MMOTargeting::FindNearestMob(const UObject* WorldContextObject, const F
 	for (TActorIterator<AMMOMob> It(World); It; ++It)
 	{
 		AMMOMob* Mob = *It;
-		if (!Mob || !Mob->GetStats() || Mob->GetStats()->bIsDead)
+		if (!IsValid(Mob) || Mob->IsActorBeingDestroyed() || !Mob->HasActorBegunPlay()
+			|| Mob->HasStartedEndPlay() || Mob->GetWorld() != World || !Mob->GetStats() || Mob->GetStats()->bIsDead)
 		{
 			continue;
 		}

@@ -5354,3 +5354,27 @@ caster kapanışını hasar/iyileştirme ile sınar. Gerçek disconnect/travel a
   giriş kontrolüyle genel yaşam döngüsü güvenliği sağlandı anlamına gelmez.
 - [ ] Gerçek disconnect/travel sonrası tekrar girişte mana/cooldown/kayıt durumunu
   kontrol et. Same-frame controllerless test kayıt yazımı veya kalıcılığı ölçmez.
+
+## O63 — EndPlay geçirmiş beceri hedefi (2026-10-10)
+
+Native 48/480 matrisinde tamamlanmış RouteEndPlay, Destroy ve canlı kontroller;
+seçili melee, yakın mob fallback, HealTarget ve self AoE için sınanır.
+
+- [ ] Listen-server PIE'de seçili mob B'yi skill kabulünden önce veya authority
+  mana listener'ında EndPlay'e sok. PowerStrike bitmiş B'ye vurmamalı; menzildeki
+  canlı mob A mevcut fallback kuralıyla vurulmalı. Host/uzak istemciyi değiştir.
+- [ ] Seçim boşken en yakın B kapanmış, ikinci yakın A canlı olsun. Skill, normal
+  saldırı ve Z hedefleme canlı A'yı kullanmalı. Ortak FindNearestMob değişikliği
+  native skill fallback ile sınandı; gerçek controller Z seçimi açık.
+- [ ] GreaterHeal'in oyuncu B hedefi kapanırsa mevcut self-fallback caster'ı
+  iyileştirmeli; bitmiş B'nin canı değişmemeli. Mana/cooldown tek kalmalı.
+- [ ] Cleave yarıçapında canlı A ve EndPlay geçirmiş B olsun; yalnız A hasar almalı.
+  İlk mobun damage callback'inde sonraki mobun kapanmasını ayrıca sınayın;
+  native matris bu iterator sırasındaki yeniden girişi çalıştırmaz.
+- [ ] Canlı hedefin normal vuruş/iyileştirme/alan hasarı, null/ölü/menzil dışı ve
+  farklı dünya hedeflerinin fallback davranışı, tam menzil sınırı ve canlı fallback
+  yokluğu ayrıca denenmeli. Native matriste her saldırıda canlı fallback bulunur.
+- [ ] Never-begun hedef, erken EndPlay cleanup yeniden girişi, component-only EndPlay,
+  zorunlu GC, hedef taşınması, gerçek RPC ownership/disconnect/travel ve görsel FX
+  açıktır. Damage/heal başladıktan sonraki debuff/FX callback'leri ve caster'ın daha
+  sonra kapanması için bu dört hedef giriş kontrolü genel garanti vermez.

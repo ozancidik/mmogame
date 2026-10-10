@@ -4948,3 +4948,79 @@ ayrıca saptanıp manifest genişletildikten sonra izole210. Ana Game exe hash'i
 de kontrol edildi. Aynı baseline fixture'ın byte eşitliği doğrulandı.
 Tam RunAllChecks, tüm proje FullCompile, uzun soak, cooked/Shipping/dedicated
 runtime ve PIE bu tur çalıştırılmadı.
+
+## O63 — EndPlay geçirmiş hedefe beceri etkisi (2026-10-10)
+
+**Native doğrulanmış hata:** seçili offensive hedef, ortak yakın mob fallback,
+HealTarget müttefiki ve self AoE iterator'ı tamamlanmış `RouteEndPlay` geçirmiş
+aktörü kullanabiliyordu. `bIsDead=false` ve aynı dünya kontrolü actor yaşam
+döngüsünü doğrulamıyordu. Hasar/iyileştirme kapanan hedefe uygulanıyor, canlı
+fallback gereken yollarda kullanılmıyordu. Destroy kontrolü eski kodda geçti.
+
+Dört girişte validity/destruction/begun-play/erken EndPlay bayrağı kontrol edilir;
+iterator'larda aynı dünya da doğrulanır. Mevcut fallback korunur: geçersiz seçili
+mob yerine en yakın canlı mob, geçersiz heal hedefi yerine caster. Mana callback'i
+sırasında hedef kapanırsa kabul edilmiş maliyet/cooldown geri alınmaz; canlı
+fallback'e etki uygulanır. Hedef sabitleme, yeni RPC/replicated/save alanı/timer
+veya helper API eklenmedi. Ortak helper normal saldırı ve Z seçimi tarafından da
+çağrılır; mevcut `< MaxRange` / seçili hedef `<= Range` eşikleri değişmedi.
+
+`MMOTestSkillTargetLifecycle` / `TestSkillTargetLifecycle.ps1`: dört yol (seçili
+PowerStrike, seçimsiz yakın PowerStrike, oyuncu GreaterHeal, self Cleave) × iki
+dış yol (native server implementation/doğrudan UseSkill) × iki zaman (önce/gerçek
+mana delegate'i içinde) × üç durum (canlı/RouteEndPlay/Destroy) = **48/480**.
+Exact B/A/caster canı, mana, cooldown deadline, kapanış/callback/context ve tekrar
+kullanım sınanır. Canlı fallback her saldırıda vardır; RPC bool acceptance no-op,
+kabul maliyet/cooldown ile gözlenir. Strong-owned actor/probe, controllerless aynı
+senkron frame: GC, kayıt, ağ ve FX ölçümü değildir.
+
+Aynı fixture ile eski kod Editor **71.62 sn / 17 aksiyon** Compile/Link sonrası
+**44/480 FAIL** verdi: target_effect16, other_effect12, retry16; tümü RouteEndPlay
+durumunda. Native0, runner1, coverageTrue. Alive/Destroy kontrolleri geçti.
+Never-begun/erken EndPlay, controller seçili dalı, ölüm/menzil/dünya/fallback yokluğu,
+iterator sırasında başka target'ın kapanması ve effect sonrası debuff/FX native
+matriste yoktur; PIE O63 maddeleri açıktır. HasActorBegunPlay'in BeginPlay callback
+zamanlaması için binary graph uyumluluğu ayrıca denetlenmedi.
+
+### O63 son dogrulama
+
+Izole duzeltilmis Editor **12.09 sn / 6 aksiyon**, ana Editor **40.34 sn /
+16 aksiyon**, Game/Development **41.71 sn / 12 aksiyon** Compile/Link ile gecti.
+Fixture/component/targeting icin PCH/shared-PCH/unity kapali NoLink tek-dosya
+Compile kontrolleri **8.61 / 7.82 / 7.37 sn** ile gecti. Izole **10/10**, ana
+ilk kosu **16/16** secilmis runner basarili; ayni baseline fixture byte'lari
+ile yeni hedef matrisi **480/480**. Native basic attack21/controller hooks8,
+caster240, context192, callback384, first skill17/7, mastery12, learned12,
+stats save15, JSON113 negatif + enum18/invalid writer2; ana ek olarak consumable11,
+save lifecycle26. Ilk store672/672, Summer57, Winter77; Winter'in mevcut
+(-5000,4800,-92) cebinde ilk doldurmada 17 denemede 3 mob uyarisi goruldu.
+Ilk NetSmoke17815 join1/welcome1/hata0 ile gecti.
+
+Bekleme sirasinda diger ajan Editor DLL'ini yeniden derlemis; eski hash manifesti
+bu degisikligi yakaladi. Eski kanitlar saklandi, ayni C++ kaynaklarla Editor
+**42.98 sn / 16 aksiyon**, Game **18.42 sn / 5 aksiyon** yeniden Compile/Link
+edildi. Yeni DLL ile **16/16** runner tekrar gecti: hedef480 dahil tum yukaridaki
+regresyonlar; store **688/688**, JSON mismatch0/writeorder1/roundtrip1,
+Summer **56**, Winter **78**, iki smoke hata0. NetSmoke **17817** Summer,
+server/client20 sn: join1/welcome1/hata0 ve gozlem boyunca iki surec yasadi.
+Bu native-entry matris ve baglanti smoke'u gercek hedefli gameplay RPC kaniti degildir.
+
+ValidateData (mevcut Lv33+ beceri boslugu uyarilari), StaticLint106 ve
+PlaytestMetrics1516/1516 iki agacta gecti; ana yeniden derleme sonrasi tekrarlandi.
+Iki PS parse ve runner coverage mock5/5 gecti. Mock generator ilk denemede
+240 kayit uretip 480 bekledigi icin basarisizdi; yalniz generator duzeltildi,
+fixture/uretim runner'i degismedi. Yerel QA kaynak incelemesi ek kusur bulmadi;
+incelemeci UE derleme/runtime test calistirmadi.
+
+Baslangictaki **672 kayit** ve yeniden dogrulama baslangicindaki **688 kayit**
+hash'leri korundu; son toplam **689**. Kapsam disi eski 949 tracked dosyanin
+**944'u birebir ayni**; diger ajan bes mevcut belge/CI dosyasini commit etti ve
+iki PocketSpacing betigi ekledi. Bu yedi dosya kendi committed hash'leriyle
+korundu; beceri commit'ine alinmadi. Kaynak/config/script + DLL dondurulmus
+manifesti izole **212/212**, ana yeniden derlemede **214** dosyanin **212'si**
+birebir ayni; iki aktif PocketSpacing dosyasi ayri peer manifestiyle denetlendi.
+Ilk ana 211 kaynak/config/script hash'i de degismedi. Game exe hash'i testler
+sonrasinda tekrar dogrulandi. Peer'in FullCompile/aggregate sonuclari bu turun
+kendi kaniti olarak sayilmadi. Tam RunAllChecks, tum proje FullCompile,
+uzun soak, cooked/Shipping/dedicated runtime ve PIE bu tur calistirilmadi;
+PLAYTEST_CHECKLIST O63 maddeleri acik. Izole ignored kanit yedegi: 14 dosya.

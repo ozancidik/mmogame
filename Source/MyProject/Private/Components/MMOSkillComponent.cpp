@@ -1172,7 +1172,8 @@ AMMOCharacter* UMMOSkillComponent::FindNearestEnemy(float Range) const
 		const AMMOPlayerController* PC = Cast<AMMOPlayerController>(Self->GetController());
 		Selected = PC ? Cast<AMMOMob>(PC->GetSelectedTarget()) : nullptr;
 	}
-	if (Selected && Selected->GetWorld() == GetWorld() && Selected->GetStats()
+	if (IsValid(Selected) && !Selected->IsActorBeingDestroyed() && Selected->HasActorBegunPlay()
+		&& !Selected->HasStartedEndPlay() && Selected->GetWorld() == GetWorld() && Selected->GetStats()
 		&& !Selected->GetStats()->bIsDead
 		&& FVector::Dist(Self->GetActorLocation(), Selected->GetActorLocation()) <= Range)
 	{
@@ -1241,7 +1242,8 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		// HealTarget tanimlarinin Range alani eskiden 0'di. Makul bir varsayilan
 		// mesafe kullan; istemcinin gonderdigi aktor referansina guvenme.
 		const float HealRange = Def.Range > 0.f ? Def.Range : 800.f;
-		if (!Ally || Ally == Caster || Cast<AMMOMob>(Ally) || Ally->GetWorld() != World
+		if (!IsValid(Ally) || Ally->IsActorBeingDestroyed() || !Ally->HasActorBegunPlay() || Ally->HasStartedEndPlay()
+			|| Ally == Caster || Cast<AMMOMob>(Ally) || Ally->GetWorld() != World
 			|| !Ally->GetStats() || Ally->GetStats()->bIsDead
 			|| FVector::Dist(CasterLoc, Ally->GetActorLocation()) > HealRange)
 		{
@@ -1321,7 +1323,8 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		for (TActorIterator<AMMOMob> It(World); It; ++It)
 		{
 			AMMOMob* Other = *It;
-			if (!Other || Other == Caster || !Other->GetStats() || Other->GetStats()->bIsDead)
+			if (!IsValid(Other) || Other->IsActorBeingDestroyed() || !Other->HasActorBegunPlay() || Other->HasStartedEndPlay()
+				|| Other->GetWorld() != World || Other == Caster || !Other->GetStats() || Other->GetStats()->bIsDead)
 			{
 				continue;
 			}
