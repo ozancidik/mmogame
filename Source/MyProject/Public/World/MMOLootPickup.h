@@ -68,6 +68,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	static bool RunLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstLootSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunCollectionCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
@@ -94,6 +95,9 @@ protected:
 	// frame'de gelen ikinci bir overlap (iki oyuncu veya cok-govde) lootu DUPE edebilir.
 	// grant'tan ONCE set edilir; ikinci overlap erken doner. (Sunucu-tarafi.)
 	bool bCollected = false;
+	// Inventory delegates run synchronously, including during a partial item grant.
+	// Per-pickup admission guard; released on every return so the remainder can be retried.
+	bool bCollectionInProgress = false;
 
 	// Rezervasyon durumu (yalniz sunucu, replike degil).
 	TArray<TWeakObjectPtr<AMMOCharacter>> ReservedFor;

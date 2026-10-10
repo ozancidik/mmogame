@@ -22,9 +22,117 @@
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
+#include "Misc/CommandLine.h"
+#include "Save/MMOCharacterSaveJson.h"
+#include "Save/MMOSaveGame.h"
+#include "Tests/MMOPurchaseCallbackProbe.h"
+#include "UObject/StrongObjectPtr.h"
 #endif
 
 #if !UE_BUILD_SHIPPING
+bool AMMOLootPickup::RunCollectionCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
+{
+	OutChecks = 0; OutError.Reset();
+	if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client
+		|| !FParse::Param(FCommandLine::Get(), TEXT("unattended")) || !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
+	{ OutError = TEXT("disposable authority headless world required"); return false; }
+	int32 Failures = 0;
+	const auto Check = [&](const FString& Case, const TCHAR* Label, bool OK)
+	{
+		++OutChecks;
+		UE_LOG(LogTemp, Display, TEXT("[MMO_LOOT_CALLBACK_CASE] %s case=%s check=%s"), OK ? TEXT("PASS") : TEXT("FAIL"), *Case, Label);
+		if (!OK) { ++Failures; if (OutError.IsEmpty()) OutError = Case + TEXT("/") + Label; }
+	};
+	const auto Snapshot = [](UMMOInventoryComponent* Inv) { FMMOCharacterSaveData D; Inv->FillSaveData(D); return D; };
+	const auto Equal = [](const FMMOCharacterSaveData& A, const FMMOCharacterSaveData& B)
+	{ TArray<FString> Fields; FMMOCharacterSaveJson::FindDifferences(A, B, Fields); return Fields.IsEmpty(); };
+	for (int32 Route = 0; Route < 2; ++Route) for (int32 Partial = 0; Partial < 2; ++Partial) for (int32 Mode = 0; Mode < 4; ++Mode)
+	{
+		const FString Case = FString::Printf(TEXT("route%d_partial%d_mode%d"), Route, Partial, Mode);
+		TArray<AActor*> Fixtures;
+		AMMOPlayerController* PC[2] = {}; AMMOCharacter* Pawn[2] = {}; UMMOInventoryComponent* Inv[2] = {};
+		FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Location(2000000, 2000000, 5000);
+		for (int32 I = 0; I < 2; ++I)
+		{
+			PC[I] = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			Pawn[I] = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location, FRotator::ZeroRotator, Params);
+			if (PC[I]) Fixtures.Add(PC[I]);
+			if (Pawn[I]) { Fixtures.Add(Pawn[I]); Pawn[I]->SetTravelSaveCommitted(true); Pawn[I]->SetActorEnableCollision(false); }
+			if (PC[I] && Pawn[I]) { PC[I]->Possess(Pawn[I]); Inv[I] = Pawn[I]->GetInventory(); }
+		}
+		auto* Loot = World->SpawnActor<AMMOLootPickup>(AMMOLootPickup::StaticClass(), Location + FVector(5000, 0, 0), FRotator::ZeroRotator, Params);
+		if (Loot) { Fixtures.Add(Loot); Loot->SetActorEnableCollision(false); Loot->SetupAsItem(TEXT("HealthPotion"), 3); }
+		const bool Ready = Loot && Inv[0] && Inv[1] && Pawn[0]->IsPlayerControlled() && Pawn[1]->IsPlayerControlled();
+		Check(Case, TEXT("fixture"), Ready);
+		if (!Ready)
+		{
+			for (auto* C : PC) if (IsValid(C)) C->UnPossess();
+			for (auto* A : Fixtures) if (IsValid(A)) A->Destroy();
+			return false;
+		}
+		const int32 Initial = Partial ? UMMOInventoryComponent::MaxStackSize - 1 : 0;
+		const int32 Added = Partial ? 1 : 3;
+		const int32 Removed = Mode >= 2 ? Added : 0;
+		for (int32 I = 0; I < 2; ++I)
+		{
+			FMMOCharacterSaveData Seed; Seed.Gold = 123 + I; Seed.NextInstanceId = 50;
+			Inv[I]->ApplySaveData(Seed);
+		}
+		if (Initial) Inv[0]->AddItem(TEXT("HealthPotion"), Initial);
+		TStrongObjectPtr<UMMOPurchaseCallbackProbe> Probe(NewObject<UMMOPurchaseCallbackProbe>());
+		bool SawCallout = false, NestedBlocked = false;
+		Probe->Callback = [&](int32)
+		{
+			SawCallout = Inv[0]->GetItemCount(TEXT("HealthPotion")) == Initial + Added && Loot->ItemCount == 3 && !Loot->bCollected;
+			if (Removed) Inv[0]->RemoveItem(TEXT("HealthPotion"), Removed);
+			const auto BeforeA = Snapshot(Inv[0]), BeforeB = Snapshot(Inv[1]);
+			for (int32 Repeat = 0; Repeat < 3; ++Repeat)
+			{
+				if (Route == 0) Loot->TryCollect(Pawn[Mode % 2]);
+				else Loot->OnOverlap(nullptr, Pawn[Mode % 2], nullptr, 0, false, FHitResult());
+			}
+			NestedBlocked = Equal(BeforeA, Snapshot(Inv[0])) && Equal(BeforeB, Snapshot(Inv[1])) && Loot->ItemCount == 3 && !Loot->bCollected;
+		};
+		Inv[0]->OnInventoryChanged.AddDynamic(Probe.Get(), &UMMOPurchaseCallbackProbe::OnInventory);
+		if (Route == 0) Loot->TryCollect(Pawn[0]);
+		else Loot->OnOverlap(nullptr, Pawn[0], nullptr, 0, false, FHitResult());
+		Check(Case, TEXT("real_callout"), SawCallout && Probe->Calls >= 1);
+		Check(Case, TEXT("nested_blocked"), NestedBlocked);
+		Check(Case, TEXT("outer_inventory"), Inv[0]->GetItemCount(TEXT("HealthPotion")) == Initial + Added - Removed && Inv[1]->GetItemCount(TEXT("HealthPotion")) == 0);
+		Check(Case, TEXT("outer_pickup"), Partial ? !Loot->bCollected && !Loot->IsActorBeingDestroyed() && Loot->ItemCount == 2 : Loot->bCollected && Loot->IsActorBeingDestroyed());
+		// A partial grant must release the transient guard for a later legitimate collector.
+		if (Partial) Loot->TryCollect(Pawn[1]);
+		Check(Case, TEXT("retry_final"), Loot->bCollected && Loot->IsActorBeingDestroyed() && Inv[1]->GetItemCount(TEXT("HealthPotion")) == (Partial ? 2 : 0));
+		Check(Case, TEXT("conservation"), Inv[0]->GetItemCount(TEXT("HealthPotion")) + Inv[1]->GetItemCount(TEXT("HealthPotion")) + Removed == Initial + 3);
+		const auto FinalA = Snapshot(Inv[0]), FinalB = Snapshot(Inv[1]);
+		for (int32 I = 0; I < 2; ++I) { Loot->TryCollect(Pawn[I]); Loot->OnOverlap(nullptr, Pawn[I], nullptr, 0, false, FHitResult()); }
+		Check(Case, TEXT("stale_and_other_resources"), Equal(FinalA, Snapshot(Inv[0])) && Equal(FinalB, Snapshot(Inv[1]))
+			&& Inv[0]->Gold == 123 && Inv[1]->Gold == 124 && Inv[0]->EquipmentBag.IsEmpty() && Inv[1]->EquipmentBag.IsEmpty());
+		Inv[0]->OnInventoryChanged.RemoveDynamic(Probe.Get(), &UMMOPurchaseCallbackProbe::OnInventory);
+		Probe->Callback = nullptr;
+		for (auto* C : PC) if (IsValid(C)) C->UnPossess();
+		for (auto* A : Fixtures) if (IsValid(A)) A->Destroy();
+	}
+	return Failures == 0; // Same frame, no player load/autosave/disk or physical overlap claim.
+}
+
+namespace
+{
+	struct FMMOLootCallbackTestExec : public FSelfRegisteringExec
+	{
+		virtual bool Exec_Dev(UWorld* InWorld, const TCHAR* Cmd, FOutputDevice& Ar) override
+		{
+			if (!FParse::Command(&Cmd, TEXT("MMOTestLootCallbacks"))) return false;
+			FString Error; int32 Checks = 0;
+			const bool Passed = AMMOLootPickup::RunCollectionCallbackSelfTest(InWorld, Error, Checks);
+			Ar.Logf(TEXT("[MMO_LOOT_CALLBACK_TEST] %s checks=%d reason=%s"), Passed ? TEXT("PASS") : TEXT("FAIL"), Checks, *Error);
+			return true;
+		}
+	};
+	FMMOLootCallbackTestExec GMMOLootCallbackTestExec;
+}
+
 bool AMMOLootPickup::RunFirstLootSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 {
 	OutChecks = 0; OutError.Reset();
@@ -416,10 +524,11 @@ void AMMOLootPickup::OnReservationExpired()
 
 void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || bCollected || bCollectionInProgress)
 	{
 		return;
 	}
+	TGuardValue<bool> Collecting(bCollectionInProgress, true);
 
 	// Sadece oyuncu toplayabilir (moblar degil).
 	if (!Char || !Char->IsPlayerControlled())
@@ -458,12 +567,8 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 		return;
 	}
 
-	// Tek-sefer guard: Destroy() ayni frame'de senkron degil; grant'tan ONCE isaretle ve
-	// bir daha overlap event'i uretmesin diye collision'i kapat (dupe onlemi).
-	if (bCollected)
-	{
-		return;
-	}
+	// bCollected remains the completed-pickup barrier. The transient admission guard
+	// above also covers synchronous callbacks before partial remainder bookkeeping.
 	// Canta doluysa AddEquipmentInstance esyayi eklemez. Pickup'i yerde birak ki
 	// oyuncu yer actiktan sonra tekrar toplayabilsin.
 	if (bIsEquipment && Inv->EquipmentBag.Num() >= UMMOInventoryComponent::MaxBagSize)
@@ -478,8 +583,8 @@ void AMMOLootPickup::TryCollect(AMMOCharacter* Char)
 		return;
 	}
 	// Sarf malzemesi: yigin tavani (999) dolarsa fazlasi yok edilmez. Sigdigi kadar alinir,
-	// kalan miktar yerde durur (tek-sefer isareti yalniz TAMAMI alininca konur). Ayni fonksiyon
-	// icinde senkron oldugu icin dupe riski yok (bCollected yukarida denetlendi).
+	// kalan miktar yerde durur (tek-sefer isareti yalniz TAMAMI alininca konur).
+	// AddItem publishes a synchronous delegate; nested collection is blocked until return.
 	if (!bIsGold && !bIsEquipment)
 	{
 		const int32 Added = Inv->AddItem(ItemId, ItemCount);

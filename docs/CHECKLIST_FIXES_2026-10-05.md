@@ -4648,3 +4648,66 @@ full RunAllChecks ve uzun soak çalıştırılmadı. İlk656 .sav byte hash'i,
 kapsam dışı942 takipli dosya ve peer dirty MMOGameMode/iki belge korundu.
 Yeni ağ slotu MMOSave_Gezgin749473.sav korundu; toplam657. Yalnız owned5 dosya
 commit'e alınır. PIE ve O57 kalıcı paired transaction kontrolleri açık kalır.
+
+## O59 — Sarf ganimeti toplamada senkron yeniden giriş (2026-10-10)
+
+`AMMOLootPickup::TryCollect`, sarf malzemesini `AddItem` ile verirken
+`OnInventoryChanged` senkron çalışıyordu. Bu sırada `ItemCount` henüz azaltılmamış,
+`bCollected` henüz set edilmemişti. İlk envanter callback'i aynı pickup'ı aynı
+oyuncuya veya uygun ikinci oyuncuya tekrar toplatınca üç adetlik ganimetten
+fazladan eşya verilebiliyordu; kısmi toplama da kalan miktarı yanlış kapatabiliyordu.
+Bu, gerçek native delegate ile doğrulanmış sunucu çağrı sırası hatasıdır;
+uzak istemcinin tek başına yeni bir RPC exploit'i kanıtlanmış değildir.
+
+Pickup başına `bCollectionInProgress` ve `TGuardValue` bütün toplama çağrısını
+korur. Yeniden giriş, authority/completion kontrolünde reddedilir; bütün return
+yolları geçici korumayı bırakır. Kısmi ganimet yerde kalır, sonraki meşru toplama
+çalışır; `bCollected` tamamlanmış pickup'ın kalıcı bariyeri olarak devam eder.
+Rezervasyon/ölülük kapıları, mevcut collision ve owner-only envanter replication
+yolu korunur. RPC, save veya replicated property şeması değişmez.
+
+### Native kanıt ve kapsam
+
+`MMOTestLootCallbacks`: **128 kontrol / 16 case**. Doğrudan toplama veya gerçek
+`OnOverlap` handler çağrısı × tam/tek adetlik kısmi teslim × aynı/ikinci oyuncu,
+ve bu ikisinin callback'te teslim edilen miktarı önce silen varyantları.
+Her callback üç nested toplama dener. Kurulum, gerçek callback, nested state
+snapshot'ı, dış teslim/kalan miktar, daha sonra ikinci oyuncunun remainder'ı
+alması, toplam adet korunumu ve bayat isteklerin iki full envanter save snapshot'ını
+değiştirmemesi sınanır. Dış çağrı için altın ve ekipman çantası ayrıca kontrol edilir.
+
+Eski kod + aynı fixture: gerçek derleme **61.04 sn**, 128 kontrolün **56'sı FAIL**;
+native exit 0 olsa da runner exit 1 ve coverage=True. Düzeltme derlemesi **19.00 sn**;
+izole ve ana projede 128/128 PASS. Runner tek özet, native exit 0, hatasız log,
+tam ve benzersiz case/check kapsamı ve 60 sn owned-process watchdog ister.
+Runner coverage fonksiyonu geçerli, yinelenen, bilinmeyen check ve eksik case
+girdileriyle **4/4** doğrulandı. `RunAllChecks.ps1` yeni runner'ı içerir.
+
+Gerçek Unreal nesneleri ve dynamic delegate kullanılır; otomatik fizik overlap'i,
+GC/async, iki farklı pickup arasındaki callback backedge'i, aktif rezervasyonun
+kısmi toplamayla birleşimi ve tam delegate sayısı burada kanıtlanmaz.
+Callback ilk envanter değişimini eski pickup bookkeeping'iyle görebilir;
+koruma nested grant'i engeller. Fixture aynı frame içinde controller'ları ayırır,
+load/autosave timer'larını çalıştırmaz; travel-save guard'ı ile disk yazmaz.
+Yerel QA rolü gerçek diff'te eyleme dönük hata bulmadı; bu inceleme PIE değildir.
+
+### Ana entegrasyon ve regresyon
+
+Ana actual compile/link **32.88 sn / 12 aksiyon, Result: Succeeded**.
+İzole **7/7**, ana **13/13** seçilmiş runner geçti: loot callback128, first loot6
+(3 first_loot metriği), loot life10, purchase174, quest callback112,
+trade transfer2584, consumable11; ana projede ayrıca quest capacity13,
+save lifecycle26, character store **662/662** (JSON mismatch0,
+writeorder1, roundtrip1), Summer/Winter ve NetSmoke.
+Summer **56**, Winter **78** mob; iki smoke hata satırı 0.
+NetSmoke Summer port17807, server/client 20 sn gözleminde bağlantı ve süreç
+yaşamı kontrolüdür; ganimet RPC/HUD veya dedicated Shipping kanıtı değildir.
+ValidateData iki ağaçta temiz (mevcut beceri boşluğu uyarıları sürer),
+StaticLint102 CPP ve PlaytestMetrics1516/1516 geçti. PS parser ve scoped diff-check geçti.
+Tam `RunAllChecks`, FullCompile veya uzun soak bu turda çalıştırılmadı.
+
+Kaynak/config/script + DLL **188'er dosya** test boyunca sabitlendi.
+Başlangıçtaki **657 kayıt** byte hash'leriyle korundu; son `.sav` sayısı **663**.
+Paralel kontroller sırasında oluşan yeni kayıtlar da korunur; hepsi bu teste mal edilmez.
+Diğer ajanın kapsam dışı **942 tracked dosyası** korunur; harita/içerik değişiklikleri
+bu commit'e alınmaz. PIE maddeleri aşağıdaki checklist'te açıktır.

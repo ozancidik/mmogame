@@ -240,6 +240,10 @@ Step "Ganimet toplamada oluluk ve tek sefer grant" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Ganimet envanter callback yeniden giris" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLootCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
 Step "Saf iksir faydasi ve ortak bekleme suresi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestConsumableBenefit.ps1") | Out-Host
     $LASTEXITCODE -eq 0

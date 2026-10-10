@@ -5263,3 +5263,24 @@ uzak RPC/render veya kalıcı kayıt kanıtı değildir.
 - [ ] Normal iptal, Destroy/disconnect, aynı/farklı partnerle callback restart
   ve stale cancel/confirm davranışları korunsun. Gerçek ServerTravel/GC/async
   ve dedicated/Shipping Server kontrolü ayrıca açık kalır.
+
+## O59 — Sarf ganimeti callback yeniden girişi (2026-10-10)
+
+Otomatik: gerçek native 128/16 matrisi, first loot6/life10 ve ilgili regresyonlar
+geçti. Bunlar fiziksel overlap, uzak istemci HUD/RPC veya rezervasyonun gerçek
+zaman akışını oynayarak doğrulamaz.
+
+- [ ] İki oyunculu listen-server PIE'de host ve uzak istemci aynı üç adetlik sarf
+  ganimetinin üstüne birlikte gelsin; iki envanterde toplam artış tam üç olmalı,
+  pickup bir kez kapanmalı; iki pencerenin envanter/HUD'u doğru miktarı göstermeli.
+- [ ] Bir oyuncunun yığını 998 iken üç adetlik ganimeti toplasın: 999'a ulaşmalı,
+  kalan iki adet yerde kalmalı. Sonra uygun ikinci oyuncu bu iki adedi alabilmeli;
+  tekrar overlap fazladan eşya vermemeli. Host/uzak istemci rollerini değiştir.
+- [ ] Dolu yığın veya ekipman çantası reddinden sonra yer açıp tekrar topla;
+  kalıcı takılma olmamalı. Rezervasyon bitmeden yetkisiz oyuncu remainder'ı
+  alamamalı; süre bitince doğru kalan miktarı alabilmeli.
+- [ ] Envanter callback'ine bağlı gerçek gameplay/UI akışlarında aynı pickup'ın
+  tekrar denenmesi fazladan grant vermemeli; ayrı pickup'ların toplanması çalışmalı.
+  Callback içinden başka pickup ve geri çağrı kombinasyonu native matriste yoktur.
+- [ ] Toplama sonrası çıkış/giriş veya harita geçişinde miktarı yeniden kontrol et;
+  disk dayanıklılığı ve gerçek replication senaryosu bu same-frame testten çıkarılmaz.
