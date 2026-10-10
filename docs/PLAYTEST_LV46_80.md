@@ -23,7 +23,7 @@ Editör kapalıyken derle, sonra oyunu aç. Konsol: `` ` ``. Debug komutları ya
 | P78 | 78 | **Naibin Elçisi** | `-2000 2500 250` | yavaş, ağır; Nöbetçi cebine 1581 u |
 
 Eski cepler değişti: Kış cebi `(-3000,-1500)` artık yalnız Lv42–44. Summer'daki Yarık cepleri (**Lv58–60** ve **Lv62–64**) genişledi
-(Summer'da `MMOTeleport 800 -4800 150` ve `-4800 4800 -20`).
+(Summer'da `MMOTeleport 800 -4800 150` ve `MMOTeleport -4400 5400 10`; ikincisi eskiden yanlışlıkla `-4800 4800 -20` yazılıydı, cebin gerçek yeri `(-4400,5400,-92)`).
 
 ## Her cep için kontrol
 

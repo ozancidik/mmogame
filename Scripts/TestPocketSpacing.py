@@ -38,6 +38,25 @@ def main():
             if code == 0 or "HATA:" not in out:
                 failures.append(f"yakin cep yakalanmadi (cikis={code}): {out.strip()}")
 
+    # Dokuman sapmasi: hicbir cebe yakin olmayan isinlanma (-4800 -4800 -20) eklenirse HATA beklenir; temiz dokuman >=6 nokta okur.
+    doc_src = os.path.join(ROOT, "docs", "PLAYTEST_LV46_80.md")
+    with open(doc_src, encoding="utf-8", errors="replace") as f:
+        doc = f.read()
+    env = dict(os.environ)
+    with tempfile.TemporaryDirectory() as d:
+        bad = os.path.join(d, "doc.md")
+        with open(bad, "w", encoding="utf-8") as f:
+            f.write(doc + "\n`MMOTeleport -4800 -4800 -20`\n")
+        env["POCKET_DOC"] = bad
+        p = subprocess.run([sys.executable, "-I", TOOL, SRC], capture_output=True, text=True, env=env)
+        if p.returncode == 0 or "dokuman koddan sapmis" not in p.stdout:
+            failures.append(f"dokuman sapmasi yakalanmadi (cikis={p.returncode}): {p.stdout.strip()}")
+        env["POCKET_DOC"] = doc_src
+        p = subprocess.run([sys.executable, "-I", TOOL, SRC], capture_output=True, text=True, env=env)
+        m = re.search(r"isinlanma noktasi: (\d+)", p.stdout)
+        if p.returncode != 0 or not m or int(m.group(1)) < 6:
+            failures.append(f"temiz dokuman okunamadi/hata (cikis={p.returncode}): {p.stdout.strip()}")
+
     # Yorumdaki sahte cagri sayilmamali: yorum satirina yakin bir cep ekle, temiz kalmali.
     with tempfile.TemporaryDirectory() as d:
         tmp = os.path.join(d, "MMOGameMode.cpp")
