@@ -309,6 +309,11 @@ Step "Takas onay callback baglami" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Takas teklif callback baglami" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestTradeOffer.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Kayitli ogrenilmis becerilerin mastery butcesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLearnedSkillBudget.ps1") | Out-Host
     $LASTEXITCODE -eq 0

@@ -699,19 +699,41 @@ void UMMOTradeComponent::OnMyOfferChanged()
 {
 	// Teklif degisti: iki tarafin onayi sifirlanir (surpriz degisikligi onlemek icin).
 	MyOffer.bConfirmed = false;
+	TheirOffer.bConfirmed = false;
 	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	++OfferRevision;
 	LastTradeChangeTime = Now;
-	if (UMMOTradeComponent* PC = GetValidPartnerComp())
+	UMMOTradeComponent* PC = GetValidPartnerComp();
+	if (PC)
 	{
 		PC->MyOffer.bConfirmed = false;
 		PC->TheirOffer = MyOffer;
 		PC->OfferRevision = OfferRevision; // iki tarafta ayni revizyon
 		PC->LastTradeChangeTime = Now;
-		PC->OnTradeChanged.Broadcast();
 	}
-	TheirOffer.bConfirmed = false;
-	OnTradeChanged.Broadcast();
+	// All mirrors and clocks are committed before callouts. A listener may
+	// replace the session or edit either offer again; the old frame publishes
+	// only while its captured pair, session and revision are still current.
+	const TWeakObjectPtr<UMMOTradeComponent> Issuer(this), Recipient(PC);
+	const uint64 Session = TradeSessionId;
+	const int32 Revision = OfferRevision;
+	const auto CurrentOffer = [Issuer, Recipient, Session, Revision]()
+	{
+		const UMMOTradeComponent* A = Issuer.Get();
+		const UMMOTradeComponent* B = Recipient.Get();
+		const AMMOCharacter* CA = A ? A->GetOwnerCharacter() : nullptr;
+		const AMMOCharacter* CB = B ? B->GetOwnerCharacter() : nullptr;
+		return IsValid(CA) && IsValid(CB) && !CA->IsActorBeingDestroyed() && !CB->IsActorBeingDestroyed()
+			&& CA->HasActorBegunPlay() && CB->HasActorBegunPlay() && !CA->HasStartedEndPlay() && !CB->HasStartedEndPlay()
+			&& A->HasAuthorityInternal() && B->HasAuthorityInternal() && A->GetWorld() && A->GetWorld() == B->GetWorld()
+			&& A->bTradeActive && B->bTradeActive && A->Partner.Get() == CB && B->Partner.Get() == CA
+			&& A->TradeSessionId == Session && B->TradeSessionId == Session
+			&& A->OfferRevision == Revision && B->OfferRevision == Revision;
+	};
+	if (!CurrentOffer()) return;
+	Recipient.Get()->OnTradeChanged.Broadcast();
+	if (!CurrentOffer()) return;
+	Issuer.Get()->OnTradeChanged.Broadcast();
 }
 
 void UMMOTradeComponent::ValidateTick()

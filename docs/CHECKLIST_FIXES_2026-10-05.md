@@ -4441,3 +4441,71 @@ bulmadı; runtime sonuçları ana oturumun gerçek koşularıdır. Yalnız bu i�
 uzun Soak bu revizyonda çalıştırılmadı; gerçek PIE ve erken EndPlay onay
 admission coverage açık. Başlangıç635 kayıt byte byte korundu.
 NetSmoke bir yeni MMOSave_Gezgin040711.sav üretti; korunarak toplam636 oldu.
+
+## O56 — Ticaret teklifi callback bağlamı (2026-10-10)
+
+**Hata ve kapsam:** OnMyOfferChanged, issuer'ın TheirOffer onayını partner
+OnTradeChanged callback'inden sonra temizliyordu. İlk listener dört onayın
+birini hâlâ true görüyordu; listener yeni oturum açıp onaylı state kurarsa
+eski çağrı bu yeni onay aynasını sıfırlıyordu. İptal, nested teklif revizyonu
+ve Destroy/EndPlay sonrasında koşulsuz issuer bildirimi de devam ediyordu.
+Yalnız teklif yayını sınırı düzeltildi; inventory transfer callback'lerinin
+atomikliği ve public API'lerin erken EndPlay admission'ı ayrı inceleme kapsamıdır.
+
+Dört onay bayrağı, mirror payload, iki revizyon ve trade clock ilk callout'tan
+önce tamamlanır. Peer ve ardından issuer yayını, captured weak component çifti,
+session/revision, authority/world, reciprocal partner ve owner yaşam döngüsü
+kontrolüyle yapılır. İlk callback'ten sonra state yazımı kalmaz. Mevcut üç
+server API admission/cooldown yolu, owner-only replication ve save/RPC şeması korunur.
+
+MMOTestTradeOffer/TestTradeOffer.ps1:60 senaryo/480 kontrol; üç public Seen
+API (gold/add/remove) ×iki issuer yönü ×10 mod. Modlar: normal edit; iptal;
+aynı/farklı peer restart; issuer/peer nested gold; issuer/peer Destroy;
+issuer/peer RouteEndPlay. İlk peer delegate'inde injection yapılır; ikinci
+issuer delegate'ine özel injection bu fixture'da yoktur. Prior ve replacement
+confirmed context test tarafından seed edilir; gerçek iki kullanıcı onayı
+iddiası değildir. Replacement revision, eski committed revision ile aynı
+seçilerek session gate bağımsız sınanır. Native dynamic delegate sayısı, ilk
+callback'teki dört flag/payload/time, fresh callback state, revision/pair/timer,
+full inventory save-data karşılaştırması ve stale/zero edit reddi kontrol edilir.
+Fresh clock'lar float değerleriyle doğrudan karşılaştırılır; diğer snapshot
+alanları formatlı metindir. Controllerless pawn'lar kullanıcı slotu yüklemez,
+teardown save guard aktiftir. GC/async, HUD/chat render, remote RPC ve kalıcı
+trade transaction kanıtı değildir. RouteEndPlay sonrası yayın kontrolü erken
+EndPlay içinden admission testi değildir. Native wrapper/rejection regresyonu
+mevcut Trade230 ile ayrıca çalıştırılır; yeni test yalnız Seen girişlerini çağırır.
+
+Eski üretim kodu gerçek compile/link68.60sn sonrası480/132FAIL,
+native0/runner1. Test watchdog'u60sn, yalnız owned process cleanup,
+GUID/quoted ABSLOG ve exact480/tek summary/no-error kontrolü kullanır.
+RunAllChecks'e runner exit'ini ileten ayrı adım eklendi.
+Kanıt: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o56_trade_offer_20261010.
+
+Son fixture QA önerileriyle güçlendirildi: guarded item index/ItemId, nested
+23/31 gold ve diğer teklif/mirror için bağımsız oracle, stale reddi boyunca
+bağlı probe'larla sıfır ek bildirim kontrolü. Son fixture ile gerçek UBT
+compile/link süreleri: baseline3.99sn, fixed2.66sn, session gate mutant2.67sn,
+revision gate mutant2.67sn, late-clear mutant2.68sn, restored2.65sn;
+hepsi Succeeded. Baseline480/132FAIL; session/revision/late-clear
+mutantları sırasıyla480/6FAIL,480/12FAIL,480/78FAIL (native0/runner1).
+Fixed ve restored480/0FAIL, native0/runner0. Mutantlar yalnız izole checkout'ta
+çalıştırıldı. Salt okuma QA son fixture'da somut ek sorun bulmadı; bu ayrı
+kaynak incelemesi runtime kanıtı olarak sayılmadı.
+
+Ana checkout gerçek UBT:12 action,34.93sn, Result:Succeeded; yeni fixture
+ve trade kaynakları compile/link edildi. İzole frozen185 ve ana frozen185
+kaynak/config/scripts+DLL hash'i testler boyunca korundu. İzole Confirm352,
+Start208,Teardown124,Trade230,SaveLifecycle26 geçti. Ana checkout'ta18/18
+kapsamlı seçilmiş runner exit0: Offer480,Confirm352,Start208,Teardown124,
+Gold60/15case/23metric,Purchase174,Vendor18,Upgrade132,Trade230,
+QuestCallbacks112,QuestCapacity13,SavedEquipment11,FirstEquip8/2event,
+SaveLifecycle26,Store636/636 ve JSON636/mismatch0/writeorder1/roundtrip1,
+Summer57/Winter79 mob ve hata0, Summer Net17797 server20sn+client20sn,
+join1/welcome1/hata0; iki owned process gözlem boyunca yaşadı.
+Bu ağ smoke'u gerçek gameplay RPC veya dedicated/Shipping Server kanıtı değildir.
+ValidateData exit0 (mevcut beceri aralığı uyarıları),StaticLint101 dosya exit0,
+PlaytestMetrics1516/1516,iki PS parser ve diff-check geçti. Full RunAllChecks,
+FullCompile ve uzun soak çalıştırılmadı; aggregate'e yalnız yeni adım eklendi.
+Başlangıçtaki636 .sav byte hash'i ve kapsam dışındaki938 takipli dosya korundu.
+Net smoke bir yeni slot üretti; toplam637, yeni dosya da korundu. PIE maddeleri
+açık; görsel/uzak istemci takas doğrulandı olarak işaretlenmedi.

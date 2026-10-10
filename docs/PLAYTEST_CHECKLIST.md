@@ -5196,3 +5196,28 @@ context fixture seed'i gerçek iki kullanıcı onayının yerine geçmez.
   admission penceresini çalıştırmaz. Shipping/Server target ve gerçek replication açık.
 - [ ] Inventory transferi sırasında callback yeniden girişini ayrıca incele;
   O55 sonucu tüm trade transaction'ın atomikliği olarak değerlendirilmemeli.
+
+## O56 — Ticaret teklif değişimi callback bağlamı (2026-10-10)
+
+Native MMOTestTradeOffer:60 senaryo/480 kontrol; üç Seen API ×iki issuer yönü
+×10 mod, ilk peer authority callback'inde injection. Onay state seed'i gerçek
+iki kullanıcı onayı değildir. Aynı-kare inventory/float state/delegate kanıtı;
+GC/async, remote RPC, rendering ve kalıcı transfer transaction kanıtı değildir.
+
+- [ ] Host+uzak istemcide altını değiştir, ekipman ekle/çıkar: önceki iki onay
+  iki HUD'da sıfırlansın; teklif ve mirror aynı revizyona gelsin. Normal yeni
+  onay/takas çalışsın; cooldown, aynı-altın no-op, duplicate/full offer ve
+  stale tıklamalar mevcut davranışı korusun.
+- [ ] İlk peer authority OnTradeChanged listener'ında bir kez iptal et;
+  eski edit issuer'a yeniden bildirim üretmesin. Aynı/farklı partnerle yeni
+  davet kabul edip onaylı yeni state kur; eski çağrı yeni onay aynasını bozmasın.
+- [ ] Callback'te issuer veya peer public altın teklifini yeniden değiştirsin;
+  yalnız güncel revizyon yayımlansın, iki onay sıfır, mirror payload tutarlı olsun.
+  Pre-edit revision ile nested request reddedilsin ve ek bildirim üretmesin.
+- [ ] Callback'te issuer/peer Destroy veya harita geçişi EndPlay: survivor
+  temizlensin, kapanan endpoint'e eski offer yayını/erişim hatası olmasın.
+- [ ] İkinci issuer delegate'inde injection, erken EndPlay parti callback'i
+  içinden public offer admission ve gerçek Shipping/Server replication ayrı
+  açık kontrollerdir; bu native fixture bunları çalıştırmaz.
+- [ ] Inventory aktarımı sırasında yeniden girişi ayrıca incele; bu sonuç
+  tüm trade transferinin atomikliği olarak değerlendirilmemeli.

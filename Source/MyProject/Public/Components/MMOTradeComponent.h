@@ -108,6 +108,7 @@ public:
 	static bool RunTradeTeardownSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
     static bool RunTradeStartSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
     static bool RunTradeConfirmSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+    static bool RunTradeOfferSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
