@@ -5171,3 +5171,28 @@ Uzak RPC teslimi, görsel HUD çizimi ve kalıcı kayıt testi değildir.
 - [ ] Yukarıdaki yolları Shipping/Server target ve gerçek replication ile
   doğrula. Tek multicast içindeki sonraki listener güncel state okuyabilir;
   native callback sayıları uzak istemci OnRep sayısı garantisi değildir.
+
+## O55 — Ticaret onayı callback bağlamı (2026-10-10)
+
+Native MMOTestTradeConfirm:44 senaryo/352 kontrol; authority dynamic delegates,
+aynı-kare inventory snapshots ve native HUD chat depolaması. Remote RPC,
+rendering, GC/async ve kalıcı trade transaction kanıtı değildir. Yeni onaylı
+context fixture seed'i gerçek iki kullanıcı onayının yerine geçmez.
+
+- [ ] Host+uzak istemci, iki yönde geçerli teklif/onay: iki onay bildirimi,
+  tek item/altın takası ve kapanan pencereler; tekrar tıklama ikinci aktarım
+  üretmemeli. İlk authority listener'dan peer'i onaylatan nested yol da tek takas yapmalı.
+- [ ] İlk veya ikinci authority OnTradeChanged listener'ında bir kez iptal et;
+  kabul edilmiş onay bildirimi iptalden önce, eski onay devamı iptalden sonra
+  gelmemeli. Aynı/farklı peer ile yeniden kabulde yeni teklif/onay/timer korunmalı.
+- [ ] Callback'te public teklif değiştir: revizyon artsın, iki onay sıfırlansın,
+  eski onay yeni revizyona uygulanmasın. Yeni revizyonu normal biçimde yeniden
+  onaylamak çalışmalı; reddedilen eski tıklama altın/eşya aktarmamalı.
+- [ ] Onay callback'inde kendisini/peer'i Destroy veya harita geçişiyle EndPlay
+  eden authority testinde survivor kapanmalı; eski callback erişim hatası olmamalı.
+- [ ] Açık native coverage: gerçek parti ayrılma callback'i içinden, karakterin
+  BeginPlay'i hâlâ true ve HasStartedEndPlay'i true iken onay dene. Onay flags,
+  mesaj ve onay delegate'i oluşmamalı. O55 RouteEndPlay testleri bu erken
+  admission penceresini çalıştırmaz. Shipping/Server target ve gerçek replication açık.
+- [ ] Inventory transferi sırasında callback yeniden girişini ayrıca incele;
+  O55 sonucu tüm trade transaction'ın atomikliği olarak değerlendirilmemeli.

@@ -4379,3 +4379,65 @@ yedi ek kayıt paralel koşuda oluştu; bu çalışma ana testleri yeni kayıt
 oluşturmadı, mevcut toplam635. Yalnız sahip olunan8 dosya commit kapsamında.
 Bu revizyonda tam RunAllChecks/-FullCompile yeniden çalıştırılmadı; paralel
 ajanın önceki koşusu O54 doğrulaması olarak sunulmaz. Açık PIE maddeleri O54 bölümünde.
+
+## O55 — Ticaret onayı callback bağlamı (2026-10-10)
+
+**Hata ve kapsam:** ServerConfirm ilk/ikinci OnTradeChanged sonrasında ham
+peer ile eski onay mesajını yayımlıyor, TryExecuteTrade ise o anda güncel
+partneri yeniden seçiyordu. Listener iptal edip aynı/farklı peer ile yeni,
+onaylı bir server context kurunca eski çağrı yeni ticaretin altınını
+aktarabiliyordu. Revizyon değişimi ve Destroy/EndPlay de eski yayını geçersiz
+kılar. Bu çalışma yalnız onay yayını ve onun devam sınırını düzeltir;
+TryExecuteTrade içindeki inventory/equipment/gold callback atomikliği ve
+OnMyOfferChanged içindeki yeniden giriş ayrı inceleme konularıdır.
+
+Onay iki aynaya commit edilir; kopyalanmış isimli bildirim delegelerden önce
+captured peer'e gönderilir. Her sonraki yayın ve execution çağrısında weak
+component çiftinden owner'lar yeniden alınır: authority, aynı world,
+geçerli/canlı BeginPlay, başlamamış EndPlay, reciprocal partner, iki tarafta
+aynı captured session/revision ve issuer'ın mirrored onayı aranır. Yeni
+RPC/property/save şeması yok; owner-only replication yolu korunur.
+
+Native MMOTestTradeConfirm ve TestTradeConfirm.ps1: 44 senaryo/352 kontrol.
+İki issuer yönü × iki callback konumu ×10 mod: normal tek onay; iptal;
+aynı/farklı peer restart; public altın revizyonu; iki endpoint için Destroy
+ve RouteEndPlay; revizyon sonrası yeniden onaylı server context fixture'ı.
+Replacement/revision bağlamında mirrored onaylar test tarafından seed edilir;
+bu seed, iki gerçek kullanıcı RPC'sinin çalıştırıldığı iddiası değildir.
+Dört ek senaryo normal ve nested peer confirmation, duplicate issuer/closed
+request, exact 3/3 veya3/2 server delegate sayısı ve tek altın aktarımını sınar.
+Native HUD chat depolaması exact mesaj sırasını; save-data JSON alan karşılaştırması
+aynı karede inventory'yi kontrol eder. Completion pawn'ları controller'sız,
+initial load tamamlanmamış olduğundan save guard yazımı reddeder. Kalıcı trade
+save transaction, GC/async ömür, uzak RPC veya görsel HUD kanıtı değildir.
+
+Eski üretim kodu son352 fixture ile gerçek compile/link sonrası134FAIL
+(native0/runner1). Önceki320 fixture'da generation guard tek başına kaldırılınca
+20FAIL; final continuation guard kaldırılınca113 kontrol sonrası native3
+EXCEPTION_ACCESS_VIOLATION (TryExecuteTrade) ve runner1 oluştu. Mutantlar yalnız
+izole ağaçta çalıştı. Erken EndPlay parti callback'i içinden onay admission
+native olarak bu fixture'da sınanmadı; O54'ün start admission sonucu onay yolu
+kanıtı olarak sunulmaz. Açık oynanış ve bu test boşluğu PLAYTEST O55'te.
+Kanıt kökü: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o55_trade_confirm_20261010.
+
+**Doğrulama tamamlandı:** Son352 fixture'da yalnız revision guard kaldıran
+mutant20FAIL (native0/runner1); restore gerçek compile/link2.65sn ardından
+352/0. Baseline352 compile/link4.65sn; ana gerçek compile/link34.08sn,
+12 eylem, Succeeded. Ana17/17 scoped runner exit0: onay352, başlangıç208,
+kapanış124, gold60+15case/23metric, purchase174, vendor18, upgrade132,
+trade230, quest callbacks112/capacity13, saved equipment11, first equip8+2events,
+save lifecycle26, Store635/635 loaded/JSON mismatch0/writeorder1/disk roundtrip1.
+Summer56 ve Winter78 mob doğumu, iki smoke exit0/hata0; NetSmoke port17795,
+server20sn/client20sn,1join/1welcome, iki süreç gözlem boyunca hayatta ve
+iki log hata0. NetSmoke trade RPC veya temiz native çıkış kanıtı değildir.
+
+İzole restored352 sonrası start208/teardown124/trade230/save lifecycle26 geçti.
+İki kökte182 source/config/script +DLL hash'i derleme sonrası koşular boyunca
+aynı kaldı. ValidateData mevcut beceri boşluğu uyarılarıyla exit0; StaticLint100
+ve PlaytestMetrics1516/1516 geçti; ana Lore97 girdisi eşleşti. İki PowerShell
+parser ve git diff --check geçti. QA salt kaynakta yeni actionable bulgu
+bulmadı; runtime sonuçları ana oturumun gerçek koşularıdır. Yalnız bu işin
+7 dosyası commit edilir. Tam RunAllChecks/-FullCompile, Shipping/Server ve
+uzun Soak bu revizyonda çalıştırılmadı; gerçek PIE ve erken EndPlay onay
+admission coverage açık. Başlangıç635 kayıt byte byte korundu.
+NetSmoke bir yeni MMOSave_Gezgin040711.sav üretti; korunarak toplam636 oldu.

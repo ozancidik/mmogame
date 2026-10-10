@@ -304,6 +304,11 @@ Step "Takas baslangic delegate ve yasam dongusu" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestTradeStart.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
+Step "Takas onay callback baglami" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestTradeConfirm.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Kayitli ogrenilmis becerilerin mastery butcesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLearnedSkillBudget.ps1") | Out-Host
     $LASTEXITCODE -eq 0

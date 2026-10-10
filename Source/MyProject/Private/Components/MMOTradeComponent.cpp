@@ -535,13 +535,35 @@ void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int3
 		return;
 	}
 
+	// Callouts may replace this trade, revise its offers, or retire an endpoint.
+	// Capture this approval's identity; reacquire weak endpoints after every callout.
+	const TWeakObjectPtr<UMMOTradeComponent> Issuer(this), Recipient(PC);
+	const FString Confirmation = FString::Printf(TEXT("%s teklifi onayladi."), *TradeNameOf(GetOwnerCharacter()));
+	const auto CurrentApproval = [Issuer, Recipient, SeenSessionId, SeenRevision](bool RequireConfirmed)
+	{
+		const UMMOTradeComponent* A = Issuer.Get();
+		const UMMOTradeComponent* B = Recipient.Get();
+		const AMMOCharacter* CA = A ? A->GetOwnerCharacter() : nullptr;
+		const AMMOCharacter* CB = B ? B->GetOwnerCharacter() : nullptr;
+		return IsValid(CA) && IsValid(CB) && !CA->IsActorBeingDestroyed() && !CB->IsActorBeingDestroyed()
+			&& CA->HasActorBegunPlay() && CB->HasActorBegunPlay() && !CA->HasStartedEndPlay() && !CB->HasStartedEndPlay()
+			&& A->HasAuthorityInternal() && B->HasAuthorityInternal() && A->GetWorld() && A->GetWorld() == B->GetWorld()
+			&& A->bTradeActive && B->bTradeActive && A->Partner.Get() == CB && B->Partner.Get() == CA
+			&& A->TradeSessionId == SeenSessionId && B->TradeSessionId == SeenSessionId
+			&& A->OfferRevision == SeenRevision && B->OfferRevision == SeenRevision
+			&& (!RequireConfirmed || (A->MyOffer.bConfirmed && B->TheirOffer.bConfirmed));
+	};
+	if (!CurrentApproval(false)) return;
 	MyOffer.bConfirmed = true;
 	PC->TheirOffer.bConfirmed = true;
-	OnTradeChanged.Broadcast();
-	PC->OnTradeChanged.Broadcast();
-	PC->NotifyOwner(FString::Printf(TEXT("%s teklifi onayladi."), *TradeNameOf(GetOwnerCharacter())));
-
-	TryExecuteTrade();
+	// Publish the accepted approval before a delegate can cancel or replace it.
+	Recipient.Get()->NotifyOwner(Confirmation);
+	if (!CurrentApproval(true)) return;
+	Issuer.Get()->OnTradeChanged.Broadcast();
+	if (!CurrentApproval(true)) return;
+	Recipient.Get()->OnTradeChanged.Broadcast();
+	if (!CurrentApproval(true)) return;
+	Issuer.Get()->TryExecuteTrade();
 }
 
 // ----------------------------------------------------------------------
