@@ -4219,3 +4219,77 @@ Bu script değişikliği için tekrar oyun derlemesi başlatılmadı. Her kökte
 175 source/config/script girdisi +DLL hash'i doğrulandı; ana14 koşu süresinde
 önceki girdiler de değişmedi. Başlangıçtaki627 .sav byte byte korundu, mevcut
 toplam627; yeni kayıt oluşturulmadı. Yalnız sahip olunan9 dosya commit kapsamında.
+
+## 91. O53 — Eski ticaret kapanışının callback'te açılan oturumu silmesi (2026-10-10)
+
+**Doğrulanan hata:** EndTradeServer, önce kendisini resetleyip OnTradeChanged
+yayıyor, sonra yakaladığı peer'i resetliyordu. İlk callback peer'i hâlâ aktif
+görüyor; peer RequestCancelSeen(eskiSession) ve peer callback'inden aynı çift
+için yeni StartTradeServer ile yeni oturum açılabiliyordu. Eski stack'lerin
+sonraki peer resetleri yeni oturumu ve validation timer'larını siliyordu.
+Doğrudan ilk callback'ten aynı çifti yeniden başlatma da peer hâlâ aktif olduğu
+için engelleniyordu. Self Destroy callback'inde survivor'ın yarım durumu ve
+farklı generation'a sahip reciprocal peer'in yanlış temizlenmesi de üretildi.
+Bu fixture iptalde ekonomi kaybı/dupe göstermez; transfer transaction atomikliği
+bu kapsamın dışındadır.
+
+**Düzeltme:** Inactive EndTrade no-op. Kapanan generation, reason kopyası ve
+aynı generation'a sahip ayrı reciprocal peer callback öncesi yakalanır. Silent
+ResetLocalState iki eski tarafı/timer'ı temizler. Sonra reason'lar, ardından
+trade delegate'leri yayımlanır. Her yayında weak endpoint yeniden alınır;
+aktif yeni oturum, farklı generation veya Destroy/EndPlay olan owner'a eski
+yayıma devam edilmez. Owner yaşam kapısı yalnız yayın içindir: EndPlay sırasında
+zorunlu eski durum temizliği atlanmaz. Pending invite/generation, mevcut
+RPC kimlik kapıları, owner-only replication ve save şeması korunur.
+
+**Regresyon:** MMOTestTradeTeardown, 11 mod × 2 yön =22 senaryo/124 kontrol.
+Gerçek strong UObject probe/dynamic delegate ile normal iptal, iç peer cancel
+ve restart, aynı/farklı partner restart, bozuk reciprocal/farklı generation,
+inactive tekrar/pending invite, callback self/peer Destroy ve Actor Destroy
+üzerinden gerçek component EndPlay kapsanır. Ek mod callback içinde yeni
+oturumu açıp yeniden kapatır: inactive kontrolünden bağımsız generation
+kapısı sınanır. Callback sayıları kesin karşılaştırılır; yeni oturumda altın,
+ekipman teklifi, onay ve revizyon3 seed'inin callback dönüşü snapshot'ı korunur.
+İptal senaryolarında tam envanter save snapshot'ları eşit olmalıdır. Controller
+yok; reason içerik/sırası native kaynak incelemesi ve açık PIE maddesidir.
+Destroy senaryoları aynı stack'te deferred reclamation'ı kullanır; GC sonrası
+veya async callback güvenliği için kanıt değildir.
+
+İlk eski-kod72 kontrolde18 FAIL; genişletilmiş112 kontrolde30 FAIL. Son fixture
+aynı eski üretimle gerçek TradeComponent yeniden derlemesi
+sonrası124/44 FAIL, native exit0 fakat runner exit1. Düzeltme124/0, iki kökte
+gerçek compile/link sonrası native/runner exit0. Runner GUID logu, watchdog,
+tam124 case kaydı, tek PASS summary, native exit0 ve hata0 kapılarını ister.
+RunAllChecks'e kapanış runner'ı eklendi; tüm aggregate bu çalışmada yapılmadı.
+Kanıtlar: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o53_trade_teardown_20261010.
+
+**Sınırlar:** Argumentless multicast'te bir listener yeni oturum açarsa aynı
+broadcast'ın sonraki listener'ı güncel state'i okuyabilir; immutable snapshot
+garantisi yoktur. Client property teslimi/HUD atomik değildir. TryExecuteTrade
+içindeki item/gold callback transaction incelemesi ve ending actor ile yeni
+StartTradeServer denemesi ayrı kapsamdır. Gerçek host/uzak istemci PIE,
+Shipping/Server target, -FullCompile ve uzun Soak yapılmadı.
+
+**Tamamlanma kaydı:** Ana kökte 15/15 ilgili runner exit0: teardown112
+(son fixture ile tekrar124/0), gold60 +15/23 log, purchase174, vendor18,
+upgrade132, trade230, quest callbacks112/capacity13, saved equipment11,
+first equip8+2events, save lifecycle26 ve Store627/627 loaded/JSON mismatch0/
+writeorder1/gerçek disk saved-loaded-equal1. Summer57, Winter80, iki haritada
+hata0. NetSmoke port17791 server20sn/client20sn, 1join/1welcome, iki log hata0
+ve gözlem boyunca süreçler hayatta. Bu bağlantı kontrolü ticaret RPC kanıtı değildir.
+
+QA sonrası yalnız fixture ve runner124'e genişletildi; ana gerçek compile/link
+3.83sn ardından124/0. Diğer14 runner bundan önce aynı üretimle çalıştı; bu
+fixture genişlemesinden sonra yeniden çalıştırılmadı. İzole kökte generation
+yayın kapısının tek başına kaldırılması, gerçek compile/link sonrası tam iki
+yönlü mode10 kontrolünü bozdu (124/2FAIL, native0/runner1). Düzeltme geri
+yüklenip yeniden compile/link2.79sn ardından124/0 geçti. Ana üretim için
+önceki gerçek compile/link30.12sn; izole düzeltme32.67sn, hepsi UBT Succeeded.
+
+Son ValidateData mevcut Lv33+ beceri boşluğu uyarılarıyla exit0; StaticLint98
+temiz; PlaytestMetrics1516/1516. İki PS parser kontrolü geçti. İki kökte178
+source/config/script girdisi +DLL hash'i final124 koşularında değişmedi.
+Başlangıçtaki627 .sav byte byte korundu. NetSmoke oyuncusu Gezgin454756 için
+oluşan tek ek kayıtla mevcut toplam628; bu kayıt korunur. Yalnız sahip olunan
+8 dosya commit kapsamında. QA kaynak incelemesinde yeni blocker bulmadı;
+saat snapshot'ı `%g` metnidir, bit düzeyinde float eşitliği kanıtı değildir.

@@ -295,6 +295,11 @@ Step "Takas revizyon onay ve ekonomi butunlugu" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Takas kapanis delegate oturum ve yasam dongusu" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestTradeTeardown.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Kayitli ogrenilmis becerilerin mastery butcesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestLearnedSkillBudget.ps1") | Out-Host
     $LASTEXITCODE -eq 0

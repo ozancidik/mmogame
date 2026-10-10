@@ -105,6 +105,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	// Same-frame server fixtures plus native controller chat calls; no transport or durable save proof.
 	static bool RunTradeSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunTradeTeardownSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
@@ -176,7 +177,7 @@ protected:
 	// Bu bilesenin ve karsi tarafin ticaret durumunu temizler; Reason bos degilse ikisine bildirir.
 	void EndTradeServer(const FString& Reason);
 
-	// Kendi durumunu temizler (kismi; EndTradeServer iki tarafa uygular).
+	// Silent local cleanup; EndTradeServer commits both sides before publishing.
 	void ResetLocalState();
 
 	// Sahibin teklifini karsi tarafin aynasina yazar, iki onayi sifirlar, delegeleri tetikler.

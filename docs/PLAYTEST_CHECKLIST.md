@@ -5125,3 +5125,26 @@ istemci RPC/HUD kanıtı değildir. Ayrıntı CHECKLIST_FIXES_2026-10-05 §90.
   mutasyonu player kaydı üretmesin. Uzak istemci yetkisiz çağrısı altını değiştirmesin.
 - [ ] Normal işlem sonrası çık/gir: bakiye korunsun. Bu maddeler görsel PIE,
   gerçek replication, nonauthority ret ve Shipping/Server target kontrolünü açık tutar.
+
+## O53 — Ticaret kapanış callback oturumları (2026-10-10)
+
+Native MMOTestTradeTeardown22 senaryo/124 kontrol; gerçek dynamic multicast,
+aynı-frame controllerless authority fixture kullanır. Yeni oturumu koruma,
+iki tarafın eski durumunun callback öncesi temizliği, stale session, timer,
+teklif içeriği ve gerçek Actor Destroy/EndPlay yolları kapsanır. Gerçek uzak
+RPC, görsel HUD/chat veya disk save kanıtı değildir. Ayrıntı fixes §91.
+
+- [ ] Listen host ve uzak istemcide ticareti her iki taraftan iptal et;
+  iki pencere kapansın, teklif/onay temizlensin. İptalden hemen sonra aynı
+  kişiyle ve başka oyuncuyla yeni ticaret aç; yeni pencere/teklif korunmalı.
+- [ ] Test authority Blueprint'inde tek seferlik OnTradeChanged listener'ında
+  peer'in eski oturumunu iptal etmeyi ve yeni davet/kabulü dene. Callback'in
+  başında iki eski taraf kapalı olsun. Yeni teklif/altın/onay/revizyon ve
+  zamanlayıcılar eski kapanış döndükten sonra korunmalı; eski cancel reddedilsin.
+- [ ] Aynı callback'te yeni ticareti açıp kapat: eski oturum için sonradan
+  fazladan trade-changed veya iptal mesajı gelmesin. Bildirim metinleri doğru
+  kişilere ve yeni başlangıç mesajından önce gitsin; bunu HUD/chat ile doğrula.
+- [ ] Uzaklaşma, ölüm, bağlantı kopması, harita geçişi ve normal tamamlanmada
+  iki eski pencere/timer kapansın; hayatta kalan oyuncu doğru mesajı alsın.
+  Listener'da kendisini/peer'i Destroy eden authority testinde erişim hatası
+  olmasın. Shipping/Server target ve gerçek replication kontrolleri açık.

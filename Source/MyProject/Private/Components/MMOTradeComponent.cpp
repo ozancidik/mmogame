@@ -600,12 +600,11 @@ void UMMOTradeComponent::ResetLocalState()
 	{
 		World->GetTimerManager().ClearTimer(ValidateTimerHandle);
 	}
-	OnTradeChanged.Broadcast();
 }
 
 void UMMOTradeComponent::EndTradeServer(const FString& Reason)
 {
-	if (!HasAuthorityInternal())
+	if (!HasAuthorityInternal() || !bTradeActive)
 	{
 		return;
 	}
@@ -613,20 +612,38 @@ void UMMOTradeComponent::EndTradeServer(const FString& Reason)
 	// Karsi tarafi, o da bizimle eslesmisse temizle (bayat esleme baska bir ticareti bozmasin).
 	AMMOCharacter* P = Partner.Get();
 	UMMOTradeComponent* PC = P ? P->GetTradeComponent() : nullptr;
-	if (bTradeActive && !Reason.Equals(TEXT("Ticaret tamamlandi."), ESearchCase::CaseSensitive))
+	const uint64 EndingSession = TradeSessionId;
+	const FString EndingReason = Reason;
+	const bool bResetPeer = PC && PC != this && PC->bTradeActive
+		&& PC->Partner.Get() == GetOwner() && PC->TradeSessionId == EndingSession;
+	const TWeakObjectPtr<UMMOTradeComponent> Endpoints[] = {this, bResetPeer ? PC : nullptr};
+	if (!EndingReason.Equals(TEXT("Ticaret tamamlandi."), ESearchCase::CaseSensitive))
 	{
 		UE_LOG(LogMMOTradeAudit, Display,
 			TEXT("event=trade_cancel a=\"%s\" b=\"%s\" revision=%d reason=\"%s\""),
-			*TradeNameOf(GetOwnerCharacter()), *TradeNameOf(P), OfferRevision, *Reason);
+			*TradeNameOf(GetOwnerCharacter()), *TradeNameOf(P), OfferRevision, *EndingReason);
 	}
 
-	NotifyOwner(Reason);
+	// Commit both old states and timers before any synchronous observer can restart.
 	ResetLocalState();
+	if (bResetPeer) PC->ResetLocalState();
 
-	if (PC && PC != this && PC->bTradeActive && PC->Partner.Get() == GetOwner())
+	// An observer can replace a session or destroy an endpoint. Never publish an old
+	// teardown to that replacement; cleanup itself still runs during actor EndPlay.
+	const auto EndedEndpoint = [EndingSession](const TWeakObjectPtr<UMMOTradeComponent>& Endpoint)
 	{
-		PC->NotifyOwner(Reason);
-		PC->ResetLocalState();
+		UMMOTradeComponent* T = Endpoint.Get();
+		const AActor* Owner = T ? T->GetOwner() : nullptr;
+		return T && IsValid(Owner) && !Owner->IsActorBeingDestroyed() && Owner->HasActorBegunPlay()
+			&& !T->bTradeActive && T->TradeSessionId == EndingSession ? T : nullptr;
+	};
+	for (const auto& Endpoint : Endpoints)
+	{
+		if (UMMOTradeComponent* T = EndedEndpoint(Endpoint)) T->NotifyOwner(EndingReason);
+	}
+	for (const auto& Endpoint : Endpoints)
+	{
+		if (UMMOTradeComponent* T = EndedEndpoint(Endpoint)) T->OnTradeChanged.Broadcast();
 	}
 }
 
