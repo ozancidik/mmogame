@@ -386,6 +386,16 @@ bool UMMOInventoryComponent::IsLocallyControlledOwner() const
 
 void UMMOInventoryComponent::AddGold(int32 Amount)
 {
+	AddGoldInternal(Amount, nullptr);
+}
+
+void UMMOInventoryComponent::AddGoldFrom(int32 Amount, const TCHAR* Source)
+{
+	AddGoldInternal(Amount, Source);
+}
+
+void UMMOInventoryComponent::AddGoldInternal(int32 Amount, const TCHAR* Source)
+{
 	if (!HasAuthorityInternal() || Amount == 0)
 	{
 		return;
@@ -398,6 +408,14 @@ void UMMOInventoryComponent::AddGold(int32 Amount)
 	const int64 Sum = (int64)Gold + (int64)Amount;
 	const int32 OldGold = Gold;
 	Gold = (int32)FMath::Clamp<int64>(Sum, 0, MaxGold);
+	// Record this mutation before delegates can change balance, source or possession.
+	// Source belongs to this call; nested plain AddGold calls retain their own default.
+	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); OwnerPawn && OwnerPawn->IsPlayerControlled() && Gold != OldGold)
+	{
+		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=gold who=%s src=%s amount=%d balance=%d"),
+			MMOMetrics::Seconds(), *MMOMetrics::WhoName(OwnerPawn), Source ? Source : TEXT("diger"),
+			Gold - OldGold, Gold);
+	}
 	OnGoldChanged.Broadcast(Gold);
 
 	// Tavan asimi sessiz olmasin: kazanc kirpildiysa sahibe haber ver (ticarette once reddedildigi icin
@@ -408,20 +426,6 @@ void UMMOInventoryComponent::AddGold(int32 Amount)
 			FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 	}
 
-	// Olcum gunlugu (yalniz oyuncular): gercekte degisen miktar (+kazanc / -harcama).
-	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); OwnerPawn && OwnerPawn->IsPlayerControlled() && Gold != OldGold)
-	{
-		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=gold who=%s src=%s amount=%d balance=%d"),
-			MMOMetrics::Seconds(), *MMOMetrics::WhoName(OwnerPawn), GoldSourceTag ? GoldSourceTag : TEXT("diger"),
-			Gold - OldGold, Gold);
-	}
-}
-
-void UMMOInventoryComponent::AddGoldFrom(int32 Amount, const TCHAR* Source)
-{
-	GoldSourceTag = Source;
-	AddGold(Amount);
-	GoldSourceTag = nullptr;
 }
 
 int32 UMMOInventoryComponent::GetAddRoom(FName ItemId) const

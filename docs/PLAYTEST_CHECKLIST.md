@@ -5101,3 +5101,27 @@ istemci RPC, HUD, detach/disk veya PIE kanıtı değildir. Ayrıntı CHECKLIST_F
 - [ ] Normal satın alma sonrası çık/gir: ödenen bakiye ve teslim edilen eşyalar
   korunsun. Gold ve inventory listener'ından snapshot alan test Blueprint'inde
   yarım satın alma görülmesin; gerçek detach/disk yolunu ayrıca doğrula.
+
+## O52 — Altın callback telemetrisi (2026-10-10)
+
+MMOTestGoldMetrics, gerçek APlayerController possession'ı olan geçici authority
+pawn'ında 15 senaryo/60 kontrol çalıştırır. Bağımsız Python doğrulayıcı gerçek
+üretim logundaki 23 kaydın kimlik/kaynak/miktar/bakiye/sırasını karşılaştırır.
+Eski kodda bakiye/delegate kontrolleri geçerken 10 senaryonun telemetrisi hatalı;
+düzeltmede iki kökte de 60 kontrol ve 23 kayıt geçti. Native fixture aynı frame
+içinde çalışır; bellekte save roundtrip yapar, gerçek disk/detach save veya uzak
+istemci RPC/HUD kanıtı değildir. Ayrıntı CHECKLIST_FIXES_2026-10-05 §90.
+
+- [ ] Listen host ve uzak istemcide loot, görev ödülü, satın alma, yükseltme,
+  satış ve takas yap: server gold kaydı her gerçek mutasyonu bir kez, doğru
+  kaynak/delta/son bakiye ile yazsın. Normal HUD/delegate bildirimleri sürsün.
+- [ ] Test authority Blueprint'inde gold listener'dan etiketli ve etiketsiz
+  iç işlemler çağır; dış kayıt önce gelsin, plain AddGold kaynağı diger olsun.
+  Başlangıç bakiyesine dönen iki işlem iki ayrı kayıt üretmeli. Oyuncu kimliğini
+  callback'te değiştiren özel senaryoda dış kaydın önceki kimliği ayrıca doğrula.
+- [ ] MaxGold taşması, sıfıra kırpma, sınırda değişmeyen ve Amount=0 isteklerini
+  kontrol et: yalnız gerçek delta kaydedilsin; overflow mesajı sahibine ulaşsın.
+  Callback'te UnPossess olan oyuncunun dış kaydı kaybolmasın, sonraki NPC
+  mutasyonu player kaydı üretmesin. Uzak istemci yetkisiz çağrısı altını değiştirmesin.
+- [ ] Normal işlem sonrası çık/gir: bakiye korunsun. Bu maddeler görsel PIE,
+  gerçek replication, nonauthority ret ve Shipping/Server target kontrolünü açık tutar.

@@ -4156,3 +4156,66 @@ Gezgin218665 (server log Join succeeded) için1 yeni test kaydı oluştu; ana
 mevcut toplam627. Mevcut dosya silinmedi/değiştirilmedi. Test logları ve hash
 kanıtları harici proof dizininde tutuldu. Yalnız sahip olunan8 dosya commit
 kapsamında; izole ignored runtime verisi arşiv öncesi ayrıca korundu.
+
+## 90. O52 — İç içe gold callback'lerinde işlem telemetrisi (2026-10-10)
+
+**Doğrulanan hata:** AddGold, delta/bakiye/oyuncu kapısını OnGoldChanged ve
+overflow bildirimi döndükten sonra okuyordu. AddGoldFrom ortak GoldSourceTag'i
+geçici değiştiriyordu. Nested işlem dış delta'yı yeniden sayıyor, etiketini
+değiştiriyor veya plain AddGold'a dış etiketi aktarıyordu. İlk bakiyeye dönen
+callback dış kaydı düşürebiliyor; değişmeyen tavan/taban isteğine yanlış dış
+kayıt eklenebiliyor; UnPossess dış kaydı tamamen kaybettiriyordu. Bu telemetri
+ve gözlem verisi bütünlüğü hatasıdır; fixture oyuncu altınında kayıp/dupe göstermedi.
+
+**Düzeltme:** Public AddGold/AddGoldFrom, source'u çağrıya ait argümanla
+AddGoldInternal'a iletir. Authority/Amount=0 kapıları ve int64 clamp aynı
+yerdedir. Üretim gold satırı mutasyondan hemen sonra, callback'lerden önce
+yazılır. Ortak etiket alanı kaldırıldı. Nonzero fakat clamp ile değişmeyen
+isteğin mevcut delegate yayını sürer; gold kaydı yalnız gerçek deltada oluşur.
+Overflow bildirimi delegate sonrasında özgün Amount/Sum ile devam eder.
+Kayıt şeması, public API/RPC, replication/save alanları değişmedi.
+
+**Regresyon:** Nonshipping MMOTestGoldMetrics; geçici, kaydı bastırılmış
+AMMOCharacter + gerçek plain APlayerController possession kullanır. Güçlü
+referanslı UObject probe gerçek dynamic delegate'e bağlanır/ayrılır; tüm
+fixture aktörleri aynı frame içinde temizlenir. 15 senaryo × 4 =60 native
+kontrol: delegate bakiyeleri, final bakiye, player kapısı, bellek save roundtrip.
+Plain/tagged/null source, çok katmanlı nested işlemler, cap/floor/zero,
+değişmeyen clamp, başlangıca dönüş, NPC ve callback UnPossess kapsanır.
+Python ValidateGoldMetricLog, logdaki native EXPECT'i ve gerçek üretim
+satırlarını bağımsız sabit oracle'a göre karşılaştırır: 15 tam senaryo/23 satır,
+kimlik/kaynak/delta/bakiye/sıra. Runner exit/timeout/hata/count kapılarına ek
+olarak bu doğrulayıcının başarısını ister; native PASS tek başına yeterli değildir.
+
+Eski Inventory ile gerçek fresh UBT60.78sn ve native60/0; gerçek gold logunda
+10 senaryoda payload/order FAIL, script exit1. Düzeltilmiş izole UBT23.52sn ve
+ana UBT27.74sn, ikisi de actual compile/link + Result:Succeeded/exit0.
+İki kökte native60/0 ve gold15/23 geçti. QA'nın bulduğu senaryo sınırı dışındaki
+fazladan fixture gold satırı açığı doğrulayıcıda kapatıldı: önce/tam arada/sonra
+negatif örnekleri ve ilgisiz map oyuncusunun hariç kalması eklendi; self-test14.
+RunAllChecks'e validator ve native runner eklendi; toplu koşunun tamamı bu
+çalışmada yapılmadı. Ayrıntılı log/hash kanıtları:
+C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o52_gold_metrics_20261010.
+
+**Sınırlar:** Bu aynı-frame fixture gerçek nonauthority RPC ret, uzak client
+property teslimi, kimlik rename veya overflow hint UI testi değildir. Bellek
+roundtrip gerçek detach/disk save kanıtı değildir. first_loot gibi diğer
+metriklerin callback sırası ve ticaretin transaction callback incelemesi ayrı
+kalmıştır. Gerçek host/istemci PIE, Shipping/Server target, -FullCompile ve
+uzun Soak yapılmadı; O52 oynama maddeleri açık.
+
+**Tamamlanma kaydı:** Ana14/14 ilgili runner exit0: gold60 +15/23 log,
+purchase174, vendor18, upgrade132, trade230, quest callbacks112/capacity13,
+saved equipment11, first equip8+2events, save lifecycle26, Store627/627
+loaded/JSON mismatch0/writeorder1/gerçek disk saved-loaded-equal1. Summer57,
+Winter81, iki haritada hata0. NetSmoke port17789 server20sn/client20sn,
+1join/1welcome,iki log hata0 ve gözlem boyunca süreçler hayatta. ValidateData
+mevcut Lv33+ beceri boşluğu uyarılarıyla exit0; StaticLint96 temiz; mevcut
+PlaytestMetrics1516/1516. PS parser ve git diff --check geçti.
+
+QA sonrası yalnız Python oracle değişti; üretim ve DLL aynı kaldı. Son
+14-check validator ile iki kökte native60/0 ve log15/23 yeniden geçti.
+Bu script değişikliği için tekrar oyun derlemesi başlatılmadı. Her kökte
+175 source/config/script girdisi +DLL hash'i doğrulandı; ana14 koşu süresinde
+önceki girdiler de değişmedi. Başlangıçtaki627 .sav byte byte korundu, mevcut
+toplam627; yeni kayıt oluşturulmadı. Yalnız sahip olunan9 dosya commit kapsamında.

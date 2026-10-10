@@ -54,6 +54,11 @@ Step "PlaytestMetrics fixture testi (TestPlaytestMetrics.py)" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Gold log dogrulayici negatif fixture testi" {
+    & $py (Join-Path $PSScriptRoot "ValidateGoldMetricLog.py") --self-test | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Denetim negatif testleri (TestStaticLint/TestValidateData)" {
     & $py (Join-Path $PSScriptRoot "TestStaticLint.py") | Out-Host
     $a = $LASTEXITCODE
@@ -272,6 +277,11 @@ Step "Satici ekonomi kapasite ve yetki kapilari" {
 
 Step "Satin alma delegate odeme ve teslim sirasi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestPurchaseCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Gold callback telemetri kaynak miktar bakiye ve sira" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestGoldMetrics.ps1") | Out-Host
     $LASTEXITCODE -eq 0
 }
 

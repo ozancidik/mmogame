@@ -41,6 +41,7 @@ public:
 	static bool RunFirstEquipSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunUpgradeCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunPurchaseCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunGoldMetricSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -217,8 +218,7 @@ protected:
 	UFUNCTION()
 	void OnRep_Items();
 
-	// Olcum gunlugu: AddGoldFrom'un gecici kaynak etiketi (AddGold icinde okunur, sonra temizlenir).
-	const TCHAR* GoldSourceTag = nullptr;
+	void AddGoldInternal(int32 Amount, const TCHAR* Source);
 
 	bool HasAuthorityInternal() const;
 	void EquipByInstanceIdInternal(int32 InstanceId, bool bRecordFirstEquip);
