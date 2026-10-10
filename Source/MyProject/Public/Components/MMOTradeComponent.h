@@ -106,6 +106,7 @@ public:
 	// Same-frame server fixtures plus native controller chat calls; no transport or durable save proof.
 	static bool RunTradeSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunTradeTeardownSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+    static bool RunTradeStartSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:

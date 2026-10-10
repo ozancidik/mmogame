@@ -550,10 +550,14 @@ void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int3
 
 void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 {
-	UMMOTradeComponent* CA = A ? A->GetTradeComponent() : nullptr;
-	UMMOTradeComponent* CB = B ? B->GetTradeComponent() : nullptr;
-	if (!CA || !CB || CA == CB || !CA->HasAuthorityInternal() || !CB->HasAuthorityInternal()
-		|| CA->bTradeActive || CB->bTradeActive || CA->GetWorld() != CB->GetWorld())
+	// Destruction/EndPlay callbacks can still retain an actor pointer. Admission
+	// must reject that endpoint before installing another session or timer.
+	if (!IsValid(A) || !IsValid(B) || A->IsActorBeingDestroyed() || B->IsActorBeingDestroyed()
+		|| !A->HasActorBegunPlay() || !B->HasActorBegunPlay() || A->HasStartedEndPlay() || B->HasStartedEndPlay()) return;
+	UMMOTradeComponent* CA = A->GetTradeComponent();
+	UMMOTradeComponent* CB = B->GetTradeComponent();
+	if (!IsValid(CA) || !IsValid(CB) || CA == CB || !CA->HasAuthorityInternal() || !CB->HasAuthorityInternal()
+		|| !CA->GetWorld() || CA->bTradeActive || CB->bTradeActive || CA->GetWorld() != CB->GetWorld())
 	{
 		return;
 	}
@@ -581,11 +585,33 @@ void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 	};
 	Begin(CA, B);
 	Begin(CB, A);
-	// Both reciprocal states and generations exist before synchronous observers can read them.
-	CA->OnTradeChanged.Broadcast();
-	CB->OnTradeChanged.Broadcast();
-	CA->NotifyOwner(FString::Printf(TEXT("%s ile ticaret basladi."), *CA->PartnerName));
-	CB->NotifyOwner(FString::Printf(TEXT("%s ile ticaret basladi."), *CB->PartnerName));
+	// Capture original payloads; publish both messages before observers may cancel
+	// or restart. Every publication revalidates the original reciprocal generation.
+	const TWeakObjectPtr<UMMOTradeComponent> Endpoints[] = {CA, CB};
+	const FString Messages[] = {
+		FString::Printf(TEXT("%s ile ticaret basladi."), *CA->PartnerName),
+		FString::Printf(TEXT("%s ile ticaret basladi."), *CB->PartnerName)};
+	const auto CurrentPair = [&Endpoints, NewSession]()
+	{
+		const UMMOTradeComponent* X = Endpoints[0].Get();
+		const UMMOTradeComponent* Y = Endpoints[1].Get();
+		const AMMOCharacter* OX = X ? X->GetOwnerCharacter() : nullptr;
+		const AMMOCharacter* OY = Y ? Y->GetOwnerCharacter() : nullptr;
+		return X && Y && IsValid(OX) && IsValid(OY)
+			&& !OX->IsActorBeingDestroyed() && !OY->IsActorBeingDestroyed()
+			&& OX->HasActorBegunPlay() && OY->HasActorBegunPlay() && !OX->HasStartedEndPlay() && !OY->HasStartedEndPlay()
+			&& OX->HasAuthority() && OY->HasAuthority()
+			&& X->bTradeActive && Y->bTradeActive && X->TradeSessionId == NewSession && Y->TradeSessionId == NewSession
+			&& X->Partner.Get() == OY && Y->Partner.Get() == OX;
+	};
+	for (int32 I = 0; I < 2; ++I)
+	{
+		if (CurrentPair()) Endpoints[I].Get()->NotifyOwner(Messages[I]);
+	}
+	for (const auto& Endpoint : Endpoints)
+	{
+		if (CurrentPair()) Endpoint.Get()->OnTradeChanged.Broadcast();
+	}
 }
 
 void UMMOTradeComponent::ResetLocalState()

@@ -4293,3 +4293,89 @@ Başlangıçtaki627 .sav byte byte korundu. NetSmoke oyuncusu Gezgin454756 için
 oluşan tek ek kayıtla mevcut toplam628; bu kayıt korunur. Yalnız sahip olunan
 8 dosya commit kapsamında. QA kaynak incelemesinde yeni blocker bulmadı;
 saat snapshot'ı `%g` metnidir, bit düzeyinde float eşitliği kanıtı değildir.
+
+## 92. O54 — Ticaret başlangıcının bayat callback yayını ve EndPlay kabulü (2026-10-10)
+
+**Doğrulanan hatalar:** StartTradeServer iki state'i kurduktan sonra ilk
+delegate'i çağırıyor, sonra raw peer üzerinden ikinci delegate ve iki mesajı
+gönderiyordu. İlk callback iptal/yeni ticaret/Destroy yapınca eski başlangıç
+stack'i kapalı veya başka generation state'ine fazladan callback ve değişmiş
+partner adıyla mesaj yayıyordu. Ayrıca Destroy/EndPlay actor'üyle doğrudan
+başlangıç yeni state/timer kurabiliyordu. Erken Character EndPlay'deki parti
+ayrılma listener'ından gerçek RequestAcceptSeen de kapanmakta olan actor'ü
+kabul ediyordu: HasActorBegunPlay henüz true, IsActorBeingDestroyed false.
+
+**Düzeltme:** Mevcut Character bEndPlayStarted bayrağı salt okunur native
+HasStartedEndPlay getter'ıyla kullanılır. Başlangıç öncesi iki actor'ün valid,
+başlamış, otoriter, aynı world'de, kapanmayan ve ayrı/inactive component'ler
+olması gerekir. İki state/generation/timer önce kurulur. İki orijinal partner
+mesajı kopyalanıp delegate'lerden önce gönderilir; ardından trade delegate'leri
+yayımlanır. Her yayın weak component/owner, yaşam durumu, otorite, aktif state,
+orijinal generation ve reciprocal partner üzerinden tekrar doğrulanır.
+Callback sonrası raw endpoint kullanılmaz. RPC/replication/save şeması değişmez.
+
+**Regresyon:** MMOTestTradeStart, 13 mod × 2 inviter/recipient yönü =26 senaryo,
+208 kontrol. Normal başlangıç, ilk callback cancel, aynı/farklı partner restart,
+self/peer Destroy, restart sonra tekrar end, önceden Destroy/RouteEndPlay olan
+iki uç ve erken party EndPlay callback'inden davet kabulü kapsanır. İlk yedi mod
+gerçek SetPendingInviteServer + RequestAcceptSeen yoluyla başlar. Önceden
+kapanmış uç modları doğrudan internal admission'ı sınar; erken iki mod gerçek
+Character RouteEndPlay → Party RequestLeave → OnPartyChanged → RequestAcceptSeen
+zincirini çalıştırır. Parti public reciprocal state'i fixture içinde seed edilir;
+parti oluşturma/davet protokolünün testi değildir.
+
+Native controller/PlayerState'lere üç ayrı ad verilir. Gerçek ClientReceiveChat
+implementation ve HUD chat storage'da partner adı, mesaj sırası ve tam ticaret
+mesajları karşılaştırılır; ilgisiz parti geri bildirimi filtrelenir. Gerçek trade
+delegate sayıları, callback başında iki reciprocal state/generation/boş teklif/
+revizyon0/timer, yeni teklif17/ekipman/onay/revizyon3 snapshot'ı, stale cancel,
+tam inventory save snapshot eşitliği kontrol edilir. EndPlay bayrağının erkenden
+set edildiği callback içinde ayrıca gözlenir. Destroy sonrası okumalar aynı
+stack'te deferred reclamation kullanır; async/GC sonrası güvenlik kanıtı değildir.
+
+Final208 fixture ile eski üretim gerçek compile/link sonrası90 FAIL üretti
+(native0/runner1). Düzeltilmiş üretim gerçek compile/link ardından208/0,
+native0/runner0. İlk176 fixture'daki14 yanlış mesaj beklentisi QA ile bulundu:
+controller PlayerState adı `?` değildir; ayırt edilebilir adlarla oracle düzeltildi
+ve eski üretim yeniden derlenip son fixture ile tekrar sınandı. Bu ilk176 sonucu
+doğrulanmış başarı olarak kullanılmaz. RunAllChecks'e yeni runner eklendi.
+
+**Sınırlar:** Native HUD storage görsel çizim/uzak Client RPC teslimi değildir.
+Argumentless multicast listener'ları aynı broadcast içinde değişmiş state'i
+okuyabilir; immutable snapshot garantisi yoktur. TryExecuteTrade item/gold
+transaction callback'leri bu düzeltmenin kapsamı dışındadır. Gerçek host/uzak
+istemci PIE, Shipping/Server target ve uzun Soak bu çalışma için açık kalır.
+Kanıtlar: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o54_trade_start_20261010.
+
+**Tamamlanma kaydı:** Generation yayın kapısını tek başına kaldıran mutant,
+iki yönde aynı-partner restart callback sayısını bozdu (208/2FAIL). Erken
+EndPlay bayrağı kapılarını kaldıran mutant, dört erken-parti senaryosunda
+208/16FAIL üretti. Her mutant gerçek compile/link sonrası native0/runner1;
+düzeltme geri yüklenip gerçek compile/link2.99sn ardından208/0 geçti.
+Final eski-kod baseline compile/link33.79sn, fixed208 compile/link2.91sn;
+ana gerçek UBT compile/link35.51sn, tümü Succeeded. İlk kopyalama sonrası
+up-to-date sonucu üretim derlemesi sayılmadı; source timestamp yenilenip
+gerçek compile eylemi görülmeden runtime başarı kabul edilmedi.
+
+Ana16/16 runner exit0: başlangıç208, kapanış124, gold60 +15/23 log,
+purchase174, vendor18, upgrade132, trade230, quest callbacks112/capacity13,
+saved equipment11, first equip8+2events, save lifecycle26, Store635/635 loaded/
+JSON mismatch0/writeorder1/gerçek disk saved-loaded-equal1. Summer57, Winter79,
+iki smoke hata0; Winter engebeli cepte ilk dolum3 mob uyarısı kaldı. NetSmoke
+port17793 server20sn/client20sn, 1join/1welcome, iki log hata0 ve gözlem
+boyunca iki süreç hayatta. Bu koşu ticaret RPC veya temiz native çıkış kanıtı değildir.
+
+İzole kökte restored208 ardından kapanış124/trade230/save lifecycle26 geçti.
+İki kökte source/config/script180 girdisi +DLL hash'i koşu boyunca değişmedi.
+ValidateData mevcut Lv33+ beceri boşluğu uyarılarıyla exit0; StaticLint99 temiz,
+PlaytestMetrics1516/1516, iki PS parser ve git diff --check geçti. Ana Lore
+üretim kontrolü97 görev girdisinde eşleşti. QA salt kaynak incelemesinde son
+adayda yeni actionable bulgu bulmadı; runtime kanıtı bu oturumun koşularıdır.
+
+Paralel ajanın ana FullCompile koşusu bitene kadar aktarım yapılmadı. Onun
+dfdeff2 yan görev commit'i üzerine entegrasyon yapıldı, beş dosyası değişmedi.
+Başlangıç628 .sav ve aktarım öncesindeki635 .sav byte byte korundu. Aradaki
+yedi ek kayıt paralel koşuda oluştu; bu çalışma ana testleri yeni kayıt
+oluşturmadı, mevcut toplam635. Yalnız sahip olunan8 dosya commit kapsamında.
+Bu revizyonda tam RunAllChecks/-FullCompile yeniden çalıştırılmadı; paralel
+ajanın önceki koşusu O54 doğrulaması olarak sunulmaz. Açık PIE maddeleri O54 bölümünde.

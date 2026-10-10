@@ -5148,3 +5148,26 @@ RPC, görsel HUD/chat veya disk save kanıtı değildir. Ayrıntı fixes §91.
   iki eski pencere/timer kapansın; hayatta kalan oyuncu doğru mesajı alsın.
   Listener'da kendisini/peer'i Destroy eden authority testinde erişim hatası
   olmasın. Shipping/Server target ve gerçek replication kontrolleri açık.
+
+## O54 — Ticaret başlangıcı callback ve EndPlay kabulü (2026-10-10)
+
+Native MMOTestTradeStart, 26 senaryo/208 kontrol: controller/PlayerState/HUD
+chat depolaması ve gerçek dynamic delegate kullanır. Native RequestAcceptSeen
+dispatch'i, Destroy, RouteEndPlay ve erken parti ayrılma callback'i çalışır.
+Uzak RPC teslimi, görsel HUD çizimi ve kalıcı kayıt testi değildir.
+
+- [ ] Host ve uzak istemcide daveti iki yönde kabul et: iki tarafın doğru
+  partner adıyla tek başlangıç mesajı ve ticaret penceresi olmalı.
+- [ ] Authority test listener'ında ilk OnTradeChanged sırasında bir kez iptal et;
+  başlangıç mesajları iptalden önce gelmeli, eski başlangıç pencereyi yeniden
+  açmamalı. İptal sonrası aynı/farklı partnerle yeni davet kabul et; yeni teklif,
+  onay, revizyon ve timer korunmalı, eski başlangıç ekstra bildirim üretmemeli.
+- [ ] İlk callback'te yeni oturumu açıp yeniden kapat; eski başlangıç mesajı
+  sona eklenmesin. İlk callback'te kendisini/partnerini Destroy eden authority
+  testinde survivor kapalı kalmalı, erişim hatası olmamalı.
+- [ ] Partideki oyuncunun harita geçişi/EndPlay parti listener'ından bekleyen
+  ticaret davetini kabul etmeyi dene; ayrılan oyuncuyla yeni ticaret/timer
+  başlamamalı. Normal yeni pawn ve yeni davet daha sonra çalışmalı.
+- [ ] Yukarıdaki yolları Shipping/Server target ve gerçek replication ile
+  doğrula. Tek multicast içindeki sonraki listener güncel state okuyabilir;
+  native callback sayıları uzak istemci OnRep sayısı garantisi değildir.

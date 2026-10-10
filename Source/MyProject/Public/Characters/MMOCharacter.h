@@ -80,6 +80,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOPartyComponent* GetPartyComponent() const { return PartyComponent; }
+	// Server admission must reject reentry from early EndPlay callbacks.
+	bool HasStartedEndPlay() const { return bEndPlayStarted; }
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOTradeComponent* GetTradeComponent() const { return TradeComponent; }
