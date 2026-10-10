@@ -8,6 +8,26 @@ This is an Unreal Engine 5.7 project (`MyProject.uproject`), started from Epic's
 
 Gameplay logic lives in two places: (1) the C++ module for systems (stats, combat, progression, replication), and (2) Blueprint assets for content and visuals. Blueprint graph logic is not greppable — `.uasset` files are binary, so understanding/changing Blueprint behavior requires opening the asset in the Unreal Editor. C++ logic under `Source/` is normal text and can be grepped/edited directly.
 
+## Agent usage (MANDATORY — owner rule 2026-10-11: never work without agents)
+
+The main session is the **orchestrator**: split the work, delegate it to the project agents in `.claude/agents/`, verify what they return (read the test output / diff yourself; never report an agent's claim as verified), then commit. Only trivial glue (a one-line doc fix, commit/push verification, merging agent results) may be done directly. Skip agents only when the owner explicitly says so for that task.
+
+| Work | Agent(s) |
+|---|---|
+| New feature / unstarted area | `oyun-tasarimcisi` (design) -> `mmo-developer` (code + build) -> `test-muhendisi` (self-test + mutation) -> `qa-kontrolcu` + `ag-guvenlik-denetcisi` (independent, read-only, run in parallel) -> `belge-denetcisi` (docs) |
+| Bug fix / code change | `mmo-developer`, then `qa-kontrolcu` on the diff (and `ag-guvenlik-denetcisi` if it touches RPCs, gold/items, saves, identity) |
+| Economy, XP, rewards, prices | `ekonomi-tasarimcisi` (model numbers first) |
+| Spawn pockets, stuck mobs, level/content gaps | `seviye-tasarimcisi` |
+| NPC dialogue, quest text, lore | `metin-yazari` (then `GenQuestDialogue.py`) |
+| Tests, mutation checks, RunAllChecks steps | `test-muhendisi` |
+| Docs / counts / daily summary | `belge-denetcisi` |
+
+Concurrency rules (several agents share ONE working tree, and Codex edits it too):
+- **One builder at a time.** Agents that compile or launch the game (`mmo-developer`, `test-muhendisi`, `seviye-tasarimcisi`) run one after another, never in parallel. Read-only agents (`qa-kontrolcu`, `ag-guvenlik-denetcisi`, `oyun-tasarimcisi`) may run in parallel with each other.
+- Give every agent an explicit file scope in its prompt, tell it to check `git status` first and to leave Codex's uncommitted files alone, and to commit by file name (no `git add -A`, no manual `git push`).
+- Start agents in the background and continue; do not poll with sleep loops.
+- Typical triggers: after every new system or non-trivial change, run `qa-kontrolcu` before calling it done.
+
 ## C++ module (`Source/MyProject/`)
 
 The MMORPG systems are written in C++ so they can be edited and compiled without the editor. Current classes:
