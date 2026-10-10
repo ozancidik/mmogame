@@ -7,7 +7,7 @@
 | Alan | Ne | Kanıt |
 |---|---|---|
 | Süreç | Claude oturumu "devam et" beklemeden sürsün diye proje `Stop` kancası (`.claude/stop-autonomy.ps1`, `settings.local.json`); durdurmak için `.claude/STOP-AUTONOMY` dosyası | kanca gerçek oturumda tetiklendi; betik 4 senaryoda elle denendi |
-| Doğrulama | HEAD (Codex'in Ticaret commit'leri dahil) tam derleme + tüm kontroller | `RunAllChecks -FullCompile` 114, sonra 116 GECTI, çıkış 0 |
+| Doğrulama | HEAD (Codex'in Ticaret/Ganimet/Beceri commit'leri dahil) tam derleme + tüm kontroller | `RunAllChecks -FullCompile` 114 → 116 → son olarak `5d8dab7` sonrası birleşik HEAD'de 126 GECTI, çıkış 0 |
 | Spawner | Winter **P48** cebi `(5000,0)` → `(4500,-700,120)`: eski noktada bir mob `Pine_tree34` yanında takılıyordu (6 soak koşusunun 2'sinde, tek olayda 14 satır) | yeni nokta 64/64 yüzey probu; 2 soak koşusu 0 takılma, ilk doldurma 6/7, 6/8 |
 | Spawner | Winter **Uçurum Gezgini** cebi `(-5500,4500)` → `(-5000,4800,-92)`: ilk doldurma 3–4/6'ydı | yeni nokta 64/64; 2 soak koşusu 0 takılma, ilk doldurma 5/6 |
 | Kontrol | Winter 600 sn soak (son yerleşim): 17 spawner, 1 takılma satırı (P78 `(-2000,2500)`, tek mob; önceki 4 koşuda 0), diğer 16 cep temiz; Gezgin ilk doldurma bu koşuda 4/6 (koşular arası 4–5 oynuyor). Satır incelendi: engel arazi/ağaç değil başka bir mob (`MMOMob_110`, çakışan kapsül), "0 other events" yani geçici. Taşınmadı; tekrarlarsa yedek adaylar probla hazır: `(-1500,2500,212)`, `(-1700,2000,206)`, `(-1400,2000,213)` (hepsi 64/64, düz) | `SoakTest.ps1 -Seconds 600` |
