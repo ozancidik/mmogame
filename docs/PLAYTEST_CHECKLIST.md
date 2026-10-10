@@ -5245,3 +5245,21 @@ fixture kalıcı kayıt başarısını, gerçek uzak RPC/HUD veya GC/async'yi ka
   atomik kalıcı işlem ayrıca gerekir; native2584 sonucu bu riski kapatmaz.
 - [ ] Erken EndPlay parti callback'i içinden takas kapanış yayını, gerçek GC/async
   ve dedicated/Shipping Server replication ayrı açık kontrollerdir.
+
+
+## O58 — Parti callback'i içinde erken EndPlay ve takas iptali (2026-10-10)
+
+Native teardown220 kontrol/30 case; yeni8 case gerçek RouteEndPlay ve native
+controller/HUD metin deposu kullanır. Public roster seed'i gerçek parti daveti,
+uzak RPC/render veya kalıcı kayıt kanıtı değildir.
+
+- [ ] Host+uzak istemcide aynı partide iki oyuncuyla takas aç. Bir oyuncu harita
+  geçişine başlarken authority OnPartyChanged listener'ında retiring veya canlı
+  endpoint'ten bir kez iptal et. İki takas state/timer temizlensin; canlı HUD
+  bir kez kapansın, retiring owner'a yeni chat/delegate ulaşmasın.
+- [ ] İlk authority OnTradeChanged listener'ında self veya peer EndPlay başlat:
+  kapanmış state korunmalı, daha sonra retiring endpoint'e delegate gitmemeli.
+  EndPlay'den önce gönderilmiş chat geri alınmaz; çift kapanış/erişim hatası olmasın.
+- [ ] Normal iptal, Destroy/disconnect, aynı/farklı partnerle callback restart
+  ve stale cancel/confirm davranışları korunsun. Gerçek ServerTravel/GC/async
+  ve dedicated/Shipping Server kontrolü ayrıca açık kalır.

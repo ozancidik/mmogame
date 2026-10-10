@@ -4583,3 +4583,68 @@ MMOSave_Gezgin047761.sav dosyası da korundu, toplam656. Yeniden yönelim
 snapshot'ındaki kapsam dışı938 takipli dosyanın içeriği değişmedi.
 PIE maddeleri açık; görsel/uzak istemci takası ve kalıcı paired transaction
 başarılı olarak işaretlenmedi. QA alt ajanı kapatıldı.
+
+
+## O58 — Erken EndPlay sırasında takas kapanış yayını (2026-10-10)
+
+O57 kaynak incelemesinin şüphesi gerçek native fixture ile doğrulandı:
+AMMOCharacter::EndPlay önce bEndPlayStarted işaretler, ardından Super::EndPlay
+öncesinde parti RequestLeave çağırır. Parti delegate'i içinde pawn hâlâ
+HasActorBegunPlay=true, IsActorBeingDestroyed=false ve controller bağlıdır.
+Buradan iki endpoint'in herhangi biri takası iptal ettiğinde eski EndedEndpoint
+filtresi kapanan pawn'a chat ve OnTradeChanged gönderiyordu. Bu, kapanış UI veya
+listener'ının yaşam döngüsü bittikten sonra iş yapmasına yol açar.
+
+Küçük düzeltme: EndedEndpoint owner'ını AMMOCharacter olarak çözer ve
+HasStartedEndPlay olan endpoint'in yayınını bastırır. İki state/timer temizliği
+önceki gibi unconditional çalışır; canlı partnerin yayını bağımsız kalır.
+RPC/replication/save şeması veya takas ekonomisi değişmedi.
+
+Mevcut MMOTestTradeTeardown/TestTradeTeardown 124/22'den220/30'a genişletildi.
+Yeni sekiz case: retiring oyuncu × cancel caller × erken parti callback'i veya
+ilk trade delegate'i içinden RouteEndPlay(LevelTransition). Public parti roster,
+ortak session ve membership context seed edilir; gerçek davet akışı değildir.
+Native controller/HUD bağlıdır; erken pencerede begun+started/notdestroy ve
+controller attachment, nonvacuous reciprocal trade/timer/party, her observer'dan
+önce iki kapalı state, exact delegate ve chat metni/sayısı, parti cleanup,
+full envanter save-data değişmezliği ve stale cancel/confirm kontrol edilir.
+İlk trade delegate'inden peer EndPlay, eski begun-play guard'ının regresyonudur;
+chat iki delegate'den önce gönderildiği için o case'te önceki chat beklenir.
+Kapanan oyuncunun kendi ilk delegate'inde EndPlay'e girmesi de matriste bulunur.
+
+Baseline gerçek compile/link62.18sn/13action, güçlendirilmiş220 fixture5.74sn:
+220/12FAIL, native0/runner1. Dört erken case'te no-retiring-delegate,
+exact-count ve native-chat kontrolleri başarısız oldu. Fixed compile/link
+10.48sn/5action Succeeded;220/0FAIL, native0/runner0. İlk124 kontrol korunur.
+Kanıt: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o58_trade_endplay_20261010.
+
+Sınırlar: native authority/controller/HUD veri saklaması, gerçek render veya
+uzak RPC kanıtı değildir. Aynı karede AutoLoadDeferred çalışmaz; initial load
+başlatılmaz ve travel-save guard aktiftir. Kalıcı kayıt/ServerTravel/GC/async,
+Shipping/dedicated Server ve genel bütün EndPlay callout'ları burada sınanmaz.
+O57'nin kalıcı paired disk transaction riski açık kalır; PIE maddeleri açıktır.
+
+Son fixture QA önerileriyle güçlendirildi: mirrored revision7, consumed invite
+ID100/101, distinct LastInvite/Offer/Trade/Confirm zamanları doğrudan typed
+karşılaştırılır; cancellation ve stale istek boyunca korunmaları kontrol edilir.
+Runner tam30 case-ID kümesini,220 kaydı ve benzersiz(case,check) çiftlerini
+zorunlu kılar. Salt parser valid/duplicate/missing-case kontrolleri3/3 geçti.
+Final fixture gerçek baseline compile/link5.97sn:220/12FAIL; fixed5.99sn:
+220/0FAIL. Native0, baseline runner1/coverageTrue, fixed runner0. QA son
+fixture/runner/production gate incelemesinde yeni somut sorun bulmadı; ajan kapatıldı.
+
+Ana checkout UBT5action/11.87sn Succeeded; trade ve teardown fixture compile/link
+edildi. İzole ve ana source/config/scripts+DLL frozen187 hash'i korundu.
+İzole10/10 seçilmiş runner exit0: Transfer2584,Offer480,Confirm352,Start208,
+Teardown220,Gold60,Purchase174,Upgrade132,Trade230,SaveLifecycle26.
+Ana19/19 exit0: aynı10 +Vendor18,QuestCallbacks112,QuestCapacity13,
+SavedEquipment11,FirstEquip8/2event,Store656/656,Summer57/Winter80
+mob ve hata0,NetSummer port17803/server20sn+client20sn/join1/welcome1/hata0;
+iki owned süreç gözlem boyunca yaşadı. Store JSON656/mismatch0/writeorder1/
+roundtrip1. Net smoke gerçek gameplay RPC veya dedicated/Shipping Server kanıtı değildir.
+ValidateData exit0 (mevcut beceri boşluğu uyarıları),StaticLint102 dosya exit0,
+PlaytestMetrics1516/1516,PS parser/scoped diff-check geçti. FullCompile,
+full RunAllChecks ve uzun soak çalıştırılmadı. İlk656 .sav byte hash'i,
+kapsam dışı942 takipli dosya ve peer dirty MMOGameMode/iki belge korundu.
+Yeni ağ slotu MMOSave_Gezgin749473.sav korundu; toplam657. Yalnız owned5 dosya
+commit'e alınır. PIE ve O57 kalıcı paired transaction kontrolleri açık kalır.

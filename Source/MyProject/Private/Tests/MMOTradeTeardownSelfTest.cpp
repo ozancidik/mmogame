@@ -3,6 +3,10 @@
 #if !UE_BUILD_SHIPPING
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Components/MMOPartyComponent.h"
+#include "GameFramework/PlayerState.h"
+#include "Player/MMOPlayerController.h"
+#include "UI/MMOHUD.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
 #include "Misc/CoreMisc.h"
@@ -22,6 +26,7 @@ bool UMMOTradeComponent::RunTradeTeardownSelfTest(UWorld* World, FString& OutErr
 		|| !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
 	{ OutError = TEXT("disposable authority headless game world required"); return false; }
 	TArray<AMMOCharacter*> Fixtures;
+	TArray<AMMOPlayerController*> Controllers; TArray<AMMOHUD*> HUDs;
 	int32 Failures = 0;
 	const auto Check = [&](const FString& Case, const TCHAR* Label, bool bOK)
 	{
@@ -215,11 +220,116 @@ bool UMMOTradeComponent::RunTradeTeardownSelfTest(UWorld* World, FString& OutErr
 				: Closed(T[2]));
 			T[Side]->EndTradeServer(TEXT("fixture final cleanup"));
 		}
+		// Native Character EndPlay -> party leave callout before Super::EndPlay.
+		// Seed only the public roster/context; this is not invitation/remote RPC proof.
+		for(int32 Retired=0;Retired<2;++Retired) for(int32 Caller=0;Caller<2;++Caller) for(int32 Route=0;Route<2;++Route)
+		{
+			const FString Case=FString::Printf(TEXT("early_retired%d_caller%d_route%d"),Retired,Caller,Route);
+			AMMOCharacter* P[2]={}; AMMOPlayerController* PC[2]={}; AMMOHUD* H[2]={};
+			UMMOTradeComponent* T[2]={}; UMMOPartyComponent* Party[2]={}; FMMOCharacterSaveData Before[2];
+			FActorSpawnParameters Params; Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			for(int32 I=0;I<2;++I)
+			{
+				P[I]=World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(),FVector(2300000+I*100,2300000,5000),FRotator::ZeroRotator,Params);
+				PC[I]=World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(),Params);
+				if(P[I]) Fixtures.Add(P[I]); if(PC[I]) Controllers.Add(PC[I]);
+				if(!P[I] || !PC[I] || !P[I]->GetInventory() || !P[I]->GetTradeComponent() || !P[I]->GetPartyComponent())
+				{ OutError=TEXT("early fixture spawn/components"); return false; }
+				P[I]->SetTravelSaveCommitted(true); P[I]->SetActorTickEnabled(false); P[I]->SetActorEnableCollision(false);
+				PC[I]->SetActorTickEnabled(false); PC[I]->Possess(P[I]);
+				if(!P[I]->GetPlayerState()) { OutError=TEXT("early fixture PlayerState"); return false; }
+				P[I]->GetPlayerState()->SetPlayerName(FString::Printf(TEXT("O58_%d"),I));
+				PC[I]->ClientSetHUD(AMMOHUD::StaticClass()); H[I]=Cast<AMMOHUD>(PC[I]->GetHUD());
+				if(!H[I]) { OutError=TEXT("early fixture HUD"); return false; } HUDs.Add(H[I]);
+				T[I]=P[I]->GetTradeComponent(); Party[I]=P[I]->GetPartyComponent();
+				FMMOCharacterSaveData Seed; Seed.Gold=1000+I*100; Seed.NextInstanceId=50;
+				FMMOEquipmentInstance Item; Item.ItemId=TEXT("ShortSword"); Item.InstanceId=40; Seed.EquipmentBag.Add(Item);
+				P[I]->GetInventory()->ApplySaveData(Seed); Before[I]=Snapshot(P[I]->GetInventory());
+			}
+			Party[0]->Members.Add(P[1]); Party[1]->Members.Add(P[0]);
+			Party[0]->Leader=Party[1]->Leader=P[0]; Party[0]->PartySessionId=Party[1]->PartySessionId=FGuid::NewGuid();
+			Party[0]->PartyMembershipId=FGuid::NewGuid(); Party[1]->PartyMembershipId=FGuid::NewGuid();
+			StartTradeServer(P[0],P[1]);
+			T[0]->MyOffer.Gold=17; T[1]->TheirOffer=T[0]->MyOffer;
+			T[1]->MyOffer.Items.Add(P[1]->GetInventory()->EquipmentBag[0]); T[0]->TheirOffer=T[1]->MyOffer;
+			T[1]->MyOffer.bConfirmed=true; T[0]->TheirOffer.bConfirmed=true;
+			for(int32 I=0;I<2;++I)
+			{
+				T[I]->OfferRevision=7; T[I]->PendingInviteId=100+I;
+				T[I]->LastInviteTime=-91.f-I; T[I]->LastOfferChangeTime=-81.f-I;
+				T[I]->LastTradeChangeTime=-71.f-I; T[I]->LastConfirmTime=-61.f-I;
+			}
+			const auto ContextUnchanged=[&]()
+			{
+				for(int32 I=0;I<2;++I) if(T[I]->OfferRevision!=7 || T[I]->PendingInviteId!=100+I
+					|| T[I]->PendingInviteFrom.IsValid() || T[I]->PendingInviteTime!=-1.f
+					|| T[I]->LastInviteTime!=-91.f-I || T[I]->LastOfferChangeTime!=-81.f-I
+					|| T[I]->LastTradeChangeTime!=-71.f-I || T[I]->LastConfirmTime!=-61.f-I) return false;
+				return true;
+			};
+			const int32 Base[2]={H[0]->GetChatLinesForTests().Num(),H[1]->GetChatLinesForTests().Num()};
+			TStrongObjectPtr<UMMOTradeTeardownProbe> TradeProbe[2]={TStrongObjectPtr<UMMOTradeTeardownProbe>(NewObject<UMMOTradeTeardownProbe>()),TStrongObjectPtr<UMMOTradeTeardownProbe>(NewObject<UMMOTradeTeardownProbe>())};
+			TStrongObjectPtr<UMMOTradeTeardownProbe> PartyProbe(NewObject<UMMOTradeTeardownProbe>());
+			bool SawEarly=false, ClosedAtHook=false, LivePublications=true, ClosedAtPublication=true;
+			Check(Case,TEXT("nonvacuous_pair_and_party"),T[0]->GetValidPartnerComp()==T[1] && T[1]->GetValidPartnerComp()==T[0]
+				&& T[0]->TradeSessionId==1 && T[1]->TradeSessionId==1 && World->GetTimerManager().IsTimerActive(T[0]->ValidateTimerHandle)
+				&& World->GetTimerManager().IsTimerActive(T[1]->ValidateTimerHandle) && Party[0]->Members.Num()==1 && Party[1]->Members.Num()==1
+				&& Party[0]->PartySessionId.IsValid() && Party[0]->PartySessionId==Party[1]->PartySessionId
+				&& Party[0]->PartyMembershipId.IsValid() && Party[1]->PartyMembershipId.IsValid());
+			PartyProbe->Callback=[&](int32 Call)
+			{
+				if(Call!=1) return;
+				SawEarly=P[Retired]->HasActorBegunPlay() && P[Retired]->HasStartedEndPlay() && !P[Retired]->IsActorBeingDestroyed()
+					&& P[Retired]->GetController()==PC[Retired] && (Route==1 || T[0]->bTradeActive && T[1]->bTradeActive);
+				if(Route==0) T[Caller]->RequestCancelSeen(1);
+				ClosedAtHook=Closed(T[0]) && Closed(T[1]);
+			};
+			Party[Retired]->OnPartyChanged.AddDynamic(PartyProbe.Get(),&UMMOTradeTeardownProbe::OnTrade);
+			for(int32 I=0;I<2;++I)
+			{
+				TradeProbe[I]->Callback=[&,I](int32 Call)
+				{
+					ClosedAtPublication &= Closed(T[0]) && Closed(T[1]) && T[0]->TradeSessionId==1 && T[1]->TradeSessionId==1;
+					LivePublications &= !P[I]->HasStartedEndPlay() && P[I]->HasActorBegunPlay() && !P[I]->IsActorBeingDestroyed();
+					if(Route==1 && I==Caller && Call==1) P[Retired]->RouteEndPlay(EEndPlayReason::LevelTransition);
+				};
+				T[I]->OnTradeChanged.AddDynamic(TradeProbe[I].Get(),&UMMOTradeTeardownProbe::OnTrade);
+			}
+			if(Route==0) P[Retired]->RouteEndPlay(EEndPlayReason::LevelTransition); else T[Caller]->RequestCancelSeen(1);
+			Check(Case,TEXT("native_early_window"),SawEarly && PartyProbe->Calls==1);
+			Check(Case,TEXT("both_closed_inside_party_hook"),ClosedAtHook);
+			Check(Case,TEXT("no_retiring_delegate"),LivePublications);
+			Check(Case,TEXT("closed_before_each_trade_observer"),ClosedAtPublication && TradeProbe[1-Retired]->Calls==1);
+			Check(Case,TEXT("exact_trade_delegate_counts"),TradeProbe[Retired]->Calls==(Route==1 && Retired==Caller?1:0) && TradeProbe[1-Retired]->Calls==1);
+			bool Chat=true;
+			for(int32 I=0;I<2;++I)
+			{
+				TArray<FString> Actual; const auto& Lines=H[I]->GetChatLinesForTests();
+				for(int32 N=Base[I];N<Lines.Num();++N) Actual.Add(Lines[N].Text);
+				TArray<FString> Expected; if(Route==1 || I!=Retired) Expected.Add(TEXT("Ticaret iptal edildi."));
+				Chat &= Actual==Expected;
+			}
+			Check(Case,TEXT("native_chat_exact"),Chat);
+			Check(Case,TEXT("party_cleanup_completed"),!Party[0]->IsInParty() && !Party[1]->IsInParty() && !Party[0]->PartyMembershipId.IsValid() && !Party[1]->PartyMembershipId.IsValid());
+			Check(Case,TEXT("trade_states_and_timers_closed"),Closed(T[0]) && Closed(T[1]) && T[0]->TradeSessionId==1 && T[1]->TradeSessionId==1 && ContextUnchanged());
+			const auto Economy=[&]() { return EqualSave(Before[0],Snapshot(P[0]->GetInventory())) && EqualSave(Before[1],Snapshot(P[1]->GetInventory())); };
+			Check(Case,TEXT("economy_unchanged"),Economy());
+			const int32 Calls[2]={TradeProbe[0]->Calls,TradeProbe[1]->Calls}, ChatCounts[2]={H[0]->GetChatLinesForTests().Num(),H[1]->GetChatLinesForTests().Num()};
+			const FString Final[2]={State(T[0]),State(T[1])};
+			for(int32 I=0;I<2;++I) { T[I]->RequestCancelSeen(1); T[I]->RequestConfirmSeen(1,0); }
+			Check(Case,TEXT("stale_requests_no_effect"),State(T[0])==Final[0] && State(T[1])==Final[1] && Economy() && ContextUnchanged()
+				&& TradeProbe[0]->Calls==Calls[0] && TradeProbe[1]->Calls==Calls[1] && H[0]->GetChatLinesForTests().Num()==ChatCounts[0] && H[1]->GetChatLinesForTests().Num()==ChatCounts[1]);
+			Check(Case,TEXT("native_endplay_completed"),P[Retired]->HasStartedEndPlay() && !P[Retired]->HasActorBegunPlay() && !P[Retired]->IsActorBeingDestroyed());
+			Party[Retired]->OnPartyChanged.RemoveDynamic(PartyProbe.Get(),&UMMOTradeTeardownProbe::OnTrade); PartyProbe->Callback=nullptr;
+			for(int32 I=0;I<2;++I) { T[I]->OnTradeChanged.RemoveDynamic(TradeProbe[I].Get(),&UMMOTradeTeardownProbe::OnTrade); TradeProbe[I]->Callback=nullptr; }
+		}
 		return true;
 	}();
 	for(AMMOCharacter* P:Fixtures) if(IsValid(P)) { if(P->GetTradeComponent()) P->GetTradeComponent()->EndTradeServer(TEXT("fixture cleanup")); P->Destroy(); }
+	for(AMMOPlayerController* PC:Controllers) if(IsValid(PC)) { PC->UnPossess(); PC->Destroy(); }
+	for(AMMOHUD* H:HUDs) if(IsValid(H)) H->Destroy();
 	if(!bCompleted) return false;
-	if(OutChecks!=124) { ++Failures; OutError += TEXT(" check_count_mismatch"); }
+	if(OutChecks!=220) { ++Failures; OutError += TEXT(" check_count_mismatch"); }
 	if(Failures) OutError=FString::Printf(TEXT("failures=%d first=%s"),Failures,*OutError);
 	return Failures==0;
 }

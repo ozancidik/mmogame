@@ -693,9 +693,9 @@ void UMMOTradeComponent::EndTradeServer(const FString& Reason, bool bSaveComplet
 	const auto EndedEndpoint = [EndingSession](const TWeakObjectPtr<UMMOTradeComponent>& Endpoint)
 	{
 		UMMOTradeComponent* T = Endpoint.Get();
-		const AActor* Owner = T ? T->GetOwner() : nullptr;
+		const AMMOCharacter* Owner = T ? T->GetOwnerCharacter() : nullptr;
 		return T && IsValid(Owner) && !Owner->IsActorBeingDestroyed() && Owner->HasActorBegunPlay()
-			&& !T->bTradeActive && T->TradeSessionId == EndingSession ? T : nullptr;
+			&& !Owner->HasStartedEndPlay() && !T->bTradeActive && T->TradeSessionId == EndingSession ? T : nullptr;
 	};
 	for (const auto& Endpoint : Endpoints)
 	{
