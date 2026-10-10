@@ -220,6 +220,11 @@ Step "Ilk kabul edilen sunucu becerisi ve ret kapilari" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Beceri mana/can callback tekrar kullanimi ve cooldown" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestSkillCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ilk kabul edilen temel saldiri ve ret kapilari" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstBasicAttack.ps1") | Out-Host
     $LASTEXITCODE -eq 0

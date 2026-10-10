@@ -5284,3 +5284,25 @@ zaman akışını oynayarak doğrulamaz.
   Callback içinden başka pickup ve geri çağrı kombinasyonu native matriste yoktur.
 - [ ] Toplama sonrası çıkış/giriş veya harita geçişinde miktarı yeniden kontrol et;
   disk dayanıklılığı ve gerçek replication senaryosu bu same-frame testten çıkarılmaz.
+
+## O60 — Beceri mana/can callback cooldown sırası (2026-10-10)
+
+Otomatik native 384/32 matrisi gerçek mana/can delegate'leriyle geçti;
+native RPC implementation çağrısı gerçek uzak istemci trafiğini kanıtlamaz.
+
+- [ ] İki oyunculu listen-server PIE'de Warrior BloodDrain ve Priest HolyLight
+  için authority mana/can listener'ından aynı beceriyi bir kez tekrar dene.
+  Bir kullanımda tek mana tüketimi ve tek iyileştirme olmalı; host/uzak istemci
+  HUD'unda cooldown callback anından itibaren doğru görünmeli. Rolleri değiştir.
+- [ ] Aynı callback'te farklı hazır beceri dene: yeterli manada o da çalışmalı,
+  iki cooldown bağımsız görünmeli; yetersiz manada yalnız ikinci kullanım reddedilmeli.
+- [ ] Cooldown sırasında hızlı tekrar/uzak RPC isteği tek etkiyi aşmamalı.
+  Süre dolunca ve yetersiz mana sonrasında kaynak gelince normal kullanım çalışmalı.
+  Gerçek ağ jitter'ı ve 0.1 sn grace sınırı PIE/ağ ölçümüyle ayrıca kontrol edilmeli.
+- [ ] Saldırı becerilerini gerçek hedef hasarı callback'iyle, iyileştirmeleri
+  dolu/yaralı canla dene. Farklı hedefli nested RPC, ölüm/disconnect/travel ve
+  çıkış-giriş sonrası cooldown/kayıt korunumu otomatik matriste doğrulanmadı.
+- [ ] Paketli Game/Development ortamında dört sınıf ve beş rarity ile kayıt
+  çıkış-girişini kontrol et; metadata bulunmayan runtime ortamında geçerli enumlar
+  korunmalı, MAX/bozuk JSON reddi mevcut geçerli karakter verisini değiştirmemeli.
+  Bu tur Game exe derlemesi yapıldı; cooked/paketli çalıştırma yapılmadı.

@@ -18,9 +18,11 @@ if (-not $process.WaitForExit(280000)) {
 }
 
 $pass = Select-String -Path $log -Pattern "\[MMO_SAVE_JSON_TEST\] PASS schema=2 bytes=([1-9][0-9]*) negative=([5-9][0-9]|[1-9][0-9]{2,})"
+$enumPolicy = @(Select-String -Path $log -Pattern '\[MMO_SAVE_ENUM_TEST\] PASS variants=18 invalid_writers=2')
 $fail = Select-String -Path $log -Pattern "\[MMO_SAVE_JSON_TEST\] FAIL|Error:|Fatal error|Ensure condition|Access violation"
-if ($pass -and -not $fail -and $process.ExitCode -eq 0) {
+if ($pass -and $enumPolicy.Count -eq 1 -and -not $fail -and $process.ExitCode -eq 0) {
     Write-Output $pass.Line
+    Write-Output $enumPolicy[0].Line
     exit 0
 }
 Write-Output "JSON gidis-donus testi KALDI (exit=$($process.ExitCode))"

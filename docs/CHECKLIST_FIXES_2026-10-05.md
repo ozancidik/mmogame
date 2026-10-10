@@ -4711,3 +4711,101 @@ Başlangıçtaki **657 kayıt** byte hash'leriyle korundu; son `.sav` sayısı *
 Paralel kontroller sırasında oluşan yeni kayıtlar da korunur; hepsi bu teste mal edilmez.
 Diğer ajanın kapsam dışı **942 tracked dosyası** korunur; harita/içerik değişiklikleri
 bu commit'e alınmaz. PIE maddeleri aşağıdaki checklist'te açıktır.
+
+## O60 — Beceri kullanımında callback öncesi cooldown (2026-10-10)
+
+`UMMOSkillComponent::UseSkill` sunucuda `ConsumeMana` ve `ExecuteSkill`
+çalıştırdıktan sonra cooldown kaydediyordu. Gerçek `OnManaChanged` veya
+`OnHealthChanged` listener'ı aynı beceriyi tekrar çağırınca bir bekleme süresi
+içinde iki mana tüketimi ve iki iyileştirme oluşuyordu. Bu native delegate ile
+doğrulanmış sunucu çağrı sırası hatasıdır; uzak istemcinin tek başına bağımsız
+bir RPC exploit'i doğrulanmış değildir.
+
+Cooldown artık sınıf/seviye/ölüm/mana/hedef kontrollerinden sonra, mana
+bildiriminden önce kaydedilir. `ConsumeMana` başarısızsa bu kayıt kaldırılır.
+Etki sonrasında eski cooldown tekrar yazılmaz. Farklı hazır beceri callback'te
+kullanılabilir; her becerinin cooldown'u bağımsızdır. Mevcut RPC 0.1 sn toleransı
+ve client optimistic cooldown akışı korunur. RPC, replicated property ve save
+şeması değişmez. Güncel veri tablosundaki cooldown'lar en az 1 sn'dir;
+gelecekte 0.1 sn veya daha kısa tanım eklenirse RPC reentry kapısı ayrıca ele alınmalıdır.
+
+### Native kanıt
+
+Yeni `MMOTestSkillCallbacks` **384 kontrol / 32 case** içerir: iki dış iyileştirme
+becerisi (War_BloodDrain/Pri_HolyLight) × dış doğrudan/native RPC entry × nested
+doğrudan/native RPC entry × mana/can delegate'i × aynı/farklı beceri.
+Gerçek dynamic listener üç nested deneme yapar. Callback'te görülen cooldown,
+nested kaynak/etki sonucu, dış tek ücret/iyileştirme, bağımsız cooldown,
+aktif cooldown reddi, yetersiz mana reddi ve kaynak yenilenince tekrar kullanım,
+RPC 0.05 sn grace kabulü ve süresi geçmiş cooldown'da tekrar kullanım sınanır.
+Farklı beceriler War_LifeReap/Pri_GreaterHeal'dir; ikincisinin self-fallback'i kullanılır.
+
+Eski üretim kodu + fixture actual build **73.87 sn / 14 aksiyon**: **80 FAIL / 384**
+(32 callback cooldown, 16 nested state, 16 dış mana, 16 dış can). Native exit0
+olmasına rağmen runner exit1 ve coverage=True. Düzeltme actual compile/link
+**4.95 sn / 5 aksiyon**, izole **384/384 PASS**. Yeni fixture PCH'siz tek dosya
+derlemesi **9.52 sn / 1 aksiyon** geçti. Runner tam ve benzersiz 32×12 kapsam,
+tek PASS özeti, native exit0, hatasız log ve 60 sn owned-process watchdog ister.
+Coverage parser geçerli, duplicate, eksik ve bilinmeyen check girdileriyle **4/4** geçti.
+`RunAllChecks.ps1` yeni runner'ı içerir; aggregate'in tamamı bu turda çalıştırılmadı.
+
+İzole seçilmiş **5/5**: callback384, first skill17 (7 ayrı controller metriği),
+mastery budget12, learned budget12 ve stats save budget15. ValidateData temiz
+(mevcut skill-gap uyarıları), StaticLint103 CPP ve PlaytestMetrics1516/1516 geçti.
+Read-only yerel QA üretim diff'i, fixture ve runner'da engelleyici hata bulmadı.
+
+Fixture controllerless ve same-frame'dir; oyuncu kayıt yükleme/yazma timer'ı
+çalışmaz. Probe `TStrongObjectPtr` ile tutulur. Saldırı hedefinin can callback'i,
+toplam delegate sayısı, grace sınırına yakın ret, sentetik post-precheck mana
+başarısızlığı, farklı nested RPC hedef bağlamı, yaşam döngüsü/GC ve gerçek ağ/PIE
+burada kanıtlanmaz. Son iki bağlam için kaynak incelemesindeki adaylar ayrı
+native reproduksiyon bekler; bu commit bunları kapattığını iddia etmez.
+
+### Doğrulamada bulunan Game hedefi kayıt derleme engeli
+
+Gerçek `MyProject Win64 Development` derlemesi kayıt JSON kodundaki
+`UEnum::HasMetaData` çağrısıyla C2039 verdi (**60.06 sn**). API engine başlığında
+`WITH_METADATA` altında kalır; runtime hedefinde mevcut değildir. Sunucu/oyun
+kayıt doğrulaması metadata'ya bağlı olmamalıdır.
+
+`ValidateEnum` şimdi mevcut kayıt grafiğinin iki enum türünü runtime'da tanır:
+EMMOClass Warrior..Priest ve EMMOItemRarity Common..<MAX. İsimsiz/sayısal geçersiz
+değerler, generated class MAX, rarity MAX ve bilinmeyen yeni enum türü reddedilir.
+Yeni enum türü kayıt şemasına eklenirse politika ayrıca güncellenmelidir.
+Sınıf/rarity aralıklarının içindeki gelecekteki bir hidden enumerator için
+otomatik metadata koruması iddia edilmez; mevcut tanımlarda böyle değer yoktur.
+JSON şeması v2 ve v1 uyumu değişmez; yerel `.sav` serialization yolu farklıdır.
+
+Mevcut native JSON self-test'e tüm dört sınıf ve beş rarity'nin ad/sayı biçimleri
+için **18 tam struct karşılaştırması**, writer tarafında iki geçersiz enum/boş
+output kontrolü ve reader tarafında generated class MAX'ın ad/sayı reddi eklendi.
+Runner `[MMO_SAVE_ENUM_TEST] PASS variants=18 invalid_writers=2` kaydını da ister.
+Read-only QA recursive save grafiğinde başka enum türü ve güncel veri bütünlüğü
+hatası bulmadı. Oyun exe'si derlemek cooked/paketli oynanış veya dedicated/Shipping
+Server çalıştırma kanıtı değildir.
+
+### Son entegrasyon kanıtı
+
+Ana Editor actual derleme/link: önce **36.94 sn / 7 compile, NoLink**,
+ardından runtime kayıt düzeltmesiyle **12.91 sn / 5 aksiyon, Succeeded**.
+Ana Game/Development **65.47 sn / 19 aksiyon, Succeeded**. İzole son Editor
+**31.07 sn / 13 aksiyon**, Game **12.16 sn / 3 aksiyon** geçti.
+Beceri component'i, yeni fixture ve kayıt JSON dosyası için ayrı PCH'siz
+tek-dosya derlemeleri geçti; bütün proje FullCompile yapılmadı.
+
+Son izole **6/6**, ana **12/12** seçilmiş runner geçti. İki ağaçta callback384,
+first skill17/7 controller metriği, mastery12, learned12, stats save15 ve
+JSON schema2/113 negatif + enum18/invalid writer2; ana projede ayrıca
+consumable11, save lifecycle26, store **669/669** (JSON mismatch0, writeorder1,
+roundtrip1), Summer **55**, Winter **78** mob ve NetSmoke Summer port17809
+server/client20 sn. Smoke hata satırı0; ağda join1/welcome1 ve iki süreç yaşamı
+doğrulandı. Native temiz process çıkışı, gameplay RPC veya dedicated server
+garantisi çıkarılmaz. ValidateData/StaticLint103/PlaytestMetrics1516 iki ağaçta
+geçti. PowerShell parse ve scoped diff-check temizdir.
+
+Kaynak/config/script + Editor DLL **206'şar dosya**, ayrıca iki Game exe hash'i
+doğrulama sonunda korundu. İlk **666 kayıt** hash'leriyle korunur; toplam **670**
+slot vardır. Paralel soak'ın ürettiği üç yeni kayıt ve ağ smoke'ındaki yeni kayıt
+silinmedi. Kapsam dışı **941 tracked dosya** değişmedi. Diğer ajanın günlük özet
+belgesindeki Winter soak/probe commit'leri ayrı kaydedildi ve bu commit'e alınmadı.
+Tam RunAllChecks, uzun soak, cooked/paketli oyun ve PIE bu turda çalıştırılmadı.

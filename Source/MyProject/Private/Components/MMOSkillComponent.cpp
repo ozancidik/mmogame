@@ -897,9 +897,12 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 		return false;
 	}
 
-	// Sunucu: kesin mana harcamasi + etki.
+	// Mana ve etki delegate'leri senkron olarak yeniden beceri kullanabilir.
+	// Kabul edilen kullanim, bu bildirimlerden once cooldown'u sahiplenir.
+	CooldownEndTimes.Add(SkillId, Now + Def->Cooldown);
 	if (!Owner->GetStats()->ConsumeMana(Def->ManaCost))
 	{
+		CooldownEndTimes.Remove(SkillId);
 		return false;
 	}
 	if (Def->Effect == EMMOSkillEffect::MeleeDamage || Def->Effect == EMMOSkillEffect::RangedDamage
@@ -913,7 +916,6 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	if (AMMOPlayerController* PC = Cast<AMMOPlayerController>(Owner->GetController()))
 		PC->RecordFirstSkillMetric(Def->SkillId);
 	ExecuteSkill(Owner, *Def);
-	CooldownEndTimes.Add(SkillId, Now + Def->Cooldown);
 
 	if (GEngine && bLocalFeedback)
 	{

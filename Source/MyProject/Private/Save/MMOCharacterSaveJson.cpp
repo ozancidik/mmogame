@@ -146,7 +146,13 @@ namespace
 			return Fail(OutError, Path, TEXT("enum icin ad (string) bekleniyor"));
 		}
 		const int32 Index = Enum->GetIndexByValue(EnumValue);
-		if (Index == INDEX_NONE || Enum->HasMetaData(TEXT("Hidden"), Index))
+		// Metadata is absent in Game/Server targets. Keep the persisted enum policy
+		// explicit at runtime; new enum types must be reviewed before saving them.
+		const bool bAllowedValue = (Enum == StaticEnum<EMMOClass>()
+			&& EnumValue >= static_cast<int64>(EMMOClass::Warrior) && EnumValue <= static_cast<int64>(EMMOClass::Priest))
+			|| (Enum == StaticEnum<EMMOItemRarity>()
+				&& EnumValue >= static_cast<int64>(EMMOItemRarity::Common) && EnumValue < static_cast<int64>(EMMOItemRarity::MAX));
+		if (Index == INDEX_NONE || !bAllowedValue)
 		{
 			return Fail(OutError, Path, TEXT("gizli/gecersiz enum degeri"));
 		}
@@ -769,6 +775,8 @@ namespace
 		MMO_EXPECT_REJECT("sinif int64 disi sayi", Data->SetField(TEXT("CharacterClass"), Num(1.0e300));)
 		MMO_EXPECT_REJECT("sinif negatif sayi", Data->SetField(TEXT("CharacterClass"), Num(-1));)
 		MMO_EXPECT_REJECT("sinif bool", Data->SetField(TEXT("CharacterClass"), Bool(false));)
+		MMO_EXPECT_REJECT("sinif otomatik MAX ad", Data->SetField(TEXT("CharacterClass"), Str(*StaticEnum<EMMOClass>()->GetNameStringByValue(StaticEnum<EMMOClass>()->GetMaxEnumValue())));)
+		MMO_EXPECT_REJECT("sinif otomatik MAX sayi", Data->SetField(TEXT("CharacterClass"), Num(StaticEnum<EMMOClass>()->GetMaxEnumValue()));)
 		MMO_EXPECT_REJECT("nadirlik gizli MAX", FirstOfArray(Data, TEXT("EquipmentBag"))->SetField(TEXT("Rarity"), Str(TEXT("MAX")));)
 		MMO_EXPECT_REJECT("nadirlik gizli MAX (sayi 5)", FirstOfArray(Data, TEXT("EquipmentBag"))->SetField(TEXT("Rarity"), Num(5));)
 
@@ -1017,6 +1025,40 @@ bool FMMOCharacterSaveJson::RunRoundTripSelfTest(FString& OutError, int32& OutUt
 	}
 
 	int32 NegativeCount = 0;
+	int32 EnumVariants = 0;
+	for (int32 Kind = 0; Kind < 2; ++Kind)
+	for (int32 Numeric = 0; Numeric < 2; ++Numeric)
+	for (int32 Value = 0; Value < (Kind == 0 ? 4 : 5); ++Value)
+	{
+		FMMOCharacterSaveData Expected = Before;
+		if (Kind == 0) Expected.CharacterClass = static_cast<EMMOClass>(Value);
+		else Expected.EquipmentBag[0].Rarity = static_cast<EMMOItemRarity>(Value);
+		FString Variant;
+		if (!ToJson(Expected, Variant)) { OutError = TEXT("valid enum writer rejected"); return false; }
+		if (Numeric)
+		{
+			const TSharedPtr<FJsonObject> Root = ParseObject(Variant);
+			const TSharedPtr<FJsonObject> Data = Sub(Root, DataField);
+			if (Kind == 0) Data->SetNumberField(TEXT("CharacterClass"), Value);
+			else FirstOfArray(Data, TEXT("EquipmentBag"))->SetNumberField(TEXT("Rarity"), Value);
+			Variant = WriteObject(Root);
+		}
+		FMMOCharacterSaveData Actual;
+		if (!FromJson(Variant, Actual, nullptr, &OutError)
+			|| !FMMOCharacterSaveData::StaticStruct()->CompareScriptStruct(&Expected, &Actual, 0))
+		{ OutError = TEXT("valid enum roundtrip failed: ") + OutError; return false; }
+		++EnumVariants;
+	}
+	FMMOCharacterSaveData Invalid = Before;
+	Invalid.CharacterClass = static_cast<EMMOClass>(StaticEnum<EMMOClass>()->GetMaxEnumValue());
+	FString RejectedJson = TEXT("stale");
+	if (ToJson(Invalid, RejectedJson) || !RejectedJson.IsEmpty())
+	{ OutError = TEXT("invalid class writer accepted"); return false; }
+	Invalid = Before; Invalid.EquipmentBag[0].Rarity = EMMOItemRarity::MAX;
+	RejectedJson = TEXT("stale");
+	if (ToJson(Invalid, RejectedJson) || !RejectedJson.IsEmpty())
+	{ OutError = TEXT("invalid rarity writer accepted"); return false; }
+	UE_LOG(LogTemp, Display, TEXT("[MMO_SAVE_ENUM_TEST] PASS variants=%d invalid_writers=2"), EnumVariants);
 	if (!RunNegativeTests(Json, OutError, NegativeCount) || !RunToleranceTests(Before, Json, OutError))
 	{
 		return false;
