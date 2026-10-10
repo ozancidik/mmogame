@@ -138,12 +138,13 @@ Eşya yuvaları: silah, zırh, kask, bot (`MMOItemDatabase.cpp`). Şablon:
 | Yarık (58) | Rift* | `dark metal with glowing purple fissures as if cracked open` |
 | Kül (66) | Ashen* | `ash-grey metal with smoldering coal veins and frost patches together` |
 | Uçurum (72) | Abyss* | `light-absorbing matte black metal with faint indigo outline, organic grown shapes` |
+| Taht (78) | Throne* (satıcıda satılmaz; Naib/Lv75+ düşüşü, `Q_AbyssRegent` ödülü) | `obsidian-black regal armor with hollow-crown motifs, indigo edge glow, throne-room majesty` |
 
 ---
 
 ## 5. Moblar
 
-**Kodda sayılan arketip: 51** (`Table.Add(MakeMob(` sayısı). **38 normal + 13 elit.** `PROGRESSION_PLAN.md`'deki
+**Kodda sayılan arketip: 59** (`Table.Add(MakeMob(` sayısı; 2026-10-10). **46 normal + 13 elit.** (#52-59 sekiz yeni Lv47-78 normal mob.) `PROGRESSION_PLAN.md`'deki
 "48 arketip" sayısı Çözülme Yolu'nun üç mobu eklenmeden önceki duruma ait.
 
 ### Aile blokları (aynı ailedeki her mob bu bloğu kullanır)
@@ -218,17 +219,25 @@ Lv8-12 üçüncü, Lv16-22 dördüncü bölge spawner'ında çıkıyor. Satır p
 | 48 | FrostboundWarden | Buzbağlı Muhafız | 57 | Elit | W · Buz Kapısı | Kapıya sadık son bekçi | `last warden of the ice gate, immense oath-bound knight, gate key chained to the belt, ice-sealed tower shield, accent: deep frost blue` |
 | 49 | RiftHerald | Yarık Habercisi | 65 | Elit | S · dış yamaçlar | Karşı yakadan söz taşıyan haberci | `herald figure in long robes split by glowing purple fissures, faceless hood, carries a cracked horn, accent: rift purple` |
 | 50 | AshTyrant | Kül Tiranı | 70 | Elit | W · Kül Hattı | Magma Tiranı'nın külünden doğan | `ash tyrant, burnt-out colossus of grey ash and cooled basalt, dim coal glow inside cracks, frost on the shoulders, accent: coal red` |
+| 52 | WinterWolf | Don Kurdu | 47 | - | W · Kış Diyarı (batı cebi) | Hükümdar'ın fırtınadaki sürüsü, hızlı akıncı | `large pale-furred winter wolf with frost-crusted mane and icicle fangs, breath steam, accent: frost white and grey` |
+| 53 | WinterBehemoth | Buz Devi | 49 | - | W · Kış Diyarı (doğu cebi) | Karın altında uyuyan buzdan dev, yavaş ve öfkeli | `towering ice behemoth, body of packed blue ice slabs with snow on the shoulders, glowing pale eye slits, accent: ice blue` |
+| 54 | FrostboundSworn | Buzbağlı Yeminli | 53 | - | W · Buzbağlı Sınır (güneydoğu cep) | Gözcü ile Nöbetçi arası, yeminini bozmayan dengeli asker | `oath-bound frontier soldier in mid-weight ice-sealed plate, carved vow runes, frozen helm, accent: frost blue` |
+| 55 | RiftWhisperer | Yarık Fısıldayanı | 60 | - | S · dış yamaçlar (Arayıcı cebi) | Yarığın ağzında fısıldaşan hızlı gölge | `hunched whispering shadow creature, cracked skin leaking purple light, too many thin fingers, accent: rift purple` |
+| 56 | RiftWalker | Yarık Yürüyeni | 64 | - | S · dış yamaçlar (Bekçi cebi) | Yarığın derininden yürüyerek çıkan ağır yaratık | `slow rift walker brute, crystalline purple growths over charred plates, dragging heavy arms, accent: rift purple` |
+| 57 | AshMarcher | Kül Yürüyeni | 69 | - | W · Kül Hattı (güneybatı cep) | Hat çözüldükten sonra kayan ağır sürü | `ash marcher brute, grey ash-caked armor plates with coal glow in the seams, frost patches on the shoulders, accent: coal red on ash grey` |
+| 58 | AbyssEcho | Uçurum Yankısı | 74 | - | W · Uçurum Yaylası (batı cep) | Uçurumdan yükselen, geri dönen her yankıdan bir şey eksilten gölge | `hovering echo figure with a blurred doubled outline, matte black with faint indigo rim, soundless, accent: deep indigo` |
+| 59 | AbyssEnvoy | Naibin Elçisi | 78 | - | W · Uçurum Yaylası (güney cep) | Naib'in sesini yeryüzünde taşıyan iri elçi | `abyss envoy brute in smooth light-absorbing armor with a hollow crown motif, indigo-edged cloak, accent: deep indigo` |
 | 51 | AbyssRegent | Uçurum Naibi | 80 | Elit | W · Uçurum Yaylası (doğu) | Unutulmuş gücün yeryüzündeki sesi | `abyss regent, tall shadow figure on an empty throne motif, robes of light-absorbing black with indigo edges, faceless with a hollow crown, accent: deep indigo` |
 
-**Aile eşleşmesi:** GOBLIN: 1 · WOLF: 2, 7, 16 · ORC: 3, 6, 12, 15, 18, 22, 25, 29, 40, 45 · BRUTE: 32, 34, 36, 38, 46 ·
-HUMAN: 4, 8, 10, 27, 31, 35, 42 · WRAITH: 9, 19, 26, 30, 43, 49, 51 · GOLEM: 14, 17, 21, 24, 28, 41, 44, 50 ·
+**Aile eşleşmesi (52-59 eklendi):** GOBLIN: 1 · WOLF: 2, 7, 16, 52 · ORC: 3, 6, 12, 15, 18, 22, 25, 29, 40, 45 · BRUTE: 32, 34, 36, 38, 46, 53, 54, 56, 57, 59 ·
+HUMAN: 4, 8, 10, 27, 31, 35, 42 · WRAITH: 9, 19, 26, 30, 43, 49, 51, 55, 58 · GOLEM: 14, 17, 21, 24, 28, 41, 44, 50 ·
 SPIDER: 11, 39 · STALKER: 13, 20, 23, 33, 37 · TROLL: 5 · Ailesiz elit insansı: 47, 48 (`{FAM_HUMAN}` ile kullan).
-Toplam: 1+3+10+5+7+7+8+2+5+1+2 = **51**.
+Toplam: 1+4+10+10+7+9+8+2+5+1+2 = **59**.
 
-**Kodla uyum:** Kod şu 15 arketipte Warrok mesh'ini kullanıyor: Orc, OrcWarrior, OrcBerserker, ScorchedRaider,
+**Kodla uyum (2026-10-10: +5 yeni Warrok kullanıcısı: WinterBehemoth, FrostboundSworn, RiftWalker, AshMarcher, AbyssEnvoy = 20):** Kod şu 15 eski arketipte ayrıca Warrok mesh'ini kullanıyor: Orc, OrcWarrior, OrcBerserker, ScorchedRaider,
 AshOrc, ObsidianRaider, DuskReaver, WinterReaver, FrostboundSentinel, RiftKeeper, AshBinder, AbyssGuardian,
 OrcWarlord, ObsidianWarlord, DuskOverlord. Bunların 10'u ORC, 5'i BRUTE ailesinde. Yeni modeller Warrok iskeletine
-rig'lenirse mevcut 4 Warrok animasyonu (Idle/Run/Attack/Death) hemen çalışır. Geri kalan 36 arketip şu an Manny +
+rig'lenirse mevcut 4 Warrok animasyonu (Idle/Run/Attack/Death) hemen çalışır. Geri kalan 39 arketip şu an Manny +
 renk ile görünüyor.
 
 ---
@@ -326,7 +335,7 @@ kapalı (karakter hareketi kodda). Önce elitlerin Attack ve Death klipleriyle b
 
 ## 8. Efektler (Niagara)
 
-Koddaki **81 beceri**: Savaşçı 23, Okçu 19, Büyücü 18, Rahip 21. Dokümanlardaki "73" sayısı Lv31/39 halkaları
+Koddaki **93 beceri** (2026-10-10): Savaşçı 26, Okçu 22, Büyücü 21, Rahip 24. Aşağıdaki kapsama tablosu 81 becerilik eski sayıma aittir; **12 yeni Lv52/64/75 beceri mevcut efekt gruplarını yeniden kullanır** (bkz. tablonun altındaki not). Dokümanlardaki "73" sayısı Lv31/39 halkaları
 eklenmeden önceki duruma ait. Uygulanan durum efektleri: `Poison`, `Slow`, `Rage`, `RageII`, `IronSkin`, `IronSkinII`,
 `IronSkinIII`, `Haste`, `HasteII`, `HasteIII`, `Regen`, `RegenII`.
 
@@ -361,6 +370,8 @@ stylized hand-painted game VFX texture, soft painted shapes, readable from a dis
 
 **Kapsama kontrolü:** Savaşçı: 10 + 6 + 4 + 3 = 23 · Okçu: 8 + 2 + 4 + 2 + 3 = 19 · Büyücü: 5 + 5 + 2 + 6 = 18 ·
 Rahip: 5 + 5 + 8 + 3 = 21 · **Toplam 81, dışarıda kalan beceri yok.**
+
+**Yeni 12 beceri → mevcut efekt grubu (2026-10-10; yeni Niagara varlığı gerekmez):** War_BladeStorm → #2 NS_War_Whirl · War_Obliterate, War_WorldBreaker → #1 NS_Melee_Impact (büyüklük artsın) · Arc_ShatterShot, Arc_SunderingArrow → #5 NS_Arrow_Trail · Arc_Multishot → #7 NS_Arrow_Rain · Mag_Combustion → #10 NS_Fire · Mag_GlacialSpike → #11 NS_Ice (Slow) · Mag_CosmicBlast → #13 NS_Arcane · Pri_SmitingLight → #14 NS_Holy_Bolt · Pri_Sanctify → #15 NS_Holy_Area · Pri_HealingSurge → #16 NS_Heal (Regen).
 
 Ek dünya efekti [öneri]: `NS_Loot_Glow` (`AMMOLootPickup` için yerde hafif ışık sütunu).
 
@@ -476,6 +487,14 @@ Durum değerleri: `yok` / `üretildi` / `rig'lendi` / `UE'ye aktarıldı`. Promp
 | SK_Mob_FrostboundWarden | | P1 | yok | elit |
 | SK_Mob_RiftHerald | | P1 | yok | elit |
 | SK_Mob_AshTyrant | | P1 | yok | elit |
+| SK_Mob_WinterWolf | | P1 | yok | 2026-10-10 eklendi; dört ayaklı (WOLF) |
+| SK_Mob_WinterBehemoth | Mixamo (Warrok) | — | UE'ye aktarıldı | 2026-10-10; geçici; BRUTE |
+| SK_Mob_FrostboundSworn | Mixamo (Warrok) | — | UE'ye aktarıldı | 2026-10-10; geçici; BRUTE |
+| SK_Mob_RiftWhisperer | | P1 | yok | 2026-10-10 eklendi; hızlı gölge (WRAITH) |
+| SK_Mob_RiftWalker | Mixamo (Warrok) | — | UE'ye aktarıldı | 2026-10-10; geçici; BRUTE |
+| SK_Mob_AshMarcher | Mixamo (Warrok) | — | UE'ye aktarıldı | 2026-10-10; geçici; BRUTE |
+| SK_Mob_AbyssEcho | | P1 | yok | 2026-10-10 eklendi; süzülen gölge (WRAITH) |
+| SK_Mob_AbyssEnvoy | Mixamo (Warrok) | — | UE'ye aktarıldı | 2026-10-10; geçici; BRUTE |
 | SK_Mob_AbyssRegent | | P1 | yok | elit, son boss |
 | NS_Melee_Impact … NS_Status_Enrage (18 grup) | | P1 | yok | bölüm 8 |
 | Bölge prop setleri (Summer 9, Winter 5) | Fab + PCG | P1 | yok | bölüm 9 |
@@ -485,7 +504,7 @@ Durum değerleri: `yok` / `üretildi` / `rig'lendi` / `UE'ye aktarıldı`. Promp
 ## 11. Kısıtlar ve bilinmeyenler
 
 - **Hiçbir prompt denenmedi.** `{STYLE}` ilk 3-4 varlıkla ayarlanmadan toplu üretim yapma.
-- **Sayılar (kodla doğrulandı, 2026-10-06):** 51 mob arketipi (38 normal + 13 elit), 81 beceri (23/19/18/21), 5 NPC.
+- **Sayılar (kodla doğrulandı, 2026-10-10):** 59 mob arketipi (46 normal + 13 elit), 93 beceri (26/22/21/24), 5 NPC.
   Dokümanlardaki "48 arketip" ve "73 beceri" sayıları bayat; görevdeki "73 beceri" de bu yüzden 81 olarak ele alındı.
 - **[Tahmin] olanlar:** Poligon ve doku bütçeleri, LOD oranları, FBX ayarları, image-to-3D önerisi.
 - **[Yorum] olanlar:** Lore'da beden tipi verilmeyen mobların görünümü (STALKER ailesi; WinterStalker, FrostboundScout,
