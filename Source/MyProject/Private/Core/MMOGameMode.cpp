@@ -1021,14 +1021,14 @@ void AMMOGameMode::SpawnMobArea()
 		//  Kul Oncusu Lv66 (1200,-5200) | Kul Baglayici Lv68 (-2000,-6800) | Kul Tirani elit Lv70 (4750,-5750)
 		//  (Tiran ilk (4400,-5200,340) egiminde neredeyse surekli takiliyordu: 90 sn'de 10-11 'is stuck'; 2026-10-09 7x7 probla
 		//   iki aday gercek olculdu, (4750,-5750,179) iki kosuda 0 takilma, P53'e 2150u.)
-		//  Ucurum Gezgini Lv72 (-5500,4500) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
+		//  Ucurum Gezgini Lv72 (-5000,4800,-92; 2026-10-10: eski (-5500,4500) 59/64 idi, ilk doldurmada 3-4/6 veriyordu) | Ucurum Koruyucusu Lv76 (4400,3600) | Ucurum Naibi elit Lv80 (6800,2000, Z~580)
 		//  (Naib ilk (-7600,-1200)'deydi; gezinmeyle navmesh sinirini -8000 asiyordu, QA ile tasindi.)
 		SpawnFrostbound(FVector(1200.f, -5200.f, 50.f), 66, 66, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(-2000.f, -6800.f, 49.f), 68, 68, 225.f, 6, NAME_None, 0.f);
 		//  P69 Lv69 (AshMarcher) (-4000,-6000,50) 64/64: Baglayici cebine 2154u, hub'dan 6021u (2026-10-09 taramasi)
 		SpawnFrostbound(FVector(-4000.f, -6000.f, 50.f), 69, 69, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(4750.f, -5750.f, 179.f), 0, 0, 150.f, 1, FName(TEXT("AshTyrant")), 60.f);
-		SpawnFrostbound(FVector(-5500.f, 4500.f, -92.f), 72, 72, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(-5000.f, 4800.f, -92.f), 72, 72, 225.f, 6, NAME_None, 0.f);
 		// U paketi (2026-10-09 ince tarama, 500u arali, 273 nokta):
 		//  P74 Lv74 (AbyssEcho)  (-5500,2500,-120) 64/64: Gezgin cebine 2000u, hub'dan 6801u
 		//  P78 Lv78 (AbyssEnvoy) (-2000,2500,151): probda 64/64, GERCEK doguma 4/6; hub'dan 4472u, Nobetci cebine 1581u

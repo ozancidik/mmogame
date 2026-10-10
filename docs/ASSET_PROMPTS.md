@@ -418,7 +418,7 @@ PlayerStart (-816, -47, 113). İlk bölgeler PlayerStart'a göre (`Origin` + yö
 | Kış Diyarı | 42-48 (+Hükümdar Lv50) | (-3000, -1500); elit (-3000, 0) | Fırtına hiç dinmiyor, ufuk yok | Kar yığını, donmuş çam, buz sütunu, taht | `winter environment stylized`, `snow pine` | `endless white blizzard land, frozen pines, no visible horizon` |
 | Buzbağlı Sınır | 51-55 (+Muhafız Lv57) | Gözcü (3000, 0), Nöbetçi (-3500, 3000), Muhafız (2000, 2800) | Buzdan sur, yemin | Buz duvarı, nöbet kuleleri, Buz Kapısı | `ice wall`, `frozen gate`, `ice castle` | `wall of ice stretching like a fortress border, giant sealed ice gate` |
 | Kül Hattı | 66-68 (+Tiran Lv70) | Öncü (1200, -5200), Bağlayıcı (-2000, -6800), Tiran (4400, -5200) | Gri kar, gökten kül | Gri kar decal'ı, kömürleşmiş kütük, kara hat (zincir/çit) | `ash snow`, `burnt trees`, `ember particles` | `snowfield turned grey by falling ash, black line of chains across the snow` |
-| Uçurum Yaylası | 72-76 (+Naib Lv80) | Gezgin (-5500, 4500), Koruyucu (4400, 3600), Naib (6800, 2000) | Çıplak yayla, dipsiz boşluk | Çıplak kaya, uçurum kenarı, boş taht | `cliff edge`, `abyss`, `bare plateau` | `bare windswept plateau around a bottomless dark chasm, an empty throne on the east edge` |
+| Uçurum Yaylası | 72-76 (+Naib Lv80) | Gezgin (-5000, 4800), Koruyucu (4400, 3600), Naib (6800, 2000) | Çıplak yayla, dipsiz boşluk | Çıplak kaya, uçurum kenarı, boş taht | `cliff edge`, `abyss`, `bare plateau` | `bare windswept plateau around a bottomless dark chasm, an empty throne on the east edge` |
 
 ---
 
