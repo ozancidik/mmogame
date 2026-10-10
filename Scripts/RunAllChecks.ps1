@@ -34,6 +34,22 @@ Step "Uretilmis gorev diyalogu Lore.md ile eslesiyor (GenQuestDialogue.py --chec
     $LASTEXITCODE -eq 0
 }
 
+Step "Icerik haritasi koddan uretilenle ayni (ContentMap.py --check) ve dokuman baslik sayilari (DocCounts.py)" {
+    & $py (Join-Path $PSScriptRoot "ContentMap.py") --check | Out-Host
+    $a = $LASTEXITCODE
+    & $py (Join-Path $PSScriptRoot "DocCounts.py") | Out-Host
+    ($a -eq 0) -and ($LASTEXITCODE -eq 0)
+}
+
+Step "Cep araligi ve dokuman isinlanma noktalari (PocketSpacing.py + negatif testler)" {
+    & $py (Join-Path $PSScriptRoot "PocketSpacing.py") | Out-Host
+    $a = $LASTEXITCODE
+    & $py (Join-Path $PSScriptRoot "TestPocketSpacing.py") | Out-Host
+    $b = $LASTEXITCODE
+    & $py (Join-Path $PSScriptRoot "TestDocCounts.py") | Out-Host
+    ($a -eq 0) -and ($b -eq 0) -and ($LASTEXITCODE -eq 0)
+}
+
 Step "Statik C++ kontrolu (StaticLint.py; derleme degildir)" {
     & $py (Join-Path $PSScriptRoot "StaticLint.py") | Out-Host
     $LASTEXITCODE -eq 0
