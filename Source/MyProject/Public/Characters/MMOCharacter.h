@@ -15,6 +15,7 @@ class UMMOTradeComponent;
 class UMMOClanComponent;
 class UMMOFriendsComponent;
 class UMMOAchievementComponent;
+class UMMODailyComponent;
 class IMMOCharacterStore;
 
 /**
@@ -65,6 +66,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
 	TObjectPtr<UMMOAchievementComponent> AchievementComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
+	TObjectPtr<UMMODailyComponent> DailyComponent;
+
 	// Unreal'in standart hasar akışı (UGameplayStatics::ApplyDamage) buraya düşer;
 	// biz de stat bileşenine yönlendiririz. Sadece otoritede etki eder.
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
@@ -98,6 +102,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMOAchievementComponent* GetAchievementComponent() const { return AchievementComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MMO")
+	UMMODailyComponent* GetDailyComponent() const { return DailyComponent; }
+
+	// Kayit basariyla yuklendi/olusturuldu mu (gun-ici sayac referanslari buna gore alinir).
+	bool IsInitialLoadComplete() const { return bInitialLoadComplete; }
 
 	// Sinif degistirme konsol komutu: "MMOClass savasci|okcu|buyucu|rahip"
 	// (Ingilizce warrior|archer|mage|priest de calisir).

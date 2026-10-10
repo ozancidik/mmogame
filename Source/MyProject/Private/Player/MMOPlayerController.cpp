@@ -21,6 +21,7 @@
 #include "Core/MMOMetrics.h"
 #include "Core/MMONotify.h"
 #include "Components/MMOAchievementComponent.h"
+#include "Components/MMODailyComponent.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -1624,6 +1625,21 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		{
 			ClientReceiveChat(FString(), TEXT("Kullanim: /basarim, /basarim unvan ad, /basarim unvan (kaldir)"), 2);
 		}
+		return;
+	}
+	// Gunluk gorevler: "/gunluk" (liste; tamamlananlarin odulu otomatik verilir).
+	if (Msg.Equals(TEXT("/gunluk"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/gunluk "), ESearchCase::IgnoreCase))
+	{
+		if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			if (UMMODailyComponent* Daily = Me->GetDailyComponent())
+			{
+				Daily->CmdList();
+				return;
+			}
+		}
+		ClientReceiveChat(FString(), TEXT("Gunluk gorevler su an kullanilamaz."), 2);
 		return;
 	}
 	// Klan sohbeti: "/g mesaj" (yalniz ayni klan adindaki cevrimici oyunculara).

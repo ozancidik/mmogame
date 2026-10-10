@@ -5,6 +5,7 @@
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOAchievementComponent.h"
+#include "Components/MMODailyComponent.h"
 #include "Items/MMOItemDatabase.h"
 #include "Save/MMOSaveGame.h"
 #include "Net/UnrealNetwork.h"
@@ -563,6 +564,10 @@ void UMMOQuestComponent::NotifyMobKilled(FName MobArchetypeId)
 		if (UMMOAchievementComponent* Ach = Me->GetAchievementComponent())
 		{
 			Ach->NotifyMobKilled(MobArchetypeId);
+		}
+		if (UMMODailyComponent* Daily = Me->GetDailyComponent())
+		{
+			Daily->NotifyMobKilled(MobArchetypeId);
 		}
 	}
 }
