@@ -5024,3 +5024,81 @@ sonrasinda tekrar dogrulandi. Peer'in FullCompile/aggregate sonuclari bu turun
 kendi kaniti olarak sayilmadi. Tam RunAllChecks, tum proje FullCompile,
 uzun soak, cooked/Shipping/dedicated runtime ve PIE bu tur calistirilmadi;
 PLAYTEST_CHECKLIST O63 maddeleri acik. Izole ignored kanit yedegi: 14 dosya.
+
+## O64 — Beceri health bildirimi sonrası kapanış (2026-10-10)
+
+**Native doğrulanmış hata:** ExecuteSkill ilk ApplyDamage/Heal'dan döndükten
+sonra health listener'ında kapanan recipient'e Poison/Regen/Slow ekliyordu.
+Caster kapanırsa da ek etki ve alanın sonraki mobuna hasar devam ediyordu.
+O62/O63 giriş kontrolleri bu daha sonraki senkron bildirimi kapsamıyordu.
+
+ExecuteSkill içindeki yerel participant kontrolü validity/destruction/begun/
+started-EndPlay/aynı dünya kapılarını health/effect dönüşlerinde ve alanın her
+iterasyonunda tekrar uygular. Caster kapanırsa kalan beceri işi durur; yalnız
+recipient kapanırsa ona ek etki uygulanmaz, AoE canlı sonraki hedefe devam eder.
+İlk hasar/heal, kabul edilmiş mana ve cooldown korunur. Global Stats API,
+RPC/save/replication alanı, timer, maliyet veya hedef seçme kuralı değişmedi.
+
+Gerçek Arc_PoisonArrow, Pri_DivineRestoration, Mag_FrostNova × iki dış giriş
+(native Server implementation / doğrudan UseSkill) × kapanan iki kimlik
+(caster/ilk recipient) × canlı/RouteEndPlay/Destroy = **36 case / 360 check**.
+Fixture ilk AoE recipient'ini production ile aynı iterator'dan bulur; sağlık,
+ek effect kimliği/instigator'ı, kalan hedef, mana/cooldown/context sınanır.
+Destroy dönüşü ve invalid/destruction durumu EndPlay'in valid durumundan ayrı
+kontrol edilir. Native RPC bool acceptance no-op; kaynaklar kabulü gösterir.
+Strong-owned, controllerless aynı senkron frame; GC/ağ/kayıt/görsel FX testi değil.
+
+İlk eski-kod Editor derlemesi **109.54 sn / 18 aksiyon** (mutex beklemesi dahil),
+ilk matris **28/360 FAIL**. QA önerisiyle Destroy oracle güçlendirildi; eski
+production yeniden **3.52 sn / 4 aksiyon** Compile/Link ile derlenip aynı
+**28/360 FAIL** verdi: effects24, remaining4. Native0/runner1/coverageTrue;
+canlı kontroller ve ilk sağlık/mana/cooldown geçti. İlk kanıtlar ayrıca saklandı.
+Final güçlü fixture byte'ları sonraki derlemelerle karşılaştırılır.
+
+OnEffectsChanged kapanışı, HealSelf/self-fallback, BuffSelf, AoETarget, görsel
+FX ve diğer PIE O64 boşlukları açık. Skill FX korumaları kaynak incelemesi;
+AoE FX ilk hasardan önce yayımlanır. Stats Heal/TakeDamage içindeki continuation,
+yalnız ölüm (EndPlay olmadan) ve component-only kapanış bu düzeltmenin kapsamı değil.
+
+### O64 dogrulama sonucu
+
+Guclendirilmis ayni fixture ile izole duzeltilmis Editor **3.77 sn / 4 aksiyon**
+Compile/Link ve **360/360 PASS**. Ana Game Development **51.12 sn / 12 aksiyon**
+Compile/Link gecti. Ana Editor iki ayri UBT cagrisi: **40.57 sn / 13 aksiyon**
+NoLink Compile; ana DLL'i kullanan peer runtime bitince **4.52 sn / 3 aksiyon**
+Link/metadata. Birlesik log iki cagridir; tek derleme suresi olarak sunulmaz.
+Fixture **13.25 sn**, component **8.52 sn** NoPCH/NoSharedPCH/DisableUnity/NoLink
+ile gercek Compile gecti. Etkilesimli editor acik degildi; peer sureci sonlandirilmadi.
+
+Izole **11/11**, ana **17/17** secili runner exit0: yeni360, hedef480,
+caster240, context192, callback384, basic attack21/hooks8, first skill17/hooks7,
+mastery12, learned12, stats save15, JSON113 negatif ve enum18/invalid writer2.
+Ana ek olarak consumable11 ve save lifecycle26. Store **696/696**, invalid0,
+loadFailed0, JSON mismatch0, writeorder1/roundtrip1. Summer **57**, Winter **78**
+mob, iki smoke hata0. NetSmoke **17819**, Summer, server/client20 sn:
+join1/welcome1 ve iki taraf hata0; iki surec gozlem boyunca yasadi.
+Baglanti smoke'u bu becerilerin gercek uzaktan gameplay RPC testi degildir.
+
+Iki agacta ValidateData (mevcut Lv33+ skill boslugu uyarilari), StaticLint107,
+PlaytestMetrics1516/1516 gecti. PS parse ve runner coverage mock5/5 gecti.
+Yerel QA kaynak incelemesi somut ek kusur bulmadi; Destroy oracle onerisi
+uygulanip eski-kod matrisi yeniden kosuldu. Reviewer derleme/runtime calistirmadi.
+
+Baslangictaki **689 save** hash'i korundu, son toplam **697**; eszamanli peer
+ve test kayitlari nedeniyle artisin tamami bu tura mal edilmedi. Baslangic
+954 kapsam disi tracked dosyanin **950'si ayni**; peer c44fdc8/9acfa9f/ada4808
+commitleri dort eski dosyayi degistirdi ve iki belge denetimi betigi ekledi.
+Bu alti dosya kendi committed icerikleri ve ayri hash manifestiyle korundu;
+bu beceri commit'ine alinmadi. Source/Config/Scripts + Editor DLL dondurulmus
+manifesti izole **216/216**, ana **215/216** ayni: tek fark peer ContentMap.py;
+iki yeni peer betigi ayri manifestte. Oyun kaynaklari/config/DLL degismedi.
+Game exe hash'i testler sonrasi ayni. Yedi owned dosya iki agacta birebir ayni.
+
+Eski production kopyasi CRLF checkout'tan alinmis; baslangic ana working-file
+raw hash'iyle esit degil. Satir sonlari normalize edilince orijinal a1cf714
+Git blob'uyla byte-byte ayni oldugu ayrica dogrulandi. Bu kaynak raw hash
+esitligi olarak sunulmaz; guclendirilmis fixture ise baseline/fix/ana/izolede
+birebir ayni byte'lardir. Izole ignored kanit yedegi **17 dosya**.
+
+Tam RunAllChecks, tum proje FullCompile, uzun soak, cooked/Shipping/dedicated
+runtime ve PIE bu tur calistirilmadi. PLAYTEST_CHECKLIST O64 maddeleri acik.

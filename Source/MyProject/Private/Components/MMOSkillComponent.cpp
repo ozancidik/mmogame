@@ -1187,10 +1187,15 @@ AMMOCharacter* UMMOSkillComponent::FindNearestEnemy(float Range) const
 void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef& Def)
 {
 	UWorld* World = GetWorld();
-	// Mana notification may end/destroy the caster after payment. Keep that
-	// accepted cast's cost/cooldown, but never start effects from an ended actor.
-	if (!World || !IsValid(Caster) || Caster->IsActorBeingDestroyed()
-		|| !Caster->HasActorBegunPlay() || Caster->HasStartedEndPlay())
+	// Health/effect notifications can end either participant synchronously.
+	// Keep committed cost/health, but stop the remaining cast work after teardown.
+	const auto IsActiveParticipant = [World](const AMMOCharacter* Participant)
+	{
+		return IsValid(Participant) && !Participant->IsActorBeingDestroyed()
+			&& Participant->HasActorBegunPlay() && !Participant->HasStartedEndPlay()
+			&& Participant->GetWorld() == World;
+	};
+	if (!World || !IsActiveParticipant(Caster))
 	{
 		return;
 	}
@@ -1219,12 +1224,14 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		if (Caster->GetStats())
 		{
 			Caster->GetStats()->Heal(Def.Power);
+			if (!IsActiveParticipant(Caster)) return;
 			// Iyilestirme skili bir buff da tasiyabilir (or. yenilenme HoT).
 			if (!Def.AppliedEffectId.IsNone())
 			{
 				Caster->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 			}
 		}
+		if (!IsActiveParticipant(Caster)) return;
 		MulticastSkillFX(Def.Effect, CasterLoc, CasterLoc, 90.f, AnimIndex);
 		break;
 	}
@@ -1254,11 +1261,13 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		if (Recipient->GetStats())
 		{
 			Recipient->GetStats()->Heal(Def.Power);
+			if (!IsActiveParticipant(Caster) || !IsActiveParticipant(Recipient)) return;
 			if (!Def.AppliedEffectId.IsNone())
 			{
 				Recipient->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 			}
 		}
+		if (!IsActiveParticipant(Caster) || !IsActiveParticipant(Recipient)) return;
 		MulticastSkillFX(EMMOSkillEffect::HealSelf, Recipient->GetActorLocation(), Recipient->GetActorLocation(), 90.f, AnimIndex);
 		break;
 	}
@@ -1270,6 +1279,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		{
 			Caster->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 		}
+		if (!IsActiveParticipant(Caster)) return;
 		MulticastSkillFX(EMMOSkillEffect::HealSelf, CasterLoc, CasterLoc, 90.f, AnimIndex);
 		break;
 	}
@@ -1285,6 +1295,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 				Caster->SetActorRotation(Dir.Rotation());
 			}
 			const float AppliedDamage = UGameplayStatics::ApplyDamage(Target, Def.Power, Instigator, Caster, nullptr);
+			if (!IsActiveParticipant(Caster) || !IsActiveParticipant(Target)) return;
 
 			// Vurulan hedefe debuff uygula (or. zehirli ok -> Poison DoT).
 			if (AppliedDamage > 0.f && !Def.AppliedEffectId.IsNone()
@@ -1293,6 +1304,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 				Target->GetStats()->ApplyEffect(Def.AppliedEffectId, Caster);
 			}
 
+			if (!IsActiveParticipant(Caster) || !IsActiveParticipant(Target)) return;
 			MulticastSkillFX(Def.Effect, CasterLoc + FVector(0, 0, 40), Target->GetActorLocation() + FVector(0, 0, 40), 0.f, AnimIndex);
 		}
 		else
@@ -1322,6 +1334,7 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 		// Yaricap icindeki tum MOBLARA vur (PvP simdilik kapali).
 		for (TActorIterator<AMMOMob> It(World); It; ++It)
 		{
+			if (!IsActiveParticipant(Caster)) return;
 			AMMOMob* Other = *It;
 			if (!IsValid(Other) || Other->IsActorBeingDestroyed() || !Other->HasActorBegunPlay() || Other->HasStartedEndPlay()
 				|| Other->GetWorld() != World || Other == Caster || !Other->GetStats() || Other->GetStats()->bIsDead)
@@ -1331,6 +1344,8 @@ void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef&
 			if (FVector::Dist(Center, Other->GetActorLocation()) <= Def.Radius)
 			{
 				const float AppliedDamage = UGameplayStatics::ApplyDamage(Other, Def.Power, Instigator, Caster, nullptr);
+				if (!IsActiveParticipant(Caster)) return;
+				if (!IsActiveParticipant(Other)) continue;
 
 				// Alan hasarina debuff da eslik edebilir (or. buz patlamasi -> Slow).
 				if (AppliedDamage > 0.f && !Def.AppliedEffectId.IsNone()

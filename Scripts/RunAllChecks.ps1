@@ -220,6 +220,11 @@ Step "Ilk kabul edilen sunucu becerisi ve ret kapilari" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Beceri health callback sonrasi ek etki ve alan devamligi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestSkillEffectContinuation.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Beceri hedefinin EndPlay ve mana callback yasam dongusu" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestSkillTargetLifecycle.ps1") | Out-Host
     $LASTEXITCODE -eq 0

@@ -5378,3 +5378,26 @@ seçili melee, yakın mob fallback, HealTarget ve self AoE için sınanır.
   zorunlu GC, hedef taşınması, gerçek RPC ownership/disconnect/travel ve görsel FX
   açıktır. Damage/heal başladıktan sonraki debuff/FX callback'leri ve caster'ın daha
   sonra kapanması için bu dört hedef giriş kontrolü genel garanti vermez.
+
+## O64 — Health callback sonrası beceri devamı (2026-10-10)
+
+Native 36/360 matris: PoisonArrow, DivineRestoration ve FrostNova; health
+callback'inde caster veya ilk recipient için canlı/RouteEndPlay/Destroy.
+
+- [ ] Listen-server ve uzak istemcide Zehirli Ok hedefinin authority health
+  listener'ında caster veya hedefi EndPlay/Destroy'e sok. İlk hasar ve tek
+  mana/cooldown korunmalı; kapanıştan sonra Poison ve skill FX başlamamalı.
+- [ ] DivineRestoration müttefikini iyileştirirken caster veya müttefik kapanırsa
+  ilk heal korunmalı; sonradan Regen/skill FX uygulanmamalı. Canlı kontrolünde
+  ikisi de çalışmalı. Native matris görsel FX'i ölçmez.
+- [ ] FrostNova'nın ilk vuruş health listener'ında caster kapanırsa sonraki mob
+  hasar/Slow almamalı. Yalnız ilk mob kapanırsa bu moba Slow eklenmemeli ve canlı
+  ikinci mob normal hasar/Slow almalı; host/istemci rollerini değiştir.
+- [ ] OnEffectsChanged içinde kapanış, HealSelf/self-fallback, BuffSelf,
+  AoETarget merkezi/FX callback'i ve çok hedefli iterator sırası PIE'da ayrıca
+  denenmeli. Bu yolların korumaları kaynak incelemesine dayanır; 36-case health
+  matrisi hepsini çalıştırmaz. AoE FX zaten ilk hasardan önce yayımlanır.
+- [ ] Ölümün EndPlay olmadan gerçekleşmesi, component-only EndPlay, erken
+  cleanup yeniden girişi, forced GC, gerçek ownership/RPC/disconnect/travel ve
+  Stats::Heal/TakeDamage içindeki kendi devam işlemleri açık; bu değişiklik
+  genel callback/yaşam döngüsü güvenliği garantisi değildir.
