@@ -5017,3 +5017,34 @@ Bu süreç/log kontrolü sürekli bağlantı, uzak gameplay RPC, UI/replication,
 seamless travel veya dedicated Server build sonucu değildir. Mevcut gerçek
 host + uzak istemci PIE kutuları açık kalır. C++/config/DLL değişmedi; oyun
 derlemesi ve tam aggregate bu script düzeltmesinde başlatılmadı.
+
+## 2026-10-10 — Yükseltmede gold callback ve eşya kimliği (O49, §87)
+
+Eski gerçek kod native132 kontrolün14'ünde yanlış hedef/snapshot verdi;
+düzeltme izole gerçek derleme sonrası132/0 geçti. Bu headless controller'sız
+authority fixture'ıdır; uzak RPC, HUD, gerçek disk kaydı ve PIE sonucu değildir.
+Gold listener artık eşya sonucu ve ücretin birlikte tamamlanmış halini görür.
+
+Ana derleme + native132 ve dokuz ek runner geçti: vendor18/saved equipment11,
+first equip8/trade230/save lifecycle26; store625/625 ve JSON625/0 mismatch,
+gerçek geçici save/load eşit. Ana Summer56/Winter76/errors0 ve NetSmoke
+20sn+20sn1join/1welcome/errors0. Bu kontroller aşağıdaki PIE kutularını kapatmaz.
+
+İzole toplu RunAllChecks -SkipBuild47/47 geçti (ayrı UBT derlemesi vardı);
+izole Summer56/Winter78 ve varsayılan ağ30sn+45sn1join/1welcome/errors0.
+Ana tam aggregate yapılmadı. Ana625 eski .sav byte'ları korundu; loguyla
+eşleşen1 yeni ağ-test slotu korundu. İzole Store slots0 atlaması, ana625
+kayıt ve gerçek geçici roundtrip kontrolüyle ayrıca ele alındı.
+
+- [ ] Listen host ve uzak istemcide çantada iki benzer eşyayla yükseltme yap:
+  yalnız seçilen InstanceId değişsin, tek ücret düşsün; hızlı çift tık ve
+  bayat ExpectedPlus ikinci işlem üretmesin. Başarı/başarısızlık/yanma mesajı,
+  çanta ve altın HUD'u iki oyuncu için doğru ve owner-only kalsın.
+- [ ] Authority Blueprint gold listener'ı varsa test ortamında snapshot veya
+  kuşanma çağrısıyla dene: callback tamamlanmış upgrade sonucunu görsün,
+  diğer çanta örneği artmasın/yanmasın. Var olmayan binding'i mevcut gameplay
+  davranışı olarak sayma. Callback sonrası kuşanma ayrı geçerli işlem olabilir.
+- [ ] Normal yükseltme sonrası çıkıp yeniden gir; altın, hedef örnek/artı veya
+  yanma kayıtta aynı kalsın. Ölüyken, yetersiz altınla, MAX artıda ve cooldown
+  sırasında ret kaynak tüketmesin. Native memory roundtrip gerçek disk/PIE
+  yeniden girişinin yerine geçmez; Shipping/dedicated Server build yapılmadı.

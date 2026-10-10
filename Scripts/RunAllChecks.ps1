@@ -265,6 +265,11 @@ Step "Satici ekonomi kapasite ve yetki kapilari" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Yukseltme altin delegate esya kimligi ve snapshot" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestUpgradeCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Takas revizyon onay ve ekonomi butunlugu" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestTrade.ps1") | Out-Host
     $LASTEXITCODE -eq 0

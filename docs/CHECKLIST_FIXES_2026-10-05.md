@@ -3930,3 +3930,80 @@ Başlangıç623 .sav byte'ları korundu; kendi NetSmoke loglarıyla eşleşen
 Gezgin351695/Gezgin849269 için2 yeni slot korundu (toplam625).
 Kanıt TEMP/mmo_o48_net_survival_20261010 altında. Gerçek gameplay/PIE
 kontrolleri açık; kod incelemesi veya bağlantı smoke'u bu kutuları kapatmaz.
+
+## 87. Yükseltmede altın callback'i sonrası yanlış eşya (O49, 2026-10-10)
+
+UpgradeByInstanceId, çanta eleman referansını ve indeksini aldıktan sonra
+AddGoldFrom çağırıyordu. OnGoldChanged senkron authority listener'ı çantayı
+sıraladığında referans başka örneği gösteriyordu; kuşanma/silme/büyüme ayrıca
+referansı geçersiz bırakabilir. Cooldown iç içe yükseltmeyi engeller, ayrı
+kuşanma veya çanta değişikliğini engellemez.
+
+Eski gerçek DLL ile native regresyon132 kontrol/14 başarısızlık verdi:
+sıralama ve gerçek EquipByInstanceId callback'inde başka eşya yükseldi;
+altın listener'ındaki snapshot yükseltme öncesi eşyayı içerdi. Salt sıralama
+iki mevcut elemanı allocation değiştirmeden yer değiştirir. Çökme veya
+aktif Blueprint exploit'i yeniden üretildi iddiası yok: C++/script aramasında
+production gold subscriber bulunmadı, binary Blueprint graph'ları incelenmedi.
+
+İşlem artık örneği değer olarak kopyalar, zarı atıp artı/yanma sonucunu
+callback olmadan uygular, ardından altını düşürüp bildirir. Callback sonrası
+çanta referansı/indeksi kullanılmaz; sonuç RPC'si ve upgrade audit'i kopyalanmış
+kimlik/artı/rarity/sonuç/işlem bakiyesini kullanır. Authority, ölüm, para,
+ExpectedPlus ve cooldown kapıları korunur. Save şeması, replication alanları,
+oranlar, ücretler ve oyun verisi değişmedi; yeni Tick/timer/RPC eklenmedi.
+
+Native fixture başarı/başarısızlık/+7 yanma için normal, snapshot, sıralama,
+gerçek kuşanma ve iç içe yükseltme yollarını sınar. Her biri tek ücret,
+istenen örnek, dokunulmayan ikinci eşya, callback sayısı/settled snapshot,
+bellek save roundtrip ve anlık tekrar kontrolünü içerir. Altı ret kapısıyla
+toplam132 kontrol. Controller'sız aktörler aynı frame yok edilir; seed edilen
+process RNG nedeniyle yalnız unattended NullRHI authority game world kabul
+edilir. Disk save/load fixture'ı ve uzak istemci davranışı değildir.
+
+İlk fixture derlemesi yanlış JSON helper adıyla başarısızdı; mevcut
+FindDifferences kullanılarak düzeltildi. İlk runtime dar seed aralığında
+checks0 verdi; geniş aralıklı seed seçimi düzeltildi. Sonraki cold açılış
+fixture'a ulaşmadan60sn watchdog'a takıldı ve yalnız owned process kapatıldı.
+Warm baseline retry132/14 hatayı gösterdi. Düzeltme gerçek UBT compile/link
+3.45sn ve native132/0 ile doğrulandı. Ana proje gerçek UBT compile/link
+42.48sn Succeeded; eski DLL test başarısı derleme yerine sayılmadı.
+
+Boyle salt okunur kaynak review'unda referans/callback kusurunu bağımsız
+doğruladı. Son fixture review isteği kullanım limitine takıldı; tamamlanmış
+bağımsız nihai review olarak sayılmadı. Parent ilgili diff/caller/delegate,
+UObject strong listener sahipliği ve cleanup'ı ayrıca inceledi.
+Kanıt TEMP/mmo_o49_upgrade_callbacks_20261010 altında.
+
+Bu değişiklik yalnız upgrade yayın sırasını kapsar; tüm inventory/quest/trade
+callback'lerine transaction garantisi vermez. Genel AddGold nested source-tag
+telemetrisi ve callback'in keyfi actor yok etmesi/disk hatası bu kapsamda değil.
+Gerçek host/uzak istemci PIE, görsel HUD ve Shipping/Server target açık.
+
+Ana projede yeni fixture132/0; vendor18, saved equipment11, first equip8
+(iki oturum marker'ı), trade230 ve save lifecycle26 geçti. Store625/625 yükleme,
+JSON625/0 mismatch, writeorder ve gerçek geçici save/load eşitliği geçti.
+Bu dokuz ek runner + ayrı yeni fixture toplam10 ilgili kontrol koşusudur.
+Ana Summer56/Winter76 mob smoke'u exit0/errors0; NetSmoke20sn server +20sn
+client, port17781,1join/1welcome/iki log errors0 ile geçti. Ağ smoke'u upgrade
+RPC veya UI/replication davranışının doğrulandığı anlamına gelmez.
+
+Ana ek kontroller için ayrı TEMP kullanıldı. İlk store runner'ı eski tırnaksız
+ABSLOG argümanının boşluklu TEMP yoluyla logu bulamaması nedeniyle durdu;
+oyun kodu hatası veya geçerli test başarısı sayılmadı. Aynı özel TEMP'in
+boşluksuz8.3 yoluyla store ve kalan kontroller tekrar çalıştırılıp geçti.
+
+İzole RunAllChecks -SkipBuild -NetPort17779:47/47, exit0. Derleme ayrı gerçek
+UBT adımıydı. Summer56/Winter78/errors0; varsayılan30sn server +45sn client
+NetSmoke1join/1welcome/errors0. ValidateData mevcut Lv33+ beceri boşluğu
+uyarılarıyla exit0, StaticLint90 temiz. Soak mock25/98 ve NetSmoke mock52/678
+bu aggregate içinde de geçti. İzole Store başlangıç slots0 nedeniyle mevcut
+.sav okuma/JSON/roundtrip'i atladı; ana625 kayıt testi bu boşluğu ayrıca kapattı.
+Ana projede tam aggregate/-FullCompile çalıştırılmadı,10 ilgili kontrol koşusu
+yapıldı. İki kökte165 source/config/script girdisi ve derlenmiş DLL hash'i
+test sonrası sabit; yalnız sahip olunan8 dosya commit kapsamına alındı.
+
+Ana başlangıç625 .sav'ın tamamı byte byte korundu. Ana NetSmoke sunucusunda
+Join/Starter pack loglarıyla eşleşen Gezgin767052 için1 yeni slot korundu
+(toplam626). İzole çalışma ağacının kendi test kayıtları/logları arşiv öncesi
+kanıt dizinine alındı. Test süreçleri tamamlandı; foreign dosya/süreç kapatılmadı.

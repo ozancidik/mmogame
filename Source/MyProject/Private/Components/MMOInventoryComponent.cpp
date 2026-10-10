@@ -776,7 +776,7 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 		}
 	}
 
-	FMMOEquipmentInstance& Inst = EquipmentBag[BagIndex];
+	const FMMOEquipmentInstance Inst = EquipmentBag[BagIndex];
 	const FMMOItemDef* Def = FMMOItemDatabase::Find(Inst.ItemId);
 	if (!Def || Inst.Plus < 0 || Inst.Plus >= FMMOItemDatabase::MaxPlus)
 	{
@@ -806,41 +806,42 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 	}
 
 	LastUpgradeServerTime = Now;
-	AddGoldFrom(-Cost, TEXT("yukseltme"));
+	const int32 BalanceAfterUpgrade = Gold - Cost;
 
 	const FName UpgradedItemId = Inst.ItemId;
 	const int32 OldPlus = Inst.Plus;
 	const int32 UpgradeRarity = static_cast<int32>(Inst.Rarity);
 	const int32 ChancePct = FMMOItemDatabase::GetUpgradeChancePct(Inst.Plus);
 	const bool bSuccess = FMath::RandRange(1, 100) <= ChancePct;
+	bool bBurned = false;
 	const TCHAR* Result = TEXT("failed");
 	int32 ResultPlus = OldPlus;
 
 	if (bSuccess)
 	{
-		Inst.Plus++;
+		EquipmentBag[BagIndex].Plus = OldPlus + 1;
 		Result = TEXT("success");
-		ResultPlus = Inst.Plus;
-		ClientUpgradeResult(true, false, Inst.ItemId, Inst.Plus);
+		ResultPlus = OldPlus + 1;
 	}
 	else if (FMath::RandRange(1, 100) <= FMMOItemDatabase::GetBurnChancePct(Inst.Plus))
 	{
 		// YANDI! Item yok olur (klasik KO).
-		const FName BurnedId = Inst.ItemId;
 		EquipmentBag.RemoveAt(BagIndex);
+		bBurned = true;
 		Result = TEXT("burned");
 		ResultPlus = -1;
-		ClientUpgradeResult(false, true, BurnedId, 0);
 	}
-	else
-	{
-		ClientUpgradeResult(false, false, Inst.ItemId, Inst.Plus);
-	}
+
+	// O49: AddGoldFrom publishes OnGoldChanged synchronously. Its authority listeners
+	// may equip/reorder/remove items or take a save snapshot. Settle the item outcome
+	// before publication, and never use a bag reference/index after that callback.
+	AddGoldFrom(-Cost, TEXT("yukseltme"));
+	ClientUpgradeResult(bSuccess, bBurned, UpgradedItemId, bBurned ? 0 : ResultPlus);
 
 	UE_LOG(LogMMOInventoryAudit, Display,
 		TEXT("event=item_upgrade actor=\"%s\" slot=\"%s\" item=\"%s\" instance=%d rarity=%d from_plus=%d to_plus=%d cost=%d chance=%d result=%s balance=%d"),
 		*InventoryActorName(this), *InventorySlotName(this), *UpgradedItemId.ToString(), InstanceId,
-		UpgradeRarity, OldPlus, ResultPlus, Cost, ChancePct, Result, Gold);
+		UpgradeRarity, OldPlus, ResultPlus, Cost, ChancePct, Result, BalanceAfterUpgrade);
 
 	OnInventoryChanged.Broadcast();
 }

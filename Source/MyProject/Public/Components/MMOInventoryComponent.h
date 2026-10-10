@@ -39,6 +39,7 @@ public:
 	static bool RunSavedEquipmentLevelSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunVendorEconomySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstEquipSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunUpgradeCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
