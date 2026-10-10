@@ -5079,3 +5079,25 @@ Bu sonuçlar aşağıdaki gerçek host/istemci PIE kutularını kapatmaz.
   Ölüyken, uzaktayken ve dolu çantada ret kaynak tüketmesin; koşulu düzelttikten
   sonra teslim çalışsın. Normal teslim sonrası çık/gir: ödüller ve tamamlanmış
   görev kaydı aynı kalsın. PIE, görsel HUD ve Shipping/Server target açık.
+
+## O51 — Satın alma callback ödeme/teslim sırası (2026-10-10)
+
+Native MMOTestPurchaseCallbacks174 kontrol, gerçek dynamic delegate üzerinden
+üç satın alma API'sinin ilk bildiriminde ücret+teslimi ve nested/seri eşdeğerliği
+kontrol eder. Public loot/ödül wrapper bildirimleri de sınanır. Eski kod son
+baseline'da174/21 FAIL; düzeltme174/0. Controllerless/bellek fixture'i gerçek
+istemci RPC, HUD, detach/disk veya PIE kanıtı değildir. Ayrıntı CHECKLIST_FIXES
+§89; genel ağ smoke yalnız bağlantı/süreç/log gözlemidir.
+
+- [ ] Listen host ve uzak istemcide satıcı yanında ShortSword, can iksiri ve
+  mana iksiri al: doğru ücret/adet, çanta ve HUD güncellensin; owner-only veri
+  diğer oyuncunun HUD'una sızmasın. Normal alma/satma/loot bildirimleri sürsün.
+- [ ] Test authority Blueprint'inde tek seferlik gold/inventory listener'ından
+  aynı satın alma API'sini çağır. İlk listener ödenmiş teslimi görsün. Tek bütçe
+  varsa ikinci işlem reddedilsin; iki bütçe ve yer varsa iki ücret/iki eşya olsun.
+  Son çanta yuvasında tek ekipman ve tek ücret;998 iksirden999'a tek ücret olsun.
+- [ ] Tam çanta/yığın, yetersiz altın, ölü/uzak oyuncu ve ekipman seviye/satış
+  kısıtlarında ret eşya/altın değiştirmesin. Koşulu düzelttikten sonra satın al.
+- [ ] Normal satın alma sonrası çık/gir: ödenen bakiye ve teslim edilen eşyalar
+  korunsun. Gold ve inventory listener'ından snapshot alan test Blueprint'inde
+  yarım satın alma görülmesin; gerçek detach/disk yolunu ayrıca doğrula.

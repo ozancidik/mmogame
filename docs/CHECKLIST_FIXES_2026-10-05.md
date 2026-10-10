@@ -4068,3 +4068,91 @@ kontrolü ve gerçek geçici roundtrip ayrıca yapıldı. Gerçek uzun Soak bu t
 Ana başlangıç626 .sav'ın tamamı byte byte aynı, yeni ana slot0. İzole test
 kayıtları/logları arşiv öncesi kanıt dizinine alındı. Yalnız sahip olunan8
 dosya commit kapsamındadır; diğer ajan dosyaları/süreçleri değiştirilmedi.
+
+## 89. O51 — Satın almada ödeme ve teslimin callback öncesi tamamlanması (2026-10-10)
+
+Başlangıç HEAD b7c7ffe; tracked dosyalar temizdi. Ayrı managed worktree
+purchase-callback-order aynı HEAD'den açıldı. Başlangıçtaki .agents/, .codex/
+ve AGENTS.md untracked dosyaları kapsam dışı bırakıldı. ecc-mmo-review,
+ecc-mmo-verify, ue-build ve küçük derlenebilir adım yaklaşımı uygulandı.
+Gauss QA rolünde salt kaynak incelemesi yaptı; runtime kanıtını ana ajan üretti.
+Agency araçları bu oturumda mevcut değildi.
+
+**Doğrulanan koşullu hata:** BuyEquipment altını düşürüp gold delegate'ini
+çağırıyor, ekipmanı sonra ekliyordu. Son çanta yuvasında, gold listener'ından
+aynı API ile ikinci satın alma yapıldığında iki ücret alınabiliyor, bir ekipman
+teslim ediliyordu. BuyPotion/BuyConsumable ise AddItem'ın inventory delegate'ini
+ödeme öncesi çağırıyordu: tek satın alma bütçesi ve boş yığınla listener'daki
+ikinci satın alma iki iksiri tek ücretle verebiliyordu. Gerçek synchronous
+dynamic delegate ve native vendor API ile yeniden üretildi. Mevcut Blueprint
+listener'ları incelenmedi; uzak istemcinin tek başına listener enjekte edebildiği
+veya bu hatayı mevcut içerikte kullandığı iddia edilmiyor.
+
+**Değişiklik:** Public AddItem ve AddEquipmentInstance imzaları/bildirimleri
+korundu. Protected internal helper'lar bNotify=false ile teslimi yayımlamadan
+yapabiliyor. Üç satın alma API'si doğrulamadan sonra sessiz teslimi tamamlıyor,
+AddGoldFrom ile ödemeyi uyguluyor ve inventory delegate'ini çağırıyor. Ekipman
+helper'ı başarısızsa ödeme yapılmıyor; stack ücreti gerçek Added üzerinden.
+İlk gold veya inventory callback'i artık ödenmiş teslimi görüyor. İç içe satın
+alma kalan altın/kapasite üzerinden normal seri işlem gibi değerlendiriliyor.
+Authority/RPC, owner-only replication, fiyat, seviye, mesafe, canlılık, kapasite
+ve taşma kapıları değişmedi. Yeni timer/tick veya save şeması yok.
+
+**Native regresyon:** MMOTestPurchaseCallbacks / TestPurchaseCallbacks.ps1.
+3 API x 2 delegate x 2 bütçe x 2 kapasite =24 vaka, vaka başına7 kontrol;
+yeni/mevcut yığın ve ekipman wrapper'ları ile bilinmeyen/dolu retleri için6
+kontrol:174. İlk callback full inventory save snapshot'ını (NextInstanceId dahil)
+karşılaştırır. Nested sonuç seri API oracle'ına ek olarak bağımsız ücret/adet/
+InstanceId hesabıyla ve tam delegate sayısıyla sınanır; sonraki normal satın
+alma ve bellek roundtrip'i de kontrol edilir. Controllerless geçici pawns,
+aynı kare, authority+unattended+NullRHI; gerçek RPC, detach/disk ve PIE değildir.
+Strong UObject probe, tek seferlik callback, explicit unbind ve fixture cleanup
+kullanılır. Runner GUID/quoted ABSLOG, yalnız sahip olduğu process için watchdog/
+cleanup, native exit0,174 marker, tek PASS özeti ve sıfır error/FAIL şartı arar.
+RunAllChecks içine derleme sonrası yeni adım eklendi; toplu betiğin tamamı bu
+turda çalıştırılmadı.
+
+**Eski/yeni kanıtı:** İlk168 kontrol eski kodda18 başarısızdı. QA sonrası
+bağımsız toplamlar, tam bildirim sayısı ve6 wrapper kontrolü eklenerek174 oldu.
+Son eski Inventory.cpp gerçek compile/link sonrası174/21 FAIL, native/script
+0/1; aynı174 kontrol düzeltilmiş kodda0 FAIL, native/script0/0. Eski dosyayı
+kopyalamanın mtime'ı koruduğu bir ara denemede UBT Inventory'yi yeniden derlemedi;
+o PASS baseline sayılmadı, discard_baseline_final.txt ile iptal edildi. Dosya
+zamanı güncellenip Inventory compile satırı doğrulanarak baseline tekrarlandı.
+Son QA'daki fixture Items[0] koruması sonrası da gerçek derleme/native tekrarlandı;
+bu koruma normal fixture/reproducer yolunu değiştirmez.
+
+Kanıtlar: C:\Users\OZANCI~1\AppData\Local\Temp\mmo_o51_purchase_callbacks_20261010.
+Fresh izole UBT59.58sn; üretim düzeltmesi/header UBT22.36sn; son eski kod UBT5.43sn;
+son düzeltilmiş Inventory UBT3.05sn. Ana üretim/header UBT27.03sn ve fixture UBT2.92sn.
+Tüm bu build'ler exit0/Result:Succeeded ve gerçek compile/link içerir.
+Main ValidateData mevcut Lv33+ beceri boşluğu uyarılarıyla exit0; StaticLint94
+kaynak temiz; metrics parser1516/1516. Main vendor18, upgrade132, trade230,
+quest callbacks112, quest capacity13, saved equipment11, first equip8+2events,
+save lifecycle26 geçti. Store626/626 loaded, invalid/loadFailed/existsMismatch0,
+JSON626/0, writeorder1 ve gerçek geçici disk saved/loaded/equal1 geçti.
+Summer57/Winter80/errors0. Nihai ağ/kayıt/hash sonucu aşağıdaki tamamlanma kaydındadır.
+
+**Sınırlar/sonraki iş:** AddGold/AddGoldFrom'un iç içe callback'lerde metrics
+miktarını/tag'ini yanlış raporlayabilmesi önceden mevcut ayrı QA bulgusudur;
+bu controllerless fixture bunu ölçmez, bu düzeltme kapsamına alınmadı. Ticaret
+transaction/callback incelemesi ayrı kaldı. Server üzerindeki yayın sırası,
+client property OnRep teslimini atomik yapmaz. Arbitrary ApplySaveData/actor
+Destroy veya bileşenler arası tüm işlemler için transaction garantisi verilmez.
+Gerçek host/uzak istemci PIE, görsel HUD, Shipping/Server target, -FullCompile
+ve uzun Soak yapılmadı; ilgili oynama adımları O51'de açık bırakıldı.
+
+**Tamamlanma kaydı:** Ana13/13 ilgili koşu exit0; NetSmoke Summer port17787,
+20sn server+20sn client gözlemi,1join/1welcome,iki log errors0. Test boyunca
+ana171 source/config/script girdisi ve o DLL değişmedi. Son QA'da yalnız test
+fixture'indeki Items[0] için hata raporunu koruyan sınır kontrolü eklendi:
+izole UBT3.44sn ve ana UBT2.88sn gerçek fixture compile/link; iki kökte son
+174 kontrol tekrar0 FAIL/native0/script0 geçti. Üretim/config/script girdileri
+aynı kaldı;13 koşunun kalan12'si bu yalnız fixture korumasından sonra tekrarlanmadı.
+Son171 girdi ve DLL hash'leri iki kökte son testten sonra da eşleşti.
+
+Başlangıç626 .sav dosyasının tamamı byte byte aynı. Ağ testindeki
+Gezgin218665 (server log Join succeeded) için1 yeni test kaydı oluştu; ana
+mevcut toplam627. Mevcut dosya silinmedi/değiştirilmedi. Test logları ve hash
+kanıtları harici proof dizininde tutuldu. Yalnız sahip olunan8 dosya commit
+kapsamında; izole ignored runtime verisi arşiv öncesi ayrıca korundu.

@@ -270,6 +270,11 @@ Step "Satici ekonomi kapasite ve yetki kapilari" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Satin alma delegate odeme ve teslim sirasi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestPurchaseCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Yukseltme altin delegate esya kimligi ve snapshot" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestUpgradeCallbacks.ps1") | Out-Host
     $LASTEXITCODE -eq 0

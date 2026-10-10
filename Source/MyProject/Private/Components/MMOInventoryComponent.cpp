@@ -442,6 +442,11 @@ int32 UMMOInventoryComponent::GetAddRoom(FName ItemId) const
 
 int32 UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
 {
+	return AddItemInternal(ItemId, Count, true);
+}
+
+int32 UMMOInventoryComponent::AddItemInternal(FName ItemId, int32 Count, bool bNotify)
+{
 	if (!HasAuthorityInternal() || ItemId.IsNone() || Count <= 0)
 	{
 		return 0;
@@ -459,7 +464,7 @@ int32 UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
 		if (Stack.ItemId == ItemId)
 		{
 			Stack.Count = FMath::Max(0, Stack.Count) + ToAdd; // GetAddRoom tavani asmamayi garanti eder
-			OnInventoryChanged.Broadcast();
+			if (bNotify) OnInventoryChanged.Broadcast();
 			return ToAdd;
 		}
 	}
@@ -468,7 +473,7 @@ int32 UMMOInventoryComponent::AddItem(FName ItemId, int32 Count)
 	NewStack.ItemId = ItemId;
 	NewStack.Count = ToAdd;
 	Items.Add(NewStack);
-	OnInventoryChanged.Broadcast();
+	if (bNotify) OnInventoryChanged.Broadcast();
 	return ToAdd;
 }
 
@@ -543,9 +548,14 @@ FMMOEquipmentInstance UMMOInventoryComponent::GetEquipped(EMMOEquipSlot Slot) co
 
 void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMOItemRarity Rarity)
 {
+	AddEquipmentInstanceInternal(ItemId, Plus, Rarity, true);
+}
+
+bool UMMOInventoryComponent::AddEquipmentInstanceInternal(FName ItemId, int32 Plus, EMMOItemRarity Rarity, bool bNotify)
+{
 	if (!HasAuthorityInternal() || !FMMOItemDatabase::Find(ItemId))
 	{
-		return;
+		return false;
 	}
 
 	// Canta dolu (bug-hunt: HUD zaten TUM cantayi gosterecek sekilde MaxBagSize'a
@@ -554,7 +564,7 @@ void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMO
 	if (EquipmentBag.Num() >= MaxBagSize)
 	{
 		MMONotify::ToOwner(GetOwner(), TEXT("Canta dolu!"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
-		return;
+		return false;
 	}
 
 	FMMOEquipmentInstance Inst;
@@ -563,7 +573,8 @@ void UMMOInventoryComponent::AddEquipmentInstance(FName ItemId, int32 Plus, EMMO
 	Inst.Plus = FMath::Clamp(Plus, 0, FMMOItemDatabase::MaxPlus);
 	Inst.Rarity = Rarity;
 	EquipmentBag.Add(Inst);
-	OnInventoryChanged.Broadcast();
+	if (bNotify) OnInventoryChanged.Broadcast();
+	return true;
 }
 
 void UMMOInventoryComponent::RecomputeEquipmentBonuses()
@@ -939,8 +950,10 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 		return;
 	}
 
+	// No callback may fill the last bag slot between payment and delivery.
+	if (!AddEquipmentInstanceInternal(ItemId, 0, EMMOItemRarity::Common, false)) return;
 	AddGoldFrom(-Price, TEXT("satin_alma"));
-	AddEquipmentInstance(ItemId, 0);
+	OnInventoryChanged.Broadcast();
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %s (-%d altin)"), *Def->Name, Price), FColor(120, 220, 120), 2.f);
 }
 
@@ -987,13 +1000,14 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 		return;
 	}
 
-	const int32 Added = AddItem(PotionId, Count);
+	const int32 Added = AddItemInternal(PotionId, Count, false);
 	if (Added <= 0)
 	{
 		return;
 	}
 	const int32 Price = FMMOItemDatabase::PotionPrice * Added;
 	AddGoldFrom(-Price, TEXT("satin_alma"));
+	OnInventoryChanged.Broadcast();
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d iksir (-%d altin)%s"), Added, Price,
 		Added < Wanted ? TEXT(" - tavana ulasildi") : TEXT("")), FColor(120, 220, 120), 2.f);
 }
@@ -1043,13 +1057,14 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 		return;
 	}
 
-	const int32 Added = AddItem(ItemId, Count);
+	const int32 Added = AddItemInternal(ItemId, Count, false);
 	if (Added <= 0)
 	{
 		return;
 	}
 	const int32 Price = Def->Price * Added;
 	AddGoldFrom(-Price, TEXT("satin_alma"));
+	OnInventoryChanged.Broadcast();
 	MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Satin alindi: %d %s (-%d altin)%s"), Added, *Def->Name, Price,
 		Added < Wanted ? TEXT(" - tavana ulasildi") : TEXT("")), FColor(120, 220, 120), 2.f);
 }

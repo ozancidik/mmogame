@@ -40,6 +40,7 @@ public:
 	static bool RunVendorEconomySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstEquipSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunUpgradeCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunPurchaseCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -206,6 +207,10 @@ public:
 	void ApplySaveData(const struct FMMOCharacterSaveData& In);
 
 protected:
+	// Purchase commits delivery and payment before publishing either delegate.
+	int32 AddItemInternal(FName ItemId, int32 Count, bool bNotify);
+	bool AddEquipmentInstanceInternal(FName ItemId, int32 Plus, EMMOItemRarity Rarity, bool bNotify);
+
 	UFUNCTION()
 	void OnRep_Gold();
 
