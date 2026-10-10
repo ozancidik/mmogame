@@ -19,6 +19,7 @@
 #include "Core/MMOGameMode.h"
 #include "Core/MMOAdmin.h"
 #include "Core/MMOMetrics.h"
+#include "Core/MMONotify.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -2649,10 +2650,12 @@ void AMMOPlayerController::ServerRequestHeal_Implementation(AMMOHealerNPC* Npc)
 	}
 
 	// Yeterli altin var mi?
-	const int32 Cost = FMath::Max(0, Npc->HealCost);
+	// Bedel seviyeyle buyur (AMMOHealerNPC::ComputeHealCost); sabit taban Lv58+ bantlarinda bedavaydi.
+	const int32 Cost = AMMOHealerNPC::ComputeHealCost(Npc->HealCost, St->Level);
 	if (Inv->Gold < Cost)
 	{
 		ClientReceiveNpcDialogue(Speaker, Npc->InsufficientGoldLine);
+		MMONotify::ToOwner(C, FString::Printf(TEXT("Sifa bedeli: %d altin"), Cost), FColor(255, 200, 80), 3.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 
@@ -2670,4 +2673,8 @@ void AMMOPlayerController::ServerRequestHeal_Implementation(AMMOHealerNPC* Npc)
 
 	// Onay balonu: sifacinin sabit repliklerinden biri (istemciye ozel gonderilir).
 	ClientReceiveNpcDialogue(Speaker, Npc->PickGreeting());
+	if (IsValid(C))
+	{
+		MMONotify::ToOwner(C, FString::Printf(TEXT("Sifa: -%d altin"), Cost), FColor(120, 255, 120), 3.f);
+	}
 }
