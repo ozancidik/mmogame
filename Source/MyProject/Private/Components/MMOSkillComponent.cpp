@@ -944,9 +944,14 @@ void UMMOSkillComponent::ServerUseSkill_Implementation(FName SkillId, AMMOCharac
 	// UseSkill kendi kapisini yeniden uygular; cakismamasi icin kaydi temizle,
 	// UseSkill mana harcayip etkiyi calistirir ve cooldown'u yeniden yazar.
 	CooldownEndTimes.Remove(SkillId);
-	RequestedTargetForCast = RequestedTarget;
-	const bool bCast = UseSkill(SkillId);
-	RequestedTargetForCast.Reset();
+	bool bCast;
+	{
+		// Mana/effect delegates may cast another skill synchronously. Restore the
+		// enclosing weak target before publishing rejection or resuming its effect.
+		TGuardValue<TWeakObjectPtr<AMMOCharacter>> TargetScope(RequestedTargetForCast,
+			TWeakObjectPtr<AMMOCharacter>(RequestedTarget));
+		bCast = UseSkill(SkillId);
+	}
 	if (!bCast)
 	{
 		// Reddedildi (hedef yok, mana yetersiz, vb.): kayit yukarida silindi, istemci de bekleme gostermesin.

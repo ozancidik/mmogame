@@ -116,6 +116,7 @@ public:
 	static bool RunLearnedSkillBudgetSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunFirstSkillSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunCastCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunTargetContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	// Each rank costs one point; saved ranks and unspent points share this budget.
@@ -127,7 +128,7 @@ public:
 protected:
 	// Skill id -> cooldown bitis zamani (dunya saati; her makine kendi kopyasini tutar).
 	TMap<FName, float> CooldownEndTimes;
-	// Yalnizca mevcut sunucu beceri cagrisi boyunca gecerli; istemcinin hedef onerisi
+	// Ic ice sunucu cagrilarinda onceki weak hedef geri yuklenir; istemcinin hedef onerisi
 	// FindNearestEnemy/HealTarget icinde tekrar dogrulanir.
 	TWeakObjectPtr<AMMOCharacter> RequestedTargetForCast;
 

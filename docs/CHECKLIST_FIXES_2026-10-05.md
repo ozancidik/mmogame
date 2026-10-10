@@ -4809,3 +4809,69 @@ slot vardır. Paralel soak'ın ürettiği üç yeni kayıt ve ağ smoke'ındaki 
 silinmedi. Kapsam dışı **941 tracked dosya** değişmedi. Diğer ajanın günlük özet
 belgesindeki Winter soak/probe commit'leri ayrı kaydedildi ve bu commit'e alınmadı.
 Tam RunAllChecks, uzun soak, cooked/paketli oyun ve PIE bu turda çalıştırılmadı.
+
+## O61 — İç içe beceri çağrısında hedef bağlamı (2026-10-10)
+
+**Doğrulanan orta hata:** `ServerUseSkill_Implementation` geçici istenen hedefi
+koşulsuz atayıp dönüşte sıfırlıyordu. `ConsumeMana` gerçek `OnManaChanged`
+delegate'inden farklı beceri aynı component üzerinde çağrıldığında iç çağrı dış
+B hedefini siliyordu. Dış PowerStrike yakındaki A'ya, hedefli GreaterHeal kendine
+gidiyordu. İç çağrı `UseSkill` içinde reddedilse bile bu gerçekleşiyordu;
+cooldown erken reddi hedefe dokunmadığı için kontrol grubu sağlamdı.
+
+Hedef artık `UseSkill` çevresindeki dar blokta `TGuardValue<TWeakObjectPtr<...>>`
+ile geçici kurulur ve ret bildirimi öncesinde önceki weak değer geri gelir.
+Aktörü canlı tutan yeni sahiplik, async state, RPC veya replicated/save alanı yoktur.
+Mevcut sunucu sınıf/seviye/mana/cooldown ve hedef tür/dünya/ölüm/mesafe kapıları
+korunur. Geçersiz weak hedefi diriltmez; component EndPlay/GC güvenliği için ayrı
+bir genel koruma olduğu iddia edilmez. O60 cooldown rezervasyonu aynen durur.
+
+### Native regresyon kapsamı
+
+`MMOSkillTargetSelfTest.cpp`, `MMOTestSkillTargets` ve `TestSkillTargets.ps1`:
+2 etki (PowerStrike/ShieldBash hasarı ve GreaterHeal/DivineRestoration iyileştirmesi)
+× 2 dış yol (native RPC implementation veya fixture'ın kurduğu doğrudan bağlam)
+× 4 iç native RPC modu (başarılı, bilinmeyen beceri, cooldown, yetersiz mana)
+= **16 vaka / 192 kontrol**. Yakın fallback A, dış B ve iç C ayrıdır.
+Controllerless disposable aktörler aynı senkron frame'de yok edilir; save yükleme
+timer'ı işletilmez. Gerçek mana dynamic listener'ı strong-owned bir probe ile bir kez
+iç çağrı enjekte eder; toplam delegate bildirim sayısı ölçümü olduğu iddia edilmez.
+Son fixture kesin hasar/iyileştirme, ayrı cooldown'lar, mana, geri gelen hedef,
+yanlış fallback'in etkilenmemesi, dış dönüş temizliği ve sonraki hedefi denetler.
+Yetersiz mana modu callback içinde kalan manayı geçici sıfırlar ve geri yükler.
+Regen süreli tick'i veya gerçek oyuncu kontrolcüsü/metrik/replication ölçümü yapılmaz.
+
+Eski production kodu ilk fixture ile gerçek Editor derlemesi
+**100.42 sn / 15 aksiyon** sonrasında **42/192 FAIL** üretti:
+restored_context12, outer_target12, fallback_target12, top_level_context6.
+Native process0 fakat runner1, coverageTrue; yalnız process çıkışına güvenilmedi.
+Ardından hasar ve nested cooldown assertion'ları güçlendirildi; dar weak guard ile
+Editor **23.36 sn / 10 aksiyon** ve native **192/192 PASS** geldi.
+Runner tek summary, beklenen benzersiz vaka/check çiftleri, hatasız log ve native0
+ister; GUID log, 60 sn watchdog ve yalnız kendi process'inin cleanup'ını kullanır.
+Coverage helper valid/duplicate/missing/unknown AST fixture'ları **4/4** geçti.
+`RunAllChecks.ps1` yeni runner'ı içerir; bu tur aggregate'ın tümü çalıştırılmaz.
+
+Uzak istemci PIE, controller seçili hedefi, null/expired hedef, çok katlı nesting,
+caster/target EndPlay/GC ve diğer ret kapıları native matris kapsamında değildir.
+Somut açık adımlar `PLAYTEST_CHECKLIST.md` O61 bölümündedir.
+
+### Son doğrulama
+
+Ana Editor **33.93 sn / 10 aksiyon**, Game/Development **33.85 sn / 9 aksiyon**
+gerçek Compile/Link ile geçti. İzole fixture ve component için PCH/shared-PCH/unity
+kapalı, NoLink tek-dosya derlemeleri **8.59 sn** ve **7.66 sn** geçti; tüm proje
+FullCompile veya cooked/Shipping/dedicated runtime doğrulaması yapılmadı.
+
+İzole **7/7**, ana **13/13** seçilmiş runner başarılı: hedef192, cooldown384,
+first skill17/7 controller metriği, mastery12, learned12, stats save15,
+JSON113 negatif + enum18/invalid writer2. Ana ayrıca consumable11, save lifecycle26,
+store **670/670** (JSON mismatch0, writeorder1, roundtrip1), Summer **57**, Winter
+**78** mob ve Summer NetSmoke port17811 server/client20 sn: join1/welcome1,
+hata0 ve gözlem boyunca süreç yaşamı. Ağ smoke, hedefli gameplay RPC testi değildir.
+ValidateData (mevcut Lv33+ beceri boşluğu uyarıları), StaticLint104 ve
+PlaytestMetrics1516 iki ağaçta geçti; iki PS parse ve scoped diff-check temiz.
+Kaynak/config/script + Editor DLL **208'er dosya**, ana Game exe ve başlangıçtaki
+**670 kayıt** hash'leri korundu. Kapsam dışı **946 tracked dosya** değişmedi.
+Ağ smoke yeni bir kayıt oluşturdu; toplam **671**, hiçbir kayıt silinmedi.
+Tam RunAllChecks, uzun soak ve PIE bu tur çalıştırılmadı.

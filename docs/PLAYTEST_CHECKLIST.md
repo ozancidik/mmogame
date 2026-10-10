@@ -5306,3 +5306,27 @@ native RPC implementation çağrısı gerçek uzak istemci trafiğini kanıtlama
   çıkış-girişini kontrol et; metadata bulunmayan runtime ortamında geçerli enumlar
   korunmalı, MAX/bozuk JSON reddi mevcut geçerli karakter verisini değiştirmemeli.
   Bu tur Game exe derlemesi yapıldı; cooked/paketli çalıştırma yapılmadı.
+
+## O61 — İç içe beceride istenen hedefin korunması (2026-10-10)
+
+Native 192/16 matrisi gerçek mana delegate'inde ayrı hedefli sunucu implementation
+çağrısını doğrular. Bu, uzak istemci RPC taşınması veya seçili hedef HUD testi değildir.
+
+- [ ] İki oyunculu listen-server PIE'de authority mana listener'ı bir kez farklı
+  hazır beceri kullansın: dış PowerStrike mob B'ye, iç ShieldBash mob C'ye gitsin.
+  Yakın mob A veya controller'da seçili farklı mob dış vuruşu almamalı.
+  Her becerinin tek mana maliyeti, bağımsız cooldown'u ve doğru hasarı host/istemcide
+  görünmeli. Host ve uzak istemci rollerini değiştir.
+- [ ] Priest GreaterHeal oyuncu B'ye giderken listener DivineRestoration'ı oyuncu C'ye
+  kullansın. B ve C kendi iyileştirmesini almalı; caster veya seçili farklı oyuncu
+  yanlışlıkla iyileşmemeli. Regen'in süreli tick'i ve effect UI'si ayrıca kontrol edilmeli.
+- [ ] İç çağrı bilinmeyen/öğrenilmemiş beceri, yanlış sınıf/seviye, dolu cooldown,
+  yetersiz mana veya menzilde hedef olmaması yüzünden reddedilsin. Dış B hedefi
+  korunmalı; reddedilen iç kullanım ek kaynak veya etki üretmemeli. Native matriste
+  yalnız bilinmeyen beceri/cooldown/yetersiz mana retleri çalıştırıldı.
+- [ ] İç çağrının null hedefi mevcut fallback kurallarını kullanmalı; sonrasında dış
+  hedef geri gelmeli. Callback'te B'nin ölmesi/yok edilmesi, disconnect ve travel
+  durumlarında geçersiz aktöre etki uygulanmamalı. Null/expired hedef, GC ve çok katlı
+  callback zinciri native matrisin kapsamı dışında; weak guard bunları test edilmiş yapmaz.
+- [ ] Dış çağrı bitince sonraki beceri yeni hedefi kullanmalı. Gerçek ağ gecikmesi,
+  seçili hedef değişimi ve çıkış/giriş sonrası hedef/cooldown durumu ayrıca denenmeli.
