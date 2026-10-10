@@ -3,6 +3,7 @@
 Calistir:
   python Scripts/ContentMap.py            # Markdown'i ekrana basar
   python Scripts/ContentMap.py --write    # docs/CONTENT_MAP.md dosyasina yazar
+  python Scripts/ContentMap.py --check    # docs/CONTENT_MAP.md koddan uretilenle ayni mi (yazmaz; sapmada cikis 1)
 
 Moblar, gorevler (kapi seviyesi), ekipman (gereken seviye) ve beceriler (gereken seviye) icin hangi
 seviyede ne acildigini tek tabloda gosterir ve "hic yeni icerik gelmeyen" seviye araliklarini isaretler.
@@ -105,8 +106,23 @@ def build(max_level=80):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
+    ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     text = build()
+    if args.check:
+        path = ROOT / "docs" / "CONTENT_MAP.md"
+
+        def norm(s):
+            return [ln.rstrip() for ln in s.replace("\r\n", "\n").strip().split("\n")]
+
+        have = norm(path.read_text(encoding="utf-8")) if path.exists() else []
+        want = norm(text)
+        if have == want:
+            print("docs/CONTENT_MAP.md koddan uretilenle ayni")
+            raise SystemExit(0)
+        diff = next((i for i, (a, b) in enumerate(zip(have, want)) if a != b), min(len(have), len(want)))
+        print(f"HATA: docs/CONTENT_MAP.md eski (ilk fark satir {diff + 1}); `python Scripts/ContentMap.py --write` calistir")
+        raise SystemExit(1)
     if args.write:
         (ROOT / "docs" / "CONTENT_MAP.md").write_text(text, encoding="utf-8")
         print("docs/CONTENT_MAP.md yazildi")

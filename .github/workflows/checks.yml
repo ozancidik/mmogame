@@ -33,6 +33,7 @@ jobs:
           python Scripts/TestPocketSpacing.py
       - name: Dokuman baslik sayilari kodla uyumlu mu (negatif testiyle)
         run: |
+          python Scripts/ContentMap.py --check
           python Scripts/DocCounts.py
           python Scripts/TestDocCounts.py
       - name: PlaytestMetrics fixture testi (sahte [MMOMETRIC] logu)
