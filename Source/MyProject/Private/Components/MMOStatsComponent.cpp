@@ -23,6 +23,14 @@ namespace
 	// Oyuncu -> mob DoT tick'ine eklenen saldiri payi (tick = efekt tabani + AttackPower x bu). PLACEHOLDER; PIE'de
 	// dogrulanmadi (DOT_SCALING_DESIGN.md, onerilen 0,08-0,12).
 	constexpr float DotPlayerAttackScale = 0.10f;
+
+	bool IsActiveMMOPlayerDotSource(const AActor* Source, const UWorld* World)
+	{
+		const AMMOCharacter* Player = Cast<AMMOCharacter>(Source);
+		return IsValid(Player) && !Player->IsActorBeingDestroyed()
+			&& Player->HasActorBegunPlay() && !Player->HasStartedEndPlay()
+			&& Player->GetWorld() == World;
+	}
 }
 
 #if !UE_BUILD_SHIPPING
@@ -817,7 +825,8 @@ void UMMOStatsComponent::ApplyEffect(FName EffectId, AActor* EffectInstigator)
 			const bool bRetainedSourceInHub = TargetMob && RetainedSource && RetainedSource->IsPlayerControlled()
 				&& TargetMob->bHasHub && TargetMob->HubSafeRadius > 0.f
 				&& FVector::Dist2D(RetainedSource->GetActorLocation(), TargetMob->HubLocation) < TargetMob->HubSafeRadius;
-			if (Def->Type == EMMOEffectType::PeriodicDamage && bPlayerSource && E.bPlayerSource && E.Instigator.IsValid()
+			if (Def->Type == EMMOEffectType::PeriodicDamage && bPlayerSource && E.bPlayerSource
+				&& IsActiveMMOPlayerDotSource(E.Instigator.Get(), EffectWorld)
 				&& !bRetainedSourceInHub && EffectMagnitude < E.Magnitude)
 			{
 				E.RemainingTime = Def->Duration;
@@ -987,9 +996,10 @@ void UMMOStatsComponent::ProcessEffects(float DeltaTime)
 					}
 				}
 			}
-			// Resolve again for EACH pending tick: an earlier damage callback may destroy the source.
+			// Resolve again for EACH pending tick: a damage callback can start EndPlay
+			// while the source UObject/weak reference is still valid.
 			AActor* Instigator = P.Instigator.Get();
-			if (P.bPlayerSource && !Instigator)
+			if (P.bPlayerSource && !IsActiveMMOPlayerDotSource(Instigator, GetWorld()))
 			{
 				continue; // Orphan player DoT cannot bypass PvP/party/clan/hub or kill without attribution.
 			}

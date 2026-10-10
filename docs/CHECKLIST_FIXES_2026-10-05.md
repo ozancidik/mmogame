@@ -5102,3 +5102,76 @@ birebir ayni byte'lardir. Izole ignored kanit yedegi **17 dosya**.
 
 Tam RunAllChecks, tum proje FullCompile, uzun soak, cooked/Shipping/dedicated
 runtime ve PIE bu tur calistirilmadi. PLAYTEST_CHECKLIST O64 maddeleri acik.
+
+## O65 — Oyuncu DoT kaynaginin EndPlay'i (2026-10-10)
+
+**Native dogrulanmis P2:** ProcessEffects oyuncu kaynaginin weak referansinin
+cozulmesini yeterli goruyordu. RouteEndPlay sonrasi UObject gecerli kaldigindan
+hasar devam ediyordu. ApplyEffect de kapanmis guclu kaynagi tutup daha zayif
+canli yenilemenin guc ve stored provenance bilgisini devralmasini engelliyordu.
+
+Yerel IsActiveMMOPlayerDotSource, AMMOCharacter validity/destruction/begun/
+started-EndPlay/ayni dunya kontrolunu her pending oyuncu DoT tick'inde ve
+retained-source kararinda tekrarlar. Ilk kabul edilmis hasar korunur; kalan
+orphan oyuncu tick'leri atlanir. Kapanmis kaynak canli incoming ile yenilenirse
+guc ve stored instigator birlikte degisir. Canli guclu kaynagin zayif yenileme
+kurali, mob/environment zehiri, orphan HoT, sure ilerletme/expiry degismedi.
+RPC, save semasi, replication alani ve timer degisikligi yok.
+
+Yeni gercek ApplyEffect/ProcessEffects/TakeDamage matrisi: ilk batch oncesi
+veya ilk OnHealthChanged icinde kapanis x alive/RouteEndPlay/Destroy x
+none/weaker/stronger refresh = **18 case / 180 check**. Kaynaklar kontrolcusuz,
+strong-owned; hedef mob olmez. Yeni fixture player load/save yapmaz.
+Eski kod Editor **108.89 sn / 15 aksiyon** Compile/Link (once peer Build.bat
+kilidi beklendi), **16/180 FAIL**: batch6, followup6, refresh_source2,
+refresh_magnitude2. Native0/runner1/coverageTrue; alive/Destroy kontrolleri gecti.
+Ilk fix derlemesi **1.98 sn** C2039 verdi: HasStartedEndPlay AActor metodu degil.
+AMMOCharacter cast'iyle duzeltildi; gercek fixed Editor **3.96 sn / 4 aksiyon**
+Compile/Link ve ayni fixture **180/180 PASS**. Basarisiz derleme logu saklandi.
+
+Yerel QA kaynak incelemesi iki P2 bulguyu ve 18/180 oracle'ini dogruladi;
+incelemeci test/derleme calistirmadi veya dosya degistirmedi. Stored instigator
+ve gucun testi gercek DamageContributions/kill XP/loot kredisi kaniti degildir.
+Kaynak ilk health callback'inde Destroy olursa kabul edilmis vurusun sonrasinda
+player-controlled katkisi kaybolabilir; bu ayri attribution yolu incelenmeli.
+Early EndPlay, never-begun/cross-world, GC, gercek disconnect/travel, remote
+HP/effect/HUD/credit ve diger O65 PIE maddeleri acik. Hedef owner/component
+kapanisi, EndPlay olmadan olum ve zaten kapanmis incoming kaynaktan dogrudan
+ApplyEffect bu bounded duzeltmeye dahil degil.
+
+
+**O65 son dogrulama:** Ana Game Development gercek Compile/Link
+**50.99 sn / 10 aksiyon**. NoPCH/NoSharedPCH/DisableUnity/NoLink ile yeni
+fixture **11.55 sn / 1 Compile**, Stats **8.90 sn / 1 Compile** gecti.
+Ana Editor iki ayri UBT cagrisi: NoLink **37.63 sn / 10 Compile**; peer ag
+kosusu bittikten sonra normal Link **4.02 sn / 3 aksiyon**. Son sure tek
+basina toplam Editor derleme suresi degildir. Tum oyun derlemeleri editor
+kapaliyken yapildi; diger ajanin UE sureclerine dokunulmadi.
+
+Izole **7/7**, ana **13/13** runner exit0. Her ikisinde yeni DoT **180**,
+eski DoT/source **46**, skill effect **360**, skill callback **384**,
+reentrant XP **206**, stats budget **15** check ve JSON **113** negatif
+kontrol; enum **18** variant / **2** invalid writer gecti. Ana ek kontroller:
+consumable **11**, save lifecycle **26**, Store **704/704** slot/JSON,
+writeorder ve roundtrip PASS. Store sonrasi roundtrip slotuyla toplam **705**
+save var; baslangictaki **697/697** save byte-byte korundu. Artisi yalniz
+bu fixture'a atfetmiyoruz; yeni fixture player save/load yapmaz.
+Summer **57**, Winter **76** mob / exit0 / hata0; Summer NetSmoke port
+**17821**, server join1 / client welcomed1 / iki log hata0 / 20 sn canli.
+NetSmoke temiz native exit veya gercek gameplay RPC garantisi degildir.
+
+Iki agacta ValidateData temiz (bilinen Lv33+ skill boslugu uyarilari mevcut),
+StaticLint **108 C++**, PlaytestMetrics **1516/1516**. PowerShell parse PASS;
+runner coverage mock **5/5**. Scoped staged diff --check commit oncesi
+ayrica uygulandi. Source/Config/Scripts/Editor DLL dondurulmus envanteri
+iki agacta **220/220** hash ile ayni; ana Game exe hash'i de korundu.
+Yedi owned dosya iki agacta ayni. Eski Stats kaynagi baslangic 03d973d Git
+blob'uyla satir sonu normalizasyonundan sonra ayni; raw hash esitligi iddiasi
+yok. Fixture baseline/fixed/ana/izolede birebir ayni byte'lar.
+
+Baslangictaki **958** unowned tracked dosyanin **957** tanesi degismedi;
+tek istisna peer'in 3024012 commitindeki GUNLUK_OZET belgesi, committed
+hash'iyle korundu. Peer tam kosusundaki 132 PASS bu turun O65 kaniti olarak
+sayilmadi. Izole ignored kanit yedegi **12 dosya / 43,601 byte**.
+Tam RunAllChecks, tum proje FullCompile, Shipping/cooked/dedicated runtime,
+uzun soak veya PIE bu tur calistirilmadi. O65 PIE maddeleri acik kaldi.

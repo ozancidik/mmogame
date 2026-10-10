@@ -5401,3 +5401,25 @@ callback'inde caster veya ilk recipient için canlı/RouteEndPlay/Destroy.
   cleanup yeniden girişi, forced GC, gerçek ownership/RPC/disconnect/travel ve
   Stats::Heal/TakeDamage içindeki kendi devam işlemleri açık; bu değişiklik
   genel callback/yaşam döngüsü güvenliği garantisi değildir.
+
+## O65 — Oyuncu DoT kaynaginin EndPlay'i (2026-10-10)
+
+Native hedef: kontrolcusuz/strong-owned mob hedef, 18 case/180 check;
+ilk hasardan once veya ilk health callback'inde kaynak alive/EndPlay/Destroy,
+sonrasinda yenilemesiz/zayif/guclu canli kaynak. Gercek zaman akisi, PvP,
+uzak istemci ownership, GC, oyuncu kaydi ve XP/loot kredisi bu matrisin kaniti degil.
+
+- [ ] Listen host + uzak istemci: zehirli okla moba DoT uygula; kaynak gercek
+  disconnect/travel ile EndPlay'e girince sonraki oyuncu DoT tick'leri durmali.
+  Kapanmadan once uygulanmis hasar geri alinmamali.
+- [ ] Ilk hasar bildirimi sirasinda kaynak kapansin; ayni frame'de birikmis
+  kalan tick'ler ve sonraki frame'in orphan tick'i uygulanmamali.
+- [ ] Kaynak canliyken daha zayif oyuncu ayni zehri yenilesin: guc/kredi eski
+  kaynakta, sure tazelenmis kalmali. Kaynak EndPlay'e girdikten sonra zayif
+  canli kaynak yenilesin: guc ve kredi yeni kaynakla birlikte degismeli.
+- [ ] Daha guclu kaynak yenilemesi, PvP/parti/klan/hub/spawn-protection
+  kapilari; mob/environment zehiri ve healer kaynagi kapanan HoT davranisi
+  gercek iki oyunculu oturumda regresyon gostermemeli.
+- [ ] Zorlanmis GC, component-only kapanis, hedef owner EndPlay, EndPlay
+  olmadan olum, zaten kapanmis incoming kaynaktan dogrudan ApplyEffect,
+  timer/hitch scheduling ve gercek kill XP/loot atfi ayrica test edilmeli.

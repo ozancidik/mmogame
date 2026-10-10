@@ -30,6 +30,7 @@ public:
 	UMMOStatsComponent();
 #if !UE_BUILD_SHIPPING
 	static bool RunDotSourceLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunDotEndPlaySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunReentrantExperienceSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
