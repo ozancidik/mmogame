@@ -60,8 +60,8 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 - Lv1–30 yolu çok kısa (~80–85 öldürme); Lv30'da 49–51 harcanmamış beceri puanı birikiyor (yeni 8 beceri aynı rütbeyi paylaştığı için puan fazlasını azaltmaz).
 - Altın kaynağı bol, harcama yolu zayıf; `Q_Gold*` görevleri harcama değil birikim.
 - Ölüm neredeyse bedava; savunma formülü tehdidi büyük ölçüde siliyor.
-- Warrior ve Priest'te Lv24–70 arası hasar becerisi platosu; Warrior Lv80 capstone'u Lv70'inkinden zayıf (QA Bulgu #5, #6).
-- Lv61→65 ve Lv75→80 aralıkları görevsiz uzun öğütme.
+- Warrior ve Priest'te Lv24–70 arası hasar becerisi platosu **kısmen kapandı** (2026-10-10): Lv52/64/75'e her sınıfta üç yeni beceri eklendi; Warrior Lv80 capstone'u yine de Lv70/Lv75 halkalarından güç/sn'de zayıf (`QA_ROUND_2026-10-09_CLAUDE.md`, "Güç eğrisi"), denge verisi gerek.
+- Lv61→65 ve Lv75→80 görevsiz öğütme **kapandı** (2026-10-10): `CONTENT_MAP.md` Lv59–79 arasında her seviyede en az bir görev gösteriyor (yan görevler dahil); XP kalibi hâlâ placeholder.
 
 **PR #1'deki kod değişikliklerinin hiçbiri derlenmedi** (güvenlik/ağ düzeltmeleri, 12 beceri veri satırı, Y3 replikasyon değişiklikleri). Ayrıntı ve olası derleme hata yerleri: PR açıklaması. Yerelde `Scripts/RunAllChecks.ps1` çalıştırılmadan birleştirilmemeli.
 
