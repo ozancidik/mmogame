@@ -24,6 +24,12 @@
 
 ## 1. Lv1–5 hızlı başlangıç korunsun mu
 
+> **Model denemesi (2026-10-10, kod değişmedi):** Lv16–20 "görevli" bandı hedefin altında hızlı (5,9 öldürme/seviye; hedef 11–15; görevsiz 16,8).
+> `ProgressionModel.py --quest-mult` ile görev XP çarpanını bu aralıkta düşürmek (16→0,04, 20→0,08) bandı yalnız **8,0**'a çıkarıyor ve Lv21–25'i
+> hedefin üstüne (18,6 > 18) itiyor; tek çarpan ayarıyla iki bant birden hedefe girmiyor. Bu yüzden değişiklik yapılmadı: Lv16–20 bilinçli "görev
+> bandı" kabul edilirse sorun yok, düzeltilecekse Lv16–20'ye öldürme görevi eklemek/ham ödülleri tek tek düşürmek gerekir (ölçüm sonrası).
+> Aynı gün eklenen Lv21/23 yan görevleri Lv21–25'i 20,3 → 18,0 ile hedefe soktu.
+
 **Neden önemli:** Lv1–20'nin 20 seviyesinin **tamamı** modelde "grind=0" (görev XP'si ihtiyacı karşılıyor) **[Kesin, model]**. Lv1–5 görev ödülleri ihtiyacın %347–616'sı; bu fazla XP ileri taşınıp Lv11–20'yi bedava yapıyor. Lv11–15'i grind'e sokmanın tek model yolu Lv1–5 hızından vazgeçmek (C).
 
 | Seçenek | Ne değişir | Model etkisi (görevli öldürme/seviye; parantezde grind=0 seviye / 5) | Lv1→30 öldürme |
