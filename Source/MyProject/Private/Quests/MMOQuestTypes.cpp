@@ -455,6 +455,43 @@ namespace
 		// Altin gorevleri mevcut desene uyup altin DEGIL sadece XP oduller (bkz. Q_Gold500/1000).
 
 		// Seviye kilometre taslari zinciri: Q_Level5 -> Q_Level20 -> Q_Level30 -> Q_Level40.
+		// Ara seviye yan gorevleri (CONTENT_MAP bosluk dolgusu 2026-10-10: Lv21/23/26/32/41/43/45 kapi bosluklari). Her biri komsu
+		// ana gorevin hedef mobunu 8 kez daha avlatir; ana zinciri kilitlemez. XP ~%6,3 esik (pace-notr; MMOXPTuning sonrasi), altin
+		// ~XP x 0,3, odul 5 iksir. PLACEHOLDER; PIE'de dogrulanmadi.
+		Table.Add(MakeQuest(TEXT("Q_AshOrcPack"), TEXT("Kul Orku Surusu"), TEXT("Surunun gerisini temizle: 8 Kul Orku daha oldur."),
+			T::KillSpecificMob, TEXT("AshOrc"), 8, 2800, 850, 21, TEXT("Q_AshOrcs")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_WraithNest"), TEXT("Hayalet Yuvasi"), TEXT("Yuvayi dagit: 8 Cehennem Hayaleti daha oldur."),
+			T::KillSpecificMob, TEXT("InfernalWraith"), 8, 3800, 1150, 23, TEXT("Q_InfernalWraiths")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_ObsidianPatrol"), TEXT("Obsidyen Devriyesi"), TEXT("Devriyeyi kes: 8 Obsidyen Avcisi daha oldur."),
+			T::KillSpecificMob, TEXT("ObsidianStalker"), 8, 6600, 2000, 26, TEXT("Q_ObsidianStalkers")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_DuskPack"), TEXT("Alacakaranlik Surusu"), TEXT("Avcilarin sayisini azalt: 8 Alacakaranlik Avcisi daha oldur."),
+			T::KillSpecificMob, TEXT("DuskProwler"), 8, 8300, 2500, 32, TEXT("Q_DuskProwlers")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_DuskHaunt"), TEXT("Alacakaranlik Musallati"), TEXT("Hukumdarin ardindan kalanlari kov: 8 Alacakaranlik Hayaleti daha oldur."),
+			T::KillSpecificMob, TEXT("DuskWraith"), 8, 15600, 4700, 41, TEXT("Q_DuskOverlord")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_WinterScouts"), TEXT("Kis Gozculeri"), TEXT("Gecidin gozcularini sustur: 8 Kis Izcisi daha oldur."),
+			T::KillSpecificMob, TEXT("WinterStalker"), 8, 18700, 5600, 43, TEXT("Q_WinterStalkers")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterManaPotion"));
+		Table.Last().RewardConsumableCount = 5;
+
+		Table.Add(MakeQuest(TEXT("Q_WinterBulwark"), TEXT("Kis Siperi"), TEXT("Siperi zayiflat: 8 Kis Muhafizi daha oldur."),
+			T::KillSpecificMob, TEXT("WinterGuardian"), 8, 22100, 6600, 45, TEXT("Q_WinterGuardians")));
+		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));
+		Table.Last().RewardConsumableCount = 5;
 		Table.Add(MakeQuest(TEXT("Q_Level20"), TEXT("Kidemli Savasci"), TEXT("Deneyimini kanitla: 20. seviyeye ulas."),
 			T::ReachLevel, TEXT(""), 20, 9000, 5500, 16, TEXT("Q_Level5")));
 		Table.Last().RewardConsumableId = FName(TEXT("GreaterHealthPotion"));

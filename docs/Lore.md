@@ -1007,3 +1007,29 @@ Defterin iki yakayı nasıl bağladığını soran çıkmadı değil; Rana yaln�
 kaldırıp "Satır yerinde, gerisi benim derdim" der. Merek her şeyin bir fiyatı
 olduğuna inanır, Doran her şeyin bir terazisi olduğuna; Rana ise her şeyin bir yeri
 olduğuna.
+
+## Görevler (Anlatı): Ara Seviye Yan Görevler (Lv21–45)
+
+*Kapı boşluklarını dolduran, komşu ana görevin hedefini yeniden avlatan yan görevler. Ana zinciri kilitlemezler.*
+
+- **Kül Orku Sürüsü** *(Q_AshOrcPack)* — "Sürünün başını devirdin ama gerisi hâlâ ovada, evlat. Sekizini daha dağıt;
+  kül ovasında bırakılan her sürü yarın bir yağmaya dönüşür."
+  - *Dönüşte:* "Ova sustu. Al şu Büyük Can İksirleri'ni; sürü dağılınca yolcu da rahat eder."
+- **Hayalet Yuvası** *(Q_WraithNest)* — "Hayaletler vadinin dibinde bir yuva kurmuş. Sekizini daha kov; yuva boşalmazsa
+  geceleri yine yükselirler."
+  - *Dönüşte:* "Yuva boşaldı. Bu Büyük Mana İksirleri'ni al; hayaletle uğraşan aklını yormasın."
+- **Obsidyen Devriyesi** *(Q_ObsidianPatrol)* — "Kara camın gölgesinde avcılar hâlâ dolaşıyor. Sekizini daha durdur;
+  devriye kesilmezse sırtlardaki yol açılmaz."
+  - *Dönüşte:* "Devriye kırıldı. Al şu Büyük Can İksirleri'ni; sırtlar artık daha az tehlikeli."
+- **Alacakaranlık Sürüsü** *(Q_DuskPack)* — "Alacakaranlık avcıları çoğalıyor, evlat. Sekizini daha indir ki sürü
+  kendini toparlayamasın."
+  - *Dönüşte:* "Sürü dağıldı. Bu Büyük Mana İksirleri senin; karanlıkta berrak kalmak bir sanattır."
+- **Alacakaranlık Musallatı** *(Q_DuskHaunt)* — "Hükümdar düştü ama hayaletleri hâlâ dolaşıyor. Sekizini daha kov;
+  ardında bıraktığı gölge kalıcı olmasın."
+  - *Dönüşte:* "Gölgeler çekildi. Al şu Büyük Can İksirleri'ni; Kış Diyarı'na yolun açık."
+- **Kış Gözcüleri** *(Q_WinterScouts)* — "Kış Diyarı'nın geçidinde izciler yeniden nöbette. Sekizini daha sustur;
+  karda iz bırakmayanları görmeden geçemezsin."
+  - *Dönüşte:* "Gözcüler sustu. Bu Büyük Mana İksirleri'ni al; soğukta zihin de donar, ısıt."
+- **Kış Siperi** *(Q_WinterBulwark)* — "Muhafızlar siperlerini yeniden örüyor. Sekizini daha zayıflat; bir siper
+  güçlendikçe sana düşen yük ağırlaşır."
+  - *Dönüşte:* "Siper çatladı. Al şu Büyük Can İksirleri'ni; çatlayan duvar bir gün yıkılır."

@@ -70,3 +70,19 @@ sürdürülebilir kılıyor `[Hesap]`), alan becerileri ikinci hedefte tek hedef
   `Q_Gold5000+` görevleri teslimde altını **düşürür** (bağış). Kontrol: satıcı reddi mesajı, yükseltme maliyeti HUD'da doğru mu, bağış sonrası bakiye.
 - Kül mobları lore'da "yakar", kodda yavaşlatır/vurur; `Burn` efekti yok.
 - Elit/boss karşılaşmaları hâlâ "daha çok can + Öfke"; fazlı boss yok.
+
+## Ara seviye yan görevler (Lv21–45; 2026-10-10, denenmedi)
+
+Kapı boşluklarını dolduran yedi yan görev; her biri komşu ana görevin hedefini 8 kez daha avlatır, ana zinciri kilitlemez, ödül 5 iksir.
+
+| Görev | Kapı | Önkoşul | Hedef × adet |
+|---|---:|---|---|
+| `Q_AshOrcPack` | 21 | `Q_AshOrcs` | 8 Kül Orku |
+| `Q_WraithNest` | 23 | `Q_InfernalWraiths` | 8 Cehennem Hayaleti |
+| `Q_ObsidianPatrol` | 26 | `Q_ObsidianStalkers` | 8 Obsidyen Avcısı |
+| `Q_DuskPack` | 32 | `Q_DuskProwlers` | 8 Alacakaranlık Avcısı |
+| `Q_DuskHaunt` | 41 | `Q_DuskOverlord` | 8 Alacakaranlık Hayaleti |
+| `Q_WinterScouts` | 43 | `Q_WinterStalkers` | 8 Kış İzcisi |
+| `Q_WinterBulwark` | 45 | `Q_WinterGuardians` | 8 Kış Muhafızı |
+
+Kontrol: görev, önkoşul bitince listede çıkıyor mu; XP ~%6 eşik (placeholder) seviye atlama hızını bozuyor mu.

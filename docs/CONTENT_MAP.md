@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 59 mob (13 elit), 90 gorev, 57 ekipman, 93 beceri.
+Toplam: 59 mob (13 elit), 97 gorev, 57 ekipman, 93 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -26,29 +26,29 @@ Toplam: 59 mob (13 elit), 90 gorev, 57 ekipman, 93 beceri.
 | 18 | MagmaGolem |  | Q_MagmaGolems |  |  |
 | 19 |  |  | Q_GolemQuarry |  |  |
 | 20 | AshOrc |  | Q_AshOrcs |  | War_Execute, Arc_Snipe, Mag_ArcaneBlast, Pri_Mending |
-| 21 | _yeni icerik yok_ | | | | |
+| 21 |  |  | Q_AshOrcPack |  |  |
 | 22 | InfernalWraith |  | Q_InfernalWraiths |  |  |
-| 23 | _yeni icerik yok_ | | | | |
+| 23 |  |  | Q_WraithNest |  |  |
 | 24 |  | MagmaTyrant | Q_MagmaTyrant, Q_Level30 |  | War_TempestSlash, Arc_DragonArrow, Mag_Thunderclap, Pri_WrathOfAngels |
 | 25 | ObsidianStalker |  | Q_ObsidianStalkers | ObsidianBlade, ObsidianPlate, ObsidianHelm, ObsidianBoots |  |
-| 26 | _yeni icerik yok_ | | | | |
+| 26 |  |  | Q_ObsidianPatrol |  |  |
 | 27 | ObsidianSentinel |  | Q_ObsidianSentinels |  |  |
 | 28 |  |  | Q_Gold15000, Q_Gold30000 |  | War_Rampage, Arc_DeathMark, Mag_Disintegrate, Pri_Retribution |
 | 29 | ObsidianRaider |  | Q_ObsidianRaiders |  |  |
 | 30 |  | ObsidianWarlord | Q_ObsidianWarlord, Q_Level40 |  |  |
 | 31 | DuskProwler |  | Q_DuskProwlers |  | War_Earthshaker, Arc_ThornVolley, Mag_Inferno, Pri_RadiantNova |
-| 32 | _yeni icerik yok_ | | | | |
+| 32 |  |  | Q_DuskPack |  |  |
 | 33 | DuskGuardian |  | Q_DuskGuardians | DuskBlade, DuskPlate, DuskHelm, DuskBoots | War_BloodLord, Arc_WindsBreath, Mag_FreezingTempest, Pri_LifeBond |
 | 34-35 | _yeni icerik yok_ | | | | |
 | 36 | DuskReaver |  | Q_DuskReavers |  |  |
 | 37-38 | _yeni icerik yok_ | | | | |
 | 39 | DuskWraith |  | Q_DuskWraiths |  | War_Skullsplitter, Arc_Impaler, Mag_Starfall, Pri_SalvationLight |
 | 40 |  | DuskOverlord | Q_DuskOverlord, Q_Level50, Q_Gold50000 |  |  |
-| 41 | _yeni icerik yok_ | | | | |
+| 41 |  |  | Q_DuskHaunt |  |  |
 | 42 | WinterStalker |  | Q_WinterStalkers | WinterBlade, WinterPlate, WinterHelm, WinterBoots |  |
-| 43 | _yeni icerik yok_ | | | | |
+| 43 |  |  | Q_WinterScouts |  |  |
 | 44 | WinterGuardian |  | Q_WinterGuardians |  |  |
-| 45 |  |  |  |  | War_WarCyclone, War_SteelArmor, Arc_SpikeTrap, Mag_ArcaneBurst (+2) |
+| 45 |  |  | Q_WinterBulwark |  | War_WarCyclone, War_SteelArmor, Arc_SpikeTrap, Mag_ArcaneBurst (+2) |
 | 46 | WinterReaver |  | Q_WinterReavers |  |  |
 | 47 | WinterWolf |  | Q_WinterHowls |  |  |
 | 48 | WinterWraith |  | Q_WinterWraiths |  |  |
