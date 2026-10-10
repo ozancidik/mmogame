@@ -14,6 +14,7 @@
 #include "Components/MMOFriendsComponent.h"
 #include "Components/MMOAchievementComponent.h"
 #include "Components/MMODailyComponent.h"
+#include "Components/MMOMailComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Core/MMOMetrics.h"
 #include "Player/MMOPlayerController.h"
@@ -695,6 +696,7 @@ AMMOCharacter::AMMOCharacter()
 	FriendsComponent = CreateDefaultSubobject<UMMOFriendsComponent>(TEXT("FriendsComponent"));
 	AchievementComponent = CreateDefaultSubobject<UMMOAchievementComponent>(TEXT("AchievementComponent"));
 	DailyComponent = CreateDefaultSubobject<UMMODailyComponent>(TEXT("DailyComponent"));
+	MailComponent = CreateDefaultSubobject<UMMOMailComponent>(TEXT("MailComponent"));
 
 	// NETWORK_AUDIT Y5: oyuncu aktoru icin makul replikasyon sikligi (motor varsayilani ~100 Hz
 	// gereksiz; 60 Hz akici hareket icin yeterli, hareketsizken 20 Hz tabanina duser). Cull

@@ -22,6 +22,7 @@
 #include "Core/MMONotify.h"
 #include "Components/MMOAchievementComponent.h"
 #include "Components/MMODailyComponent.h"
+#include "Components/MMOMailComponent.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -1640,6 +1641,30 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 			}
 		}
 		ClientReceiveChat(FString(), TEXT("Gunluk gorevler su an kullanilamaz."), 2);
+		return;
+	}
+	// Posta: "/posta" (bilgi), "/posta gonder <isim> [altin] <mesaj>".
+	if (Msg.Equals(TEXT("/posta"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/posta "), ESearchCase::IgnoreCase))
+	{
+		if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
+		UMMOMailComponent* Mail = nullptr;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			Mail = Me->GetMailComponent();
+		}
+		const FString Rest = Msg.RightChop(6).TrimStartAndEnd();
+		if (!Mail)
+		{
+			ClientReceiveChat(FString(), TEXT("Posta su an kullanilamaz."), 2);
+		}
+		else if (Rest.StartsWith(TEXT("gonder "), ESearchCase::IgnoreCase))
+		{
+			Mail->CmdSend(Rest.RightChop(7));
+		}
+		else
+		{
+			Mail->CmdInfo();
+		}
 		return;
 	}
 	// Klan sohbeti: "/g mesaj" (yalniz ayni klan adindaki cevrimici oyunculara).

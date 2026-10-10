@@ -16,6 +16,7 @@ class UMMOClanComponent;
 class UMMOFriendsComponent;
 class UMMOAchievementComponent;
 class UMMODailyComponent;
+class UMMOMailComponent;
 class IMMOCharacterStore;
 
 /**
@@ -69,6 +70,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
 	TObjectPtr<UMMODailyComponent> DailyComponent;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MMO")
+	TObjectPtr<UMMOMailComponent> MailComponent;
+
 	// Unreal'in standart hasar akışı (UGameplayStatics::ApplyDamage) buraya düşer;
 	// biz de stat bileşenine yönlendiririz. Sadece otoritede etki eder.
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
@@ -105,6 +109,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MMO")
 	UMMODailyComponent* GetDailyComponent() const { return DailyComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "MMO")
+	UMMOMailComponent* GetMailComponent() const { return MailComponent; }
 
 	// Kayit basariyla yuklendi/olusturuldu mu (gun-ici sayac referanslari buna gore alinir).
 	bool IsInitialLoadComplete() const { return bInitialLoadComplete; }
