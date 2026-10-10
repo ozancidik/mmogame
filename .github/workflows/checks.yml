@@ -27,6 +27,10 @@ jobs:
           python Scripts/ProgressionModel.py --max 30 > /dev/null
           python Scripts/EconomyModel.py > /dev/null
           python Scripts/ContentMap.py > /dev/null
+      - name: Cep aralik denetimi (komsu cepler >= 1500 u; negatif testiyle)
+        run: |
+          python Scripts/PocketSpacing.py
+          python Scripts/TestPocketSpacing.py
       - name: PlaytestMetrics fixture testi (sahte [MMOMETRIC] logu)
         run: python Scripts/TestPlaytestMetrics.py
       - name: Denetimlerin negatif testleri (kasitli bozuk kopya yakalaniyor mu)
