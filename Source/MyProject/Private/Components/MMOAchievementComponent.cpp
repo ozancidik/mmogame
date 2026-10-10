@@ -24,11 +24,11 @@
 
 namespace
 {
-	constexpr int32 MaxKillEntries = 256;     // dosyadaki/bellekteki arketip sayaci ust siniri (kotuye kullanima karsi)
-	constexpr float PeriodicSeconds = 5.f;    // seviye/altin/gorev taramasi
-	constexpr double MinSaveGapSeconds = 30.0;
+	constexpr int32 AchMaxKillEntries = 256;     // dosyadaki/bellekteki arketip sayaci ust siniri (kotuye kullanima karsi)
+	constexpr float AchPeriodicSeconds = 5.f;    // seviye/altin/gorev taramasi
+	constexpr double AchMinSaveGapSeconds = 30.0;
 
-	int32 ClampCount(double V)
+	int32 AchClampCount(double V)
 	{
 		return static_cast<int32>(FMath::Clamp(V, 0.0, static_cast<double>(UMMOAchievementComponent::MaxCounter)));
 	}
@@ -80,7 +80,7 @@ void UMMOAchievementComponent::BeginPlay()
 	}
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(PeriodicTimer, this, &UMMOAchievementComponent::OnPeriodic, PeriodicSeconds, true, PeriodicSeconds);
+		World->GetTimerManager().SetTimer(PeriodicTimer, this, &UMMOAchievementComponent::OnPeriodic, AchPeriodicSeconds, true, AchPeriodicSeconds);
 	}
 }
 
@@ -164,22 +164,22 @@ bool UMMOAchievementComponent::FromJson(const FString& Json, FMMOAchievementCoun
 		return false;
 	}
 	double V = 0.0;
-	if (Root->TryGetNumberField(TEXT("killTotal"), V)) OutC.KillTotal = ClampCount(V);
-	if (Root->TryGetNumberField(TEXT("deaths"), V)) OutC.Deaths = ClampCount(V);
-	if (Root->TryGetNumberField(TEXT("peakGold"), V)) OutC.PeakGold = ClampCount(V);
+	if (Root->TryGetNumberField(TEXT("killTotal"), V)) OutC.KillTotal = AchClampCount(V);
+	if (Root->TryGetNumberField(TEXT("deaths"), V)) OutC.Deaths = AchClampCount(V);
+	if (Root->TryGetNumberField(TEXT("peakGold"), V)) OutC.PeakGold = AchClampCount(V);
 	const TSharedPtr<FJsonObject>* KillsObj = nullptr;
 	if (Root->TryGetObjectField(TEXT("kills"), KillsObj) && KillsObj && KillsObj->IsValid())
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& P : (*KillsObj)->Values)
 		{
-			if (OutC.Kills.Num() >= MaxKillEntries)
+			if (OutC.Kills.Num() >= AchMaxKillEntries)
 			{
 				break;
 			}
 			double N = 0.0;
 			if (P.Value.IsValid() && P.Value->TryGetNumber(N) && !P.Key.IsEmpty())
 			{
-				OutC.Kills.Add(FName(*P.Key), ClampCount(N));
+				OutC.Kills.Add(FName(*P.Key), AchClampCount(N));
 			}
 		}
 	}
@@ -291,7 +291,7 @@ void UMMOAchievementComponent::SaveNow()
 
 void UMMOAchievementComponent::SaveIfDirty()
 {
-	if (bDirty && FPlatformTime::Seconds() - LastSaveTime >= MinSaveGapSeconds)
+	if (bDirty && FPlatformTime::Seconds() - LastSaveTime >= AchMinSaveGapSeconds)
 	{
 		SaveNow();
 	}
@@ -310,7 +310,7 @@ void UMMOAchievementComponent::NotifyMobKilled(FName ArchetypeId)
 	{
 		*K = FMath::Min(*K + 1, MaxCounter);
 	}
-	else if (Counters.Kills.Num() < MaxKillEntries)
+	else if (Counters.Kills.Num() < AchMaxKillEntries)
 	{
 		Counters.Kills.Add(ArchetypeId, 1);
 	}

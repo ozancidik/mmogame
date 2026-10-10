@@ -24,9 +24,9 @@
 
 namespace
 {
-	constexpr float PeriodicSeconds = 5.f;
-	constexpr int32 MaxTarget = 10000;
-	constexpr int32 MaxReward = 10000000;
+	constexpr float DailyPeriodicSeconds = 5.f;
+	constexpr int32 DailyMaxTarget = 10000;
+	constexpr int32 DailyMaxReward = 10000000;
 }
 
 UMMODailyComponent::UMMODailyComponent()
@@ -60,7 +60,7 @@ void UMMODailyComponent::BeginPlay()
 	}
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(PeriodicTimer, this, &UMMODailyComponent::OnPeriodic, PeriodicSeconds, true, PeriodicSeconds);
+		World->GetTimerManager().SetTimer(PeriodicTimer, this, &UMMODailyComponent::OnPeriodic, DailyPeriodicSeconds, true, DailyPeriodicSeconds);
 	}
 }
 
@@ -95,7 +95,7 @@ void UMMODailyComponent::BuildBounties(int32 Level, int32 ExpToNextLevel, TArray
 		B.Kind = Kind;
 		B.Target = Target;
 		B.RewardGold = 15 * L * Mult;
-		B.RewardXP = static_cast<int32>(FMath::Min<int64>(BaseXP * Mult, MaxReward));
+		B.RewardXP = static_cast<int32>(FMath::Min<int64>(BaseXP * Mult, DailyMaxReward));
 		Out.Add(B);
 	};
 	Make(EMMODailyKind::KillAny, 15 + L / 2, 1);
@@ -158,7 +158,7 @@ bool UMMODailyComponent::FromJson(const FString& Json, int32& OutDayKey, int32& 
 		double Kind = -1, Target = 0, Progress = 0, Gold = 0, XP = 0;
 		bool bDone = false;
 		if (!(*O)->TryGetNumberField(TEXT("kind"), Kind) || Kind < 0 || Kind > 2
-			|| !(*O)->TryGetNumberField(TEXT("target"), Target) || Target < 1 || Target > MaxTarget)
+			|| !(*O)->TryGetNumberField(TEXT("target"), Target) || Target < 1 || Target > DailyMaxTarget)
 		{
 			return false;
 		}
@@ -170,8 +170,8 @@ bool UMMODailyComponent::FromJson(const FString& Json, int32& OutDayKey, int32& 
 		B.Kind = static_cast<EMMODailyKind>(static_cast<int32>(Kind));
 		B.Target = static_cast<int32>(Target);
 		B.Progress = static_cast<int32>(FMath::Clamp(Progress, 0.0, Target));
-		B.RewardGold = static_cast<int32>(FMath::Clamp(Gold, 0.0, static_cast<double>(MaxReward)));
-		B.RewardXP = static_cast<int32>(FMath::Clamp(XP, 0.0, static_cast<double>(MaxReward)));
+		B.RewardGold = static_cast<int32>(FMath::Clamp(Gold, 0.0, static_cast<double>(DailyMaxReward)));
+		B.RewardXP = static_cast<int32>(FMath::Clamp(XP, 0.0, static_cast<double>(DailyMaxReward)));
 		B.bDone = bDone;
 		Parsed.Add(B);
 	}
