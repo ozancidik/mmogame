@@ -20,6 +20,7 @@
 #include "Core/MMOAdmin.h"
 #include "Core/MMOMetrics.h"
 #include "Core/MMONotify.h"
+#include "Components/MMOAchievementComponent.h"
 #include "UI/MMOHUD.h"
 #include "Components/InputComponent.h"
 #include "GameFramework/Pawn.h"
@@ -1594,6 +1595,34 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		else
 		{
 			ClientReceiveChat(FString(), TEXT("Kullanim: /arkadas ekle isim, /arkadas kabul, /arkadas sil isim, /arkadas liste"), 2);
+		}
+		return;
+	}
+	// Basarimlar ve unvanlar: "/basarim" (liste), "/basarim unvan <ad>" (sec), "/basarim unvan" (kaldir).
+	if (Msg.Equals(TEXT("/basarim"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/basarim "), ESearchCase::IgnoreCase))
+	{
+		if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;
+		UMMOAchievementComponent* Ach = nullptr;
+		if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetPawn()))
+		{
+			Ach = Me->GetAchievementComponent();
+		}
+		const FString Rest = Msg.RightChop(8).TrimStartAndEnd();
+		if (!Ach)
+		{
+			ClientReceiveChat(FString(), TEXT("Basarimlar su an kullanilamaz."), 2);
+		}
+		else if (Rest.IsEmpty() || Rest.Equals(TEXT("liste"), ESearchCase::IgnoreCase))
+		{
+			Ach->CmdList();
+		}
+		else if (Rest.Equals(TEXT("unvan"), ESearchCase::IgnoreCase) || Rest.StartsWith(TEXT("unvan "), ESearchCase::IgnoreCase))
+		{
+			Ach->CmdTitle(Rest.RightChop(5));
+		}
+		else
+		{
+			ClientReceiveChat(FString(), TEXT("Kullanim: /basarim, /basarim unvan ad, /basarim unvan (kaldir)"), 2);
 		}
 		return;
 	}

@@ -356,6 +356,47 @@ if not pb:
 elif not 0.0 <= float(pb.group(1)) <= 0.5:
     errors.append(f"MMOXPTuning.cpp: parti bonusu {pb.group(1)} [0, 0.5] disinda")
 
+# --- Basarimlar (MMOAchievementDatabase.cpp): MakeAch(Id, Ad, Aciklama, Kind, HedefId, Hedef, AltinOdulu, Unvan)
+ach_path = SRC / "Achievements" / "MMOAchievementDatabase.cpp"
+if ach_path.exists():
+    ach_src = ach_path.read_text(encoding="utf-8", errors="replace")
+    ach_pat = re.compile(
+        r'MakeAch\(TEXT\("([^"]+)"\),\s*TEXT\("([^"]*)"\),\s*TEXT\("([^"]*)"\),\s*K::(\w+),\s*TEXT\("([^"]*)"\),\s*(\d+),\s*(\d+),\s*TEXT\("([^"]*)"\)\)'
+    )
+    ach = [m.groups() for m in ach_pat.finditer(ach_src)]
+    declared = len(re.findall(r"Table\.Add\(MakeAch\(", ach_src))
+    if declared != len(ach):
+        errors.append(f"MMOAchievementDatabase.cpp: {declared} MakeAch satiri var, {len(ach)} tanesi ayristirildi (ValidateData kalibi bozuk)")
+    dupes([a[0] for a in ach], "Basarim")
+    kinds = {"KillTotal", "KillMob", "ReachLevel", "GoldHeld", "QuestsDone", "Deaths"}
+    titles = {}
+    reward_total = 0
+    for aid, aname, adesc, kind, target_id, target, reward, title in ach:
+        if kind not in kinds:
+            errors.append(f"Basarim {aid}: bilinmeyen tur {kind}")
+        if int(target) <= 0:
+            errors.append(f"Basarim {aid}: hedef 0 veya negatif")
+        if kind == "KillMob" and target_id not in mobs:
+            errors.append(f"Basarim {aid}: hedef mob '{target_id}' MMOMobArchetype.cpp'de yok")
+        if kind != "KillMob" and target_id:
+            errors.append(f"Basarim {aid}: HedefId yalniz KillMob icin kullanilir ('{target_id}')")
+        if kind == "ReachLevel" and int(target) > MAX_LEVEL:
+            errors.append(f"Basarim {aid}: seviye hedefi {target} > MAX_LEVEL {MAX_LEVEL} (hic acilmaz)")
+        if kind == "QuestsDone" and int(target) > len(quests):
+            errors.append(f"Basarim {aid}: gorev hedefi {target} > toplam gorev {len(quests)} (hic acilmaz)")
+        if not aname.strip() or not adesc.strip():
+            errors.append(f"Basarim {aid}: ad/aciklama bos")
+        if title:
+            if title in titles:
+                errors.append(f"Basarim {aid}: unvan '{title}' {titles[title]} ile ayni (secim unvan adiyla yapilir)")
+            titles[title] = aid
+            if len(title) > 32:
+                errors.append(f"Basarim {aid}: unvan 32 karakterden uzun")
+        reward_total += int(reward)
+    if reward_total > 100000:
+        warnings.append(f"Basarim altin odulu toplami {reward_total} > 100.000 (ekonomi sink'ini bozabilir; EconomyModel ile kontrol et)")
+    print(f"Basarim: {len(ach)} (toplam altin odulu {reward_total}, unvan {len(titles)})")
+
 print(f"Mob: {len(mobs)} (elit {len(elites)})  Item: {len(items)} (seviyesi okunan: {len(item_levels)})  Gorev: {len(quests)}  Beceri: {len(skills)}  Efekt: {len(effects)}  Spawner: {len(spawners)}")
 for w in warnings:
     print("UYARI:", w)

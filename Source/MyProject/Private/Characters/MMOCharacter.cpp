@@ -12,6 +12,7 @@
 #include "Components/MMOTradeComponent.h"
 #include "Components/MMOClanComponent.h"
 #include "Components/MMOFriendsComponent.h"
+#include "Components/MMOAchievementComponent.h"
 #include "Core/MMOTargeting.h"
 #include "Core/MMOMetrics.h"
 #include "Player/MMOPlayerController.h"
@@ -691,6 +692,7 @@ AMMOCharacter::AMMOCharacter()
 	TradeComponent = CreateDefaultSubobject<UMMOTradeComponent>(TEXT("TradeComponent"));
 	ClanComponent = CreateDefaultSubobject<UMMOClanComponent>(TEXT("ClanComponent"));
 	FriendsComponent = CreateDefaultSubobject<UMMOFriendsComponent>(TEXT("FriendsComponent"));
+	AchievementComponent = CreateDefaultSubobject<UMMOAchievementComponent>(TEXT("AchievementComponent"));
 
 	// NETWORK_AUDIT Y5: oyuncu aktoru icin makul replikasyon sikligi (motor varsayilani ~100 Hz
 	// gereksiz; 60 Hz akici hareket icin yeterli, hareketsizken 20 Hz tabanina duser). Cull

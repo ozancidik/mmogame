@@ -16,6 +16,7 @@ P = "Source/MyProject/Private/"
 GM = P + "Core/MMOGameMode.cpp"
 ITEMS = P + "Items/MMOItemDatabase.cpp"
 TUNING = P + "Core/MMOXPTuning.cpp"
+ACH = P + "Achievements/MMOAchievementDatabase.cpp"
 
 # (ad, dosya, desen, yerine, beklenen cikti parcasi, HATA mi)
 CASES = [
@@ -37,6 +38,14 @@ CASES = [
      "{12, 0.08f}, {16, 0.0f}, {20, 0.18f}", "GQuestKnots Lv16 carpani 0.0", True),
     ("XP knot araligi disi", TUNING, r"\{34, 1\.00f\}\n\t\};\n\t// XP_TUNING_QUEST", "{90, 1.00f}\n\t};\n\t// XP_TUNING_QUEST",
      "GMobKnots knot Lv90 1..80 disinda", True),
+    ("Basarim hedef mobu tabloda yok", ACH, r'K::KillMob, TEXT\("SpiderQueen"\)', 'K::KillMob, TEXT("SpiderQuen")',
+     "Basarim Ach_SpiderQueen: hedef mob 'SpiderQuen' MMOMobArchetype.cpp'de yok", True),
+    ("Basarim kimligi yinelenmis", ACH, r'TEXT\("Ach_Kill100"\)', 'TEXT("Ach_Kill10")',
+     "Basarim kimligi yinelenmis: Ach_Kill10", True),
+    ("Basarim seviye hedefi MAX_LEVEL ustu", ACH, r'(TEXT\("Ach_Lv80"\).*?K::ReachLevel, TEXT\(""\), )80,', r"\g<1>95,",
+     "seviye hedefi 95 > MAX_LEVEL 80", True),
+    ("Basarim unvani yinelenmis", ACH, r'(TEXT\("Ach_Kill100"\).*?)TEXT\("Avci"\)\)\);', r'\1TEXT("Acemi")));',
+     "unvan 'Acemi' Ach_Kill10 ile ayni", True),
     ("Parti bonusu araligi disi", TUNING, r"GPartyBonusPerExtraMember = 0\.10f", "GPartyBonusPerExtraMember = 0.90f",
      "parti bonusu 0.90 [0, 0.5] disinda", True),
 ]

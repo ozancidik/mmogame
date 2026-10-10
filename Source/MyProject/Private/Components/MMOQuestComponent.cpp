@@ -4,6 +4,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Components/MMOAchievementComponent.h"
 #include "Items/MMOItemDatabase.h"
 #include "Save/MMOSaveGame.h"
 #include "Net/UnrealNetwork.h"
@@ -553,6 +554,15 @@ void UMMOQuestComponent::NotifyMobKilled(FName MobArchetypeId)
 				GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor(200, 200, 120),
 					FString::Printf(TEXT("%s: %d/%d"), *Def->Name, P.KillProgress, Def->TargetCount));
 			}
+		}
+	}
+
+	// Basarimlar gorev ilerlemesinden SONRA: odul/altin callback'leri gorev dongusunu etkilemesin.
+	if (const AMMOCharacter* Me = Cast<AMMOCharacter>(GetOwner()))
+	{
+		if (UMMOAchievementComponent* Ach = Me->GetAchievementComponent())
+		{
+			Ach->NotifyMobKilled(MobArchetypeId);
 		}
 	}
 }
