@@ -4875,3 +4875,76 @@ Kaynak/config/script + Editor DLL **208'er dosya**, ana Game exe ve başlangıç
 **670 kayıt** hash'leri korundu. Kapsam dışı **946 tracked dosya** değişmedi.
 Ağ smoke yeni bir kayıt oluşturdu; toplam **671**, hiçbir kayıt silinmedi.
 Tam RunAllChecks, uzun soak ve PIE bu tur çalıştırılmadı.
+
+## O62 — Kapanan caster'dan beceri etkisi (2026-10-10)
+
+**Native doğrulanmış hata:** `UseSkill` yalnız null owner kontrolüyle,
+`RouteEndPlay(LevelTransition)` veya `Destroy` geçirmiş caster'ı kabul edebiliyordu.
+`ConsumeMana` maliyeti düşürüp gerçek `OnManaChanged` delegate'ini yayınladıktan
+sonra caster kapanırsa `ExecuteSkill` yine hasar/iyileştirme uyguluyordu.
+
+Kabulde ve etki başlangıcında `IsValid`, destruction, `HasActorBegunPlay` ve
+projenin erken `HasStartedEndPlay` bayrağı denetlenir. Kabul öncesi bitmiş caster
+kaynak tüketmeden reddedilir. Mana bildirimi sırasında kapanış ise daha önce
+kabul edilmiş kullanımı geri almaz: maliyet/cooldown korunur, `UseSkill` true döner,
+etki başlatılmaz. Böylece server RPC `ClientSkillRejected(...,0)` ile istemci
+cooldown'unu yanlışlıkla silmez. Yeni RPC/replicated/save alanı veya timer yoktur.
+O60 cooldown rezervasyonu ve O61 weak hedef restorasyonu korunur.
+
+### Native kapsam
+
+`MMOSkillLifecycleSelfTest.cpp` / `MMOTestSkillLifecycle` / `TestSkillLifecycle.ps1`:
+2 etki (PowerStrike hasarı, HolyLight iyileştirmesi) × 2 dış yol (native server
+implementation/doğrudan UseSkill) × 2 zaman (kabul öncesi/mana delegate'i içinde)
+× 3 durum (canlı kontrol/RouteEndPlay/Destroy) = **24 vaka / 240 kontrol**.
+Mana, cooldown tablosundaki deadline, kesin hasar/iyileştirme, termination,
+callback enjeksiyonu, doğrudan return, hedef bağlamı ve cooldown temizlendikten
+sonraki tekrar kullanımı denetlenir. RPC yolu bool return döndürmez; acceptance
+assertion'ı o yolda no-op, kabul diğer maliyet/cooldown assertion'larıyla gözlenir.
+Actor ve probe strong-owned; aynı senkron frame'de çalışır, GC zorlanmaz.
+Controllerless fixture save timer'ı işletmez. Tek callback enjeksiyonu, toplam
+delegate bildirim sayısı ölçümü olarak sunulmaz. Runtime FX ayrı gözlenmedi.
+
+Aynı fixture ile eski kod Editor **72.58 sn / 16 aksiyon** Compile/Link sonrasında
+**76/240 FAIL**: callout8, mana8, cooldown8, acceptance4, effect16, retry16,
+retry_resources16. Native0, runner1, coverageTrue. İki guard sonrası Editor
+**3.72 sn / 4 aksiyon** Compile/Link ve native **240/240 PASS**.
+Runner GUID log, 60 sn watchdog, yalnız kendi process cleanup'ı, tek PASS summary,
+tam benzersiz 24×10 kayıt ve native0/hatasız log ister. AST helper'ın valid,
+duplicate, missing, unknown-check, unknown-case kontrolleri **5/5** geçti.
+`RunAllChecks.ps1` entegrasyonu yapıldı; aggregate'ın tümü çalıştırılmadı.
+
+Guard etki başlamadan önceki kapanışı kapsar. Damage/heal callback'i daha sonra
+caster'ı kapatırsa kalan debuff/FX/AoE aşamaları için genel garanti verilmez.
+Never-begun, erken EndPlay reentry, component-only kapanış, target yaşam döngüsü,
+yalnız ölüm, gerçek RPC/disconnect/travel ve zorunlu GC native matriste yoktur.
+HasActorBegunPlay engine BeginPlay callback'leri bittikten sonra true olur;
+bu callback'ler içindeki Blueprint skill kullanımının uyumluluğu denetlenmedi.
+İlk-skill metriğinin mana callback sırası bu tur değiştirilmedi.
+Somut PIE kontrolleri `PLAYTEST_CHECKLIST.md` O62 bölümünde açıktır.
+
+### Son doğrulama
+
+Ana Editor **35.91 sn / 11 aksiyon**, Game/Development **34.24 sn / 10 aksiyon**
+gerçek Compile/Link ile geçti. Fixture ve component PCH/shared-PCH/unity kapalı,
+NoLink tek-dosya derlemelerinde **8.39 sn** ve **7.69 sn** ile geçti.
+İzole **8/8**, ana **14/14** seçilmiş runner başarılı: lifecycle240, hedef192,
+cooldown384, first skill17/7, mastery12, learned12, stats save15,
+JSON113 negatif + enum18/invalid writer2. Ana ayrıca consumable11, save lifecycle26,
+store **671/671** (JSON mismatch0, writeorder1, roundtrip1), Summer **57**, Winter
+**79** mob ve Summer NetSmoke port17813 server/client20 sn: join1/welcome1,
+hata0 ve gözlem boyunca süreç yaşamı. Ağ smoke, hedefli gameplay RPC kanıtı değildir.
+Winter mevcut (-5000,4800,-92) cebinde ilk doldurmada 18 denemede 3 mob uyarısı
+üretti; bu tur harita/spawner dosyaları değiştirilmedi.
+
+ValidateData (mevcut Lv33+ beceri boşluğu uyarıları), StaticLint105 ve
+PlaytestMetrics1516 iki ağaçta geçti. İki PS parse, runner coverage mock5/5 ve
+scoped diff-check temiz. Yerel QA kaynak incelemesinde ek kusur bulunmadı;
+incelemeci runtime test çalıştırmadı. Başlangıçtaki **671 kayıt** hash'i ve
+kapsam dışı **948 tracked dosya** korundu. Ağ smoke bir yeni kayıt oluşturdu;
+toplam **672**, hiçbir kayıt silinmedi. Kaynak/config/script + Editor DLL
+hash'leri korundu: ana210, izole önce205; statik kontrolde üretilen beş pycache
+ayrıca saptanıp manifest genişletildikten sonra izole210. Ana Game exe hash'i
+de kontrol edildi. Aynı baseline fixture'ın byte eşitliği doğrulandı.
+Tam RunAllChecks, tüm proje FullCompile, uzun soak, cooked/Shipping/dedicated
+runtime ve PIE bu tur çalıştırılmadı.

@@ -117,6 +117,7 @@ public:
 	static bool RunFirstSkillSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunCastCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunTargetContextSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunCasterLifecycleSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	// Each rank costs one point; saved ranks and unspent points share this budget.

@@ -5330,3 +5330,27 @@ Native 192/16 matrisi gerçek mana delegate'inde ayrı hedefli sunucu implementa
   callback zinciri native matrisin kapsamı dışında; weak guard bunları test edilmiş yapmaz.
 - [ ] Dış çağrı bitince sonraki beceri yeni hedefi kullanmalı. Gerçek ağ gecikmesi,
   seçili hedef değişimi ve çıkış/giriş sonrası hedef/cooldown durumu ayrıca denenmeli.
+
+## O62 — Caster EndPlay sırasında beceri kabulü ve etkisi (2026-10-10)
+
+Native 240/24 matrisi EndPlay/Destroy öncesi veya gerçek mana bildirimi sırasında
+caster kapanışını hasar/iyileştirme ile sınar. Gerçek disconnect/travel ağı değildir.
+
+- [ ] İki oyunculu listen-server PIE'de bitmiş/yok edilen caster'dan gecikmiş
+  PowerStrike veya HolyLight isteği gelsin: yeni mana/cooldown/hasar/iyileştirme olmamalı.
+  Host ve uzak istemci rollerini değiştir; RPC ownership/kanal kapanışını ayrıca kontrol et.
+- [ ] Authority mana listener'ı ödemeden sonra caster'ı çıkış/harita geçişi nedeniyle
+  kapatsın. Bu kabul edilmiş kullanımın mana maliyeti ve cooldown'u korunmalı;
+  hasar/iyileştirme/skill FX başlamamalı. Ret bildirimiyle istemci cooldown'u yanlışlıkla
+  sıfırlanmamalı. Native test hasar/iyileştirme ve maliyeti doğrular; FX/RPC HUD gözlemi açık.
+- [ ] Normal canlı caster saldırı ve iyileştirme kullansın; cooldown dolunca tekrar
+  çalışmalı. Dört sınıfın normal hotbar ve hedef seçimi akışlarını kontrol et.
+- [ ] Blueprint ReceiveBeginPlay veya component BeginPlay içinden beceri çağrısı
+  yapan içerik varsa incele: engine henüz HasActorBegunPlay=true olmadan gelen çağrı
+  artık reddedilir. Native çağıranlarda böyle kullanım bulunmadı; binary graph denetlenmedi.
+- [ ] Erken EndPlay içindeki yeniden giriş, component-only EndPlay, zorunlu GC,
+  target EndPlay, yalnız ölüm (EndPlay olmadan) ve beceri etkisi başladıktan sonraki
+  damage/heal/debuff/AoE callback kapanışlarını ayrıca sınayın. Bunlar O62'nin iki
+  giriş kontrolüyle genel yaşam döngüsü güvenliği sağlandı anlamına gelmez.
+- [ ] Gerçek disconnect/travel sonrası tekrar girişte mana/cooldown/kayıt durumunu
+  kontrol et. Same-frame controllerless test kayıt yazımı veya kalıcılığı ölçmez.

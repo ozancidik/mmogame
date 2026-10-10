@@ -828,7 +828,8 @@ bool UMMOSkillComponent::UseSkill(FName SkillId)
 	const FMMOSkillDef* Def = FMMOSkillDatabase::Find(SkillId);
 	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());
 	UWorld* World = GetWorld();
-	if (!Def || !Owner || !World || !Owner->GetStats() || Owner->GetStats()->bIsDead || !IsLearned(SkillId)
+	if (!Def || !IsValid(Owner) || Owner->IsActorBeingDestroyed() || !Owner->HasActorBegunPlay()
+		|| Owner->HasStartedEndPlay() || !World || !Owner->GetStats() || Owner->GetStats()->bIsDead || !IsLearned(SkillId)
 		|| Def->RequiredClass != CharacterClass || Owner->GetStats()->Level < Def->RequiredLevel)
 	{
 		return false;
@@ -1185,7 +1186,10 @@ AMMOCharacter* UMMOSkillComponent::FindNearestEnemy(float Range) const
 void UMMOSkillComponent::ExecuteSkill(AMMOCharacter* Caster, const FMMOSkillDef& Def)
 {
 	UWorld* World = GetWorld();
-	if (!World || !Caster)
+	// Mana notification may end/destroy the caster after payment. Keep that
+	// accepted cast's cost/cooldown, but never start effects from an ended actor.
+	if (!World || !IsValid(Caster) || Caster->IsActorBeingDestroyed()
+		|| !Caster->HasActorBegunPlay() || Caster->HasStartedEndPlay())
 	{
 		return;
 	}
