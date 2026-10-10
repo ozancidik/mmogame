@@ -16,7 +16,7 @@ Editör kapalıyken derle, sonra oyunu aç. Konsol: `` ` ``. Debug komutları ya
 | Cep | Bant | Mobu | `MMOTeleport` | Beklenen |
 |---|---|---|---|---|
 | P46 | 46–47 | Kış Yağmacısı, **Don Kurdu** | `-5000 -3000 150` | 4–6 mob, hızlı kurt yavaşlatır |
-| P48 | 48–49 | Kış Hayaleti, **Buz Devi** | `5000 0 220` | Buz Devi yavaş, can <%40'ta öfkelenir |
+| P48 | 48–49 | Kış Hayaleti, **Buz Devi** | `4500 -700 220` | Buz Devi yavaş, can <%40'ta öfkelenir |
 | P53 | 53 | **Buzbağlı Yeminli** | `6000 -4000 340` | dengeli vurucu, <%45 öfke |
 | P69 | 69 | **Kül Yürüyeni** | `-4000 -6000 150` | ağır vurucu, <%40 öfke |
 | P74 | 74 | **Uçurum Yankısı** | `-5500 2500 -20` | hızlı, yavaşlatır |

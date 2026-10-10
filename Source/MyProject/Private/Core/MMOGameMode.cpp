@@ -1006,10 +1006,12 @@ void AMMOGameMode::SpawnMobArea()
 		// 2026-10-09 grid taramasi (SmokeTest.ps1 + MMOProbeSurface, 289 nokta, 1000u arali; ok = 64 ornekte gecen):
 		// CONTENT_PLAN_LV46_80.md paketlerinin ayri cepleri. Hepsi hub'dan >=5200u, onceki Winter ceplerinden >=1800u.
 		//  P46 Lv46-47 (WinterReaver + WinterWolf)    (-5000,-3000,50)  64/64  W1 cebine 2500u
-		//  P48 Lv48-49 (WinterWraith + WinterBehemoth) (5000,0,114)     63/64  Gozcu cebine 2000u
+		//  P48 Lv48-49 (WinterWraith + WinterBehemoth) (4500,-700,120)  64/64  Gozcu cebine 1733u
+		//      (2026-10-10: eski (5000,0,114) 55-63/64'tu; soak'ta 6 kosunun 2'sinde bir mob (4973,208)'de
+		//       Pine_tree34/egimde takildi -> duz 64/64 noktaya tasindi)
 		//  P53 Lv53   (FrostboundSworn)                (6000,-4000,240) 64/64  Kul Tirani'na 2000u
 		SpawnFrostbound(FVector(-5000.f, -3000.f, 50.f), 46, 47, 225.f, 6, NAME_None, 0.f);
-		SpawnFrostbound(FVector(5000.f, 0.f, 114.f), 48, 49, 225.f, 6, NAME_None, 0.f);
+		SpawnFrostbound(FVector(4500.f, -700.f, 120.f), 48, 49, 225.f, 6, NAME_None, 0.f);
 		SpawnFrostbound(FVector(6000.f, -4000.f, 240.f), 53, 53, 225.f, 6, NAME_None, 0.f);
 
 		// Lv66-80 Kul + Ucurum dilimleri. Winter NavMeshBoundsVolume 2026-10-03'te
