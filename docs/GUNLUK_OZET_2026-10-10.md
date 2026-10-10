@@ -10,6 +10,7 @@
 | Doğrulama | HEAD (Codex'in Ticaret commit'leri dahil) tam derleme + tüm kontroller | `RunAllChecks -FullCompile` 114, sonra 116 GECTI, çıkış 0 |
 | Spawner | Winter **P48** cebi `(5000,0)` → `(4500,-700,120)`: eski noktada bir mob `Pine_tree34` yanında takılıyordu (6 soak koşusunun 2'sinde, tek olayda 14 satır) | yeni nokta 64/64 yüzey probu; 2 soak koşusu 0 takılma, ilk doldurma 6/7, 6/8 |
 | Spawner | Winter **Uçurum Gezgini** cebi `(-5500,4500)` → `(-5000,4800,-92)`: ilk doldurma 3–4/6'ydı | yeni nokta 64/64; 2 soak koşusu 0 takılma, ilk doldurma 5/6 |
+| Kontrol | Summer soak (1 koşu, 150 sn): 18 spawner, hepsi ilk doldurmada 5–6/6, 0 takılma | `SoakTest.ps1` + `SpawnAudit.py` |
 | Belge | `PLAYTEST_PRIORITY.md` bayat satırlar düzeltildi (Lv61→65/75→80 görevsiz öğütme kapandı; Lv80 capstone "zayıf" bulgusu bayat: Savaşçı 66,3 vs 58,3 güç/sn, Büyücü 51,9 vs 45,8) | `CONTENT_MAP.md`, `MMOSkillDatabase.cpp` |
 
 ## Dürüst notlar
