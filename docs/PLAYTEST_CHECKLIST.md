@@ -5048,3 +5048,34 @@ kayıt ve gerçek geçici roundtrip kontrolüyle ayrıca ele alındı.
   yanma kayıtta aynı kalsın. Ölüyken, yetersiz altınla, MAX artıda ve cooldown
   sırasında ret kaynak tüketmesin. Native memory roundtrip gerçek disk/PIE
   yeniden girişinin yerine geçmez; Shipping/dedicated Server build yapılmadı.
+
+## 2026-10-10 — Görev ödülünde callback tekrar teslimi (O50, §88)
+
+Sunucu ödül delegate'leri çalışırken aynı quest component'ındaki iç içe
+ClaimReward çağrıları reddedilir. İlk çağrı döndükten sonra başka hazır görev
+normal alınabilir; başka oyuncunun component'ı bağımsızdır. Ödül verme ve
+görevi tamamlanmış listeye taşıma sırası korunur. Bu koruma, callback içindeki
+keyfi envanter/ölüm/save değişikliklerini atomik bir işlem haline getirmez.
+
+Headless native fixture 14 senaryoda 112 kontrolü geçti: iksir/ekipman/bağış,
+gold/XP/inventory/level delegate'leri, ikinci görev ve bağımsız pawn. Memory
+Fill/Apply eşitliği gerçek disk yeniden girişi veya uzak istemci testi değildir.
+Mevcut Blueprint graph'larında tekrar teslim binding'i incelenmedi.
+
+Ana projede yeni fixture dahil 11 ilgili runner geçti; Store 626/626 yükleme,
+JSON 626/0 mismatch ve gerçek geçici save/load eşit. Summer 57/Winter 78,
+hata 0; ağ 20sn+20sn, 1 join/1 welcome, iki logda hata 0. İzole toplu koşu
+48/48 geçti (derleme ayrı yapıldı). Başlangıçtaki 626 kayıt byte'ı korundu.
+Bu sonuçlar aşağıdaki gerçek host/istemci PIE kutularını kapatmaz.
+
+- [ ] Listen host ve uzak istemcide hazır Goblin/Boss görevlerini görevli
+  yanında teslim et; hızlı tekrar tıklama tek XP/altın/iksir/ekipman versin.
+  Görev listesi, HUD ve sahibine bildirim doğru olsun; başka oyuncuya sızmasın.
+- [ ] Test authority Blueprint'inde tek seferlik gold/XP/inventory/level
+  listener'dan aynı görev ve başka hazır görev için ClaimReward çağır:
+  iç çağrılar ödül/durum değiştirmesin, dış ödül bir kez tamamlansın. İlk çağrı
+  döndükten sonra ikinci görev normal teslim edilebilsin; başka oyuncu engellenmesin.
+- [ ] Bağış görevinde yeterli altınla teslim sonrası tek bağış düşsün.
+  Ölüyken, uzaktayken ve dolu çantada ret kaynak tüketmesin; koşulu düzelttikten
+  sonra teslim çalışsın. Normal teslim sonrası çık/gir: ödüller ve tamamlanmış
+  görev kaydı aynı kalsın. PIE, görsel HUD ve Shipping/Server target açık.

@@ -4007,3 +4007,64 @@ Ana başlangıç625 .sav'ın tamamı byte byte korundu. Ana NetSmoke sunucusunda
 Join/Starter pack loglarıyla eşleşen Gezgin767052 için1 yeni slot korundu
 (toplam626). İzole çalışma ağacının kendi test kayıtları/logları arşiv öncesi
 kanıt dizinine alındı. Test süreçleri tamamlandı; foreign dosya/süreç kapatılmadı.
+
+## 88 — Görev ödülünde senkron tekrar teslimi (O50, 2026-10-10)
+
+ClaimReward, XP/altın/ekipman/iksir delegate'lerinden sonra görevi tamamlanmış
+listeye taşıyordu. Tek seferlik authority listener aynı hazır görevi tekrar
+teslim ederek ödülü çoğaltabiliyordu; tamamlanmış listede AddUnique bunu geri
+almıyordu. RPC hız sınırı doğrudan authority çağrılarını kapsamaz. Eski native
+kod112 kontrolde44 başarısız sonuç verdi (process0, runner1); çökme veya mevcut
+Blueprint/uzak istemci exploit'i gösterilmedi.
+
+Component'a kaydedilmeyen/replike edilmeyen bool ve authority kolundan hemen
+sonra fonksiyon sonuna kadar TGuardValue eklendi. Aynı component'ta aynı veya
+başka görev için iç içe teslim reddedilir; başka component serbesttir. Sonraki
+normal çağrı yeniden deneyebilir. Ödül/bağış/completion sırası, RPC/rate limit,
+save şeması ve owner-only replication değişmedi; Tick/timer eklenmedi.
+
+Yeni MMOTestQuestRewardCallbacks / TestQuestRewardCallbacks.ps1:14senaryo112
+kontrol. Üç görev (Q_Goblins/Q_Boss/Q_Gold5000), düz çağrı ve gerçek reflected
+gold/XP/inventory/level listener'ları; bağışta inventory ödülü yok, bu kombinasyon
+atlanır. İlk callback aynı görevi iki kez ve başka hazır görevi bir kez dener;
+durumun değişmemesi, tek normal ödülle eşitlik, bağımsız pawn, sonraki teslim,
+tekrar ret ve bellek Fill/Apply eşitliği doğrulanır. Callback'te görevin hâlâ
+aktif olması ayrıca denetlenir; başlangıç baseline koşusundan sonra bu sıra
+assert'i güçlendirildi. Native listener TStrongObjectPtr ile tutulur, delegate'ler
+çözülür ve capture temizlenir. Controller'sız pawn'lar aynı karede yok edilir;
+bu fixture disk/RPC/PIE doğrulaması değildir. Runner GUID log, tırnaklı yollar,
+native exit/112case/tek summary/hata kapıları ve yalnız sahip olunan process
+cleanup'ını kullanır. RunAllChecks'e derleme sonrasında bir adım eklendi.
+
+İzole gerçek UBT: ilk fixture90.71sn; sıfır altınlı bağış verisi kontrolü
+düzeltilip tekrar2.70sn. Production koruması14.24sn ve son fixture2.67sn gerçek
+compile/link ile geçti; fixed native112/0. Ana UBT25.25sn gerçek compile/link
+ve ana native112/0 geçti. Socrates read-only kaynak/fixture/probe incelemesinde
+yeni eyleme dönük hata bulmadı; runtime sonucu olarak sayılmadı.
+
+Bu koruma yalnız ClaimReward reentry'sini kapsar. Callback'in keyfi owner yok
+etmesi, envanteri doldurması, ApplySaveData çağırması veya ödülün ortasında
+snapshot/disk kaydı alması için genel transaction garantisi verilmez. Gerçek
+host/uzak istemci PIE, HUD ve Shipping/Server target checklist'te açık.
+Kanıt: TEMP/mmo_o50_quest_reentry_20261010.
+
+Ana projede yeni callback112 dahil11 runner exit0: quest life8/capacity13,
+first quest6 ve oturum marker'ları; XP206/levelup16 (5 olay), save lifecycle26,
+Store626/626 yükleme/invalid0/loadFailed0/mismatch0, JSON626/0 ve writeorder1,
+gerçek geçici disk save/load eşit. Summer57/Winter78/errors0; NetSmoke20sn
+server +20sn client, port17783,1join/1welcome ve iki log errors0. Ana tam
+aggregate/-FullCompile çalıştırılmadı; bu11 ilgili koşu yapıldı.
+
+İzole RunAllChecks -SkipBuild -NetPort17785:48/48, exit0. Derleme ayrı gerçek
+UBT adımıydı. Summer57/Winter81/errors0; varsayılan30sn+45sn ağ gözlemi
+1join/1welcome/errors0. ValidateData mevcut Lv33+ beceri boşluğu uyarılarıyla
+exit0; StaticLint92 temiz. Soak mock25/98, NetSmoke mock52/678 ve metrics
+parser1516/1516 geçti. İzole Store başlangıç slots0 nedeniyle okuma/JSON/
+roundtrip'i atladı; bu mevcut kayıt uyumluluğu kanıtı değildir, ana626 kayıt
+kontrolü ve gerçek geçici roundtrip ayrıca yapıldı. Gerçek uzun Soak bu turda
+çalıştırılmadı; smoke/RPC kapsamı PIE sonucu olarak sunulmadı.
+
+İki kökte168 kaynak/config/script girdisi ve DLL SHA test sonrası değişmedi.
+Ana başlangıç626 .sav'ın tamamı byte byte aynı, yeni ana slot0. İzole test
+kayıtları/logları arşiv öncesi kanıt dizinine alındı. Yalnız sahip olunan8
+dosya commit kapsamındadır; diğer ajan dosyaları/süreçleri değiştirilmedi.

@@ -60,6 +60,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	static bool RunRewardLifeStateSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunRewardCapacitySelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunRewardCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 protected:
@@ -90,6 +91,10 @@ protected:
 	double LastAcceptRpcTime = -1.0;
 	double LastClaimRpcTime = -1.0;
 	bool PassesRpcRateLimit(double& LastTime);
+
+	// Synchronous reward delegates may call ClaimReward again. Per-component,
+	// server-only call guard; neither replicated nor persisted.
+	bool bClaimRewardInProgress = false;
 
 	UFUNCTION(Server, Reliable)
 	void ServerAcceptQuest(FName QuestId);

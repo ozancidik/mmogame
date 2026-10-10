@@ -570,6 +570,15 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 		ServerClaimReward(QuestId);
 		return;
 	}
+	// XP/gold/inventory delegates run before the quest is completed. Reject all
+	// nested claims on this component, including a different quest sharing its
+	// reward capacity. A later call can retry after this guard leaves scope.
+	if (bClaimRewardInProgress)
+	{
+		return;
+	}
+	TGuardValue<bool> ClaimGuard(bClaimRewardInProgress, true);
+
 	// GainExperience oluyken XP vermez. Gorevi burada tuketmek altin/esya verip XP'yi
 	// kalici kaybettirirdi: tum oduller ve gorev durumu, dirilene kadar oldugu gibi kalmali.
 	AMMOCharacter* Owner = Cast<AMMOCharacter>(GetOwner());

@@ -175,6 +175,11 @@ Step "Gorev odulunde yigin ve canta kapasitesi" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Gorev odulunde senkron delegate tekrar teslimi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestQuestRewardCallbacks.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Ilk gorev kontrolcu oturumu ve tekillik" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestFirstQuestMetrics.ps1") | Out-Host
     $LASTEXITCODE -eq 0
