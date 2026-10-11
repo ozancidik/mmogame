@@ -45,6 +45,7 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 #include "Components/CapsuleComponent.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"
@@ -1608,6 +1609,12 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 		Reject(MMONameRules::AllowedCharsHint());
 		return;
 	}
+	// Tur 5: ayrilmis adlar (Default, motorun misafir adi Player<Id>) istenerek alinamaz (ortak/oturumdan oturuma degisen yuva).
+	if (MMONameRules::IsReservedName(Trimmed))
+	{
+		Reject(MMONameRules::ReservedNameHint());
+		return;
+	}
 	// SECURITY_AUDIT K-1 yeni yuz (F1): uzak istemci yalniz HIC kaydedilmemis karakterin adini degistirebilir. Kayitli karakter
 	// yeni ada gecip cikinca yeni yuvaya tam envanterle yazilir, eski yuva diskte kalir (catallama, altin/esya ikiye katlanir).
 	// Kosul diskteki yuva: ActiveSaveSlot.IsEmpty() YETMEZ, yeni karakter dali yuvayi dosya yokken de atar. Bos ActiveSaveSlot
@@ -1676,6 +1683,20 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			{
 				Reject(TEXT("Bu ad su an baska bir oyuncuda"));
 				return;
+			}
+		}
+		// Tur 5: pawn'i olmayan (olu/izleyici/henuz possess edilmemis) bagli oyuncular yukaridaki pawn listesinde yok;
+		// PreLogin/ChangeName gibi PlayerState listesine de bak.
+		if (const AGameStateBase* GS = World->GetGameState())
+		{
+			const APlayerState* OwnPS = GetPlayerState();
+			for (const APlayerState* OtherPS : GS->PlayerArray)
+			{
+				if (OtherPS && OtherPS != OwnPS && MMONameRules::CanonicalKey(OtherPS->GetPlayerName()) == CandidateKey)
+				{
+					Reject(TEXT("Bu ad su an baska bir oyuncuda"));
+					return;
+				}
 			}
 		}
 	}

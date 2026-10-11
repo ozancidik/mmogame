@@ -87,4 +87,44 @@ namespace MMONameRules
 	{
 		return A.ToLower() == B.ToLower();
 	}
+
+	/** Adin kayit yuvasinin kanonik bicimi ("mmosave_" + CanonicalKey): AMMOCharacter::GetSaveSlotName ile SameCanonical esdegeri. */
+	inline FString CanonicalSlot(const FString& Name)
+	{
+		return FString(TEXT("mmosave_")) + CanonicalKey(Name);
+	}
+
+	/**
+	 * Tur 5 (misafir adi): oyuncunun ISTEYEREK alamayacagi adlar. Kanonik anahtari "default" olan ad (bos/temizlenince bos ad
+	 * da buraya duser: MMOSave_Default ortak yedek yuvadir) ve "player" + yalniz rakam (motorun ?Name= verilmeyen istemciye
+	 * verdigi "Player<PlayerId>"; Id her sunucu surecinde 256'dan yeniden baslar, baska bir misafir oncekinin kaydina duserdi).
+	 * "Player" (rakamsiz), "PlayerOne" ve ChangeName'in atadigi "Gezgin######" adlari ayrilmis DEGIL.
+	 */
+	inline bool IsReservedName(const FString& Name)
+	{
+		const FString Key = CanonicalKey(Name);
+		if (Key.Equals(TEXT("default"), ESearchCase::CaseSensitive))
+		{
+			return true;
+		}
+		constexpr int32 PlayerPrefixLen = 6; // "player"
+		if (Key.Len() <= PlayerPrefixLen || !Key.StartsWith(TEXT("player"), ESearchCase::CaseSensitive))
+		{
+			return false;
+		}
+		for (int32 I = PlayerPrefixLen; I < Key.Len(); ++I)
+		{
+			if (Key[I] < TEXT('0') || Key[I] > TEXT('9'))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Ayrilmis ad ret metni (ASCII). */
+	inline const TCHAR* ReservedNameHint()
+	{
+		return TEXT("Bu ad ayrilmis (Default ve Player+rakam, orn. Player123): baska bir ad sec");
+	}
 }

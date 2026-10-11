@@ -29,7 +29,9 @@ public:
 
 	// Ad -> dosya adi govdesi (bos/gecersiz adlar "Default" olur; Default kutusuna posta GONDERILMEZ).
 	static FString SanitizeName(const FString& Name);
-	static bool IsDeliverableName(const FString& Name) { return SanitizeName(Name) != TEXT("Default"); }
+	// Tur 5: ayrilmis adlar (MMONameRules::IsReservedName: Default/default, Player+rakam) teslim edilemez; bos/gecersiz ad da
+	// kanonik "default" oldugundan ayni kurala duser.
+	static bool IsDeliverableName(const FString& Name);
 	static FString GetBoxPath(const FString& Name);
 
 	// JSON (test edilebilir): FromJson girdiyi dogrular (metin kisaltilir, altin [0,MaxGoldPerMail], fazla posta atilir,

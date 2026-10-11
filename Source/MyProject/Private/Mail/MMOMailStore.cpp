@@ -101,6 +101,12 @@ FString FMMOMailStore::SanitizeName(const FString& Name)
 	return Safe.IsEmpty() ? FString(TEXT("Default")) : Safe;
 }
 
+bool FMMOMailStore::IsDeliverableName(const FString& Name)
+{
+	// SanitizeName ile ayni uzunluk (MaxNameLength == SlotKey varsayilani 32): bos sonuc = "Default" = ayrilmis.
+	return !MMONameRules::IsReservedName(Name);
+}
+
 FString FMMOMailStore::GetBoxPath(const FString& Name)
 {
 	// Kucuk harf: Linux sunucuda "Ali" ve "ali" ayri dosya olup altin kaybettirmesin (kimlik karsilastirmasi zaten harf duyarsiz).

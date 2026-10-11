@@ -391,6 +391,14 @@ namespace
 		return Out.Left(20).TrimStartAndEnd();
 	}
 
+	// Tur 5 (Y-NEW-1 devami): temizleme adi bas/son bosluk kirpmasi DISINDA degistiriyorsa ad kabul edilmez. Eskiden izinsiz
+	// karakterler sessizce atiliyordu: O-umlaut ile baslayan "Omer" -> "mer", U/O-umlautlu "Unal"/"Onal" ayni "nal" kaydini
+	// paylasip baskasinin kaydini aciyordu; "Ali!" -> "Ali" de ayni sorun.
+	bool InitialNameWasAltered(const FString& Raw, const FString& Clean)
+	{
+		return !Clean.Equals(Raw.TrimStartAndEnd(), ESearchCase::CaseSensitive);
+	}
+
 	// "<ad>-<12+ onaltilik hane>" kalibi: Null OSS'in uretilen varsayilan oyuncu adi
 	// (gercek ornek "CIDIK-<14 hex>"). Mesru adlar ("Ozan-20261005", "Kral-12345678", "Ali-deadbeef")
 	// 12 haneden kisa kuyruk tasidigi icin eslesmez.
@@ -453,8 +461,11 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 	bool bAssignedRandomName = false; // DUSUK-4: "yeni karakter / ilerleme tasinmaz" uyarisi yalniz Gezgin atamasinda
 	if (!bNameChange)
 	{
-		// Baslangic adi: guvensiz karakterleri at; bos kalirsa ya da OS kullanici adi kalibindaysa rastgele ad ver.
+		// Baslangic adi: bos, izinsiz karakterli (temizleme adi degistiriyor; PreLogin'i atlayan giris/gecis yollari), ayrilmis
+		// (Default, motorun misafire verdigi Player<Id>) ya da OS kullanici adi kalibindaysa rastgele ad ver.
 		const FString Clean = SanitizeInitialName(NewName);
+		const bool bAltered = InitialNameWasAltered(NewName, Clean);
+		const bool bReserved = MMONameRules::IsReservedName(Clean);
 		UseName = Clean;
 		// PreLogin yalniz o an var olan PlayerController'lara bakar; iki istemci ayni anda ayni ?Name= ile
 			// girerse ikisi de gecer (ayni kayit yuvasi = esya cogaltma). Burada diger denetleyicilerle tekrar kontrol et.
@@ -479,7 +490,7 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 					}
 				}
 			}
-			if (Clean.IsEmpty() || bNameInUse || LooksLikeOsDefaultName(Clean))
+			if (Clean.IsEmpty() || bAltered || bReserved || bNameInUse || LooksLikeOsDefaultName(Clean))
 		{
 			// Cevrimici baska bir oyuncuyla VE diskteki bir kayit yuvasiyla cakismayan rastgele ad
 			// (kayit yuvasi = ad; var olan bir yuva baska birinin karakterini yukler/ezer).
@@ -520,22 +531,18 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 	}
 	Super::ChangeName(Controller, UseName, bNameChange);
 
-	// Baglanti adi degistirildiyse (gecersiz karakter, kullanimda, OS varsayilan adi) oyuncu kayit yuvasinin
-	// neden baska oldugunu bilsin. Istemci HUD'u bu anda henuz hazir degil: kisa gecikmeyle sohbet satiri.
-	// Yalniz bas/son bosluk kirpildiysa ad (ve yuva) ayni: uyari yok.
-	if (UseName != NewName && UseName != NewName.TrimStartAndEnd() && Controller)
+	// Rastgele (Gezgin) ad atandiysa oyuncu kayit yuvasinin neden baska oldugunu bilsin. Istemci HUD'u bu anda henuz hazir
+	// degil: kisa gecikmeyle sohbet satiri. Tur 5: izinsiz karakterli ad artik kirpilip kabul edilmedigi icin (Gezgin alir)
+	// eski "izinsiz karakterler atildi" bildirimi kalkti; yalniz bas/son bosluk kirpilan ad aynen kabul edilir (uyari yok).
+	if (bAssignedRandomName && Controller)
 	{
 		if (UWorld* NoticeWorld = GetWorld())
 		{
 			const TWeakObjectPtr<AController> WeakController(Controller);
 			// Ad kilidi (K-1 F1): bu ad ilk kayittan sonra degistirilemez; oyuncu bunu bilmeden ilerleme yaparsa kaybeder.
-			// DUSUK-4: "yeni karakter / ilerleme tasinmaz" yalniz rastgele (Gezgin) ad atandiginda dogru; temizlenen ad
-			// (ornegin "Ali!" -> "Ali") o adin kendi kaydini yukler, ona yalniz hangi karakterlerin atildigi soylenir.
-			const FString Notice = bAssignedRandomName
-				? FString::Printf(TEXT("Baglanti adin kullanilamadigi icin (bos/gecersiz, su an baska oyuncuda ya da sistem varsayilan adi) bu oturumda adin '%s' (yeni karakter). %s. Bu ad ilk kayittan sonra (MMOSave, otomatik kayit, takas/klan/arkadas/posta islemi) kilitlenir. Kayitli karakterin icin cik ve gecerli bir ?Name=Ad ile yeniden baglan; burada yapilan ilerleme ona tasinmaz."),
-					*UseName, MMONameRules::AllowedCharsHint())
-				: FString::Printf(TEXT("Baglanti adindaki izinsiz karakterler atildi: adin '%s'. %s. Farkli bir ad istiyorsan cik ve ?Name=Ad ile yeniden baglan."),
-					*UseName, MMONameRules::AllowedCharsHint());
+			// DUSUK-4: "yeni karakter / ilerleme tasinmaz" yalniz rastgele (Gezgin) ad atandiginda dogru.
+			const FString Notice = FString::Printf(TEXT("Baglanti adin kullanilamadigi icin (bos, Turkce harf/izinsiz karakterli, ayrilmis (Default, Player+rakam), su an baska oyuncuda ya da sistem varsayilan adi) bu oturumda adin '%s' (yeni karakter). %s. Bu ad ilk kayittan sonra (MMOSave, otomatik kayit, takas/klan/arkadas/posta islemi) kilitlenir. Kayitli karakterin icin cik ve gecerli bir ?Name=Ad ile yeniden baglan; burada yapilan ilerleme ona tasinmaz."),
+				*UseName, MMONameRules::AllowedCharsHint());
 			FTimerHandle NoticeHandle;
 			NoticeWorld->GetTimerManager().SetTimer(NoticeHandle, FTimerDelegate::CreateWeakLambda(this, [WeakController, Notice]()
 			{
@@ -576,10 +583,23 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 	}
 	// Kayit yuvasi adiyla ayni normallestirme: kanonik anahtar (ASCII, bosluk -> '_', kucuk harf; MMONameRules).
 	// Motor (AGameModeBase::InitNewPlayer) ?Name= degerini 20 karakterle keser; ayni kesimle karsilastir.
-	// Temizlenince bos kalan ad ChangeName'de rastgele (Gezgin) ad alir: burada reddedilmez.
-	const FString CleanRequested = SanitizeInitialName(Requested.Left(20));
-	if (CleanRequested.IsEmpty())
+	// Yalniz bosluktan olusan ad misafir sayilir (ChangeName'de rastgele Gezgin adi alir): burada reddedilmez.
+	const FString Requested20 = Requested.Left(20);
+	const FString CleanRequested = SanitizeInitialName(Requested20);
+	if (Requested20.TrimStartAndEnd().IsEmpty())
 	{
+		return;
+	}
+	// Tur 5: temizleme adi (bas/son bosluk kirpmasi disinda) degistiriyorsa ret: sessiz kirpma baska bir kaydi acardi
+	// (O-umlautlu "Omer" -> "mer", "Ali!" -> "Ali"). Ayrilmis adlar (Default, Player+rakam) de istenerek alinamaz.
+	if (InitialNameWasAltered(Requested20, CleanRequested))
+	{
+		ErrorMessage = TEXT("Gecersiz ad: Turkce harf kullanilamaz; yalniz a-z, A-Z, rakam, bosluk, _ ve - kullanilabilir.");
+		return;
+	}
+	if (MMONameRules::IsReservedName(CleanRequested))
+	{
+		ErrorMessage = TEXT("Bu ad ayrilmis (Default ve Player+rakam, orn. Player123): baska bir ad sec.");
 		return;
 	}
 	const FString RequestedKey = MMONameRules::CanonicalKey(CleanRequested);

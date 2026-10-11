@@ -10,6 +10,7 @@
 #include "Core/MMONameRules.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
@@ -80,6 +81,21 @@ namespace
 				{
 					UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Eski yuva dosyasi silinmedi: %s su an baska bir cevrimici oyuncuya ait"), *OldSlot);
 					return;
+				}
+			}
+			// Tur 5: pawn'i olmayan bagli oyuncular (olu/izleyici/henuz possess edilmemis) icin PlayerState listesi (canli ad).
+			if (const AGameStateBase* GS = World->GetGameState())
+			{
+				const APawn* SelfPawn = Cast<APawn>(Self);
+				const APlayerState* SelfPS = SelfPawn ? SelfPawn->GetPlayerState() : nullptr;
+				const FString OldSlotLower = OldSlot.ToLower();
+				for (const APlayerState* PS : GS->PlayerArray)
+				{
+					if (PS && PS != SelfPS && MMONameRules::CanonicalSlot(PS->GetPlayerName()) == OldSlotLower)
+					{
+						UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Eski yuva dosyasi silinmedi: %s su an bagli baska bir oyuncunun adi"), *OldSlot);
+						return;
+					}
 				}
 			}
 		}

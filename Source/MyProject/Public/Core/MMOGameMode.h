@@ -21,13 +21,15 @@ public:
 	virtual void StartPlay() override;
 
 	// Y-5 (SECURITY_AUDIT): baslangic adi "<isletim sistemi kullanici adi>-<hex>" kalibindaysa (Null OSS
-	// varsayilani) herkese gorunmesin diye rastgele "Gezgin######" ile degistirilir. Kasitli secilen adlar
-	// (?Name=Ozan, MMOSetName) ve sonraki ad degisiklikleri (bNameChange) etkilenmez.
+	// varsayilani) herkese gorunmesin diye rastgele "Gezgin######" ile degistirilir. Tur 5: izinsiz karakterli (temizleme adi
+	// degistiriyor), ayrilmis (Default, motorun misafir adi Player<Id>) ya da bos ad da Gezgin adi alir. Gecerli adlar
+	// (?Name=Ozan) aynen kalir; sonraki ad degisiklikleri (bNameChange) MMOSetName kapilarina yonlendirilir.
 	virtual void ChangeName(AController* Controller, const FString& NewName, bool bNameChange) override;
 
 	// Kimlik korumasi (SECURITY_AUDIT K-1, kismi): baglanti URL'indeki ?Name= degeri su an
 	// cevrimici bir oyuncunun adiyla (kayit yuvasi esdegeri: buyuk/kucuk harf ve bosluk/_ ayni)
 	// cakisiyorsa baglanti reddedilir. Cevrimdisi birinin adini kapmayi ENGELLEMEZ (hesap sistemi gerekir).
+	// Tur 5: izinsiz karakterli (Turkce harf dahil) ve ayrilmis (Default, Player+rakam) adlar da reddedilir.
 	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 
 	// Gelistirici araci: spawner dogrulamasini (zemin izi + navmesh) verilen konumda 64 kez calistirir ve

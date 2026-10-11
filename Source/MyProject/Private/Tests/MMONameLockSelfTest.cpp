@@ -19,6 +19,7 @@
 #include "Core/MMONameRules.h"
 #include "Core/MMONotify.h"
 #include "Engine/GameInstance.h"
+#include "Mail/MMOMailStore.h"
 #include "Player/MMOPlayerController.h"
 #include "UI/MMOHUD.h"
 #include "Save/MMOCharacterStoreSubsystem.h"
@@ -110,6 +111,17 @@ namespace
 			bool bHintAscii = true;
 			for (const TCHAR* P = AllowedCharsHint(); *P; ++P) { bHintAscii &= (*P > 0 && *P < 128); }
 			Check(bHintAscii && FCString::Strlen(AllowedCharsHint()) > 10, TEXT("y1_rules_hint_ascii"));
+			// Tur 5: ayrilmis adlar (Default/default, Player+rakam; bos/temizlenince bos ad kanonik "default") - Gezgin adlari, rakamsiz
+			// "Player" ve "PlayerOne" ayrilmis degil.
+			Check(IsReservedName(TEXT("Default")) && IsReservedName(TEXT("default")) && IsReservedName(TEXT("DEFAULT")) && IsReservedName(TEXT("Player123"))
+				&& IsReservedName(TEXT("player7")) && IsReservedName(TEXT("Player256")) && IsReservedName(FString()) && IsReservedName(TEXT("???"))
+				&& !IsReservedName(TEXT("Player")) && !IsReservedName(TEXT("PlayerOne")) && !IsReservedName(TEXT("Player12a")) && !IsReservedName(TEXT("Player 12"))
+				&& !IsReservedName(TEXT("Gezgin")) && !IsReservedName(TEXT("Gezgin2")) && !IsReservedName(TEXT("Gezgin123456")) && !IsReservedName(TEXT("Defaulter"))
+				&& !IsReservedName(TEXT("Ali")), TEXT("y5_rules_reserved_names"));
+			// Posta ayni kurali kullanir: Default/default ayni davranir, Player+rakam teslim edilmez.
+			Check(!FMMOMailStore::IsDeliverableName(TEXT("Default")) && !FMMOMailStore::IsDeliverableName(TEXT("default"))
+				&& !FMMOMailStore::IsDeliverableName(TEXT("Player123")) && FMMOMailStore::IsDeliverableName(TEXT("Gezgin2"))
+				&& FMMOMailStore::IsDeliverableName(TEXT("Player")), TEXT("y5_mail_reserved_not_deliverable"));
 			// Gozlem (kontrol degil): eski kural FChar::IsAlnum bu harfleri kabul ediyor mu (mutasyon/ClanLegacy yorumu icin).
 			UE_LOG(LogTemp, Display, TEXT("[MMO_NAMELOCK_NOTE] fchar_isalnum O_umlaut=%d dotless_i=%d s_cedilla=%d"),
 				FChar::IsAlnum(UpperOUml) ? 1 : 0, FChar::IsAlnum(DotlessI) ? 1 : 0, FChar::IsAlnum(SCedilla) ? 1 : 0);
@@ -339,6 +351,18 @@ namespace
 				Check(!PreLoginError(NameOf(TEXT("om"))).IsEmpty() && !PreLoginError(NameOf(TEXT("OM"))).IsEmpty(), TEXT("y1_prelogin_case_variant_rejected"));
 				Check(!PreLoginError(MMONameLockMix(NameOf(TEXT("")), { LowerOUml }, TEXT("x"))).IsEmpty(), TEXT("y1_prelogin_unicode_cleaned_collision_rejected"));
 				Check(PreLoginError(NPreFree).IsEmpty(), TEXT("y1_prelogin_free_name_accepted"));
+				// Tur 5: temizleme adi degistiriyorsa (Unicode harf ya da izinsiz isaret) cakisma olmasa da ret; ret metni ASCII.
+				const FString ErrUni = PreLoginError(MMONameLockMix(NameOf(TEXT("")), { SCedilla }, TEXT("Z")));
+				const FString ErrPunct = PreLoginError(NameOf(TEXT("!")));
+				bool bErrAscii = !ErrUni.IsEmpty();
+				for (const TCHAR Ch : ErrUni) { bErrAscii &= (Ch > 0 && Ch < 128); }
+				Check(bErrAscii && !ErrPunct.IsEmpty(), TEXT("y5_prelogin_altered_name_rejected"));
+				Check(!PreLoginError(TEXT("Default")).IsEmpty() && !PreLoginError(TEXT("default")).IsEmpty() && !PreLoginError(TEXT("Player123")).IsEmpty(),
+					TEXT("y5_prelogin_reserved_rejected"));
+				// Yalniz bas/son bosluk kirpmasi ad degisikligi sayilmaz; ?Name= verilmeyen misafir burada reddedilmez (ChangeName Gezgin verir).
+				FString GuestErr;
+				GM->PreLogin(FString(), TEXT("127.0.0.1"), FUniqueNetIdRepl(), GuestErr);
+				Check(PreLoginError(FString(TEXT(" ")) + NPreFree + TEXT(" ")).IsEmpty() && GuestErr.IsEmpty(), TEXT("y5_prelogin_trim_and_guest_accepted"));
 
 				// ChangeName (baslangic adi): ayni kanonik anahtar cevrimiciyse rastgele Gezgin adi atanir.
 				auto NewcomerName = [Newcomer]() { return Newcomer->PlayerState ? Newcomer->PlayerState->GetPlayerName() : FString(); };
@@ -350,10 +374,26 @@ namespace
 				const FString AfterUni = NewcomerName();
 				Check(AfterSpace.StartsWith(TEXT("Gezgin"), CS) && AfterCase.StartsWith(TEXT("Gezgin"), CS), TEXT("y1_changename_canonical_collision_gets_gezgin"));
 				Check(AfterUni.StartsWith(TEXT("Gezgin"), CS), TEXT("y1_changename_unicode_cleaned_collision_gets_gezgin"));
+				// Tur 5: Unicode harfli ad artik kirpilip kabul EDILMEZ (eski kontrol "S-cedilla + Z -> Z kabul" idi: "Omer" -> "mer"
+				// gibi baskasinin kaydini aciyordu); izinsiz isaret ("Ali!") ve ayrilmis adlar (Default, motor misafir adi Player<Id>)
+				// da rastgele Gezgin adi alir; atanan Gezgin adinin diskte kaydi yoktur.
 				GM->ChangeName(Newcomer, MMONameLockMix(NameOf(TEXT("")), { SCedilla }, TEXT("Z")), false);
-				const FString AfterClean = NewcomerName();
-				GM->ChangeName(Newcomer, NFree, false);
-				Check(AfterClean.Equals(NameOf(TEXT("Z")), CS) && NewcomerName().Equals(NFree, CS), TEXT("y1_changename_free_name_kept_unicode_stripped"));
+				const FString AfterUniFree = NewcomerName();
+				Check(AfterUniFree.StartsWith(TEXT("Gezgin"), CS) && !AfterUniFree.Equals(NameOf(TEXT("Z")), CS), TEXT("y5_changename_unicode_gets_gezgin"));
+				GM->ChangeName(Newcomer, NameOf(TEXT("!")), false);
+				const FString AfterPunct = NewcomerName();
+				Check(AfterPunct.StartsWith(TEXT("Gezgin"), CS) && !AfterPunct.Equals(NameOf(TEXT("")), CS), TEXT("y5_changename_punct_gets_gezgin"));
+				bool bReservedGezgin = true;
+				for (const TCHAR* Reserved : { TEXT("Player256"), TEXT("Player123"), TEXT("Default"), TEXT("default") })
+				{
+					GM->ChangeName(Newcomer, Reserved, false);
+					const FString Got = NewcomerName();
+					bReservedGezgin &= Got.StartsWith(TEXT("Gezgin"), CS) && !MMONameRules::IsReservedName(Got) && !Store->Exists(SlotOf(Got));
+				}
+				Check(bReservedGezgin, TEXT("y5_changename_reserved_gets_gezgin"));
+				// Kontrol: gecerli ad (bas/son bosluk kirpilarak) aynen kalir.
+				GM->ChangeName(Newcomer, FString(TEXT(" ")) + NFree + TEXT(" "), false);
+				Check(NewcomerName().Equals(NFree, CS), TEXT("y5_changename_trimmed_free_name_kept"));
 
 				// ServerSetName: canli bir oyuncuyla ayni kanonik anahtara gecis reddedilir; Unicode harfli ad reddedilir.
 				Req->MMOSetName(NameOf(TEXT("s_t")));
@@ -366,6 +406,14 @@ namespace
 				Check(bCaseKept && LiveName(Req).Equals(NReq, CS), TEXT("y1_setname_case_variant_rejected"));
 				Req->MMOSetName(MMONameLockMix(NameOf(TEXT("")), { UpperOUml }, TEXT("y")));
 				Check(LiveName(Req).Equals(NReq, CS), TEXT("y1_setname_unicode_rejected"));
+				// Tur 5: ayrilmis adlar reddedilir; pawn'i olmayan bagli oyuncunun (Newcomer: PlayerState var, pawn yok) adi da
+				// cevrimici sayilir (PlayerArray kontrolu).
+				Req->MMOSetName(TEXT("Player123"));
+				const bool bPlayerKept = LiveName(Req).Equals(NReq, CS);
+				Req->MMOSetName(TEXT("default"));
+				Check(bPlayerKept && LiveName(Req).Equals(NReq, CS), TEXT("y5_setname_reserved_rejected"));
+				Req->MMOSetName(NFree.ToLower());
+				Check(LiveName(Req).Equals(NReq, CS) && NewcomerName().Equals(NFree, CS), TEXT("y5_setname_pawnless_online_name_rejected"));
 				Req->MMOSetName(NReqOk); // kontrol: serbest ad kabul edilir (bu adim sogumayi baslatir; sona konuldu)
 				Check(LiveName(Req).Equals(NReqOk, CS), TEXT("y1_setname_free_name_accepted"));
 
@@ -514,7 +562,8 @@ namespace
 // yetki kapisi, ?Name= ile yeniden baglanma akisi, PIE ve ag replikasyonu.
 // Tur 4 bolumu: PreLogin gercek ag baglantisi olmadan dogrudan cagrilir (UniqueId bos, adres sahte); ChangeName'in 3 sn sonraki
 // bildirim zamanlayicisi kosulmaz; Y8 kilit metni standalone'da yerel calisan istemci RPC'si + test HUD'u ile, Exists sayisi
-// SwapStoreForTest ile takilan sayac magazasiyla olculur; Y-NEW-6 G dali LoadCharacter dogrudan cagrilarak (0.6 sn AutoLoad
+// SwapStoreForTest ile takilan sayac magazasiyla olculur; tur 5 misafir/ayrilmis ad kurali motorun gercek InitNewPlayer
+// ("Player<Id>") yolu yerine ChangeName dogrudan cagrilarak; Y-NEW-6 G dali LoadCharacter dogrudan cagrilarak (0.6 sn AutoLoad
 // zamanlayicisi ve gercek UnPossess/Possess dongusu olmadan) dogrulanir. Eski Turkce harfli klan adinin korunmasi FChar::IsAlnum'un
 // bu platformdaki sonucuna baglidir (NOTE satiri).
 
