@@ -230,7 +230,13 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 		LastSendTime = Now();
 		return EMMOMailResult::UnknownTarget;
 	}
-	if (FMMOMailStore::Count(To) >= FMMOMailStore::MaxMailsPerBox)
+	// Alici kutusu okunamiyor/bozuk/kurtarilamiyorsa (Load false) hicbir sey dusulmez: Count'un "0" demesine guvenilmez.
+	TArray<FMMOMail> TargetBox;
+	if (!FMMOMailStore::Load(To, TargetBox))
+	{
+		return EMMOMailResult::StoreError;
+	}
+	if (TargetBox.Num() >= FMMOMailStore::MaxMailsPerBox)
 	{
 		return EMMOMailResult::BoxFull;
 	}
@@ -239,9 +245,9 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	const int32 Charge = static_cast<int32>(Total);
 	const TWeakObjectPtr<AMMOCharacter> WeakOwner(Owner);
 	const int32 GoldBefore = Inv->Gold;
-	// Iade, GERCEKTEN dusulen miktarla yapilir: once/sonra farki [0, Charge] araligina kirpilir. Altin callback'i (Blueprint
-	// OnGoldChanged vb.) araya altin eklediyse fark kucuk cikar ve iade de kuculur; callback altin harcadiysa iade Charge'i
-	// asmaz. Iki durumda da iade fazladan altin uretmez.
+	// Iade, bu kodun GERCEKTEN dustugu miktarla yapilir: her dusum yalniz bakiye o an yetiyorsa yapilir (kirpilmaz) ve
+	// tam tutari Deducted'a eklenir. Altin callback'i (Blueprint OnGoldChanged vb.) araya girip altin harcasa ya da eklese de
+	// iade dusulenden fazla olamaz (altin uretilmez). Bakiye ucrete yetmeyecek kadar azaldiysa ucret hic dusulmez.
 	int32 Deducted = 0;
 	const auto Refund = [&WeakOwner, &Deducted]()
 	{
@@ -264,19 +270,27 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	// Olcum: ek (aliciya gecen altin) "posta", ucret (altin sink'i) "posta_ucret" kalemiyle ayri [MMOMETRIC] satiri basar.
 	if (Gold > 0)
 	{
+		// Bakiye yukarida (Inv->Gold >= Total) dogrulandi ve arada altin degismedi: dusum tam ve kirpilmasiz.
 		Inv->AddGoldFrom(-Gold, TEXT("posta"));
+		Deducted += Gold;
 	}
+	int64 NetDrop = 0;
 	if (AMMOCharacter* C = WeakOwner.Get())
 	{
 		if (UMMOInventoryComponent* I = C->GetInventory())
 		{
-			I->AddGoldFrom(-FeeFor(Gold), TEXT("posta_ucret"));
-			Deducted = static_cast<int32>(FMath::Clamp<int64>(static_cast<int64>(GoldBefore) - I->Gold, 0, Charge));
+			const int32 Fee = FeeFor(Gold);
+			if (I->Gold >= Fee)
+			{
+				I->AddGoldFrom(-Fee, TEXT("posta_ucret"));
+				Deducted += Fee;
+			}
+			NetDrop = static_cast<int64>(GoldBefore) - I->Gold;
 		}
 	}
-	// Tam ucret + ek dusulemediyse (callback araya girip bakiyeyi azaltti ya da fark olculemedi) posta gonderilmez:
-	// aksi halde alici odenmemis eki alirdi.
-	if (Deducted < Charge)
+	// Tam ucret + ek dusulemediyse ya da bakiye net olarak o kadar dusmediyse (callback araya girip altin ekledi/harcadi)
+	// posta gonderilmez (muhafazakar); iade yalniz Deducted kadardir.
+	if (Deducted < Charge || NetDrop < Charge)
 	{
 		Refund();
 		return EMMOMailResult::StoreError;

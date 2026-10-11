@@ -160,7 +160,8 @@ void UMMOFriendsComponent::CmdAdd(const FString& Name)
 	if (Canonical.StartsWith(TEXT("Player"), ESearchCase::IgnoreCase)
 		&& Canonical.RightChop(6).IsNumeric())
 	{
-		NotifyOwner(TEXT("Misafir adli oyuncu eklenemez; once MMOSetName ile kalici bir ad almali."));
+		// MMOSetName ipucu yanlisti: kayitli (ilk kaydi yapilmis) karakterin adi kilitlidir (K-1 F1).
+		NotifyOwner(TEXT("Misafir adli (PlayerNNN) oyuncu eklenemez; o oyuncu kalici bir adla (?Name=Ad) yeniden baglanmali."));
 		return;
 	}
 	if (Canonical.IsEmpty() || Canonical.Len() > MaxNameLength)

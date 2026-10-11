@@ -5454,8 +5454,8 @@ uzak istemci RPC tasimasi, Blueprint graph veya sureli respawn oynanisi degildir
 ## K1F — Ad degistirme kilidi ve yan dosya tasima (2026-10-11, 2. tur; derlendi, PIE/uzak istemci YOK)
 
 Ayrinti: `docs/SECURITY_AUDIT.md` K-1 yeni yuz F1-F5 "Durum" satirlari. Iki istemcili listen-server oturumu gerekir.
-- [ ] Uzak istemci, kaydi olan karakterle (`?Name=X`, en az bir kayit sonrasi) `MMOSetName Y`: "Kayitli karakterin adi
-  degistirilemez" mesaji; ad X kalmali, cikista `MMOSave_Y.sav` OLUSMAMALI.
+- [ ] Uzak istemci, kaydi olan karakterle (`?Name=X`, en az bir kayit sonrasi) `MMOSetName Y`: "Ad kilitli: ..." mesaji
+  (tur 3 metni); ad X kalmali, cikista `MMOSave_Y.sav` OLUSMAMALI.
 - [ ] Uzak istemci, yeni karakterle (kayit dosyasi yok, girdikten sonra 60 sn icinde) `MMOSetName Y`: kabul; mesaj "ilk
   kayittan sonra ad degistirilemez" uyarisi icermeli. `MMOSave` sonrasi ikinci `MMOSetName Z` reddedilmeli.
 - [ ] Uzak yeni karakter, cevrimdisi kayitli bir adi (`MMOSetName <kayitli>`) denesin: "kayitli bir karaktere ait" reddi ve
@@ -5514,3 +5514,18 @@ Ayrinti: [O68 gorev kaydi](tasks/MAIL_READ_FAILURE_2026-10-11.md).
   Count=0 belirsizligi, explicit Replace yazimi, existence/read yarisi ve
   FileExists=false'nin izin hatasini gizleyebilmesi de bu duzeltmede aciktir.
   Gercek remote exploit veya tamamlanmis migration kaniti ileri surulmez.
+
+## K1G — Guvenlik/QA tur 3: posta .bak, retry'siz kurtarma, ad kilidi sogumasi, mesajlar (2026-10-11; derlendi, PIE YOK)
+
+Native testler (basarim 82, gunluk 67, posta 104, ad kilidi 23, O68 24) gecti; asagidakiler PIE/listen-server ister.
+- [ ] Uzak istemci kayitli karakterle `MMOSetName Y` (red) ve HEMEN ardindan `MMOSetName Z`: ikincisi "... sn beklemelisin"
+  (F1 reddi de soguma baslatir). Red metni ilk kayit yollarini (MMOSave, otomatik kayit, takas/klan/arkadas/posta) ve
+  "ilerleme tasinmaz" bilgisini okunur sekilde gostermeli (uzun satir HUD'da tasmamali).
+- [ ] Gecersiz baglanti adiyla (`?Name=` bos/gecersiz) gir: 3 sn sonra sohbette yeni "bu oturumda adin ... (yeni karakter)"
+  bildirimi tam ve okunur gorunmeli.
+- [ ] Misafir adli (`PlayerNNN`) oyuncuyu `/arkadas ekle`: ipucu "?Name=Ad ile yeniden baglanmali" demeli (MMOSetName degil).
+- [ ] Posta: alicinin `Saved/MMOMail/MMOMail_<ad>.json` dosyasini sentetik kopyada bozuk JSON yap, `/posta gonder`:
+  "Posta su an gonderilemedi" ve gonderenin altini hic dusmemeli; dosya `.bad` olmali; ikinci gonderim normal calismali.
+- [ ] Posta: normal gonder/topla sonrasi `Saved/MMOMail` altinda `.bak` ya da `.tmp` dosyasi KALMAMALI.
+- [ ] Host: `MMOSetName Yeni` + `MMOSave` + cik: `Saved/MMOAchievements/MMOSave_<eski>.json` ve `Saved/MMODaily/...<eski>.json`
+  SILINMIS, `..._Yeni.json` var olmali (Y7).

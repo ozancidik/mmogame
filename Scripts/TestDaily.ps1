@@ -35,12 +35,12 @@ $cases = @($lines | Select-String '\[MMO_DAILY_CASE\] (PASS|FAIL) check=')
 $summaries = @($lines | Select-String '\[MMO_DAILY_TEST\] (PASS|FAIL) checks=')
 $passes = @($lines | Select-String '\[MMO_DAILY_TEST\] PASS checks=(\d+) reason=')
 $errors = @($lines | Select-String '\[MMO_DAILY_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation')
-# Kilitli .tmp senaryosu (locked_tmp_*) motorda TAM BIR "Error moving file" satiri uretir (Move 10x0.5 sn dener). Yalniz testin
-# GUID'li ZDayLockTmp_ dosyasina ait bu satir beklenir ve hata sayilmaz; sayisi 1 degilse senaryo kosmamis/kaymis demektir.
+# Kilitli .tmp senaryosu (locked_tmp_*): tur 3 (Y1) ile kurtarma Move'u tekrar denemesiz, motor "Error moving file" satiri
+# (ve 10x0.5 sn bekleme) URETMEZ. Testin ZDayLockTmp_ dosyasina ait bu satir 0 olmali; gorulurse tekrar denemeli yola donulmustur.
 $expectedLockPattern = "LogFileManager: Error: Error moving file '[^']*MMOSave_ZDayLockTmp_"
 $expectedLock = @($errors | Where-Object { $_.Line -match $expectedLockPattern })
 $errors = @($errors | Where-Object { $_.Line -notmatch $expectedLockPattern })
-Write-Output "[MMO_DAILY_RUNNER] expected_lock_error_lines=$($expectedLock.Count) (beklenen 1)"
+Write-Output "[MMO_DAILY_RUNNER] expected_lock_error_lines=$($expectedLock.Count) (beklenen 0)"
 $summaries | ForEach-Object { Write-Output $_.Line }
 $errors | ForEach-Object { Write-Output $_.Line }
 # Kontrol sayisi, ozet satiri ve tek tek CASE satirlari birbiriyle tutarli olmali (sessizce eksik kosan test gecmesin).
@@ -49,7 +49,7 @@ if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported 
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Matches[1] } } | Sort-Object -Unique)
 # Esik = bilinen kontrol sayisi (67: 30 eski + 23 kalicilik/B1/A5/D5/O1/LoadSerial/D3 + 14 guvenlik tur 2: F2 EndPlay tasimasi,
 # MMOLoad serisi, kilitli ana dosya/.tmp ertelemesi); kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 67) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 1)
+$consistent = ($reported -ge 67) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
 Write-Output "[MMO_DAILY_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

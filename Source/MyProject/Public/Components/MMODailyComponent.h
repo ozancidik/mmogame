@@ -69,6 +69,8 @@ public:
 	void SetDayForTest(int32 ForcedDay) { ForcedDayKey = ForcedDay; }
 	// Kayit hatasi enjeksiyonu: SaveNow false doner (bDone geri alinir, odul verilmez).
 	void SetSaveFailForTest(bool bFail) { bTestFailSaves = bFail; }
+	// Basarisiz .tmp kurtarmasinin 60 sn geri cekilmesini temizler (kilit kalkinca hemen yeniden denensin).
+	void ResetRecoveryBackoffForTest() { RecoveryRetryAt = 0.0; }
 	static bool RunSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -94,8 +96,12 @@ private:
 
 	// Yukleme aninda BIR KEZ belirlenen dosya yolu ve yuva; kayit hep buraya gider (EndPlay'de PlayerState kopmus olsa da).
 	FString StoragePath;
+	// Yuva tasimasinda eski dosya yolu: yeni yola ilk basarili yazimdan sonra eski dosyalar silinir (Y7).
+	FString PendingOldStoragePath;
 	FString LoadedSlot;
 	uint32 LoadedSerial = 0;
+	// Basarisiz .tmp kurtarmasindan sonra yuklemenin yeniden denenecegi an (FPlatformTime, Y1).
+	double RecoveryRetryAt = 0.0;
 	bool bTestFailSaves = false;
 	TArray<FMMODailyBounty> Bounties;
 	int32 StoredDayKey = 0;

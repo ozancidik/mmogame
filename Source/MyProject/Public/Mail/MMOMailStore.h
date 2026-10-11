@@ -37,11 +37,14 @@ public:
 	static bool ToJson(const TArray<FMMOMail>& Mails, FString& OutJson);
 	static bool FromJson(const FString& Json, TArray<FMMOMail>& OutMails);
 
-	// Diskten kutu. Dosya yoksa bos liste ve true; bozuksa .bad'a tasinir (eski .tmp de .tmp.bad'e), bos liste ve true.
-	// Ana dosya yok ama .tmp varsa (yazim ortasinda cokme) once .tmp geri konur; konamazsa false.
+	// Diskten kutu. Dosya (ve kurtarilacak .bak/.tmp) yoksa bos liste ve true.
+	// Ana dosya yoksa kurtarma sirasi: once .bak (basarisiz/yarim yazimdan onceki gecerli kutu; secilirse .tmp .tmp.bad olur),
+	// yoksa .tmp. Tasima tekrar denemesizdir; basarisizsa false ve o kutu 60 sn yeniden denenmez (yine false).
 	// Var olan dosya okunamazsa false ve bos liste; Append/TakeAll yeni kutu yazmaz.
+	// Bozuksa false: dosya .bad'a, eski .tmp .tmp.bad'e ayrilir; .bak varsa geri konur ve icerigiyle true doner.
 	static bool Load(const FString& Name, TArray<FMMOMail>& OutMails);
-	// Kutuyu verilen listeyle degistirir (atomik yazim). CollectMail teslim edilemeyenleri kutuda birakmak icin kullanir.
+	// Kutuyu verilen listeyle degistirir (atomik yazim, yazimdan once ana dosyanin .bak yedegi). false = kutu yazimdan onceki
+	// haliyle kalir (ya da sonraki Load'da .bak'tan o hale doner). CollectMail teslim edilemeyenleri kutuda birakmak icin kullanir.
 	static bool Replace(const FString& Name, const TArray<FMMOMail>& Mails);
 	// Kutuya ekle. False: kutu dolu, gecersiz ad/metin/altin veya disk hatasi.
 	static bool Append(const FString& Name, const FMMOMail& Mail);
@@ -51,4 +54,8 @@ public:
 
 	// Yalniz testler/temizlik icin.
 	static void DeleteBox(const FString& Name);
+#if !UE_BUILD_SHIPPING
+	// Testler: kurtarma/karantina tasimasi basarisizliginin 60 sn geri cekilmesini temizler.
+	static void ResetRecoveryBackoffForTest();
+#endif
 };

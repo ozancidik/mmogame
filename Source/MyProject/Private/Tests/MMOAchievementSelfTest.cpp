@@ -401,10 +401,8 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 				FMMOAchievementCounters C; TArray<FName> U;
 				Check(ReadSlot(SlotF, C, U) && C.KillTotal == 3, TEXT("f2_endplay_moves_dirty_state_to_new_slot"));
 			}
-			{
-				FMMOAchievementCounters C; TArray<FName> U;
-				Check(ReadSlot(SlotE, C, U) && C.KillTotal == 1, TEXT("f2_endplay_old_slot_not_written"));
-			}
+			// Tur 3 (Y7): eski yuva yazilmaz; yeni yuvaya basarili yazimdan sonra eski yuva dosyasi silinir (catal kalmaz).
+			Check(!FM.FileExists(*PathOf(SlotE)) && !FM.FileExists(*(PathOf(SlotE) + TEXT(".tmp"))), TEXT("f2_endplay_old_slot_not_written"));
 			const int32 G2 = Q2->GetInventory()->Gold;
 			Q2->SetSaveIdentityForTest(true, SlotF, 1);
 			B2->NotifyMobKilled(Goblin);
@@ -480,7 +478,8 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 			Check(B2->GetCounters().KillTotal == 13 && B2->IsUnlocked(Kill10) && Q2->GetInventory()->Gold == G2b, TEXT("locked_main_loads_after_release_no_regrant"));
 
 			// Ana dosya yok, .tmp var ama kilitli (geri konamiyor): yukleme ertelenir, ana dosya olusturulmaz, .tmp bozulmaz.
-			// Not: motor Move'u 10x0.5 sn dener ve bir "Error moving file" satiri basar (calistirici yalniz bu satiri bekler).
+			// Tur 3 (Y1): kurtarma Move'u tekrar denemesiz (motor "Error moving file" satiri ve 5 sn bekleme YOK; calistirici
+			// 0 satir bekler) ve basarisizlikta 60 sn geri cekilir; kilit kalkinca test geri cekilmeyi temizleyip yeniden dener.
 			const FString SeedTmp = SeedJson(5, TArray<FName>{ Kill10 });
 			FFileHelper::SaveStringToFile(SeedTmp, *(PathOf(SlotK) + TEXT(".tmp")));
 			TUniquePtr<IFileHandle> TmpLock(PF.OpenWrite(*(PathOf(SlotK) + TEXT(".tmp")), true, false));
@@ -490,6 +489,7 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 			Check(B2->GetCounters().KillTotal == 0 && !FM.FileExists(*PathOf(SlotK)) && Q2->GetInventory()->Gold == G2b, TEXT("locked_tmp_defers_load"));
 			TmpLock.Reset();
 			Check(ReadRaw(PathOf(SlotK) + TEXT(".tmp")) == SeedTmp, TEXT("locked_tmp_kept_intact"));
+			B2->ResetRecoveryBackoffForTest();
 			B2->NotifyMobKilled(Goblin);
 			Check(B2->GetCounters().KillTotal == 6 && B2->IsUnlocked(Kill10) && Q2->GetInventory()->Gold == G2b
 				&& FM.FileExists(*PathOf(SlotK)) && !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("locked_tmp_recovered_after_release"));

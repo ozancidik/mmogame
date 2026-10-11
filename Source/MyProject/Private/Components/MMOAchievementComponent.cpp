@@ -33,22 +33,34 @@ namespace
 		return static_cast<int32>(FMath::Clamp(V, 0.0, static_cast<double>(UMMOAchievementComponent::MaxCounter)));
 	}
 
+	// Y1: .tmp kurtarmasi basarisizsa bu kadar sure yeniden denenmez (yukleme ertelenir).
+	constexpr double AchRecoveryBackoffSeconds = 60.0;
+
 	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
 	// false = .tmp var ama geri konamadi: cagiran "dosya yok" sanip odulleri yeniden vermemeli ve uzerine yazmamali.
+	// Tasima tekrar denemesiz (Y1): motorun 10x0.5 sn beklemesi sunucuyu dondururdu; cagiran 60 sn geri cekilir.
 	bool AchRecoverTmp(const FString& Path)
 	{
 		const FString Tmp = Path + TEXT(".tmp");
 		IFileManager& FM = IFileManager::Get();
 		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
 		{
-			if (!FM.Move(*Path, *Tmp, true, true))
+			if (!FM.Move(*Path, *Tmp, true, true, false, true))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarilamadi (yukleme ertelendi): %s"), *Tmp);
+				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarilamadi (yukleme 60 sn ertelendi): %s"), *Tmp);
 				return false;
 			}
 			UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarildi: %s"), *Tmp);
 		}
 		return true;
+	}
+
+	// Yuva tasimasi diske yazildiktan sonra eski yuvanin dosyalari silinir (Y7): eski ad yeniden kullanilinca eski basarim
+	// dosyasi (catal) yuklenmesin. .bad dosyalari incelemek icin kalir.
+	void AchDeleteOldSlotFiles(const FString& OldPath)
+	{
+		IFileManager::Get().Delete(*OldPath, false, true, true);
+		IFileManager::Get().Delete(*(OldPath + TEXT(".tmp")), false, true, true);
 	}
 }
 
@@ -265,6 +277,7 @@ void UMMOAchievementComponent::ResetLoadedState()
 	Unlocked.Reset();
 	ActiveTitle.Reset();
 	StoragePath.Reset();
+	PendingOldStoragePath.Reset();
 	LoadedSlot.Reset();
 	bLoaded = false;
 	bDirty = false;
@@ -298,7 +311,16 @@ bool UMMOAchievementComponent::TryLoad()
 				// Ayni karakter verisi ad degisimi + basarili kayitla yeni yuvaya TASINDI: basarimlar da onunla tasinir
 				// (sifirlanmaz; aksi halde ad degistirip ayni odulleri tekrar almak mumkun olurdu).
 				UE_LOG(LogTemp, Display, TEXT("[MMOACH] Karakter yeni yuvaya tasindi (%s -> %s): basarimlar tasiniyor"), *LoadedSlot, *Bound);
+				// Eski yuva dosyalari yeni yola BASARIYLA yazildiktan sonra silinir (SaveNow; yazim olmazsa sonraki basarili yazimda).
+				if (PendingOldStoragePath.IsEmpty())
+				{
+					PendingOldStoragePath = StoragePath;
+				}
 				StoragePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Bound + TEXT(".json"));
+				if (PendingOldStoragePath.Equals(StoragePath, ESearchCase::IgnoreCase))
+				{
+					PendingOldStoragePath.Reset(); // geri donus: ayni dosya, silme
+				}
 				LoadedSlot = Bound;
 				bDirty = true;
 				SaveNow();
@@ -315,10 +337,16 @@ bool UMMOAchievementComponent::TryLoad()
 	if (bPersistenceEnabled)
 	{
 		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Slot + TEXT(".json"));
-		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir).
-		// "Dosya yok" sanilirsa odul tekrar verilir ve diskteki gercek durumun ustune yazilirdi.
+		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir,
+		// basarisiz .tmp kurtarmasindan sonra 60 sn). "Dosya yok" sanilirsa odul tekrar verilir ve diskteki gercek durumun
+		// ustune yazilirdi.
+		if (FPlatformTime::Seconds() < RecoveryRetryAt)
+		{
+			return false;
+		}
 		if (!AchRecoverTmp(Path))
 		{
+			RecoveryRetryAt = FPlatformTime::Seconds() + AchRecoveryBackoffSeconds;
 			return false;
 		}
 		bool bHadValidFile = false;
@@ -343,7 +371,14 @@ bool UMMOAchievementComponent::TryLoad()
 			else
 			{
 				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Bozuk basarim dosyasi .bad olarak ayrildi: %s"), *Path);
-				IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true);
+				IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true, true, false, true);
+				// Y6: eski .tmp de ayrilir; aksi halde ana dosya yokken (sonraki yazim basarisizsa) "yarim yazim" sanilip
+				// geri konur ve eski durum dirilirdi.
+				const FString Tmp = Path + TEXT(".tmp");
+				if (IFileManager::Get().FileExists(*Tmp) && !IFileManager::Get().Move(*(Tmp + TEXT(".bad")), *Tmp, true, true, false, true))
+				{
+					IFileManager::Get().Delete(*Tmp, false, true, true);
+				}
 			}
 		}
 		StoragePath = Path;
@@ -431,6 +466,11 @@ bool UMMOAchievementComponent::SaveNow()
 		&& IFileManager::Get().Move(*Path, *Tmp, true, true))
 	{
 		bDirty = false;
+		if (!PendingOldStoragePath.IsEmpty())
+		{
+			AchDeleteOldSlotFiles(PendingOldStoragePath);
+			PendingOldStoragePath.Reset();
+		}
 		return true;
 	}
 	return false;

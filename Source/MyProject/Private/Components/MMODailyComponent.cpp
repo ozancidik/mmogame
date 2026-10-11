@@ -14,6 +14,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/DateTime.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -29,22 +30,34 @@ namespace
 	constexpr int32 DailyMaxTarget = 10000;
 	constexpr int32 DailyMaxReward = 10000000;
 
+	// Y1: .tmp kurtarmasi basarisizsa bu kadar sure yeniden denenmez (yukleme ertelenir).
+	constexpr double DailyRecoveryBackoffSeconds = 60.0;
+
 	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
 	// false = .tmp var ama geri konamadi: cagiran "dosya yok" sanip ayni gunun gorevlerini sifirdan acmamali, uzerine yazmamali.
+	// Tasima tekrar denemesiz (Y1): motorun 10x0.5 sn beklemesi sunucuyu dondururdu; cagiran 60 sn geri cekilir.
 	bool DailyRecoverTmp(const FString& Path)
 	{
 		const FString Tmp = Path + TEXT(".tmp");
 		IFileManager& FM = IFileManager::Get();
 		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
 		{
-			if (!FM.Move(*Path, *Tmp, true, true))
+			if (!FM.Move(*Path, *Tmp, true, true, false, true))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarilamadi (yukleme ertelendi): %s"), *Tmp);
+				UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarilamadi (yukleme 60 sn ertelendi): %s"), *Tmp);
 				return false;
 			}
 			UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarildi: %s"), *Tmp);
 		}
 		return true;
+	}
+
+	// Yuva tasimasi diske yazildiktan sonra eski yuvanin dosyalari silinir (Y7): eski ad yeniden kullanilinca eski gunluk
+	// dosyasi (catal) yuklenmesin. .bad dosyalari incelemek icin kalir.
+	void DailyDeleteOldSlotFiles(const FString& OldPath)
+	{
+		IFileManager::Get().Delete(*OldPath, false, true, true);
+		IFileManager::Get().Delete(*(OldPath + TEXT(".tmp")), false, true, true);
 	}
 }
 
@@ -229,6 +242,7 @@ void UMMODailyComponent::ResetLoadedState()
 	StoredDayKey = 0;
 	QuestBaseline = 0;
 	StoragePath.Reset();
+	PendingOldStoragePath.Reset();
 	LoadedSlot.Reset();
 	bLoaded = false;
 	bDirty = false;
@@ -263,7 +277,16 @@ bool UMMODailyComponent::TryLoad()
 				// Ayni karakter verisi ad degisimi + basarili kayitla yeni yuvaya TASINDI: gunluk durum da onunla tasinir
 				// (sifirlanmaz; aksi halde ad degistirip ayni gunlukleri tekrar almak mumkun olurdu).
 				UE_LOG(LogTemp, Display, TEXT("[MMODAILY] Karakter yeni yuvaya tasindi (%s -> %s): gunluk gorevler tasiniyor"), *LoadedSlot, *Bound);
+				// Eski yuva dosyalari yeni yola BASARIYLA yazildiktan sonra silinir (SaveNow; yazim olmazsa sonraki basarili yazimda).
+				if (PendingOldStoragePath.IsEmpty())
+				{
+					PendingOldStoragePath = StoragePath;
+				}
 				StoragePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Bound + TEXT(".json"));
+				if (PendingOldStoragePath.Equals(StoragePath, ESearchCase::IgnoreCase))
+				{
+					PendingOldStoragePath.Reset(); // geri donus: ayni dosya, silme
+				}
 				LoadedSlot = Bound;
 				bDirty = true;
 				SaveNow();
@@ -280,9 +303,15 @@ bool UMMODailyComponent::TryLoad()
 	if (bPersistenceEnabled)
 	{
 		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Slot + TEXT(".json"));
-		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir).
+		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir,
+		// basarisiz .tmp kurtarmasindan sonra 60 sn).
+		if (FPlatformTime::Seconds() < RecoveryRetryAt)
+		{
+			return false;
+		}
 		if (!DailyRecoverTmp(Path))
 		{
+			RecoveryRetryAt = FPlatformTime::Seconds() + DailyRecoveryBackoffSeconds;
 			return false;
 		}
 		FString Raw;
@@ -305,7 +334,14 @@ bool UMMODailyComponent::TryLoad()
 			else
 			{
 				UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Bozuk gunluk gorev dosyasi .bad olarak ayrildi: %s"), *Path);
-				IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true);
+				IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true, true, false, true);
+				// Y6: eski .tmp de ayrilir; aksi halde ana dosya yokken (sonraki yazim basarisizsa) "yarim yazim" sanilip
+				// geri konur ve eski gunun durumu dirilirdi.
+				const FString Tmp = Path + TEXT(".tmp");
+				if (IFileManager::Get().FileExists(*Tmp) && !IFileManager::Get().Move(*(Tmp + TEXT(".bad")), *Tmp, true, true, false, true))
+				{
+					IFileManager::Get().Delete(*Tmp, false, true, true);
+				}
 			}
 		}
 		StoragePath = Path;
@@ -361,6 +397,11 @@ bool UMMODailyComponent::SaveNow()
 		&& IFileManager::Get().Move(*Path, *Tmp, true, true))
 	{
 		bDirty = false;
+		if (!PendingOldStoragePath.IsEmpty())
+		{
+			DailyDeleteOldSlotFiles(PendingOldStoragePath);
+			PendingOldStoragePath.Reset();
+		}
 		return true;
 	}
 	return false;

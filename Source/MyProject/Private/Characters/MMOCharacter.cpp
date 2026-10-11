@@ -1366,8 +1366,10 @@ bool AMMOCharacter::LoadCharacter()
 	// SECURITY_AUDIT K-1 F3: karakter zaten yukluyken (MMOLoad, yalniz host/yonetici) canli adin kaydi yoksa HICBIR SEY
 	// degistirme. Eskiden "yeni karakter" dalina dusup yuklu karakteri bellekte tutarak ActiveSaveSlot'u bos yeni yuvaya
 	// ceviriyor, LoadSerial'i artirip basarim/gunluk durumunu sifirliyordu: sonraki kayit catallama + odul tekrari demekti.
-	// Bu donus LoadSerial/bInitialLoadComplete'e dokunmadan once olmali.
-	if (bInitialLoadComplete && !ActiveSaveSlot.IsEmpty())
+	// Bu donus LoadSerial/bInitialLoadComplete'e dokunmadan once olmali. Kosul yalniz ActiveSaveSlot (Y3): bInitialLoadComplete
+	// false iken de (navmesh bekleyen yukleme, basarisiz yeniden yukleme, sahip degisimi) bellekte bir karakter vardir ve
+	// "yeni karakter" dali onu yeni yuvaya baslangic paketiyle catallardi.
+	if (!ActiveSaveSlot.IsEmpty())
 	{
 		IMMOCharacterStore* ReloadStore = UMMOCharacterStoreSubsystem::Get(this);
 		if (ReloadStore && !ReloadStore->Exists(GetSaveSlotName()))
@@ -1624,19 +1626,9 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 		bNameAdmin = false;
 	}
 #endif
-	if (bRemoteNameRules && !bNameAdmin && !ActiveSaveSlot.IsEmpty())
-	{
-		// Magaza yoksa yuvanin durumu dogrulanamaz: reddet (muhafazakar).
-		IMMOCharacterStore* OwnStore = UMMOCharacterStoreSubsystem::Get(this);
-		if (!OwnStore || OwnStore->Exists(ActiveSaveSlot))
-		{
-			MMONotify::ToOwner(this, TEXT("Kayitli karakterin adi degistirilemez. Yeni ad icin yeni karakterle (?Name=) baglan."),
-				FColor::Orange, 6.f);
-			return;
-		}
-	}
 	// Soguma (SECURITY_AUDIT Y-7): uzak istemci 30 sn, host/yerel konsol 5 sn (test akisi bozulmasin ama
 	// arkadaslara bildirim yagmasi da olmasin). Reddedilince sahibe ipucu gider (Reject).
+	// Tur 3 (Y8): soguma diske bakan her Exists kontrolunden ONCE: reddedilen istekler de diske sinirsiz hizda dokunmasin.
 	const UWorld* CooldownWorld = GetWorld();
 	if (CooldownWorld)
 	{
@@ -1645,6 +1637,22 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 		if (CooldownLeft > 0.f)
 		{
 			Reject(FString::Printf(TEXT("Ad degistirmek icin %.0f sn beklemelisin"), FMath::CeilToFloat(CooldownLeft)));
+			return;
+		}
+	}
+	if (bRemoteNameRules && !bNameAdmin && !ActiveSaveSlot.IsEmpty())
+	{
+		// Magaza yoksa yuvanin durumu dogrulanamaz: reddet (muhafazakar).
+		IMMOCharacterStore* OwnStore = UMMOCharacterStoreSubsystem::Get(this);
+		if (!OwnStore || OwnStore->Exists(ActiveSaveSlot))
+		{
+			// Y8: bu ret de soguma baslatir (diske bakan sorgu tekrarlanamaz).
+			if (CooldownWorld)
+			{
+				LastSetNameServerTime = CooldownWorld->GetTimeSeconds();
+			}
+			MMONotify::ToOwner(this, TEXT("Ad kilitli: karakter ilk kez kaydedildikten sonra (MMOSave, otomatik kayit ya da takas/klan/arkadas/posta islemi kaydi) adi degistirilemez. Baska ad = yeni karakter: cikip ?Name=YeniAd ile baglan (bu karakterin ilerlemesi tasinmaz)."),
+				FColor::Orange, 8.f);
 			return;
 		}
 	}

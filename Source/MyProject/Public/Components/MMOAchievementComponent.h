@@ -78,6 +78,8 @@ public:
 	void SetSaveFailForTest(bool bFail) { bTestFailSaves = bFail; }
 	// SaveNow cagri sayisi (C3: ayni unvan tekrar secilince diske yazilmamali).
 	int32 GetSaveCallsForTest() const { return TestSaveCalls; }
+	// Basarisiz .tmp kurtarmasinin 60 sn geri cekilmesini temizler (kilit kalkinca hemen yeniden denensin).
+	void ResetRecoveryBackoffForTest() { RecoveryRetryAt = 0.0; }
 	static bool RunSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -106,8 +108,12 @@ private:
 	FMMOAchievementCounters Counters;
 	// Yukleme aninda BIR KEZ belirlenen dosya yolu ve yuva; kayit hep buraya gider (EndPlay'de PlayerState kopmus olsa da).
 	FString StoragePath;
+	// Yuva tasimasinda eski dosya yolu: yeni yola ilk basarili yazimdan sonra eski dosyalar silinir (Y7).
+	FString PendingOldStoragePath;
 	FString LoadedSlot;
 	uint32 LoadedSerial = 0;
+	// Basarisiz .tmp kurtarmasindan sonra yuklemenin yeniden denenecegi an (FPlatformTime, Y1).
+	double RecoveryRetryAt = 0.0;
 	bool bTestFailSaves = false;
 	int32 TestSaveCalls = 0;
 	bool bLoaded = false;

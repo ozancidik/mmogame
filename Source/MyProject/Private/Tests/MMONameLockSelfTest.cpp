@@ -131,7 +131,8 @@ namespace
 			// Host/yerel denetleyici muafiyeti. UE 5.7'de NetDriver yokken ULocalPlayer'siz (test icin spawn edilen) bir
 			// APlayerController IsLocalController()=false doner, yani yukaridaki PC'li pawn'lar bayraksiz da "uzak" sayilir.
 			// Yerel denetimi AController tabanli (AI) denetleyici verir (standalone'da IsLocalController=true): ayni kayitli yuva,
-			// once bayrak ACIK (uzak benzetimi) -> RED, sonra bayrak KAPALI (yerel/host kurallari) -> izin. F1 reddi soguma baslatmaz.
+			// once bayrak ACIK (uzak benzetimi) -> RED, sonra bayrak KAPALI (yerel/host kurallari) -> izin. Tur 3 (Y8): F1 reddi
+			// de soguma baslatir; muafiyet adimi bu yuzden sogumayi test kancasiyla sifirlayip dener.
 			FMMOCharacterSaveData HostData;
 			const bool bHostSlot = Store->Load(SlotOf(NReg), HostData) && Store->Save(SlotOf(NHost), HostData);
 			FActorSpawnParameters HostParams;
@@ -156,6 +157,7 @@ namespace
 				HostPawn->MMOSetName(NHostTo);
 				Check(LiveName(HostPawn) == NHost, TEXT("f1_same_slot_remote_flag_rejected"));
 				HostPawn->SetRemoteNameRulesForTest(false);
+				HostPawn->ResetSetNameCooldownForTest();
 				HostPawn->MMOSetName(NHostTo);
 				Check(LiveName(HostPawn) == NHostTo && HostPawn->GetActiveSaveSlot() == SlotOf(NHost), TEXT("f1_host_local_exempt_registered_rename_allowed"));
 			}

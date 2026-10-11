@@ -182,6 +182,8 @@ public:
 	// Testler (ad degistirme kisiti, K-1 F1/F5): headless sunucuda yerel kontrollu pawn'a uzak istemci ad kurallarini
 	// uygular (kayitli karakter reddi, kayitli-ad reddinde soguma, 30 sn soguma); pawn yonetici sayilmaz.
 	void SetRemoteNameRulesForTest(bool bRemote) { if (HasAuthority()) bTestRemoteNameRules = bRemote; }
+	// Testler: ad degistirme sogumasini sifirlar (F1 reddi de soguma baslatir, tur 3 Y8).
+	void ResetSetNameCooldownForTest() { LastSetNameServerTime = -100.f; }
 #endif
 	// Bolge gecisinin kullandigi asenkron kayit: callback yalniz yazim tamamlandiginda cagrilir; basarisiz
 	// yazimda veya sonuc "eski" ise (ayni yuvaya daha yeni bir yazim basladi) false ile cagrilir ve

@@ -376,10 +376,8 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 				TArray<FMMODailyBounty> B;
 				Check(ReadSlot(SlotF, B) && B[0].Progress == 2, TEXT("f2_endplay_moves_dirty_state_to_new_slot"));
 			}
-			{
-				TArray<FMMODailyBounty> B;
-				Check(ReadSlot(SlotE, B) && B[0].Progress == 1, TEXT("f2_endplay_old_slot_not_written"));
-			}
+			// Tur 3 (Y7): eski yuva yazilmaz; yeni yuvaya basarili yazimdan sonra eski yuva dosyasi silinir (catal kalmaz).
+			Check(!FM.FileExists(*PathOf(SlotE)) && !FM.FileExists(*(PathOf(SlotE) + TEXT(".tmp"))), TEXT("f2_endplay_old_slot_not_written"));
 			const int32 G2 = R2->GetInventory()->Gold;
 			R2->SetSaveIdentityForTest(true, SlotF, 1);
 			E2->EvaluateAll();
@@ -420,7 +418,8 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 				TEXT("locked_main_loads_after_release"));
 
 			// Ana dosya yok, .tmp var ama kilitli (geri konamiyor): yukleme ertelenir, ana dosya olusturulmaz, .tmp bozulmaz.
-			// Not: motor Move'u 10x0.5 sn dener ve bir "Error moving file" satiri basar (calistirici yalniz bu satiri bekler).
+			// Tur 3 (Y1): kurtarma Move'u tekrar denemesiz (motor "Error moving file" satiri ve 5 sn bekleme YOK; calistirici
+			// 0 satir bekler) ve basarisizlikta 60 sn geri cekilir; kilit kalkinca test geri cekilmeyi temizleyip yeniden dener.
 			const FString SeedTmp = FreshJson(4);
 			FFileHelper::SaveStringToFile(SeedTmp, *(PathOf(SlotK) + TEXT(".tmp")));
 			TUniquePtr<IFileHandle> TmpLock(PF.OpenWrite(*(PathOf(SlotK) + TEXT(".tmp")), true, false));
@@ -430,6 +429,7 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 			Check(E2->GetBounties().IsEmpty() && !FM.FileExists(*PathOf(SlotK)) && R2->GetInventory()->Gold == G2b, TEXT("locked_tmp_defers_load"));
 			TmpLock.Reset();
 			Check(ReadRaw(PathOf(SlotK) + TEXT(".tmp")) == SeedTmp, TEXT("locked_tmp_kept_intact"));
+			E2->ResetRecoveryBackoffForTest();
 			E2->EvaluateAll();
 			Check(E2->GetBounties().Num() == BountyCount && E2->GetBounties()[0].Progress == 4 && R2->GetInventory()->Gold == G2b
 				&& FM.FileExists(*PathOf(SlotK)) && !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("locked_tmp_recovered_after_release"));

@@ -91,12 +91,13 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		for (int32 i = 0; i < FMMOMailStore::MaxMailsPerBox; ++i) FMMOMailStore::Append(NameStore, M);
 		Check(FMMOMailStore::Count(NameStore) == FMMOMailStore::MaxMailsPerBox && !FMMOMailStore::Append(NameStore, M), TEXT("store_box_full_rejects"));
 		FMMOMailStore::DeleteBox(NameStore);
-		// Bozuk dosya: .bad'a ayrilir, kutu bos baslar, ekleme yeniden calisir.
+		// Bozuk dosya: .bad'a ayrilir, o yukleme BASARISIZ (false; tur 3 Y2: bos sayilip uzerine yazilmaz), sonra kutu bos
+		// baslar ve ekleme yeniden calisir.
 		const FString Path = FMMOMailStore::GetBoxPath(NameBad);
 		IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 		FFileHelper::SaveStringToFile(TEXT("{{{ garbage"), *Path);
 		TArray<FMMOMail> Loaded;
-		Check(FMMOMailStore::Load(NameBad, Loaded) && Loaded.IsEmpty() && IFileManager::Get().FileExists(*(Path + TEXT(".bad"))) && !IFileManager::Get().FileExists(*Path), TEXT("store_corrupt_box_quarantined"));
+		Check(!FMMOMailStore::Load(NameBad, Loaded) && Loaded.IsEmpty() && IFileManager::Get().FileExists(*(Path + TEXT(".bad"))) && !IFileManager::Get().FileExists(*Path), TEXT("store_corrupt_box_quarantined"));
 		Check(FMMOMailStore::Append(NameBad, M) && FMMOMailStore::Count(NameBad) == 1, TEXT("store_recovers_after_corruption"));
 		FMMOMailStore::DeleteBox(NameBad);
 	}
@@ -354,7 +355,8 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		FMMOMailStore::DeleteBox(NameD);
 	}
 	{
-		// Bozuk ana dosya + eski .tmp: ana dosya .bad, .tmp .tmp.bad olur; sonraki Load .tmp'yi geri koymaz; DeleteBox ikisini de siler.
+		// Bozuk ana dosya + eski .tmp: ana dosya .bad, .tmp .tmp.bad olur (o yukleme false, tur 3 Y2); sonraki Load .tmp'yi geri
+		// koymaz; DeleteBox ikisini de siler.
 		const FString NameQ = TEXT("ZTestMailQ_") + Tag;
 		FMMOMailStore::DeleteBox(NameQ);
 		const FString Path = FMMOMailStore::GetBoxPath(NameQ);
@@ -368,7 +370,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		FFileHelper::SaveStringToFile(TEXT("{{{ bozuk"), *Path);
 		FFileHelper::SaveStringToFile(Json, *Tmp);
 		TArray<FMMOMail> Loaded;
-		Check(FMMOMailStore::Load(NameQ, Loaded) && Loaded.IsEmpty() && FM.FileExists(*(Path + TEXT(".bad"))) && FM.FileExists(*(Tmp + TEXT(".bad")))
+		Check(!FMMOMailStore::Load(NameQ, Loaded) && Loaded.IsEmpty() && FM.FileExists(*(Path + TEXT(".bad"))) && FM.FileExists(*(Tmp + TEXT(".bad")))
 			&& !FM.FileExists(*Tmp) && !FM.FileExists(*Path), TEXT("corrupt_box_stale_tmp_quarantined"));
 		Check(FMMOMailStore::Load(NameQ, Loaded) && Loaded.IsEmpty(), TEXT("corrupt_box_stale_tmp_not_resurrected"));
 		FMMOMailStore::DeleteBox(NameQ);
@@ -402,8 +404,8 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(InvA->Gold <= 10000 + 1000, TEXT("refund_gift_callback_no_gold_created"));
 		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] gift_callback final_gold=%d start=10000 gift=1000 charge=%d (oyuncu ucreti+eki kaybeder, altin uretilmez)"),
 			InvA->Gold, 300 + FeeFor(300));
-		// Gozlem (kontrol degil): callback bakiyeyi ucretten azina indirirse ucret 0'a kirpilir ama Deducted=Charge sayilir;
-		// sonra kayit basarisiz olursa iade gercek dusulenden fazladir (en fazla ucret kadar altin uretimi).
+		// Gozlem (kontrol degil): callback bakiyeyi ucretten azina indirirse ucret hic dusulmez (tur 3: kirpilmaz), posta
+		// reddedilir ve iade yalniz dusulen ek kadardir: final_gold no_creation_max'i asmamali.
 		A->AdvanceTimeForTest(6.0);
 		A->SetSaveResultForTest(false);
 		InvA->Gold = 1000;

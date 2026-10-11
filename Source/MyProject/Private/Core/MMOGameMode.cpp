@@ -524,7 +524,8 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 		if (UWorld* NoticeWorld = GetWorld())
 		{
 			const TWeakObjectPtr<AController> WeakController(Controller);
-			const FString Notice = FString::Printf(TEXT("Baglanti adin uygun olmadigi icin adin '%s' olarak ayarlandi. Kayitli karakterin icin gecerli bir ?Name= ile yeniden baglan."), *UseName);
+			// Ad kilidi (K-1 F1): bu ad ilk kayittan sonra degistirilemez; oyuncu bunu bilmeden ilerleme yaparsa kaybeder.
+			const FString Notice = FString::Printf(TEXT("Baglanti adin uygun olmadigi icin bu oturumda adin '%s' (yeni karakter). Bu ad ilk kayittan sonra (MMOSave, otomatik kayit, takas/klan/arkadas/posta islemi) kilitlenir. Kayitli karakterin icin cik ve gecerli bir ?Name=Ad ile yeniden baglan; burada yapilan ilerleme ona tasinmaz."), *UseName);
 			FTimerHandle NoticeHandle;
 			NoticeWorld->GetTimerManager().SetTimer(NoticeHandle, FTimerDelegate::CreateWeakLambda(this, [WeakController, Notice]()
 			{
