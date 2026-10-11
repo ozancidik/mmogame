@@ -3,7 +3,7 @@
 # Kullanim: powershell -File Scripts\RunSystemTests.ps1
 $ErrorActionPreference = 'Stop'
 $tests = @(
-    # Kontrol sayisi esikleri her calistiricinin icinde (82 / 67 / 104 / 23); kalicilik testleri Saved/ altina GUID'li dosya yazip siler.
+    # Kontrol sayisi esikleri her calistiricinin icinde (96 / 81 / 130 / 58); kalicilik testleri Saved/ altina GUID'li dosya yazip siler.
     @{ Name = 'Basarim ve unvan (TestAchievements)'; Script = 'TestAchievements.ps1' },
     @{ Name = 'Gunluk gorev (TestDaily)';            Script = 'TestDaily.ps1' },
     @{ Name = 'Posta (TestMail)';                    Script = 'TestMail.ps1' },

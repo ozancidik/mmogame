@@ -48,8 +48,9 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Matches[1] } } | Sort-Object -Unique)
 # Esik = bilinen kontrol sayisi (82: 35 eski + 26 kalicilik/B1/A5/C3/O1/D3 + 21 guvenlik tur 2: F2 EndPlay tasimasi, dosyasiz/bozuk
-# Lv>1 odulsuz isaretleme, kilitli ana dosya/.tmp ertelemesi); kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 82) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
+# Lv>1 odulsuz isaretleme, kilitli ana dosya/.tmp ertelemesi) + 14 tur 3/4: 10 sn geri cekilme penceresi, kilitli ana dosyada hizli
+# basarisiz SaveNow (bDirty kalir), eski yuva silme kurallari (basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya) = 96.
+$consistent = ($reported -ge 96) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
 Write-Output "[MMO_ACH_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

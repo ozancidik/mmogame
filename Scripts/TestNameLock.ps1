@@ -42,8 +42,10 @@ $errors | ForEach-Object { Write-Output $_.Line }
 $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Matches[1] } } | Sort-Object -Unique)
-# Esik = bilinen kontrol sayisi (23: fixture + F1 11 + F5 3 + F3 8); kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 23) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
+# Esik = bilinen kontrol sayisi (23: fixture + F1 11 + F5 3 + F3 8; + 35 tur 4: MMONameRules saf mantik 7, kanonik ad cakismasi
+# PreLogin/ChangeName/ServerSetName + Unicode temizleme + klan 17, Y8/DUSUK-5 kilit metni + Exists sayaci 5, Y3/G 6 = 58);
+# kontrol silinirse/atlanirsa kosu KALIR.
+$consistent = ($reported -ge 58) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_NAMELOCK_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

@@ -25,6 +25,11 @@ public:
 	static IMMOCharacterStore* Get(const UObject* WorldContext);
 
 	IMMOCharacterStore* GetStore() const { return Store.Get(); }
+#if !UE_BUILD_SHIPPING
+	// Testler: magazayi gecici olarak degistirir (ornek: Exists cagrilarini sayan sarmalayici). Onceki magazayi dondurur;
+	// cagiran ayni karede geri koyar. Uretim kodu cagirmaz.
+	TUniquePtr<IMMOCharacterStore> SwapStoreForTest(TUniquePtr<IMMOCharacterStore> NewStore) { Swap(Store, NewStore); return NewStore; }
+#endif
 
 private:
 	TUniquePtr<IMMOCharacterStore> Store;

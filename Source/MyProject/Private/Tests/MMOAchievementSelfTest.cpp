@@ -14,6 +14,7 @@
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Guid.h"
@@ -489,16 +490,119 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 			Check(B2->GetCounters().KillTotal == 0 && !FM.FileExists(*PathOf(SlotK)) && Q2->GetInventory()->Gold == G2b, TEXT("locked_tmp_defers_load"));
 			TmpLock.Reset();
 			Check(ReadRaw(PathOf(SlotK) + TEXT(".tmp")) == SeedTmp, TEXT("locked_tmp_kept_intact"));
+			// Tur 4: geri cekilme 10 sn (60 degil); kilit kalksa da pencere icinde yeniden denenmez (olay sayilmaz, ana dosya acilmaz).
+			const double BackoffLeft = B2->RecoveryRetryAt - FPlatformTime::Seconds();
+			UE_LOG(LogTemp, Display, TEXT("[MMO_ACH_NOTE] recovery_backoff_left=%.3f"), BackoffLeft);
+			Check(BackoffLeft > 8.0 && BackoffLeft <= 10.01, TEXT("y1_ach_backoff_is_10s"));
+			B2->NotifyMobKilled(Goblin);
+			Check(B2->GetCounters().KillTotal == 0 && !FM.FileExists(*PathOf(SlotK)) && FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))),
+				TEXT("y1_ach_backoff_blocks_retry_after_unlock"));
 			B2->ResetRecoveryBackoffForTest();
 			B2->NotifyMobKilled(Goblin);
 			Check(B2->GetCounters().KillTotal == 6 && B2->IsUnlocked(Kill10) && Q2->GetInventory()->Gold == G2b
 				&& FM.FileExists(*PathOf(SlotK)) && !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("locked_tmp_recovered_after_release"));
+
+			// Tur 4 (Y-NEW-2): ana dosya paylasimli okuyucuda (silinemez): SaveNow tekrar denemesiz basarisiz ve hizli, bDirty kalir,
+			// disk degismez; kilit kalkinca sonraki SaveNow yazar.
+			{
+				const FString Before = ReadRaw(PathOf(SlotK));
+				TUniquePtr<IFileHandle> MainRead(PF.OpenRead(*PathOf(SlotK), false));
+				const bool bLocked = MainRead.IsValid();
+				B2->bDirty = true;
+				const double T0 = FPlatformTime::Seconds();
+				const bool bSaved = bLocked && B2->SaveNow();
+				const double Dt = FPlatformTime::Seconds() - T0;
+				const bool bDirtyAfter = B2->bDirty;
+				MainRead.Reset();
+				Check(bLocked && !bSaved && bDirtyAfter, TEXT("y4_ach_locked_main_save_fails_stays_dirty"));
+				Check(Dt < 1.0, TEXT("y4_ach_locked_main_save_fast_under_1s"));
+				Check(ReadRaw(PathOf(SlotK)).Equals(Before, ESearchCase::CaseSensitive), TEXT("y4_ach_locked_main_disk_unchanged"));
+				FMMOAchievementCounters C; TArray<FName> U;
+				Check(B2->SaveNow() && !B2->bDirty && ReadSlot(SlotK, C, U) && C.KillTotal == B2->GetCounters().KillTotal
+					&& !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("y4_ach_save_after_unlock_writes"));
+			}
 		}
 		for (TStrongObjectPtr<AMMOCharacter>* Q : { &Q1, &Q2, &Q3, &Q4, &Q5 })
 		{
 			if (::IsValid(Q->Get())) (*Q)->Destroy(); // EndPlay kirli durumu kendi yuvasina yazar (asagida silinir)
 		}
 		for (const FString& Slot : { SlotE, SlotF, SlotL, SlotM, SlotG, SlotH, SlotI, SlotJ, SlotK })
+		{
+			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
+			{
+				FM.Delete(*(PathOf(Slot) + Ext), false, true, true);
+			}
+		}
+	}
+	// --- Tur 3 (Y7) + tur 4 (Y-NEW-3/4): yuva tasimasinda eski yuva dosyasinin silinme kurallari (GUID'li yuvalar) ---
+	{
+		const FString Tag3 = FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(8);
+		const FString AchDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"));
+		IFileManager& FM = IFileManager::Get();
+		auto PathOf = [&AchDir](const FString& Slot) { return FPaths::Combine(AchDir, Slot + TEXT(".json")); };
+		auto Has = [&FM, &PathOf](const FString& Slot) { return FM.FileExists(*PathOf(Slot)); };
+		const FString SlotP = TEXT("MMOSave_ZAchFP_") + Tag3, SlotQ = TEXT("MMOSave_ZAchFQ_") + Tag3, SlotR = TEXT("MMOSave_ZAchFR_") + Tag3;
+		const FString NameS = TEXT("ZAchFS_") + Tag3; // canli adi bu yuvayi veren cevrimici oyuncu senaryosu
+		const FString SlotS = TEXT("MMOSave_") + NameS, SlotT = TEXT("MMOSave_ZAchFT_") + Tag3, SlotU = TEXT("MMOSave_ZAchFU_") + Tag3;
+		const FString SlotY = TEXT("MMOSave_ZAchFY_") + Tag3; // diger oyuncunun ilgisiz yuvasi
+		const FName Goblin(TEXT("Goblin"));
+		TStrongObjectPtr<AMMOCharacter> X(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 0, 0), FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<AMMOCharacter> Y(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 5000, 0), FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<APlayerState> PSY(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params));
+		UMMOAchievementComponent* BX = X.IsValid() ? X->GetAchievementComponent() : nullptr;
+		const bool bFixture3 = BX && Y.IsValid() && PSY.IsValid();
+		if (bFixture3)
+		{
+			PSY->SetPlayerName(TEXT("ZAchFOwner_") + Tag3);
+			Y->SetPlayerState(PSY.Get()); // IsPlayerControlled: eski yuvanin "cevrimici baska oyuncu" sahibi olabilir
+			Y->SetSaveIdentityForTest(true, SlotY, 1);
+			X->SetSaveIdentityForTest(true, SlotP, 1);
+			BX->NotifyMobKilled(Goblin); // yukler, ilk kayit hemen
+		}
+		Check(bFixture3 && Y->IsPlayerControlled() && Has(SlotP), TEXT("f_fixture_old_slot_written"));
+		if (bFixture3)
+		{
+			// Basarili yazimdan sonra eski yuva (ve .tmp'si) silinir.
+			X->SetSaveIdentityForTest(true, SlotQ, 1);
+			BX->NotifyMobKilled(Goblin);
+			Check(Has(SlotQ) && !Has(SlotP) && !FM.FileExists(*(PathOf(SlotP) + TEXT(".tmp"))), TEXT("f_move_success_deletes_old_slot"));
+			// Yeni yuvaya yazim basarisizsa eski yuva silinmez; sonraki basarili yazimda silinir.
+			BX->SetSaveFailForTest(true);
+			X->SetSaveIdentityForTest(true, SlotR, 1);
+			BX->NotifyMobKilled(Goblin);
+			Check(Has(SlotQ) && !Has(SlotR) && !BX->PendingOldStoragePath.IsEmpty(), TEXT("f_move_write_fail_keeps_old_slot"));
+			BX->SetSaveFailForTest(false);
+			Check(BX->SaveNow() && Has(SlotR) && !Has(SlotQ) && BX->PendingOldStoragePath.IsEmpty(), TEXT("f_move_retry_success_deletes_old_slot"));
+			// Eski yuva su an cevrimici BASKA bir oyuncunun yukledigi yuva (ActiveSaveSlot): silinmez.
+			Y->SetSaveIdentityForTest(true, SlotR, 1);
+			X->SetSaveIdentityForTest(true, SlotS, 1);
+			BX->NotifyMobKilled(Goblin);
+			Check(Has(SlotS) && Has(SlotR), TEXT("f_old_slot_of_online_player_active_kept"));
+			// Eski yuva cevrimici baska oyuncunun CANLI adinin yuvasi (GetSaveSlotName): silinmez.
+			Y->SetSaveIdentityForTest(true, SlotY, 1);
+			PSY->SetPlayerName(NameS);
+			X->SetSaveIdentityForTest(true, SlotT, 1);
+			BX->NotifyMobKilled(Goblin);
+			Check(Has(SlotT) && Has(SlotS), TEXT("f_old_slot_of_online_player_live_name_kept"));
+			PSY->SetPlayerName(TEXT("ZAchFOwner_") + Tag3);
+			// A -> B -> A (B'ye yazim basarisiz): geri donuste ayni dosya; basarili yazim onu silmez, B hic olusmaz.
+			BX->SetSaveFailForTest(true);
+			X->SetSaveIdentityForTest(true, SlotU, 1);
+			BX->NotifyMobKilled(Goblin);
+			X->SetSaveIdentityForTest(true, SlotT, 1);
+			BX->NotifyMobKilled(Goblin);
+			BX->SetSaveFailForTest(false);
+			Check(BX->PendingOldStoragePath.IsEmpty() && BX->SaveNow() && Has(SlotT) && !Has(SlotU), TEXT("f_round_trip_back_keeps_slot"));
+			// Eski yol yeni yolla kanonik olarak ayni dosya (NTFS harf duyarsiz, ornek MMOSave_Ali -> MMOSave_ali): yeni yazilan dosya
+			// silinmez. TryLoad bu durumu tasima saymadigi icin bekleyen eski yol dogrudan verilir (ic koruma tek basina sinanir).
+			BX->PendingOldStoragePath = FPaths::Combine(AchDir, SlotT.ToUpper() + TEXT(".json"));
+			BX->bDirty = true;
+			Check(BX->SaveNow() && Has(SlotT) && BX->PendingOldStoragePath.IsEmpty(), TEXT("f_canonical_same_file_not_deleted"));
+		}
+		if (::IsValid(Y.Get())) { Y->SetSaveIdentityForTest(false, SlotY, 1); Y->SetTravelSaveCommitted(true); Y->SetPlayerState(nullptr); Y->Destroy(); }
+		if (::IsValid(X.Get())) X->Destroy(); // EndPlay son durumu SlotT'ye yazar (asagida silinir)
+		if (::IsValid(PSY.Get())) PSY->Destroy();
+		for (const FString& Slot : { SlotP, SlotQ, SlotR, SlotS, SlotT, SlotU, SlotY })
 		{
 			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
 			{
@@ -513,6 +617,9 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 // F2 bolumu EndPlay'in TryLoad cagrisini ve tasima mantigini dogrular; motorun gercek yok etme sirasini (UnPossessed kaydi ->
 // ActiveSaveSlot guncellemesi -> bilesen EndPlay) KANITLAMAZ: burada yuva degisimi Destroy'dan once elle verilir. Dosya kilidi
 // ayni surecteki ozel (paylasimsiz) bir tutamakla benzetilir; antivirus/ag surucusu gibi gercek dis kilitler denenmedi.
+// Tur 4 bolumu: "cevrimici baska oyuncu" PlayerState'li ama denetleyicisiz bir pawn ile benzetilir; kanonik-ayni-dosya korumasi TryLoad
+// yolundan ulasilamadigi icin (ASCII yuvalarda harf farki tasima sayilmaz) bekleyen eski yol test icinden verilir. 10 sn geri cekilme
+// RecoveryRetryAt'tan okunur; gercek 10 sn bekleme kosulmaz.
 
 namespace
 {

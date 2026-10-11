@@ -13,8 +13,14 @@
 #if !UE_BUILD_SHIPPING
 #include "AIController.h"
 #include "Components/MMOAchievementComponent.h"
+#include "Components/MMOClanComponent.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Core/MMOGameMode.h"
+#include "Core/MMONameRules.h"
+#include "Core/MMONotify.h"
+#include "Engine/GameInstance.h"
 #include "Player/MMOPlayerController.h"
+#include "UI/MMOHUD.h"
 #include "Save/MMOCharacterStoreSubsystem.h"
 #include "Save/MMOCharacterSaveJson.h"
 #include "Save/MMOSaveGame.h"
@@ -32,6 +38,33 @@
 namespace
 {
 	constexpr int32 NameLockPawnCount = 5;
+
+	// Tur 4 (Y8/DUSUK-5) testi: gercek magazaya devreder, Exists cagrilarini sayar (ad kilidi reddinden sonra soguma
+	// suresindeki istek diske bakmamali). UMMOCharacterStoreSubsystem::SwapStoreForTest ile ayni karede takilip sokulur.
+	class FMMONameLockCountingStore final : public IMMOCharacterStore
+	{
+	public:
+		explicit FMMONameLockCountingStore(IMMOCharacterStore& InInner) : Inner(InInner) {}
+		virtual bool Load(const FString& SlotName, FMMOCharacterSaveData& Out) override { return Inner.Load(SlotName, Out); }
+		virtual bool Save(const FString& SlotName, const FMMOCharacterSaveData& In) override { return Inner.Save(SlotName, In); }
+		virtual bool Exists(const FString& SlotName) override { ++ExistsCalls; return Inner.Exists(SlotName); }
+		virtual void ListSlotNames(TArray<FString>& Out) override { Inner.ListSlotNames(Out); }
+		int32 ExistsCalls = 0;
+	private:
+		IMMOCharacterStore& Inner;
+	};
+
+	// Kaynak ASCII kalsin: Unicode harfler UTF-16 koduyla eklenir (orn. 0x00D6 buyuk O-umlaut, 0x0131 noktasiz i, 0x015F s-cedilla).
+	FString MMONameLockMix(const FString& Prefix, const TArray<TCHAR>& Codes, const TCHAR* Suffix)
+	{
+		FString Out = Prefix;
+		for (const TCHAR Code : Codes)
+		{
+			Out.AppendChar(Code);
+		}
+		Out += Suffix;
+		return Out;
+	}
 
 	bool RunMMONameLockSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
 	{
@@ -51,6 +84,37 @@ namespace
 			if (!Condition) { bPassed = false; if (OutError.IsEmpty()) OutError = Label; }
 		};
 
+		// --- Tur 4 (Y-NEW-1): MMONameRules saf mantik (yalniz ASCII ad kurali, yuva anahtari, kanonik anahtar) ---
+		const TCHAR UpperOUml = 0x00D6, LowerOUml = 0x00F6, DotlessI = 0x0131, SCedilla = 0x015F;
+		{
+			using namespace MMONameRules;
+			const ESearchCase::Type CS = ESearchCase::CaseSensitive;
+			Check(IsAsciiAlnum(TEXT('a')) && IsAsciiAlnum(TEXT('Z')) && IsAsciiAlnum(TEXT('0')) && IsAsciiAlnum(TEXT('9'))
+				&& !IsAsciiAlnum(TEXT('_')) && !IsAsciiAlnum(TEXT(' ')) && !IsAsciiAlnum(UpperOUml) && !IsAsciiAlnum(LowerOUml)
+				&& !IsAsciiAlnum(DotlessI) && !IsAsciiAlnum(SCedilla), TEXT("y1_rules_ascii_alnum_only"));
+			Check(IsAllowedNameChar(TEXT(' ')) && IsAllowedNameChar(TEXT('_')) && IsAllowedNameChar(TEXT('-')) && !IsAllowedNameChar(TEXT('.'))
+				&& !IsAllowedNameChar(TEXT('/')) && !IsAllowedNameChar(TEXT('\n')) && !IsAllowedNameChar(UpperOUml) && !IsAllowedNameChar(DotlessI)
+				&& !IsAllowedNameChar(SCedilla), TEXT("y1_rules_allowed_chars"));
+			Check(HasOnlyAllowedChars(TEXT("Ali Veli_1-2")) && !HasOnlyAllowedChars(TEXT("Ali.")) && !HasOnlyAllowedChars(MMONameLockMix(FString(), { UpperOUml }, TEXT("mer")))
+				&& !HasOnlyAllowedChars(MMONameLockMix(TEXT("Ku"), { SCedilla }, TEXT(""))) && !HasOnlyAllowedChars(MMONameLockMix(TEXT("K"), { DotlessI }, TEXT("r"))),
+				TEXT("y1_rules_has_only_allowed"));
+			Check(SlotKey(TEXT("A B")).Equals(TEXT("A_B"), CS) && SlotKey(TEXT("AbC")).Equals(TEXT("AbC"), CS) && SlotKey(TEXT("a/b.c")).Equals(TEXT("abc"), CS)
+				&& SlotKey(MMONameLockMix(FString(), { UpperOUml }, TEXT("mer ")) + MMONameLockMix(FString(), { DotlessI, SCedilla }, TEXT("en"))).Equals(TEXT("mer_en"), CS)
+				&& SlotKey(FString::ChrN(40, TEXT('x'))).Len() == 32 && SlotKey(TEXT("abcdef"), 3).Equals(TEXT("abc"), CS), TEXT("y1_rules_slot_key"));
+			Check(CanonicalKey(TEXT("A B")).Equals(TEXT("a_b"), CS) && CanonicalKey(TEXT("A_B")).Equals(TEXT("a_b"), CS) && CanonicalKey(TEXT("a_b")).Equals(TEXT("a_b"), CS)
+				&& CanonicalKey(TEXT("Omer")).Equals(CanonicalKey(TEXT("omer")), CS)
+				&& CanonicalKey(MMONameLockMix(FString(), { UpperOUml }, TEXT("mer"))).Equals(CanonicalKey(MMONameLockMix(FString(), { LowerOUml }, TEXT("mer"))), CS)
+				&& CanonicalKey(FString()).Equals(TEXT("default"), CS) && CanonicalKey(MMONameLockMix(FString(), { UpperOUml, DotlessI, SCedilla }, TEXT(""))).Equals(TEXT("default"), CS),
+				TEXT("y1_rules_canonical_key"));
+			Check(SameCanonical(TEXT("MMOSave_Ali"), TEXT("mmosave_ALI")) && !SameCanonical(TEXT("MMOSave_Ali"), TEXT("MMOSave_Alix")), TEXT("y1_rules_same_canonical"));
+			bool bHintAscii = true;
+			for (const TCHAR* P = AllowedCharsHint(); *P; ++P) { bHintAscii &= (*P > 0 && *P < 128); }
+			Check(bHintAscii && FCString::Strlen(AllowedCharsHint()) > 10, TEXT("y1_rules_hint_ascii"));
+			// Gozlem (kontrol degil): eski kural FChar::IsAlnum bu harfleri kabul ediyor mu (mutasyon/ClanLegacy yorumu icin).
+			UE_LOG(LogTemp, Display, TEXT("[MMO_NAMELOCK_NOTE] fchar_isalnum O_umlaut=%d dotless_i=%d s_cedilla=%d"),
+				FChar::IsAlnum(UpperOUml) ? 1 : 0, FChar::IsAlnum(DotlessI) ? 1 : 0, FChar::IsAlnum(SCedilla) ? 1 : 0);
+		}
+
 		// Ad en fazla 20 karakter (ServerSetName): "ZNL" + 8 hex + 1-2 harf.
 		const FString Tag = FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(8);
 		auto NameOf = [&Tag](const TCHAR* Suffix) { return FString(TEXT("ZNL")) + Tag + Suffix; };
@@ -68,7 +132,22 @@ namespace
 		const FString NLoadX = NameOf(TEXT("LX")); // P4'un kaydi olmayan canli adi
 		const FString NHost = NameOf(TEXT("H"));   // yerel (host) denetimli kayitli karakter
 		const FString NHostTo = NameOf(TEXT("HT"));
-		const TArray<FString> AllNames = { NReg, NRegTo, NNew, NNewTo, NEmpty, NEmptyTo, NCool, NCoolTo, NTaken, NLoad, NLoadX, NHost, NHostTo };
+		// Tur 4 adlari: kanonik cakisma sahipleri (S T / Om / Unicode), istekci, yeni baglanan, Y8 kilitli karakter, Y3/G karakteri.
+		const FString NHoldSpace = NameOf(TEXT("S T"));
+		const FString NHoldCase = NameOf(TEXT("Om"));
+		const FString NHoldUni = MMONameLockMix(NameOf(TEXT("")), { UpperOUml, DotlessI, SCedilla }, TEXT("x")); // yuva anahtari ...x
+		const FString NReq = NameOf(TEXT("Q"));
+		const FString NReqOk = NameOf(TEXT("Rok"));
+		const FString NNewcomer = NameOf(TEXT("Nc"));
+		const FString NFree = NameOf(TEXT("Free"));
+		const FString NPreFree = NameOf(TEXT("Pfree"));
+		const FString NLockReg = NameOf(TEXT("Y"));  // Y8: kayitli, uzak kurallar
+		const FString NLockTo1 = NameOf(TEXT("YA"));
+		const FString NLockTo2 = NameOf(TEXT("YB"));
+		const FString NGate = NameOf(TEXT("G"));     // Y3/G: kaydi olmayan canli ad
+		const FString NGateX = NameOf(TEXT("GX"));
+		const TArray<FString> AllNames = { NReg, NRegTo, NNew, NNewTo, NEmpty, NEmptyTo, NCool, NCoolTo, NTaken, NLoad, NLoadX, NHost, NHostTo,
+			NHoldCase, NameOf(TEXT("S_T")), NameOf(TEXT("x")), NReq, NReqOk, NNewcomer, NFree, NPreFree, NameOf(TEXT("Z")), NLockReg, NLockTo1, NLockTo2, NGate, NGateX };
 		for (const FString& N : AllNames)
 		{
 			if (Store->Exists(SlotOf(N))) { OutError = TEXT("temporary slot collision"); return false; }
@@ -77,6 +156,8 @@ namespace
 
 		TArray<AMMOCharacter*> Pawns;
 		TArray<AMMOPlayerController*> Controllers;
+		TArray<AMMOCharacter*> ExtraPawns;               // tur 4 bolumu (temizlikte ayni kurallarla kaldirilir)
+		TArray<AMMOPlayerController*> ExtraControllers;
 		AMMOCharacter* HostPawn = nullptr;
 		AAIController* HostAI = nullptr;
 		APlayerState* HostPS = nullptr;
@@ -212,9 +293,179 @@ namespace
 			P4->GetPlayerState()->SetPlayerName(NLoad);
 			const bool bReload2 = P4->LoadCharacter();
 			Check(bReload2 && P4->GetLoadSerial() == Serial4 + 1 && P4->GetActiveSaveSlot() == SlotOf(NLoad), TEXT("f3_reload_registered_name_still_loads"));
+
+			// ================= Tur 4 (Y-NEW-1): kanonik ad cakismasi + Unicode ad temizleme =================
+			const ESearchCase::Type CS = ESearchCase::CaseSensitive;
+			auto SpawnPossessed = [&](const FString& Name, double Dx) -> AMMOCharacter*
+			{
+				FActorSpawnParameters Params;
+				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				AMMOCharacter* Pawn = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(),
+					FVector(2100000. + Dx, 2130000., 5000.), FRotator::ZeroRotator, Params);
+				AMMOPlayerController* PC = World->SpawnActor<AMMOPlayerController>();
+				ExtraPawns.Add(Pawn); ExtraControllers.Add(PC);
+				if (!Pawn || !PC) return nullptr;
+				Pawn->SetActorTickEnabled(false); PC->SetActorTickEnabled(false);
+				PC->Possess(Pawn);
+				if (!Pawn->GetPlayerState()) return nullptr;
+				Pawn->GetPlayerState()->SetPlayerName(Name);
+				return Pawn;
+			};
+			AMMOGameMode* GM = Cast<AMMOGameMode>(World->GetAuthGameMode());
+			AMMOCharacter* HoldSpace = SpawnPossessed(NHoldSpace, 0.);
+			AMMOCharacter* HoldCase = SpawnPossessed(NHoldCase, 3000.);
+			AMMOCharacter* HoldUni = SpawnPossessed(NHoldUni, 6000.);
+			AMMOCharacter* Req = SpawnPossessed(NReq, 9000.);
+			AMMOPlayerController* Newcomer = World->SpawnActor<AMMOPlayerController>();
+			ExtraControllers.Add(Newcomer);
+			if (Newcomer) { Newcomer->SetActorTickEnabled(false); }
+			const bool bY1Fixture = GM && HoldSpace && HoldCase && HoldUni && Req && Newcomer && Newcomer->PlayerState;
+			Check(bY1Fixture, TEXT("y1_fixture_online_holders"));
+			if (bY1Fixture)
+			{
+				Newcomer->PlayerState->SetPlayerName(NNewcomer);
+				// Yuva adi: ASCII disi harfler atilir (eski FChar::IsAlnum yolu onlari dosya adina tasirdi).
+				Check(HoldUni->GetSaveSlotName().Equals(SlotOf(NameOf(TEXT("x"))), CS), TEXT("y1_save_slot_drops_unicode_letters"));
+				Check(HoldSpace->GetSaveSlotName().Equals(SlotOf(NameOf(TEXT("S_T"))), CS), TEXT("y1_save_slot_space_to_underscore"));
+
+				// PreLogin: cevrimici ad ile ayni kanonik anahtar (bosluk/'_' ve harf buyuklugu esdeger) ikinci baglantida reddedilir.
+				auto PreLoginError = [GM](const FString& Requested)
+				{
+					FString Err;
+					GM->PreLogin(FString(TEXT("?Name=")) + Requested, TEXT("127.0.0.1"), FUniqueNetIdRepl(), Err);
+					return Err;
+				};
+				Check(!PreLoginError(NameOf(TEXT("s_t"))).IsEmpty() && !PreLoginError(NameOf(TEXT("S_T"))).IsEmpty(), TEXT("y1_prelogin_space_underscore_rejected"));
+				Check(!PreLoginError(NameOf(TEXT("om"))).IsEmpty() && !PreLoginError(NameOf(TEXT("OM"))).IsEmpty(), TEXT("y1_prelogin_case_variant_rejected"));
+				Check(!PreLoginError(MMONameLockMix(NameOf(TEXT("")), { LowerOUml }, TEXT("x"))).IsEmpty(), TEXT("y1_prelogin_unicode_cleaned_collision_rejected"));
+				Check(PreLoginError(NPreFree).IsEmpty(), TEXT("y1_prelogin_free_name_accepted"));
+
+				// ChangeName (baslangic adi): ayni kanonik anahtar cevrimiciyse rastgele Gezgin adi atanir.
+				auto NewcomerName = [Newcomer]() { return Newcomer->PlayerState ? Newcomer->PlayerState->GetPlayerName() : FString(); };
+				GM->ChangeName(Newcomer, NameOf(TEXT("s_t")), false);
+				const FString AfterSpace = NewcomerName();
+				GM->ChangeName(Newcomer, NameOf(TEXT("OM")), false);
+				const FString AfterCase = NewcomerName();
+				GM->ChangeName(Newcomer, MMONameLockMix(NameOf(TEXT("")), { LowerOUml }, TEXT("x")), false);
+				const FString AfterUni = NewcomerName();
+				Check(AfterSpace.StartsWith(TEXT("Gezgin"), CS) && AfterCase.StartsWith(TEXT("Gezgin"), CS), TEXT("y1_changename_canonical_collision_gets_gezgin"));
+				Check(AfterUni.StartsWith(TEXT("Gezgin"), CS), TEXT("y1_changename_unicode_cleaned_collision_gets_gezgin"));
+				GM->ChangeName(Newcomer, MMONameLockMix(NameOf(TEXT("")), { SCedilla }, TEXT("Z")), false);
+				const FString AfterClean = NewcomerName();
+				GM->ChangeName(Newcomer, NFree, false);
+				Check(AfterClean.Equals(NameOf(TEXT("Z")), CS) && NewcomerName().Equals(NFree, CS), TEXT("y1_changename_free_name_kept_unicode_stripped"));
+
+				// ServerSetName: canli bir oyuncuyla ayni kanonik anahtara gecis reddedilir; Unicode harfli ad reddedilir.
+				Req->MMOSetName(NameOf(TEXT("s_t")));
+				const bool bSpaceKept = LiveName(Req).Equals(NReq, CS);
+				Req->MMOSetName(NameOf(TEXT("S_T")));
+				Check(bSpaceKept && LiveName(Req).Equals(NReq, CS), TEXT("y1_setname_space_underscore_rejected"));
+				Req->MMOSetName(NameOf(TEXT("om")));
+				const bool bCaseKept = LiveName(Req).Equals(NReq, CS);
+				Req->MMOSetName(NameOf(TEXT("OM")));
+				Check(bCaseKept && LiveName(Req).Equals(NReq, CS), TEXT("y1_setname_case_variant_rejected"));
+				Req->MMOSetName(MMONameLockMix(NameOf(TEXT("")), { UpperOUml }, TEXT("y")));
+				Check(LiveName(Req).Equals(NReq, CS), TEXT("y1_setname_unicode_rejected"));
+				Req->MMOSetName(NReqOk); // kontrol: serbest ad kabul edilir (bu adim sogumayi baslatir; sona konuldu)
+				Check(LiveName(Req).Equals(NReqOk, CS), TEXT("y1_setname_free_name_accepted"));
+
+				// Klan adi: yeni klan yalniz ASCII; tur 4 oncesi kayittan gelen Unicode harfli ad yuklemede korunur.
+				const FString UniClan = MMONameLockMix(TEXT("Kartal"), { SCedilla }, TEXT(""));
+				Check(!UMMOClanComponent::IsValidClanName(UniClan) && !UMMOClanComponent::IsValidClanName(MMONameLockMix(TEXT("K"), { UpperOUml }, TEXT("pru")))
+					&& UMMOClanComponent::IsValidClanName(TEXT("Kartal1")), TEXT("y1_clan_name_ascii_only"));
+				UMMOClanComponent* UniCC = HoldUni->GetClanComponent();
+				if (UniCC) { UniCC->CmdCreate(UniClan); }
+				Check(UniCC && !UniCC->IsInClan(), TEXT("y1_clan_create_unicode_rejected"));
+				if (UniCC)
+				{
+					FMMOCharacterSaveData Legacy;
+					Legacy.ClanName = MMONameLockMix(TEXT("Eski"), { SCedilla, DotlessI }, TEXT("K"));
+					UniCC->ApplySaveData(Legacy);
+					const FString KeptLegacy = UniCC->ClanName;
+					FMMOCharacterSaveData Junk;
+					Junk.ClanName = TEXT("a b!");
+					UniCC->ApplySaveData(Junk);
+					Check(KeptLegacy.Equals(Legacy.ClanName, CS) && !UniCC->IsInClan(), TEXT("y1_clan_legacy_unicode_name_kept_on_load"));
+					UniCC->ApplySaveData(FMMOCharacterSaveData());
+				}
+			}
+
+			// ================= Tur 4 (DUSUK-5) + tur 3 (Y8): ad kilidi reddinden hemen sonra =================
+			// Ikinci istek "X sn bekle" degil kilit metnini gorur ve sogumada diske (Exists) hic bakilmaz.
+			AMMOCharacter* LockPawn = SpawnPossessed(NLockReg, 12000.);
+			AMMOPlayerController* LockPC = LockPawn ? Cast<AMMOPlayerController>(LockPawn->GetController()) : nullptr;
+			AMMOHUD* LockHUD = nullptr;
+			if (LockPC) { LockPC->ClientSetHUD(AMMOHUD::StaticClass()); LockHUD = Cast<AMMOHUD>(LockPC->GetHUD()); }
+			UMMOCharacterStoreSubsystem* StoreSub = World->GetGameInstance() ? World->GetGameInstance()->GetSubsystem<UMMOCharacterStoreSubsystem>() : nullptr;
+			bool bLockSaved = false;
+			if (LockPawn) { LockPawn->LoadCharacter(); bLockSaved = LockPawn->SaveCharacterForTravel(); }
+			const bool bY8Fixture = LockPawn && LockHUD && StoreSub && StoreSub->GetStore() && bLockSaved && Store->Exists(SlotOf(NLockReg));
+			Check(bY8Fixture, TEXT("y8_fixture_registered_remote_with_hud"));
+			if (bY8Fixture)
+			{
+				LockPawn->SetRemoteNameRulesForTest(true);
+				TUniquePtr<FMMONameLockCountingStore> CountingOwned = MakeUnique<FMMONameLockCountingStore>(*StoreSub->GetStore());
+				FMMONameLockCountingStore* Counting = CountingOwned.Get();
+				TUniquePtr<IMMOCharacterStore> RealStore = StoreSub->SwapStoreForTest(MoveTemp(CountingOwned));
+				auto LockLines = [LockHUD]()
+				{
+					int32 N = 0;
+					for (const FMMOChatLine& Ln : LockHUD->GetChatLinesForTests()) { if (Ln.Text.StartsWith(TEXT("Ad kilitli"), ESearchCase::CaseSensitive)) ++N; }
+					return N;
+				};
+				const int32 Lines0 = LockLines();
+				const int32 Exists0 = Counting->ExistsCalls;
+				LockPawn->MMOSetName(NLockTo1);
+				const int32 Exists1 = Counting->ExistsCalls;
+				Check(LiveName(LockPawn).Equals(NLockReg, CS) && Exists1 == Exists0 + 1 && LockLines() == Lines0 + 1, TEXT("y8_lock_reject_reads_disk_once_shows_lock_text"));
+				// Ayni metin 0.5 sn icinde tekrar gonderilmez (MMONotify): araya baska bir satir girer ki ikinci kilit metni gorulebilsin.
+				MMONotify::ToOwner(LockPawn, TEXT("[test] ara satir"), FColor::White, 1.f);
+				LockPawn->MMOSetName(NLockTo2);
+				const TArray<FMMOChatLine>& AfterLines = LockHUD->GetChatLinesForTests();
+				Check(LiveName(LockPawn).Equals(NLockReg, CS) && LockLines() == Lines0 + 2 && AfterLines.Num() > 0
+					&& AfterLines.Last().Text.StartsWith(TEXT("Ad kilitli"), ESearchCase::CaseSensitive), TEXT("y8_cooldown_after_lock_shows_lock_text"));
+				Check(Counting->ExistsCalls == Exists1, TEXT("y8_cooldown_after_lock_no_disk_exists"));
+				TUniquePtr<IMMOCharacterStore> Back = StoreSub->SwapStoreForTest(MoveTemp(RealStore));
+				Check(StoreSub->GetStore() == Store && Back.Get() == Counting, TEXT("y8_store_restored"));
+			}
+
+			// ================= Tur 4 (Y-NEW-6) + tur 3 (Y3): ActiveSaveSlot dolu, ilk yukleme kapali, canli adin kaydi yok =================
+			AMMOCharacter* GatePawn = SpawnPossessed(NGate, 15000.);
+			Check(GatePawn && !Store->Exists(SlotOf(NGate)) && !Store->Exists(SlotOf(NGateX)), TEXT("g_fixture_unsaved_live_name"));
+			if (GatePawn)
+			{
+				const FMMOCharacterSaveData InvG = InvSnapshot(GatePawn);
+				// G: ayni adla yeniden possess (kayit yok, ayni yuva) -> kayit kapisi yeniden acilir; seri/envanter/yuva degismez.
+				GatePawn->SetSaveIdentityForTest(false, SlotOf(NGate), 7);
+				const bool bG1 = GatePawn->LoadCharacter();
+				Check(!bG1 && GatePawn->IsInitialLoadComplete() && GatePawn->GetLoadSerial() == 7 && GatePawn->GetActiveSaveSlot().Equals(SlotOf(NGate), CS)
+					&& SameInv(InvG, InvSnapshot(GatePawn)) && !Store->Exists(SlotOf(NGate)), TEXT("g_same_name_repossess_reopens_save_gate"));
+				// Harf buyuklugu farkli canli ad ayni kanonik yuvadir: kapi yine acilir.
+				GatePawn->SetSaveIdentityForTest(false, SlotOf(NGate), 7);
+				GatePawn->GetPlayerState()->SetPlayerName(NGate.ToLower());
+				const bool bG2 = GatePawn->LoadCharacter();
+				Check(!bG2 && GatePawn->IsInitialLoadComplete() && GatePawn->GetLoadSerial() == 7 && GatePawn->GetActiveSaveSlot().Equals(SlotOf(NGate), CS),
+					TEXT("g_canonical_case_variant_reopens"));
+				// Bolge gecisi kaydi onaylanmissa G dali kapali kalir.
+				GatePawn->SetSaveIdentityForTest(false, SlotOf(NGate), 7);
+				GatePawn->GetPlayerState()->SetPlayerName(NGate);
+				GatePawn->SetTravelSaveCommitted(true);
+				const bool bG3 = GatePawn->LoadCharacter();
+				Check(!bG3 && !GatePawn->IsInitialLoadComplete() && GatePawn->GetLoadSerial() == 7, TEXT("g_travel_committed_stays_closed"));
+				GatePawn->SetTravelSaveCommitted(false);
+				// Y3: farkli (kaydi olmayan) canli ad -> false, kapi kapali kalir, yeni karakter dali (seri++, baslangic paketi, yeni yuva) YOK.
+				GatePawn->SetSaveIdentityForTest(false, SlotOf(NGate), 7);
+				GatePawn->GetPlayerState()->SetPlayerName(NGateX);
+				const bool bG4 = GatePawn->LoadCharacter();
+				Check(!bG4 && !GatePawn->IsInitialLoadComplete(), TEXT("y3_unloaded_other_unsaved_name_gate_stays_closed"));
+				Check(GatePawn->GetLoadSerial() == 7 && GatePawn->GetActiveSaveSlot().Equals(SlotOf(NGate), CS) && SameInv(InvG, InvSnapshot(GatePawn))
+					&& !Store->Exists(SlotOf(NGateX)) && !Store->Exists(SlotOf(NGate)), TEXT("y3_unloaded_other_name_no_fork_no_serial"));
+			}
 		}
 
 		// Temizlik: once kaliciligi kapat (EndPlay/UnPossess kaydi olmasin), sonra controller/pawn, sonra GUID'li dosyalar.
+		Pawns.Append(ExtraPawns);
+		Controllers.Append(ExtraControllers);
 		for (AMMOCharacter* Pawn : Pawns)
 		{
 			if (IsValid(Pawn))
@@ -261,6 +512,11 @@ namespace
 // dedicated sunucuda yonetici yoklugu, 30 sn
 // sogumanin zamanla bitmesi (tek karede yalniz baslatildigi gorulur), magaza yokken muhafazakar ret, gercek MMOLoad komut
 // yetki kapisi, ?Name= ile yeniden baglanma akisi, PIE ve ag replikasyonu.
+// Tur 4 bolumu: PreLogin gercek ag baglantisi olmadan dogrudan cagrilir (UniqueId bos, adres sahte); ChangeName'in 3 sn sonraki
+// bildirim zamanlayicisi kosulmaz; Y8 kilit metni standalone'da yerel calisan istemci RPC'si + test HUD'u ile, Exists sayisi
+// SwapStoreForTest ile takilan sayac magazasiyla olculur; Y-NEW-6 G dali LoadCharacter dogrudan cagrilarak (0.6 sn AutoLoad
+// zamanlayicisi ve gercek UnPossess/Possess dongusu olmadan) dogrulanir. Eski Turkce harfli klan adinin korunmasi FChar::IsAlnum'un
+// bu platformdaki sonucuna baglidir (NOTE satiri).
 
 namespace
 {

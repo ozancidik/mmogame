@@ -13,6 +13,7 @@
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Guid.h"
@@ -429,16 +430,116 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 			Check(E2->GetBounties().IsEmpty() && !FM.FileExists(*PathOf(SlotK)) && R2->GetInventory()->Gold == G2b, TEXT("locked_tmp_defers_load"));
 			TmpLock.Reset();
 			Check(ReadRaw(PathOf(SlotK) + TEXT(".tmp")) == SeedTmp, TEXT("locked_tmp_kept_intact"));
+			// Tur 4: geri cekilme 10 sn (60 degil); kilit kalksa da pencere icinde yeniden denenmez (gorev acilmaz, ana dosya olusmaz).
+			const double BackoffLeft = E2->RecoveryRetryAt - FPlatformTime::Seconds();
+			UE_LOG(LogTemp, Display, TEXT("[MMO_DAILY_NOTE] recovery_backoff_left=%.3f"), BackoffLeft);
+			Check(BackoffLeft > 8.0 && BackoffLeft <= 10.01, TEXT("y1_daily_backoff_is_10s"));
+			E2->EvaluateAll();
+			Check(E2->GetBounties().IsEmpty() && !FM.FileExists(*PathOf(SlotK)) && FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))),
+				TEXT("y1_daily_backoff_blocks_retry_after_unlock"));
 			E2->ResetRecoveryBackoffForTest();
 			E2->EvaluateAll();
 			Check(E2->GetBounties().Num() == BountyCount && E2->GetBounties()[0].Progress == 4 && R2->GetInventory()->Gold == G2b
 				&& FM.FileExists(*PathOf(SlotK)) && !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("locked_tmp_recovered_after_release"));
+
+			// Tur 4 (Y-NEW-2): ana dosya paylasimli okuyucuda (silinemez): SaveNow tekrar denemesiz basarisiz ve hizli, bDirty kalir,
+			// disk degismez; kilit kalkinca sonraki SaveNow yazar.
+			{
+				const FString Before = ReadRaw(PathOf(SlotK));
+				TUniquePtr<IFileHandle> MainRead(PF.OpenRead(*PathOf(SlotK), false));
+				const bool bLocked = MainRead.IsValid();
+				E2->Bounties[0].Progress = FMath::Min(E2->Bounties[0].Progress + 1, E2->Bounties[0].Target);
+				E2->bDirty = true;
+				const double T0 = FPlatformTime::Seconds();
+				const bool bSaved = bLocked && E2->SaveNow();
+				const double Dt = FPlatformTime::Seconds() - T0;
+				const bool bDirtyAfter = E2->bDirty;
+				MainRead.Reset();
+				Check(bLocked && !bSaved && bDirtyAfter, TEXT("y4_daily_locked_main_save_fails_stays_dirty"));
+				Check(Dt < 1.0, TEXT("y4_daily_locked_main_save_fast_under_1s"));
+				Check(ReadRaw(PathOf(SlotK)).Equals(Before, ESearchCase::CaseSensitive), TEXT("y4_daily_locked_main_disk_unchanged"));
+				TArray<FMMODailyBounty> B;
+				Check(E2->SaveNow() && !E2->bDirty && ReadSlot(SlotK, B) && B[0].Progress == E2->GetBounties()[0].Progress
+					&& !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("y4_daily_save_after_unlock_writes"));
+			}
 		}
 		for (TStrongObjectPtr<AMMOCharacter>* R : { &R1, &R2, &R3 })
 		{
 			if (::IsValid(R->Get())) (*R)->Destroy();
 		}
 		for (const FString& Slot : { SlotE, SlotF, SlotL, SlotM, SlotJ, SlotK })
+		{
+			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
+			{
+				FM.Delete(*(PathOf(Slot) + Ext), false, true, true);
+			}
+		}
+	}
+	// --- Tur 3 (Y7) + tur 4 (Y-NEW-3/4): yuva tasimasinda eski yuva dosyasinin silinme kurallari (GUID'li yuvalar) ---
+	{
+		const FString Tag3 = FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(8);
+		const FString DayDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"));
+		IFileManager& FM = IFileManager::Get();
+		auto PathOf = [&DayDir](const FString& Slot) { return FPaths::Combine(DayDir, Slot + TEXT(".json")); };
+		auto Has = [&FM, &PathOf](const FString& Slot) { return FM.FileExists(*PathOf(Slot)); };
+		const FString SlotP = TEXT("MMOSave_ZDayFP_") + Tag3, SlotQ = TEXT("MMOSave_ZDayFQ_") + Tag3, SlotR = TEXT("MMOSave_ZDayFR_") + Tag3;
+		const FString NameS = TEXT("ZDayFS_") + Tag3; // canli adi bu yuvayi veren cevrimici oyuncu senaryosu
+		const FString SlotS = TEXT("MMOSave_") + NameS, SlotT = TEXT("MMOSave_ZDayFT_") + Tag3, SlotU = TEXT("MMOSave_ZDayFU_") + Tag3;
+		const FString SlotY = TEXT("MMOSave_ZDayFY_") + Tag3; // diger oyuncunun ilgisiz yuvasi
+		const FName Orc(TEXT("Orc"));
+		TStrongObjectPtr<AMMOCharacter> X(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 0, 0), FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<AMMOCharacter> Y(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 5000, 0), FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<APlayerState> PSY(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params));
+		UMMODailyComponent* DX = X.IsValid() ? X->GetDailyComponent() : nullptr;
+		const bool bFixture3 = DX && X->GetStats() && Y.IsValid() && PSY.IsValid();
+		if (bFixture3)
+		{
+			X->GetStats()->Level = 10; X->GetStats()->ExperienceToNextLevel = 1000; X->GetStats()->Experience = 0;
+			DX->SetDayForTest(20261011);
+			PSY->SetPlayerName(TEXT("ZDayFOwner_") + Tag3);
+			Y->SetPlayerState(PSY.Get()); // IsPlayerControlled: eski yuvanin "cevrimici baska oyuncu" sahibi olabilir
+			Y->SetSaveIdentityForTest(true, SlotY, 1);
+			X->SetSaveIdentityForTest(true, SlotP, 1);
+			DX->NotifyMobKilled(Orc); // yukler, gunu kurar, diske
+		}
+		Check(bFixture3 && Y->IsPlayerControlled() && Has(SlotP), TEXT("f_fixture_old_slot_written"));
+		if (bFixture3)
+		{
+			X->SetSaveIdentityForTest(true, SlotQ, 1);
+			DX->NotifyMobKilled(Orc);
+			Check(Has(SlotQ) && !Has(SlotP) && !FM.FileExists(*(PathOf(SlotP) + TEXT(".tmp"))), TEXT("f_move_success_deletes_old_slot"));
+			DX->SetSaveFailForTest(true);
+			X->SetSaveIdentityForTest(true, SlotR, 1);
+			DX->NotifyMobKilled(Orc);
+			Check(Has(SlotQ) && !Has(SlotR) && !DX->PendingOldStoragePath.IsEmpty(), TEXT("f_move_write_fail_keeps_old_slot"));
+			DX->SetSaveFailForTest(false);
+			Check(DX->SaveNow() && Has(SlotR) && !Has(SlotQ) && DX->PendingOldStoragePath.IsEmpty(), TEXT("f_move_retry_success_deletes_old_slot"));
+			Y->SetSaveIdentityForTest(true, SlotR, 1);
+			X->SetSaveIdentityForTest(true, SlotS, 1);
+			DX->NotifyMobKilled(Orc);
+			Check(Has(SlotS) && Has(SlotR), TEXT("f_old_slot_of_online_player_active_kept"));
+			Y->SetSaveIdentityForTest(true, SlotY, 1);
+			PSY->SetPlayerName(NameS);
+			X->SetSaveIdentityForTest(true, SlotT, 1);
+			DX->NotifyMobKilled(Orc);
+			Check(Has(SlotT) && Has(SlotS), TEXT("f_old_slot_of_online_player_live_name_kept"));
+			PSY->SetPlayerName(TEXT("ZDayFOwner_") + Tag3);
+			DX->SetSaveFailForTest(true);
+			X->SetSaveIdentityForTest(true, SlotU, 1);
+			DX->NotifyMobKilled(Orc);
+			X->SetSaveIdentityForTest(true, SlotT, 1);
+			DX->NotifyMobKilled(Orc);
+			DX->SetSaveFailForTest(false);
+			Check(DX->PendingOldStoragePath.IsEmpty() && DX->SaveNow() && Has(SlotT) && !Has(SlotU), TEXT("f_round_trip_back_keeps_slot"));
+			// Kanonik olarak ayni dosya (NTFS harf duyarsiz): TryLoad bunu tasima saymadigi icin bekleyen eski yol dogrudan verilir.
+			DX->PendingOldStoragePath = FPaths::Combine(DayDir, SlotT.ToUpper() + TEXT(".json"));
+			DX->bDirty = true;
+			Check(DX->SaveNow() && Has(SlotT) && DX->PendingOldStoragePath.IsEmpty(), TEXT("f_canonical_same_file_not_deleted"));
+		}
+		if (::IsValid(Y.Get())) { Y->SetSaveIdentityForTest(false, SlotY, 1); Y->SetTravelSaveCommitted(true); Y->SetPlayerState(nullptr); Y->Destroy(); }
+		if (::IsValid(X.Get())) X->Destroy();
+		if (::IsValid(PSY.Get())) PSY->Destroy();
+		for (const FString& Slot : { SlotP, SlotQ, SlotR, SlotS, SlotT, SlotU, SlotY })
 		{
 			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
 			{
@@ -453,6 +554,8 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 // F2 bolumu EndPlay'in TryLoad cagrisini ve tasima mantigini dogrular; motorun gercek yok etme sirasini (UnPossessed kaydi ->
 // ActiveSaveSlot guncellemesi -> bilesen EndPlay) KANITLAMAZ: yuva degisimi Destroy'dan once elle verilir. Dosya kilidi ayni
 // surecteki ozel (paylasimsiz) bir tutamakla benzetilir; antivirus/ag surucusu gibi gercek dis kilitler denenmedi.
+// Tur 4 bolumu: "cevrimici baska oyuncu" PlayerState'li ama denetleyicisiz bir pawn ile benzetilir; kanonik-ayni-dosya korumasi TryLoad
+// yolundan ulasilamadigi icin bekleyen eski yol test icinden verilir. 10 sn geri cekilme RecoveryRetryAt'tan okunur (bekleme kosulmaz).
 
 namespace
 {

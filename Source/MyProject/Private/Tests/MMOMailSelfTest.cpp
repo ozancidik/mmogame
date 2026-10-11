@@ -10,6 +10,7 @@
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
+#include "HAL/PlatformTime.h"
 #include "Tests/MMOPurchaseCallbackProbe.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/FileHelper.h"
@@ -43,6 +44,17 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	Check(FMMOMailStore::SanitizeName(FString::ChrN(50, TEXT('x'))).Len() == FMMOMailStore::MaxNameLength, TEXT("name_length_cap"));
 	Check(FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail/MMOMail_a_b.json")) || FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail\\MMOMail_a_b.json")), TEXT("name_box_path"));
 	Check(FMMOMailStore::GetBoxPath(TEXT("ALI")) == FMMOMailStore::GetBoxPath(TEXT("ali")) && FMMOMailStore::GetBoxPath(TEXT("Al i")) == FMMOMailStore::GetBoxPath(TEXT("al_i")), TEXT("name_box_path_case_insensitive"));
+	// Tur 4 (Y-NEW-1): yalniz ASCII (kaynak ASCII: Unicode harfler UTF-16 koduyla; 0x00D6 O-umlaut, 0x0131 noktasiz i, 0x015F s-cedilla).
+	FString MailUniOmer; MailUniOmer.AppendChar(TCHAR(0x00D6)); MailUniOmer += TEXT("mer");
+	FString MailUniOnly; MailUniOnly.AppendChar(TCHAR(0x0131)); MailUniOnly.AppendChar(TCHAR(0x015F));
+	Check(FMMOMailStore::SanitizeName(MailUniOmer).Equals(TEXT("mer"), ESearchCase::CaseSensitive) && FMMOMailStore::SanitizeName(MailUniOnly) == TEXT("Default")
+		&& !FMMOMailStore::IsDeliverableName(MailUniOnly), TEXT("y1_mail_sanitize_drops_non_ascii"));
+	{
+		const FString UniFile = FPaths::GetCleanFilename(FMMOMailStore::GetBoxPath(MailUniOmer));
+		bool bAscii = true;
+		for (const TCHAR Ch : UniFile) { bAscii &= (Ch > 0 && Ch < 128); }
+		Check(bAscii && FMMOMailStore::GetBoxPath(MailUniOmer) == FMMOMailStore::GetBoxPath(TEXT("mer")), TEXT("y1_mail_box_path_ascii"));
+	}
 
 	// --- JSON dogrulama ---
 	{
@@ -152,6 +164,8 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		A->AdvanceTimeForTest(6.0);
 		const int32 GoldBefore = InvA->Gold;
 		Check(A->SendMail(NameB, 100, TEXT("tasar"), true) == EMMOMailResult::BoxFull && InvA->Gold == GoldBefore, TEXT("live_box_full_no_charge"));
+		// Tur 4 (Y-NEW-5): BoxFull da sogumaya yazilir; hemen ikinci deneme Cooldown (kutu durumu hizli sorgulanamaz).
+		Check(A->SendMail(NameB, 100, TEXT("tekrar"), true) == EMMOMailResult::Cooldown && InvA->Gold == GoldBefore, TEXT("y5_box_full_starts_cooldown"));
 	}
 
 	// --- D1: "/posta gonder" ayristirma; altin YALNIZ "<rakamlar>g" bicimi ---
@@ -262,6 +276,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(A->SendMail(NameV, 0, TEXT("alt cizgi"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(NameV) == 1, TEXT("c1_underscore_name_accepted"));
 		A->AdvanceTimeForTest(6.0);
 		Check(A->SendMail(TEXT("ZTestMail V_") + Tag, 0, TEXT("bosluk"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(NameV) == 2, TEXT("c1_space_equals_underscore"));
+		Check(A->SendMail(MailUniOmer, 0, TEXT("x"), true) == EMMOMailResult::BadTarget, TEXT("y1_mail_send_unicode_target_rejected"));
 		FMMOMailStore::DeleteBox(NameV);
 	}
 
@@ -346,9 +361,15 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		A->AdvanceTimeForTest(6.0);
 		A->SetSaveResultForTest(true);
 		InvA->Gold = 10000;
+		const double SendT0 = FPlatformTime::Seconds();
 		const EMMOMailResult R = A->SendMail(NameD, 300, TEXT("dizin"), true);
+		const double SendDt = FPlatformTime::Seconds() - SendT0;
 		Check(R == EMMOMailResult::StoreError && InvA->Gold == 10000, TEXT("tmp_first_mail_write_fail_refunds"));
 		Check(!FM.FileExists(*Tmp), TEXT("tmp_first_mail_write_fail_cleans_tmp"));
+		// Tur 4 (Y-NEW-2): tekrar denemesiz Move; tekrar denemeli Move bu senaryoda 10x0.5 sn beklerdi.
+		Check(SendDt < 1.0, TEXT("y4_first_mail_move_fail_fast_under_1s"));
+		Check(!FM.FileExists(*(Path + TEXT(".bak"))) && !FM.FileExists(*(Tmp + TEXT(".bad"))) && !FM.FileExists(*(Path + TEXT(".bad"))),
+			TEXT("first_mail_fail_no_side_files"));
 		FM.DeleteDirectory(*Path, false, true);
 		TArray<FMMOMail> Loaded;
 		Check(!FM.DirectoryExists(*Path) && FMMOMailStore::Load(NameD, Loaded) && Loaded.IsEmpty(), TEXT("tmp_refunded_first_mail_not_resurrected"));
@@ -375,6 +396,158 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(FMMOMailStore::Load(NameQ, Loaded) && Loaded.IsEmpty(), TEXT("corrupt_box_stale_tmp_not_resurrected"));
 		FMMOMailStore::DeleteBox(NameQ);
 		Check(!FM.FileExists(*(Path + TEXT(".bad"))) && !FM.FileExists(*(Tmp + TEXT(".bad"))), TEXT("deletebox_removes_quarantine_files"));
+	}
+
+	// --- Tur 3/4: WriteBox .bak durum makinesi, Load kurtarma sirasi, kilitli dosyada hiz ve 60 sn geri cekilme (GUID'li kutular) ---
+	{
+		const ESearchCase::Type CS = ESearchCase::CaseSensitive;
+		auto MailJson = [](const TCHAR* Text, int32 Gold)
+		{
+			TArray<FMMOMail> L; FMMOMail M; M.From = TEXT("Ali"); M.Text = Text; M.Gold = Gold; L.Add(M);
+			FString J; FMMOMailStore::ToJson(L, J); return J;
+		};
+		auto ReadRaw = [](const FString& F) { FString R; FFileHelper::LoadFileToString(R, *F); return R; };
+		TArray<FMMOMail> NewBox;
+		{ FMMOMail M; M.From = TEXT("Ali"); M.Text = TEXT("yeni"); M.Gold = 5; NewBox.Add(M); }
+
+		// .bak alinamazsa (ana dosya ozel kilitli, kopyalanamiyor): hic yazilmaz, eski .bak bile kalmaz, ana dosya ayni.
+		{
+			const FString N = TEXT("ZTestMailBk_") + Tag;
+			FMMOMailStore::DeleteBox(N);
+			const FString Path = FMMOMailStore::GetBoxPath(N), Tmp = Path + TEXT(".tmp"), Bak = Path + TEXT(".bak");
+			const FString Orig = MailJson(TEXT("eski"), 40);
+			FM.MakeDirectory(*FPaths::GetPath(Path), true);
+			FFileHelper::SaveStringToFile(Orig, *Path);
+			FFileHelper::SaveStringToFile(TEXT("bayat-yedek"), *Bak);
+			TUniquePtr<IFileHandle> Lock(PF.OpenWrite(*Path, true, false));
+			const bool bLocked = Lock.IsValid();
+			const bool bR = bLocked && FMMOMailStore::Replace(N, NewBox);
+			const bool bBakLeft = FM.FileExists(*Bak), bTmpLeft = FM.FileExists(*Tmp);
+			Lock.Reset();
+			Check(bLocked && !bR && !bBakLeft && !bTmpLeft, TEXT("bak_copy_fail_no_write_no_bak_left"));
+			Check(ReadRaw(Path).Equals(Orig, CS), TEXT("bak_copy_fail_main_intact"));
+			FMMOMailStore::DeleteBox(N);
+		}
+		// Move ve dogrudan yazim basarisiz (ana dosya okuyucu tarafindan silinemez/yazilamaz): false, hizli (< 1 sn, tekrar denemesiz),
+		// kutu bayt-bayt ayni; geri koyulamayan .bak kalir ve gecerli ana dosyali sonraki Load onu siler.
+		{
+			const FString N = TEXT("ZTestMailMv_") + Tag;
+			FMMOMailStore::DeleteBox(N);
+			const FString Path = FMMOMailStore::GetBoxPath(N), Tmp = Path + TEXT(".tmp"), Bak = Path + TEXT(".bak");
+			const FString Orig = MailJson(TEXT("korunan"), 55);
+			FM.MakeDirectory(*FPaths::GetPath(Path), true);
+			FFileHelper::SaveStringToFile(Orig, *Path);
+			TUniquePtr<IFileHandle> Lock(PF.OpenRead(*Path, false));
+			const bool bLocked = Lock.IsValid();
+			const double T0 = FPlatformTime::Seconds();
+			const bool bR = bLocked && FMMOMailStore::Replace(N, NewBox);
+			const double Dt = FPlatformTime::Seconds() - T0;
+			const bool bTmpLeft = FM.FileExists(*Tmp);
+			Lock.Reset();
+			Check(bLocked && !bR && !bTmpLeft, TEXT("move_fail_write_returns_false_tmp_cleaned"));
+			Check(Dt < 1.0, TEXT("y4_move_fail_write_fast_under_1s"));
+			Check(ReadRaw(Path).Equals(Orig, CS), TEXT("move_fail_box_bytes_unchanged"));
+			const bool bBakBefore = FM.FileExists(*Bak);
+			TArray<FMMOMail> L;
+			Check(bBakBefore && FMMOMailStore::Load(N, L) && L.Num() == 1 && L[0].Text == TEXT("korunan") && !FM.FileExists(*Bak),
+				TEXT("valid_main_stale_bak_deleted_on_load"));
+			FMMOMailStore::DeleteBox(N);
+		}
+		// Ana dosya yok, .bak ve .tmp birlikte: .bak (basarisiz yazimdan ONCEKI gecerli kutu) secilir, .tmp .tmp.bad olur.
+		{
+			const FString N = TEXT("ZTestMailBt_") + Tag;
+			FMMOMailStore::DeleteBox(N);
+			const FString Path = FMMOMailStore::GetBoxPath(N), Tmp = Path + TEXT(".tmp"), Bak = Path + TEXT(".bak");
+			FM.MakeDirectory(*FPaths::GetPath(Path), true);
+			FFileHelper::SaveStringToFile(MailJson(TEXT("bak-icerik"), 11), *Bak);
+			FFileHelper::SaveStringToFile(MailJson(TEXT("tmp-icerik"), 22), *Tmp);
+			TArray<FMMOMail> L;
+			Check(FMMOMailStore::Load(N, L) && L.Num() == 1 && L[0].Text == TEXT("bak-icerik") && L[0].Gold == 11 && FM.FileExists(*Path),
+				TEXT("recover_prefers_bak_over_tmp"));
+			Check(!FM.FileExists(*Bak) && !FM.FileExists(*Tmp) && FM.FileExists(*(Tmp + TEXT(".bad"))), TEXT("recover_bak_quarantines_tmp"));
+			FMMOMailStore::DeleteBox(N);
+		}
+		// Bozuk ana dosya + .bak: ana .bad'a ayrilir, .bak geri konur ve icerigiyle true; sonraki basarili yazim .bak/.tmp birakmaz.
+		{
+			const FString N = TEXT("ZTestMailCb_") + Tag;
+			FMMOMailStore::DeleteBox(N);
+			const FString Path = FMMOMailStore::GetBoxPath(N), Tmp = Path + TEXT(".tmp"), Bak = Path + TEXT(".bak");
+			FM.MakeDirectory(*FPaths::GetPath(Path), true);
+			FFileHelper::SaveStringToFile(TEXT("{{{ bozuk"), *Path);
+			FFileHelper::SaveStringToFile(MailJson(TEXT("yedek"), 33), *Bak);
+			TArray<FMMOMail> L;
+			Check(FMMOMailStore::Load(N, L) && L.Num() == 1 && L[0].Text == TEXT("yedek") && L[0].Gold == 33 && FM.FileExists(*(Path + TEXT(".bad")))
+				&& !FM.FileExists(*Bak) && ReadRaw(Path).Equals(MailJson(TEXT("yedek"), 33), CS), TEXT("corrupt_main_restores_bak_contents"));
+			FMMOMail M; M.From = TEXT("Ali"); M.Text = TEXT("ek"); M.Gold = 1;
+			Check(FMMOMailStore::Append(N, M) && FMMOMailStore::Count(N) == 2 && !FM.FileExists(*Bak) && !FM.FileExists(*Tmp),
+				TEXT("successful_write_leaves_no_bak_tmp"));
+			FMMOMailStore::DeleteBox(N);
+		}
+		// Ilk posta (ana yok), .tmp yazilamiyor VE silinemiyor/tasinamiyor (ozel kilit): yazim GERCEKLESMIS sayilir (true; iade yok,
+		// silinemeyen .tmp kurtarmada teslim edilebilir: altin kopyalanmaz, en kotu kaybolur).
+		{
+			const FString N = TEXT("ZTestMailUt_") + Tag;
+			FMMOMailStore::DeleteBox(N);
+			const FString Path = FMMOMailStore::GetBoxPath(N), Tmp = Path + TEXT(".tmp"), Bak = Path + TEXT(".bak");
+			FM.MakeDirectory(*FPaths::GetPath(Path), true);
+			FFileHelper::SaveStringToFile(MailJson(TEXT("bayat"), 7), *Tmp);
+			TUniquePtr<IFileHandle> Lock(PF.OpenWrite(*Tmp, true, false));
+			const bool bLocked = Lock.IsValid();
+			const bool bR = bLocked && FMMOMailStore::Replace(N, NewBox);
+			const bool bState = !FM.FileExists(*Path) && !FM.FileExists(*Bak) && FM.FileExists(*Tmp);
+			Lock.Reset();
+			Check(bLocked && bR && bState, TEXT("first_mail_unremovable_tmp_counts_written"));
+			FMMOMailStore::DeleteBox(N);
+		}
+		// Y1: ana yok, .tmp kilitli (geri konamiyor): Load false ve kutu 60 sn geri cekilir; kilit kalksa da pencerede yine false
+		// (bos sayilmaz, uzerine yazilmaz); test kancasi geri cekilmeyi temizleyince kurtarma calisir.
+		{
+			const FString N = TEXT("ZTestMailBo_") + Tag;
+			FMMOMailStore::DeleteBox(N);
+			const FString Path = FMMOMailStore::GetBoxPath(N), Tmp = Path + TEXT(".tmp");
+			FM.MakeDirectory(*FPaths::GetPath(Path), true);
+			FFileHelper::SaveStringToFile(MailJson(TEXT("bekleyen"), 9), *Tmp);
+			TUniquePtr<IFileHandle> Lock(PF.OpenWrite(*Tmp, true, false));
+			const bool bLocked = Lock.IsValid();
+			TArray<FMMOMail> L;
+			const bool bFirst = FMMOMailStore::Load(N, L);
+			Lock.Reset();
+			Check(bLocked && !bFirst && L.IsEmpty() && !FM.FileExists(*Path), TEXT("y1_mail_locked_tmp_load_false"));
+			const bool bSecond = FMMOMailStore::Load(N, L);
+			Check(!bSecond && !FM.FileExists(*Path) && FM.FileExists(*Tmp), TEXT("y1_mail_backoff_blocks_retry_after_unlock"));
+			FMMOMailStore::ResetRecoveryBackoffForTest();
+			Check(FMMOMailStore::Load(N, L) && L.Num() == 1 && L[0].Gold == 9 && FM.FileExists(*Path) && !FM.FileExists(*Tmp), TEXT("y1_mail_recovers_after_backoff_reset"));
+			FMMOMailStore::DeleteBox(N);
+		}
+	}
+
+	// --- Tur 3 (Y2) + tur 4 (Y-NEW-5): bozuk/okunamayan alici kutusu -> StoreError, altin ve kayit yok, ret sogumaya yazilir ---
+	{
+		FMMOMailStore::DeleteBox(NameB);
+		const FString BoxB = FMMOMailStore::GetBoxPath(NameB);
+		FM.MakeDirectory(*FPaths::GetPath(BoxB), true);
+		FFileHelper::SaveStringToFile(TEXT("{{{ bozuk alici"), *BoxB);
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(true);
+		InvA->Gold = 5000;
+		const int32 Saves0 = A->GetSaveCallsForTest();
+		Check(A->SendMail(NameB, 100, TEXT("bozuk"), true) == EMMOMailResult::StoreError && InvA->Gold == 5000 && A->GetSaveCallsForTest() == Saves0,
+			TEXT("y2_corrupt_recipient_store_error_no_charge_no_save"));
+		Check(FM.FileExists(*(BoxB + TEXT(".bad"))) && !FM.FileExists(*BoxB), TEXT("y2_corrupt_recipient_box_quarantined"));
+		Check(A->SendMail(NameB, 100, TEXT("hemen"), true) == EMMOMailResult::Cooldown && InvA->Gold == 5000, TEXT("y5_store_error_starts_cooldown"));
+		A->AdvanceTimeForTest(6.0);
+		Check(A->SendMail(NameB, 100, TEXT("onarildi"), true) == EMMOMailResult::Ok && InvA->Gold == 5000 - 100 - FeeFor(100)
+			&& FMMOMailStore::Count(NameB) == 1 && A->GetSaveCallsForTest() == Saves0 + 1, TEXT("y2_send_works_after_box_repaired"));
+		A->AdvanceTimeForTest(6.0);
+		const int32 G1 = InvA->Gold;
+		const int32 Saves1 = A->GetSaveCallsForTest();
+		TUniquePtr<IFileHandle> Lock(PF.OpenWrite(*BoxB, true, false));
+		const bool bLocked = Lock.IsValid();
+		const EMMOMailResult RLocked = bLocked ? A->SendMail(NameB, 100, TEXT("kilitli"), true) : EMMOMailResult::Ok;
+		Lock.Reset();
+		Check(bLocked && RLocked == EMMOMailResult::StoreError && InvA->Gold == G1 && A->GetSaveCallsForTest() == Saves1 && FMMOMailStore::Count(NameB) == 1,
+			TEXT("y2_unreadable_recipient_store_error_no_charge"));
+		FMMOMailStore::DeleteBox(NameB);
 	}
 
 	// --- Guvenlik tur 2: iade, gonderim sirasinda altin callback'i araya girdiginde gercek dusulen miktarla yapilir ---
@@ -404,8 +577,8 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(InvA->Gold <= 10000 + 1000, TEXT("refund_gift_callback_no_gold_created"));
 		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] gift_callback final_gold=%d start=10000 gift=1000 charge=%d (oyuncu ucreti+eki kaybeder, altin uretilmez)"),
 			InvA->Gold, 300 + FeeFor(300));
-		// Gozlem (kontrol degil): callback bakiyeyi ucretten azina indirirse ucret hic dusulmez (tur 3: kirpilmaz), posta
-		// reddedilir ve iade yalniz dusulen ek kadardir: final_gold no_creation_max'i asmamali.
+		// Callback bakiyeyi ucretten azina indirirse ucret hic dusulmez (tur 3: kirpilmaz), posta reddedilir ve iade yalniz
+		// dusulen ek kadardir: final_gold no_creation_max'i (1000 - 495 = 505) asmamali (eskiden NOTE, artik kontrol).
 		A->AdvanceTimeForTest(6.0);
 		A->SetSaveResultForTest(false);
 		InvA->Gold = 1000;
@@ -414,6 +587,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		const EMMOMailResult RClamp = A->SendMail(NameB, 500, TEXT("kirpma"), true);
 		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] fee_clamp_refund result=%d final_gold=%d no_creation_max=%d"),
 			static_cast<int32>(RClamp), InvA->Gold, 1000 - 495);
+		Check(RClamp == EMMOMailResult::StoreError && InvA->Gold <= 1000 - 495 && FMMOMailStore::Count(NameB) == 0, TEXT("fee_clamp_refund_no_creation"));
 		InvA->OnGoldChanged.RemoveDynamic(Probe.Get(), &UMMOPurchaseCallbackProbe::OnGold);
 		A->SetSaveResultForTest(true);
 		FMMOMailStore::DeleteBox(NameB);
@@ -430,6 +604,11 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 // Guvenlik tur 2 bolumu: .tmp temizligi salt-okunur eski .tmp ve dizin olan kutu yoluyla benzetilir (gercek disk dolu/antivirus
 // kilidi degil); .tmp silme de basarisiz olursa "yazim basarili sayilir" dali (son care) kosulmaz. Iade callback'i
 // UMMOPurchaseCallbackProbe ile benzetilir; Blueprint OnGoldChanged degil.
+// Tur 3/4 bolumu: kilit ayni surecteki tutamakla (ozel yazma = kopyalanamaz/okunamaz, paylasimli okuma = silinemez/yazilamaz) ve
+// dizin olan kutu yoluyla benzetilir. KOSULMAYAN dallar: WriteBox'ta Move hedefi silip tasiyamadiginda (ya da dogrudan yazim yarida
+// kaldiginda) .bak'in HEMEN geri konmasi ve ilk-posta hata dalinda ana dosyanin .bad'a ayrilmasi (ikisi de surec ici benzetilemeyen
+// isletim sistemi hatasi / FileExists yanlis negatifi ister). Posta 60 sn geri cekilmesinin SURESI olculmez (harita anonim isim
+// alaninda); yalniz pencere icinde yeniden denenmedigi ve kanca ile temizlendigi dogrulanir.
 
 namespace
 {
