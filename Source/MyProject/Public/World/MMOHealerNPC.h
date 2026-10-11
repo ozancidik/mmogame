@@ -28,7 +28,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MMO|Healer")
 	int32 HealCost = 100;
 
-	// Seviyeye gore sifa bedeli: taban + 0,4 x (Level-1)^2 (Lv1 100, Lv30 436, Lv60 1503, Lv80 2587).
+	// Seviyeye gore sifa bedeli: taban + 0,4 x (Level-1)^2 (Lv1 100, Lv30 436, Lv60 1492, Lv80 2596).
 	// PLACEHOLDER, PIE'de olculmedi: sabit 100 altin Lv58+ bantlarinda (EconomyModel gelir/gider ~30x) fiilen bedavaydi.
 	static int32 ComputeHealCost(int32 BaseCost, int32 Level)
 	{

@@ -21,7 +21,8 @@ struct FMMOAchievementCounters
 /**
  * Basarimlar ve unvanlar. Tamamen sunucu-otoriteli: sayaclar yalniz sunucuda artar, acilan basarimlar ve secili unvan
  * sahibine/herkese replike olur. Seviye/altin/gorev sayisi her 5 sn'de okunarak, oldurme ve olum olaylarla izlenir.
- * Kalicilik: Saved/MMOAchievements/<kayit-yuvasi>.json (karakter kayit semasindan bagimsiz; kimlik = oyuncu adi,
+ * Kalicilik: Saved/MMOAchievements/<karakterin ActiveSaveSlot'u>.json, yol yukleme aninda sabitlenir; karakter yuklenmeden
+ * hic yazilmaz (eski surum EndPlay'de MMOSave_Default.json'a yaziyordu). Karakter kayit semasindan bagimsiz; kimlik = oyuncu adi,
  * bilinen hesap acigi docs/SECURITY_AUDIT.md'de). Sohbet komutlari: /basarim, /basarim unvan <ad>.
  */
 UCLASS(ClassGroup=(MMO), meta=(BlueprintSpawnableComponent))
@@ -73,6 +74,8 @@ public:
 #if !UE_BUILD_SHIPPING
 	// Testler: kalici yazmayi kapatir ve yuklenmis sayar (PlayerState/disk gerekmez).
 	void InitForTest() { bPersistenceEnabled = false; bLoaded = true; }
+	// Kayit hatasi enjeksiyonu: SaveNow false doner (acilma geri alinir, odul verilmez).
+	void SetSaveFailForTest(bool bFail) { bTestFailSaves = bFail; }
 	static bool RunSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -81,15 +84,26 @@ public:
 private:
 	bool HasAuthorityInternal() const;
 	AMMOCharacter* GetOwnerCharacter() const;
+	// Yuklu degilse yukler (karakter kaydi yuklendikten sonra, karakterin ActiveSaveSlot'una gore; canli ada gore DEGIL).
+	// Karakter yeniden yuklendiyse (LoadSerial) kirli durumu ESKI yola yazar, sifirlar ve yeniden yukler. Ayni karakter
+	// verisi ad degisimi + kayitla yeni yuvaya tasindiysa durumu da tasir (sifirlamaz: ad degistirip odul tekrari yok).
 	bool TryLoad();
-	void SaveNow();
+	// Basariyla diske yazildiysa (veya test modunda) true.
+	bool SaveNow();
 	void SaveIfDirty();
-	FString GetStoragePath() const;
+	// Karakterin ActiveSaveSlot'u; bos (yuklenmedi) veya Default ise false.
+	bool GetBoundSlot(FString& OutSlot) const;
+	void ResetLoadedState();
 	void Grant(const FMMOAchievementDef& Def);
 	void NotifyChat(const FString& Text) const;
 	void OnPeriodic();
 
 	FMMOAchievementCounters Counters;
+	// Yukleme aninda BIR KEZ belirlenen dosya yolu ve yuva; kayit hep buraya gider (EndPlay'de PlayerState kopmus olsa da).
+	FString StoragePath;
+	FString LoadedSlot;
+	uint32 LoadedSerial = 0;
+	bool bTestFailSaves = false;
 	bool bLoaded = false;
 	bool bDirty = false;
 	bool bEvaluating = false;

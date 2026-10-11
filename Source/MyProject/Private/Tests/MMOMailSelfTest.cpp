@@ -38,7 +38,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	Check(FMMOMailStore::SanitizeName(TEXT("A b/c.d")) == TEXT("A_bcd"), TEXT("name_sanitize_chars"));
 	Check(FMMOMailStore::SanitizeName(FString()) == TEXT("Default") && !FMMOMailStore::IsDeliverableName(TEXT("???")) && !FMMOMailStore::IsDeliverableName(TEXT("Default")), TEXT("name_default_not_deliverable"));
 	Check(FMMOMailStore::SanitizeName(FString::ChrN(50, TEXT('x'))).Len() == FMMOMailStore::MaxNameLength, TEXT("name_length_cap"));
-	Check(FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail/a_b.json")) || FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail\\a_b.json")), TEXT("name_box_path"));
+	Check(FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail/MMOMail_a_b.json")) || FMMOMailStore::GetBoxPath(TEXT("A b")).EndsWith(TEXT("MMOMail\\MMOMail_a_b.json")), TEXT("name_box_path"));
 	Check(FMMOMailStore::GetBoxPath(TEXT("ALI")) == FMMOMailStore::GetBoxPath(TEXT("ali")) && FMMOMailStore::GetBoxPath(TEXT("Al i")) == FMMOMailStore::GetBoxPath(TEXT("al_i")), TEXT("name_box_path_case_insensitive"));
 
 	// --- JSON dogrulama ---
@@ -128,6 +128,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	Check(A->SendMail(NameB, 0, FString::ChrN(201, TEXT('t')), true) == EMMOMailResult::TextTooLong, TEXT("live_rejects_long_text"));
 	Check(A->SendMail(NameB, 0, TEXT("   "), true) == EMMOMailResult::EmptyMail, TEXT("live_rejects_empty"));
 	Check(A->SendMail(NameB, 10, TEXT("x"), false) == EMMOMailResult::UnknownTarget, TEXT("live_rejects_unknown_recipient"));
+	A->AdvanceTimeForTest(6.0); // B3: basarisiz alici denemesi de cooldown baslatir
 	Check(A->SendMail(NameB, 2000, TEXT("x"), true) == EMMOMailResult::NoGold && InvA->Gold == 1000 && FMMOMailStore::Count(NameB) == 0, TEXT("live_no_gold_no_charge"));
 	Check(A->SendMail(NameB, 995, TEXT("x"), true) == EMMOMailResult::NoGold && InvA->Gold == 1000, TEXT("live_fee_counts_toward_total"));
 

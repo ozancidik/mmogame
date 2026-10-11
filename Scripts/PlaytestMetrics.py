@@ -34,7 +34,9 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   first_move who lv mode=walking|navwalking|falling distance scope=controller sid start elapsed
     (finite distance >=1: actual XY cm at an engine movement update, emitted %.3f)
     (controller lifetime observation; no gameplay counters or anti-cheat guarantee)
-  src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil)
+  xp       who lv src amount                 (src=gunluk: gunluk gorev XP'si; tablolarda sayilmaz, logda ayri kalem)
+  src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil);
+       posta (ek), posta_ucret (gonderim ucreti sink'i), posta-iade, basarim, gunluk - bilinmeyen src de kabul edilir
 t = surec baslangicindan beri saniye.
 """
 import os

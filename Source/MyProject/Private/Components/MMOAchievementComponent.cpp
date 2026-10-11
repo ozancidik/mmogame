@@ -32,6 +32,18 @@ namespace
 	{
 		return static_cast<int32>(FMath::Clamp(V, 0.0, static_cast<double>(UMMOAchievementComponent::MaxCounter)));
 	}
+
+	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
+	void AchRecoverTmp(const FString& Path)
+	{
+		const FString Tmp = Path + TEXT(".tmp");
+		IFileManager& FM = IFileManager::Get();
+		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarildi: %s"), *Tmp);
+			FM.Move(*Path, *Tmp, true, true);
+		}
+	}
 }
 
 UMMOAchievementComponent::UMMOAchievementComponent()
@@ -217,33 +229,78 @@ bool UMMOAchievementComponent::FromJson(const FString& Json, FMMOAchievementCoun
 
 // ---------------- Kalicilik ----------------
 
-FString UMMOAchievementComponent::GetStoragePath() const
+bool UMMOAchievementComponent::GetBoundSlot(FString& OutSlot) const
 {
-	const AMMOCharacter* C = GetOwnerCharacter();
-	const FString Slot = C ? C->GetSaveSlotName() : FString(TEXT("Default"));
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Slot + TEXT(".json"));
-}
-
-bool UMMOAchievementComponent::TryLoad()
-{
-	if (bLoaded)
-	{
-		return true;
-	}
+	OutSlot.Reset();
 	const AMMOCharacter* C = GetOwnerCharacter();
 	if (!C)
 	{
 		return false;
 	}
-	// Kayit yuvasi oyuncu adina dayanir; PlayerState adi gelmeden yukleme yapma (yanlis "Default" yuvasi).
-	const APlayerState* PS = C->GetPlayerState();
-	if (!PS || PS->GetPlayerName().IsEmpty())
+	// Canli ad DEGIL, karakterin yukledigi/yazdigi yuva: ad degistirip bos dosya yukletmek (odulleri tekrar kazanmak) mumkun olmasin.
+	OutSlot = C->GetActiveSaveSlot();
+	// Bos = karakter henuz yuklenmedi; "Default" yuvasi ortak/yanlis dosyadir, kullanma (posta da bu ada teslim etmez).
+	return !OutSlot.IsEmpty() && !OutSlot.Equals(TEXT("MMOSave_Default"), ESearchCase::IgnoreCase);
+}
+
+void UMMOAchievementComponent::ResetLoadedState()
+{
+	Counters = FMMOAchievementCounters();
+	Unlocked.Reset();
+	ActiveTitle.Reset();
+	StoragePath.Reset();
+	LoadedSlot.Reset();
+	bLoaded = false;
+	bDirty = false;
+}
+
+bool UMMOAchievementComponent::TryLoad()
+{
+	const AMMOCharacter* C = GetOwnerCharacter();
+	if (bLoaded)
+	{
+		if (!bPersistenceEnabled || !C)
+		{
+			return true; // test modu: kimlik/disk yok
+		}
+		if (C->GetLoadSerial() != LoadedSerial)
+		{
+			// Karakter verisi diskten yeniden yuklendi (MMOLoad, yalniz admin/host): eski durum ESKI yola yazilir,
+			// sonra yeni yuklenen karakterin dosyasindan yuklenir (asagida, yukleme tamamlaninca).
+			UE_LOG(LogTemp, Display, TEXT("[MMOACH] Karakter yeniden yuklendi (%s): basarimlar yeniden yukleniyor"), *LoadedSlot);
+			if (bDirty)
+			{
+				SaveNow();
+			}
+			ResetLoadedState();
+		}
+		else
+		{
+			FString Bound;
+			if (GetBoundSlot(Bound) && !Bound.Equals(LoadedSlot, ESearchCase::IgnoreCase))
+			{
+				// Ayni karakter verisi ad degisimi + basarili kayitla yeni yuvaya TASINDI: basarimlar da onunla tasinir
+				// (sifirlanmaz; aksi halde ad degistirip ayni odulleri tekrar almak mumkun olurdu).
+				UE_LOG(LogTemp, Display, TEXT("[MMOACH] Karakter yeni yuvaya tasindi (%s -> %s): basarimlar tasiniyor"), *LoadedSlot, *Bound);
+				StoragePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Bound + TEXT(".json"));
+				LoadedSlot = Bound;
+				bDirty = true;
+				SaveNow();
+			}
+			return true;
+		}
+	}
+	// Yalniz karakter kaydi yuklendikten sonra ve yuvasi belliyken (PlayerState adi gelmeden "Default" yuvasi yanlis olurdu).
+	FString Slot;
+	if (!C || !C->IsInitialLoadComplete() || !GetBoundSlot(Slot))
 	{
 		return false;
 	}
+	LoadedSerial = C->GetLoadSerial();
 	if (bPersistenceEnabled)
 	{
-		const FString Path = GetStoragePath();
+		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Slot + TEXT(".json"));
+		AchRecoverTmp(Path);
 		FString Raw;
 		if (FFileHelper::LoadFileToString(Raw, *Path))
 		{
@@ -262,31 +319,44 @@ bool UMMOAchievementComponent::TryLoad()
 				IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true);
 			}
 		}
+		StoragePath = Path;
 	}
+	LoadedSlot = Slot;
 	bLoaded = true;
 	return true;
 }
 
-void UMMOAchievementComponent::SaveNow()
+bool UMMOAchievementComponent::SaveNow()
 {
-	if (!bPersistenceEnabled || !bLoaded)
+	if (bTestFailSaves)
 	{
-		return;
+		return false;
 	}
+	if (!bPersistenceEnabled)
+	{
+		return true; // test modu: disk yok, basarili say
+	}
+	// Yol yalniz yuklemede belirlenir: yuklenmemis/kimliksiz durum hicbir dosyaya (ozellikle MMOSave_Default) yazilmaz.
+	if (!bLoaded || StoragePath.IsEmpty())
+	{
+		return false;
+	}
+	LastSaveTime = FPlatformTime::Seconds();
 	FString Json;
 	if (!ToJson(Counters, Unlocked, ActiveTitle, Json))
 	{
-		return;
+		return false;
 	}
-	const FString Path = GetStoragePath();
+	const FString& Path = StoragePath;
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 	const FString Tmp = Path + TEXT(".tmp");
 	if (FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)
 		&& IFileManager::Get().Move(*Path, *Tmp, true, true))
 	{
 		bDirty = false;
+		return true;
 	}
-	LastSaveTime = FPlatformTime::Seconds();
+	return false;
 }
 
 void UMMOAchievementComponent::SaveIfDirty()
@@ -301,7 +371,8 @@ void UMMOAchievementComponent::SaveIfDirty()
 
 void UMMOAchievementComponent::NotifyMobKilled(FName ArchetypeId)
 {
-	if (!HasAuthorityInternal() || !bLoaded || ArchetypeId.IsNone())
+	// TryLoad: zamanlayicidan once gelen ilk oldurme de sayilsin; ad degistiyse once yeni yuvaya gecilir.
+	if (!HasAuthorityInternal() || ArchetypeId.IsNone() || !TryLoad())
 	{
 		return;
 	}
@@ -320,7 +391,7 @@ void UMMOAchievementComponent::NotifyMobKilled(FName ArchetypeId)
 
 void UMMOAchievementComponent::OnOwnerDied()
 {
-	if (!HasAuthorityInternal() || !bLoaded)
+	if (!HasAuthorityInternal() || !TryLoad())
 	{
 		return;
 	}
@@ -371,7 +442,17 @@ void UMMOAchievementComponent::EvaluateAll()
 		Unlocked.Add(Id);
 	}
 	bDirty = true;
-	SaveNow(); // acilma kaydi oduller dagitilmadan once diske gider: coken/atlanan callback ayni basarimi ikinci kez vermez
+	// Acilma kaydi oduller dagitilmadan once diske gider: coken/atlanan callback ayni basarimi ikinci kez vermez.
+	// Yazilamazsa odul VERME ve acilmayi geri al: bir sonraki degerlendirmede (5 sn) yeniden denenir, odul kaybolmaz.
+	if (!SaveNow())
+	{
+		for (const FName Id : Newly)
+		{
+			Unlocked.Remove(Id);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Basarim dosyasi yazilamadi (%s): %d acilma ertelendi"), *StoragePath, Newly.Num());
+		return;
+	}
 	const TWeakObjectPtr<UMMOAchievementComponent> Weak(this);
 	for (const FName Id : Newly)
 	{
@@ -436,7 +517,7 @@ void UMMOAchievementComponent::CmdList()
 	{
 		return;
 	}
-	if (!bLoaded)
+	if (!TryLoad())
 	{
 		NotifyChat(TEXT("Basarimlar su an yuklenemiyor; birkac saniye sonra tekrar dene."));
 		return;
@@ -487,16 +568,20 @@ void UMMOAchievementComponent::CmdList()
 
 void UMMOAchievementComponent::CmdTitle(const FString& TitleName)
 {
-	if (!HasAuthorityInternal() || !bLoaded)
+	if (!HasAuthorityInternal() || !TryLoad())
 	{
 		return;
 	}
 	const FString Wanted = TitleName.TrimStartAndEnd();
+	// Deger degismediyse diske yazma (komut tekrariyla disk yukunu artirmak mumkun olmasin).
 	if (Wanted.IsEmpty())
 	{
-		ActiveTitle.Reset();
-		bDirty = true;
-		SaveNow();
+		if (!ActiveTitle.IsEmpty())
+		{
+			ActiveTitle.Reset();
+			bDirty = true;
+			SaveNow();
+		}
 		NotifyChat(TEXT("Unvan kaldirildi."));
 		return;
 	}
@@ -505,9 +590,12 @@ void UMMOAchievementComponent::CmdTitle(const FString& TitleName)
 		const FMMOAchievementDef* D = FMMOAchievementDatabase::Find(Id);
 		if (D && !D->Title.IsEmpty() && D->Title.Equals(Wanted, ESearchCase::IgnoreCase))
 		{
-			ActiveTitle = D->Title;
-			bDirty = true;
-			SaveNow();
+			if (!ActiveTitle.Equals(D->Title, ESearchCase::CaseSensitive))
+			{
+				ActiveTitle = D->Title;
+				bDirty = true;
+				SaveNow();
+			}
 			NotifyChat(FString::Printf(TEXT("Unvan secildi: %s"), *ActiveTitle));
 			return;
 		}

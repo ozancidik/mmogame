@@ -1366,6 +1366,7 @@ bool AMMOCharacter::LoadCharacter()
 	// Manuel MMOLoad ve otomatik yukleme ayni guvenlik kapisindan gecer. Onceki bir
 	// yukleme basarili olsa bile simdiki dosya okunamazsa autosave onu ezmesin.
 	bInitialLoadComplete = false;
+	++LoadSerial; // basarim/gunluk: karakter verisi degisti, yan dosyalari yeniden yukle
 	GetWorldTimerManager().ClearTimer(SavedLocationRetryTimerHandle);
 	SavedLocationRetryCount = 0;
 

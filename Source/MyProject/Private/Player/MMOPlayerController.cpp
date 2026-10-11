@@ -1408,7 +1408,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 	}
 	if (Msg.Equals(TEXT("/yardim"), ESearchCase::IgnoreCase) || Msg.Equals(TEXT("/help"), ESearchCase::IgnoreCase))
 	{
-		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /parti (davet; kabul, ret, ayril), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, kabul, sil isim, liste), /yardim"), 2);
+		ClientReceiveChat(FString(), TEXT("Komutlar: /p mesaj (parti), /parti (davet; kabul, ret, ayril), /w isim mesaj (fisilti), /who (cevrimici oyuncular), /trade (ticaret; kabul, iptal), /klan (kur ad, davet, kabul, ayril, at isim, liste), /g mesaj (klan sohbeti), /arkadas (ekle isim, kabul, sil isim, liste), /basarim (unvan ad), /gunluk (gunluk gorevler), /posta (gonder isim [500g] mesaj), /yardim"), 2);
 		return;
 	}
 	if (Msg.Equals(TEXT("/who"), ESearchCase::IgnoreCase))
@@ -1643,7 +1643,7 @@ void AMMOPlayerController::ServerSendChat_Implementation(const FString& Message,
 		ClientReceiveChat(FString(), TEXT("Gunluk gorevler su an kullanilamaz."), 2);
 		return;
 	}
-	// Posta: "/posta" (bilgi), "/posta gonder <isim> [altin] <mesaj>".
+	// Posta: "/posta" (bilgi), "/posta gonder <isim> [<miktar>g] <mesaj>" (ayristirma: UMMOMailComponent::ParseSendArgs).
 	if (Msg.Equals(TEXT("/posta"), ESearchCase::IgnoreCase) || Msg.StartsWith(TEXT("/posta "), ESearchCase::IgnoreCase))
 	{
 		if (!IsValid(SeenCommandPawn) || SeenCommandPawn != GetPawn()) return;

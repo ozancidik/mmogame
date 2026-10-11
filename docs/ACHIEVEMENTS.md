@@ -31,7 +31,15 @@ gorev ilerlemesinden SONRA), `MMOPlayerController.cpp` (`/basarim` sohbet komutu
 - **Yeniden giris korumasi:** yeni acilanlar once belirlenir, `Unlocked` ve disk guncellenir, SONRA oduller dagitilir (altin callback'i bileseni
   tekrar cagirsa da ayni basarim ikinci kez verilmez; `bEvaluating` guard).
 - **Mob:** `AMMOCharacter` mobun da tabani oldugu icin bilesen mobda izleme yapmaz ve replikasyonu kapatir.
-- **Yukleme:** PlayerState adi gelmeden yuklenmez; o ana kadar gelen olaylar sayilmaz (ilk saniyelerde oldurme olmaz).
+- **Yukleme / yuva (2026-10-11 QA O1/O3/D5/A6 + guvenlik B1):** karakter kaydi yuklenmeden (`IsInitialLoadComplete`) yuklenmez; yuva oyuncunun
+  canli adi DEGIL, karakterin `GetActiveSaveSlot()` degeridir ve dosya yolu yukleme aninda sabitlenir. Boylece:
+  - EndPlay'de PlayerState kopmus olsa da dogru dosyaya yazilir (eski surum `MMOSave_Default.json`'a yaziyordu); yuklenmemis durum hic yazilmaz.
+  - Ad degistirmek bos bir dosya yukletmez (eskiden `MMOSetName Yeni1, Yeni2...` ile seviye/gorev basarim altini tekrar tekrar alinabiliyordu).
+    Karakter yeni ada kaydedilince (ActiveSaveSlot degisir) basarimlar da yeni yola TASINIR, sifirlanmaz.
+  - Karakter diskten yeniden yuklenirse (`MMOLoad`, `AMMOCharacter::GetLoadSerial()` artar) once eski durum eski yola yazilir, sonra yeniden yuklenir.
+  - Oldurme/olum olaylari da yuklemeyi tetikler (zamanlayicidan once gelen olay kaybolmaz). Yarim kalan yazim (`.tmp`, ana dosya yok) yuklemede geri konur.
+- **Disk yazilamazsa odul yok:** acilma diske yazilamazsa `Unlocked` geri alinir ve odul verilmez; 5 sn sonra yeniden denenir. Ayni unvan
+  tekrar secilirse diske yazilmaz.
 
 ## Bilinen sinirlar (durust)
 

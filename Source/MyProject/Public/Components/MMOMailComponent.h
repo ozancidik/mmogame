@@ -21,13 +21,16 @@ enum class EMMOMailResult : uint8
 	TextTooLong,
 	Cooldown,
 	BoxFull,
-	StoreError
+	StoreError,
+	NameChanged    // gonderen ad degistirdi ama karakter henuz yeni yuvaya yazilmadi (catallama/altin katlama riski)
 };
 
 /**
  * Posta: cevrimdisi/cevrimici oyuncuya kisa mesaj + altin eki. Sunucu-otoriteli, replikasyonsuz; komut /posta.
- * Gonderen once altin+ucreti oder (ucret = bir altin SINK'i), sonra kutuya yazilir; yazma basarisizsa iade edilir.
- * Alici kutusu her 10 sn ve giriste bosaltilir (once diske bos yazilir, sonra altin verilir: cift odeme yok).
+ * Gonderim sirasi (altin asla KOPYALANMAZ, en kotu durumda kaybolur): ucret dusulur -> gonderen karakter diske kaydedilir
+ * (basarisizsa iade) -> kutuya yazilir (basarisizsa iade + tekrar kayit). Kayit yuklenmeden / bolge gecisi onaylandiktan sonra gonderim yok.
+ * Alici kutusu her 10 sn bosaltilir: once teslim edilecekler kutudan silinir (diske), sonra altin verilir, sonra karakter kaydedilir.
+ * Altin tavanini (UMMOInventoryComponent::MaxGold) asacak posta kutuda kalir.
  * Kimlik oyuncu adi; alici varligi = karakter kayit dosyasi (yerel depo) veya cevrimici oyuncu. Bulut depoya gecince guncellenmeli.
  */
 UCLASS(ClassGroup=(MMO), meta=(BlueprintSpawnableComponent))
@@ -60,10 +63,20 @@ public:
 
 	static FString ResultText(EMMOMailResult R);
 
+	// "/posta gonder" argumanlari (saf, test edilebilir): "isim [<sayi>g] mesaj". Altin YALNIZ acik bicimde (rakamlar + 'g'
+	// soneki, ornek "500g"); aksi halde isimden sonraki her sey mesajdir ("100 kere tesekkurler" altin DEGILDIR).
+	// Cok buyuk sayi MaxGoldPerMail+1 olur (SendMail BadGold ile reddeder).
+	static void ParseSendArgs(const FString& Args, FString& OutName, int32& OutGold, FString& OutText);
+
 #if !UE_BUILD_SHIPPING
-	// Testler: ad ve zamanlayici/PlayerState bagimliligini kaldirir; cooldown saatini elle ilerletir.
+	// Testler: ad ve zamanlayici/PlayerState/kayit-yukleme bagimliligini kaldirir; cooldown saatini elle ilerletir.
+	// Test modunda karakter kaydi cagrilmaz; sonucu SetSaveResultForTest belirler (varsayilan basarili) ve sayilir.
 	void InitForTest(const FString& Name) { TestName = Name; bTestMode = true; }
 	void AdvanceTimeForTest(double Seconds) { TestClock += Seconds; }
+	void SetSaveResultForTest(bool bOk) { bTestSaveResult = bOk; }
+	void SetTravelLockedForTest(bool bLocked) { bTestTravelLocked = bLocked; }
+	void SetNameChangedForTest(bool bChanged) { bTestNameChanged = bChanged; }
+	int32 GetSaveCallsForTest() const { return TestSaveCalls; }
 	static bool RunSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -75,10 +88,21 @@ private:
 	double Now() const;
 	void NotifyChat(const FString& Text) const;
 	void OnPeriodic();
+	// Kayit yuklenmedi veya bolge gecisi kaydi onaylandi: altin degisikligi kalici olmaz, posta islemi yapilmaz.
+	bool IsOwnerLocked(const AMMOCharacter& Owner) const;
+	// Canli ad ile karakterin kayit yuvasi (ActiveSaveSlot) farkli: ad degisti, karakter yeni ada henuz yazilmadi.
+	bool IsNameChanged(const AMMOCharacter& Owner) const;
+	// Sahip karakteri diske yazar (senkron); test modunda sahte sonuc.
+	bool SaveOwner();
 
 	double LastSendTime = -1000.0;
 	bool bCollecting = false;
 	bool bTestMode = false;
+	bool bTestSaveResult = true;
+	bool bTestTravelLocked = false;
+	bool bTestNameChanged = false;
+	int32 TestSaveCalls = 0;
+	int32 LastCapWarnKept = 0; // altin tavani yuzunden kutuda kalan posta sayisi (uyari tekrarini onler)
 	FString TestName;
 	double TestClock = 0.0;
 	FTimerHandle PeriodicTimer;

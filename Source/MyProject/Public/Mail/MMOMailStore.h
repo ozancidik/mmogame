@@ -14,7 +14,7 @@ struct FMMOMail
 };
 
 /**
- * Posta kutusu deposu (sunucu tarafi, dosya tabanli): Saved/MMOMail/<temiz-ad>.json. Alici cevrimdisi olabilir.
+ * Posta kutusu deposu (sunucu tarafi, dosya tabanli): Saved/MMOMail/MMOMail_<temiz-ad-kucuk-harf>.json. Alici cevrimdisi olabilir.
  * Kimlik oyuncu adidir (projedeki bilinen acik, docs/SECURITY_AUDIT.md); dosya adi karakter kayit yuvasi ile ayni
  * temizleme kuralini kullanir (alnum, '_', '-', bosluk -> '_', en fazla 32 karakter).
  * Tum sinirlar burada zorlanir; bilesen ve testler ayni kurallari kullanir.
@@ -38,7 +38,10 @@ public:
 	static bool FromJson(const FString& Json, TArray<FMMOMail>& OutMails);
 
 	// Diskten kutu. Dosya yoksa bos liste ve true; bozuksa .bad'a tasinir, bos liste ve true (kutu yeniden baslar).
+	// Ana dosya yok ama .tmp varsa (yazim ortasinda cokme) once .tmp geri konur; konamazsa false.
 	static bool Load(const FString& Name, TArray<FMMOMail>& OutMails);
+	// Kutuyu verilen listeyle degistirir (atomik yazim). CollectMail teslim edilemeyenleri kutuda birakmak icin kullanir.
+	static bool Replace(const FString& Name, const TArray<FMMOMail>& Mails);
 	// Kutuya ekle. False: kutu dolu, gecersiz ad/metin/altin veya disk hatasi.
 	static bool Append(const FString& Name, const FMMOMail& Mail);
 	// Kutuyu bosaltip icerigi doner (once diske bos yazilir; cokme halinde ayni posta iki kez verilmez).

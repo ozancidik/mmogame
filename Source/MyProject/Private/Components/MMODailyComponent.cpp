@@ -8,6 +8,7 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOQuestComponent.h"
 #include "Core/MMONotify.h"
+#include "Core/MMOMetrics.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
@@ -27,6 +28,18 @@ namespace
 	constexpr float DailyPeriodicSeconds = 5.f;
 	constexpr int32 DailyMaxTarget = 10000;
 	constexpr int32 DailyMaxReward = 10000000;
+
+	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
+	void DailyRecoverTmp(const FString& Path)
+	{
+		const FString Tmp = Path + TEXT(".tmp");
+		IFileManager& FM = IFileManager::Get();
+		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarildi: %s"), *Tmp);
+			FM.Move(*Path, *Tmp, true, true);
+		}
+	}
 }
 
 UMMODailyComponent::UMMODailyComponent()
@@ -183,33 +196,79 @@ bool UMMODailyComponent::FromJson(const FString& Json, int32& OutDayKey, int32& 
 
 // ---------------- Kalicilik ----------------
 
-FString UMMODailyComponent::GetStoragePath() const
+bool UMMODailyComponent::GetBoundSlot(FString& OutSlot) const
 {
-	const AMMOCharacter* C = GetOwnerCharacter();
-	const FString Slot = C ? C->GetSaveSlotName() : FString(TEXT("Default"));
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Slot + TEXT(".json"));
-}
-
-bool UMMODailyComponent::TryLoad()
-{
-	if (bLoaded)
-	{
-		return true;
-	}
+	OutSlot.Reset();
 	const AMMOCharacter* C = GetOwnerCharacter();
 	if (!C)
 	{
 		return false;
 	}
+	// Canli ad DEGIL, karakterin yukledigi/yazdigi yuva: ad degistirip bos dosya yukletmek (gunlukleri tekrar almak) mumkun olmasin.
+	OutSlot = C->GetActiveSaveSlot();
+	// Bos = karakter henuz yuklenmedi; "Default" yuvasi ortak/yanlis dosyadir, kullanma.
+	return !OutSlot.IsEmpty() && !OutSlot.Equals(TEXT("MMOSave_Default"), ESearchCase::IgnoreCase);
+}
+
+void UMMODailyComponent::ResetLoadedState()
+{
+	Bounties.Reset();
+	StoredDayKey = 0;
+	QuestBaseline = 0;
+	StoragePath.Reset();
+	LoadedSlot.Reset();
+	bLoaded = false;
+	bDirty = false;
+}
+
+bool UMMODailyComponent::TryLoad()
+{
+	const AMMOCharacter* C = GetOwnerCharacter();
+	if (bLoaded)
+	{
+		if (!bPersistenceEnabled || !C)
+		{
+			return true; // test modu: kimlik/disk yok
+		}
+		if (C->GetLoadSerial() != LoadedSerial)
+		{
+			// Karakter verisi diskten yeniden yuklendi (MMOLoad, yalniz admin/host): eski durum ESKI yola yazilir,
+			// sonra yeni yuklenen karakterin dosyasindan yuklenir ve gorev referansi yeniden alinir.
+			UE_LOG(LogTemp, Display, TEXT("[MMODAILY] Karakter yeniden yuklendi (%s): gunluk gorevler yeniden yukleniyor"), *LoadedSlot);
+			if (bDirty)
+			{
+				SaveNow();
+			}
+			ResetLoadedState();
+			bRebaseQuestsOnLoad = true;
+		}
+		else
+		{
+			FString Bound;
+			if (GetBoundSlot(Bound) && !Bound.Equals(LoadedSlot, ESearchCase::IgnoreCase))
+			{
+				// Ayni karakter verisi ad degisimi + basarili kayitla yeni yuvaya TASINDI: gunluk durum da onunla tasinir
+				// (sifirlanmaz; aksi halde ad degistirip ayni gunlukleri tekrar almak mumkun olurdu).
+				UE_LOG(LogTemp, Display, TEXT("[MMODAILY] Karakter yeni yuvaya tasindi (%s -> %s): gunluk gorevler tasiniyor"), *LoadedSlot, *Bound);
+				StoragePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Bound + TEXT(".json"));
+				LoadedSlot = Bound;
+				bDirty = true;
+				SaveNow();
+			}
+			return true;
+		}
+	}
 	// Gorev sayaci referansi karakter kaydi yuklendikten SONRA alinmali; yoksa kayit yuklenince sayi sicrar ve gorev yanlis tamamlanir.
-	const APlayerState* PS = C->GetPlayerState();
-	if (!PS || PS->GetPlayerName().IsEmpty() || !C->IsInitialLoadComplete())
+	FString Slot;
+	if (!C || !C->IsInitialLoadComplete() || !GetBoundSlot(Slot))
 	{
 		return false;
 	}
+	LoadedSerial = C->GetLoadSerial();
 	if (bPersistenceEnabled)
 	{
-		const FString Path = GetStoragePath();
+		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Slot + TEXT(".json"));
+		DailyRecoverTmp(Path);
 		FString Raw;
 		if (FFileHelper::LoadFileToString(Raw, *Path))
 		{
@@ -227,30 +286,61 @@ bool UMMODailyComponent::TryLoad()
 				IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true);
 			}
 		}
+		StoragePath = Path;
 	}
+	if (bRebaseQuestsOnLoad)
+	{
+		// Karakter yeniden yuklendi: dosyadaki referans baska bir gorev sayacina gore alinmis olabilir: bugunku ilerlemeyi
+		// koruyarak referansi simdiki sayaca gore yeniden al (sayi sicrayip gorev yanlis tamamlanmasin).
+		bRebaseQuestsOnLoad = false;
+		const UMMOQuestComponent* Q = C->GetQuestComponent();
+		const int32 QuestsNow = Q ? Q->CompletedQuests.Num() : 0;
+		int32 ClaimProgress = 0;
+		for (const FMMODailyBounty& B : Bounties)
+		{
+			if (B.Kind == EMMODailyKind::ClaimQuests)
+			{
+				ClaimProgress = B.Progress;
+			}
+		}
+		QuestBaseline = FMath::Max(0, QuestsNow - ClaimProgress);
+		bDirty = true;
+	}
+	LoadedSlot = Slot;
 	bLoaded = true;
 	return true;
 }
 
-void UMMODailyComponent::SaveNow()
+bool UMMODailyComponent::SaveNow()
 {
-	if (!bPersistenceEnabled || !bLoaded)
+	if (bTestFailSaves)
 	{
-		return;
+		return false;
+	}
+	if (!bPersistenceEnabled)
+	{
+		return true; // test modu: disk yok, basarili say
+	}
+	// Yol yalniz yuklemede belirlenir: yuklenmemis/kimliksiz durum hicbir dosyaya (ozellikle MMOSave_Default) yazilmaz.
+	if (!bLoaded || StoragePath.IsEmpty())
+	{
+		return false;
 	}
 	FString Json;
 	if (!ToJson(StoredDayKey, QuestBaseline, Bounties, Json))
 	{
-		return;
+		return false;
 	}
-	const FString Path = GetStoragePath();
+	const FString& Path = StoragePath;
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 	const FString Tmp = Path + TEXT(".tmp");
 	if (FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)
 		&& IFileManager::Get().Move(*Path, *Tmp, true, true))
 	{
 		bDirty = false;
+		return true;
 	}
+	return false;
 }
 
 // ---------------- Olaylar ----------------
@@ -345,9 +435,18 @@ void UMMODailyComponent::EvaluateAll()
 		}
 		return;
 	}
-	TGuardValue<bool> Guard(bEvaluating, true);
 	bDirty = true;
-	SaveNow();
+	// Yazilamazsa odul VERME ve bDone'u geri al: bir sonraki degerlendirmede (5 sn) yeniden denenir, odul kaybolmaz.
+	if (!SaveNow())
+	{
+		for (const int32 i : NewlyDone)
+		{
+			Bounties[i].bDone = false;
+		}
+		UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Gunluk gorev dosyasi yazilamadi (%s): %d odul ertelendi"), *StoragePath, NewlyDone.Num());
+		return;
+	}
+	TGuardValue<bool> Guard(bEvaluating, true);
 	const TWeakObjectPtr<UMMODailyComponent> Weak(this);
 	for (const int32 i : NewlyDone)
 	{
@@ -383,6 +482,12 @@ void UMMODailyComponent::Grant(int32 Index)
 	{
 		if (UMMOStatsComponent* S = WeakOwner->GetStats())
 		{
+			// Olcum: gunluk gorev XP'si ayri kalem (oldurme/gorev XP'sinden ayrilsin). lv = odulden onceki seviye.
+			if (WeakOwner->IsPlayerControlled())
+			{
+				UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=xp who=%s lv=%d src=gunluk amount=%d"),
+					MMOMetrics::Seconds(), *MMOMetrics::WhoName(WeakOwner.Get()), S->Level, B.RewardXP);
+			}
 			S->GainExperience(B.RewardXP);
 		}
 	}

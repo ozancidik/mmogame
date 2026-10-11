@@ -115,6 +115,13 @@ public:
 
 	// Kayit basariyla yuklendi/olusturuldu mu (gun-ici sayac referanslari buna gore alinir).
 	bool IsInitialLoadComplete() const { return bInitialLoadComplete; }
+	// Bolge gecisi kaydi onaylandi (karakter gecis icin dondu): bu andan sonra altin/esya degisikligi kalici olmaz.
+	bool IsTravelSaveCommitted() const { return bTravelSaveCommitted; }
+	// Son yuklenen/olusturulan/yazilan kayit yuvasi (bos = henuz yuklenmedi). Ad degisince hemen DEGISMEZ; ancak yeni ada
+	// basarili bir kayit yazilinca (karakter verisi tasindi) ya da LoadCharacter ile degisir.
+	const FString& GetActiveSaveSlot() const { return ActiveSaveSlot; }
+	// Her LoadCharacter cagrisinda artar: yan dosyalar (basarim/gunluk) karakter verisinin degistigini buradan anlar.
+	uint32 GetLoadSerial() const { return LoadSerial; }
 
 	// Sinif degistirme konsol komutu: "MMOClass savasci|okcu|buyucu|rahip"
 	// (Ingilizce warrior|archer|mage|priest de calisir).
@@ -430,6 +437,7 @@ protected:
 #endif
 	// Son yuklenen/olusturulan/yazilan kayit yuvasi (K-1: ad degisince baska yuvanin ezilmesini engellemek icin).
 	FString ActiveSaveSlot;
+	uint32 LoadSerial = 0;
 
 	// Yeni karakter (kayit dosyasi yok) baslangic paketi: Kisa Kilic + Deri Zirh (kusanili) + 3 Can Iksiri.
 	// Yalniz LoadCharacter'in "kayit yok" dalindan, sunucuda; pawn basina bir kez.

@@ -35,7 +35,8 @@ FString FMMOMailStore::SanitizeName(const FString& Name)
 FString FMMOMailStore::GetBoxPath(const FString& Name)
 {
 	// Kucuk harf: Linux sunucuda "Ali" ve "ali" ayri dosya olup altin kaybettirmesin (kimlik karsilastirmasi zaten harf duyarsiz).
-	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOMail"), SanitizeName(Name).ToLower() + TEXT(".json"));
+	// "MMOMail_" oneki: Windows'ta ayrilmis adlar (con, nul, aux, com1...) tek basina dosya adi olamaz.
+	return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOMail"), FString(TEXT("MMOMail_")) + SanitizeName(Name).ToLower() + TEXT(".json"));
 }
 
 bool FMMOMailStore::ToJson(const TArray<FMMOMail>& Mails, FString& OutJson)
@@ -110,6 +111,17 @@ bool FMMOMailStore::Load(const FString& Name, TArray<FMMOMail>& OutMails)
 		return false;
 	}
 	const FString Path = GetBoxPath(Name);
+	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy
+	// (aksi halde kutu "bos" sayilir ve icindeki altin kaybolurdu).
+	const FString Tmp = Path + TEXT(".tmp");
+	if (!IFileManager::Get().FileExists(*Path) && IFileManager::Get().FileExists(*Tmp))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Yarim kalan yazim kurtarildi: %s"), *Tmp);
+		if (!IFileManager::Get().Move(*Path, *Tmp, true, true))
+		{
+			return false; // kurtarilamadi: bos sayip ustune yazma
+		}
+	}
 	FString Raw;
 	if (!FFileHelper::LoadFileToString(Raw, *Path))
 	{
@@ -134,8 +146,32 @@ static bool WriteBox(const FString& Name, const TArray<FMMOMail>& Mails)
 	const FString Path = FMMOMailStore::GetBoxPath(Name);
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 	const FString Tmp = Path + TEXT(".tmp");
-	return FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)
-		&& IFileManager::Get().Move(*Path, *Tmp, true, true);
+	IFileManager& FM = IFileManager::Get();
+	if (!FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		return false; // ana dosyaya dokunulmadi
+	}
+	if (FM.Move(*Path, *Tmp, true, true))
+	{
+		return true;
+	}
+	// A4: Move basarisiz (kilit, antivirus vb.): dogrudan nihai yola yazmayi dene.
+	UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Kutu tasima (Move) basarisiz, dogrudan yazim deneniyor: %s"), *Path);
+	if (FFileHelper::SaveStringToFile(Json, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
+	{
+		FM.Delete(*Tmp, false, true, true);
+		return true;
+	}
+	if (FM.FileExists(*Path))
+	{
+		// Ana dosya (eski ya da yarim yazilmis) duruyor: .tmp'yi sil, eski icerik gecerli; cagiran basarisiz sayar.
+		// (Yarim yazilmis ana dosya bir sonraki Load'da .bad'a ayrilir: posta kaybolabilir, kopyalanmaz.)
+		FM.Delete(*Tmp, false, true, true);
+		return false;
+	}
+	// Ana dosya yok, .tmp tam ve yeni icerikte: bir sonraki Load onu geri koyar. Basarisiz desek cagiran iade/teslim
+	// etmez ama kurtarma yeni icerigi yine yazardi (Append'de altin kopyalanirdi); bu yuzden yazim GERCEKLESMIS sayilir.
+	return FM.FileExists(*Tmp);
 }
 
 bool FMMOMailStore::Append(const FString& Name, const FMMOMail& Mail)
@@ -153,6 +189,15 @@ bool FMMOMailStore::Append(const FString& Name, const FMMOMail& Mail)
 	}
 	Box.Add(Mail);
 	return WriteBox(Name, Box);
+}
+
+bool FMMOMailStore::Replace(const FString& Name, const TArray<FMMOMail>& Mails)
+{
+	if (!IsDeliverableName(Name) || Mails.Num() > MaxMailsPerBox)
+	{
+		return false;
+	}
+	return WriteBox(Name, Mails);
 }
 
 bool FMMOMailStore::TakeAll(const FString& Name, TArray<FMMOMail>& OutMails)

@@ -31,6 +31,11 @@ Her **UTC gunu** icin 3 gorev, gece yarisi UTC'de yenilenir:
 - **Once kaydet, sonra odul:** tamamlanan gorevler isaretlenip diske yazilir, sonra altin/XP verilir (odul callback'i bileseni tekrar cagirsa da iki kez odenmez).
 - **Kalicilik:** `Saved/MMODaily/<kayit-yuvasi>.json`; karakter kayit semasina (`MMOSaveGame.h`) dokunulmadi. Yuklemede dogrulama: tam 3 gorev, bilinen tur,
   hedef 1..10000, ilerleme [0, hedef], oduller [0, 1e7]; gecersizse dosya `.bad` olarak ayrilir ve gorevler yeniden olusur.
+- **Yuva (2026-10-11 QA O1/O3/D3 + guvenlik B1):** yuva oyuncunun canli adi DEGIL, karakterin `GetActiveSaveSlot()` degeridir; dosya yolu
+  yukleme aninda sabitlenir (EndPlay'de `MMOSave_Default.json`'a yazma yok). Ad degistirmek bos dosya yukletip gunlukleri tekrar aldirmaz;
+  karakter yeni ada kaydedilince durum yeni yola tasinir. Karakter diskten yeniden yuklenirse (`MMOLoad`) eski durum eski yola yazilir, yeniden
+  yuklenir ve `QuestBaseline` bugunku ilerleme korunarak simdiki gorev sayisina gore yeniden alinir. Yarim kalan `.tmp` yazimi yuklemede geri konur.
+- **Disk yazilamazsa odul yok:** tamamlanma diske yazilamazsa `bDone` geri alinir, odul verilmez, sonraki degerlendirmede yeniden denenir.
 - Mobda izleme yok (AMMOCharacter mobun da tabani).
 
 ## Bilinen sinirlar (durust)

@@ -29,7 +29,7 @@ struct FMMODailyBounty
 /**
  * Gunluk gorevler: UTC gunu degisince yeniden olusturulan 3 gorev (avlanma, uygun-seviye avlanma, 1 gorev tamamlama).
  * Sunucu-otoriteli, replikasyon YOK (yalniz sohbet komutu /gunluk ve bildirimler). Tamamlaninca odul otomatik verilir.
- * Kalicilik: Saved/MMODaily/<kayit-yuvasi>.json (karakter kayit semasindan bagimsiz; kimlik = oyuncu adi, bilinen aciklar SECURITY_AUDIT.md).
+ * Kalicilik: Saved/MMODaily/<kayit-yuvasi>.json, yuva = karakterin ActiveSaveSlot'u, yol yukleme aninda sabitlenir, karakter yuklenmeden yazilmaz (karakter kayit semasindan bagimsiz; kimlik = oyuncu adi, bilinen aciklar SECURITY_AUDIT.md).
  * Oduller kucuk: altin 15 x seviye (x2 son gorevde), XP = sonraki seviye esiginin %2'si (x2 son gorevde).
  */
 UCLASS(ClassGroup=(MMO), meta=(BlueprintSpawnableComponent))
@@ -67,6 +67,8 @@ public:
 	// Testler: kalici yazmayi kapatir, yuklenmis sayar ve gun anahtarini sabitler (PlayerState/disk/saat gerekmez).
 	void InitForTest(int32 ForcedDay) { bPersistenceEnabled = false; bLoaded = true; ForcedDayKey = ForcedDay; }
 	void SetDayForTest(int32 ForcedDay) { ForcedDayKey = ForcedDay; }
+	// Kayit hatasi enjeksiyonu: SaveNow false doner (bDone geri alinir, odul verilmez).
+	void SetSaveFailForTest(bool bFail) { bTestFailSaves = bFail; }
 	static bool RunSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -76,14 +78,25 @@ private:
 	bool HasAuthorityInternal() const;
 	AMMOCharacter* GetOwnerCharacter() const;
 	int32 CurrentDayKey() const;
+	// Yuklu degilse yukler (karakter kaydi yuklendikten sonra, karakterin ActiveSaveSlot'una gore; canli ada gore DEGIL).
+	// Karakter yeniden yuklendiyse (LoadSerial) kirli durumu ESKI yola yazar, sifirlar, yeniden yukler ve gorev referansini
+	// (QuestBaseline) yeniden alir. Ayni karakter ad degisimi + kayitla yeni yuvaya tasindiysa durumu da tasir (sifirlamaz).
 	bool TryLoad();
 	void RollIfNewDay(const AMMOCharacter& Owner);
-	void SaveNow();
-	FString GetStoragePath() const;
+	// Basariyla diske yazildiysa (veya test modunda) true.
+	bool SaveNow();
+	// Karakterin ActiveSaveSlot'u; bos (yuklenmedi) veya Default ise false.
+	bool GetBoundSlot(FString& OutSlot) const;
+	void ResetLoadedState();
 	void Grant(int32 Index);
 	void NotifyChat(const FString& Text) const;
 	void OnPeriodic();
 
+	// Yukleme aninda BIR KEZ belirlenen dosya yolu ve yuva; kayit hep buraya gider (EndPlay'de PlayerState kopmus olsa da).
+	FString StoragePath;
+	FString LoadedSlot;
+	uint32 LoadedSerial = 0;
+	bool bTestFailSaves = false;
 	TArray<FMMODailyBounty> Bounties;
 	int32 StoredDayKey = 0;
 	int32 QuestBaseline = 0;
@@ -91,6 +104,7 @@ private:
 	bool bDirty = false;
 	bool bEvaluating = false;
 	bool bPersistenceEnabled = true;
+	bool bRebaseQuestsOnLoad = false; // karakter yeniden yuklendikten sonraki ilk yuklemede QuestBaseline yeniden alinir
 	int32 ForcedDayKey = 0;
 	FTimerHandle PeriodicTimer;
 };
