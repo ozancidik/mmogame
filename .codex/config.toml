@@ -1,0 +1,9 @@
+# Project roles are discovered from .codex/agents/*.toml (standalone format).
+# Twelve specialist roles are available; schedule work in bounded waves.
+# Do not set model/provider/approval/sandbox defaults on behalf of the user.
+[features]
+multi_agent = true
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 6
