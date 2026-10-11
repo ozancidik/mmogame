@@ -5175,3 +5175,122 @@ hash'iyle korundu. Peer tam kosusundaki 132 PASS bu turun O65 kaniti olarak
 sayilmadi. Izole ignored kanit yedegi **12 dosya / 43,601 byte**.
 Tam RunAllChecks, tum proje FullCompile, Shipping/cooked/dedicated runtime,
 uzun soak veya PIE bu tur calistirilmadi. O65 PIE maddeleri acik kaldi.
+
+
+## O66 — Ic ice hasarda tekrarlanan olum (2026-10-10)
+
+**Native dogrulanmis veri butunlugu hatasi:** ApplyDamageCommon health delegate
+yayinladiginda bIsDead henuz false. Dinleyiciden gelen olumcul ic hasar olumu
+tamamliyor; dis frame Health=0 gorup tekrar OnDeath yayiniyordu. Kontrollu
+AMMOCharacter HandleDeath her yayinda gercek XP cezasini uyguluyordu; first-death
+metric tekilligi cezayi engellemiyordu. Yeterli XP ile iki kesinti, dusuk XP'de
+sifira kirpma var. Yerel read-only QA kaynak bulguyu dogruladi; canli production
+Blueprint dinleyicisinde bu recursion'in varligi saptanmis degil.
+
+Duzeltme: health callback'i sonrasi olum kararinda bIsDead tekrar kontrol edilir.
+Ic cagri olumu tamamlamissa dis cagri yeniden yayin/ceza/cleanup yapmaz.
+Normal mitigation, kabul edilmis hasar donusu, Heal ile kurtulma ve Revive
+sonrasi yeni olum davranisi korunur. Authority/RPC, replication alani, save
+semasi, ceza orani veya timer duzeni degismedi; kalici bir lifetime latch yok.
+
+Native matrix: 3 dis x 3 ic route (ApplyDamage/ignoring-defense/TakeDamage) x
+7 mode x kontrollu/kontrolcusuz = **126 case / 1512 check**. Controller sahipligi
+gercek; XP=80/esik100/%10 cezayla tek olum70, sonraki olum60 beklenir.
+Fixture ayni frame'de calisir, player load/save baslatmaz, cleanup oncesi
+travel-save committed yapar; timer expiry, remote transport veya GC kaniti degil.
+
+Ilk harness yapay MaxHealth=100 ile Regen cleanup'taki derived-vitals delta'sini
+tetikledi ve 126 alakasiz health/callback hatasi uretip asil recursion'i maskeledi.
+Bu harness sonucu bug kaniti sayilmadi. Gercek derived MaxHealth korundu ve
+cleanup/Revive'in mevcut health bildirimleri oracle'a dahil edildi; eski kod
+ayni son fixture ile yeniden derlenip calistirildi. **126/1512 FAIL**:
+death_count36, penalty18, dead_reentry18, next_life_death36, next_life_penalty18.
+Native exit0/runner1/coverageTrue; diger check'ler gecti. Basarisiz harness ve
+son eski-kod loglari ayri saklandi; fixture regression'u zayiflatilmadi.
+
+
+**O66 son dogrulama:** QA fixture incelemesi 126x12 oracle'i ve gercek XP
+yolunu dogruladi; Revive'den hemen sonra Health==MaxHealth kontrolu eksikligini
+buldu. Health'i test icin 100'e normalize etmeden once bu assertion guclendirildi
+(hem callback icindeki hem sonraki hayat Revive'i). Ayni guclendirilmis fixture
+eski kodda tekrar **126/1512 FAIL**, fixed'de **1512/1512 PASS** verdi; eski/fixed
+CPP byte'lari ayni test fixture'indan. Baslangic eski Editor **67.13 sn /16
+aksiyon**, fixture refresh **3.53 sn /4**, duzeltilmis harness eski build
+**3.26 sn /4**, ilk fixed **4.46 sn /4**. Son guclendirilmis eski build
+**7.00 sn /5** (Stats+fixture Compile), son fixed **4.18 sn /4** Compile/Link.
+
+Ana Game Development **47.28 sn /13 aksiyon**, son fixture ile ilave gercek
+Compile/Link **7.48 sn /3 aksiyon** gecti. Ana Editor iki compile-only UBT
+cagrisi **38.02 sn /11 Compile** ve **31.14 sn /11 Compile**; peer runtime
+bitince normal Link **4.33 seconds**. Link suresi tum derleme suresi degildir.
+NoPCH/NoSharedPCH/DisableUnity/NoLink fixture ilk **9.64 sn**, son **9.16 sn**,
+Stats **8.31 sn**, her biri gercek tek Compile. Etkilesimli editor kapaliydi;
+peer surecleri durdurulmadi. Oyun kaynaklarinda yalniz olum guard'i degisti.
+
+Son fixture ile izole **9/9**, ana **15/15** runner exit0. Iki agacta:
+reentrant death1512, DoT EndPlay180, eski DoT/source46, skill effect360,
+skill callbacks384, reentrant XP206, stats budget15, JSON113 negatif/enum18/
+invalid writer2, FirstKill10 +5 ilk-kredi metric/session PASS. Ana ek:
+consumable11, save lifecycle26, Store **711/711** slot/JSON,
+writeorder ve roundtrip. Summer **57**, Winter **79** mob,
+exit0/hata0; Summer NetSmoke **17823**, server join1/client welcomed1,
+iki log hata0, 20 sn canli. NetSmoke temiz native exit, gameplay RPC veya
+dedicated server runtime garantisi degildir.
+
+Iki agacta ValidateData temiz (bilinen Lv33+ skill boslugu uyarilari mevcut),
+StaticLint **110 dosya**, PlaytestMetrics **1516/1516**. Iki PowerShell parse
+ve coverage mock **5/5** gecti; staged diff --check commit oncesi uygulandi.
+Izole ilk frozen223 envanter testler sonunda dogrulandi, ardindan yalniz
+RunAllChecks'a yeni adim eklendi. QA assertion guclendirmesi sonrasi yeniden
+freeze ve tum izole9 kosusu yapildi. Son Source/Config/Scripts/Editor DLL
+envanteri iki agacta **223/223** ayni, ana Game exe hash'i korundu.
+
+Baslangictaki **705/705** save byte-byte korundu; final snapshot toplam
+**712** save. Artisi yeni fixture'a atfetmiyoruz: diger
+regresyonlar ve peer kosusu da save uretiyor. 960
+unowned tracked dosyadan 959 tanesi degismedi;
+peer istisnalari varsa final_result.json manifestinde ayri hash ile korundu.
+Sekiz owned dosya iki agacta ayni. Baseline Stats baslangic6261bd3 Git blob'uyla
+satir sonu normalizasyonundan sonra ayni; raw hash esitligi iddiasi yok.
+Izole ignored kanit yedegi **24 dosya /
+46,469 byte**. Iki QA yalniz kaynak/fixture inceledi;
+test veya derleme calistirmadi, dosyalara dokunmadi.
+
+Tam RunAllChecks, tum proje FullCompile, Shipping/cooked/dedicated runtime,
+uzun soak veya PIE bu tur tarafimizdan calistirilmadi. Peer tam kosusu bu
+O66 native/final-DLL kaniti olarak sayilmadi. Canli production Blueprint
+dinleyicisinde recursion tetikleyicisi saptanmadi; O66 PIE maddeleri acik.
+
+### O66 — Ajanli guncel taban entegrasyonu (2026-10-11)
+
+Yukaridaki 2026-10-10 hash/derleme/sayimlari tarihsel kanittir. Yeni ajanli
+entegrasyonda once a702590 + ayni alti kaynak/betik dosyasi derlendi ve
+**17/17** kontrol gecti. Peer oyun kodu commit'i 43e87ca gelince izole worktree
+fast-forward edildi; O66 dosyalari byte-byte ayni kaldi. Bu tabanda Editor
+**33.65 sn** (10 Compile/2 Link), Game **34.63 sn** (10 Compile/1 Link),
+Result: Succeeded/exit0. Iki guncel build -WaitMutex/-MaxParallelActions=1
+kullandi; ortak build kilidi build ve runtime boyunca tutuldu.
+
+Guncel **11/11**: ValidateData, StaticLint123, reentrant death1512,
+reentrant XP206, FirstKill10, achievement35, daily30, mail41,
+Summer57/Winter80 mob (native0/hata0), NetSmoke17829
+(join1/welcomed1/iki log hata0; 30 sn baslangic+45 sn gozlem). NetSmoke
+sahip olunan surecleri sonunda kapatir; temiz native exit/gameplay RPC veya
+dedicated kaniti degildir. Onceki a702590 turundaki DoT180/46, skill360/384,
+StatsBudget15 ve SaveJson kontrolleri 43e87ca uzerinde tekrar kosulmadi.
+
+UE gelistirme ajani Ramanujan 01a128ac-47dc-75d2-9512-2bd3d74078b4;
+bagimsiz O66 QA Heisenberg 01a128ab-00df-7be2-94de-f539824bf484. Orchestrator
+11 exit sonucunu, 226 tracked kaynak/betik hash'ini, alti owned kaynak/betik
+hash'ini ve yedi binary/target hash'ini yeniden kontrol etti. Test sirasinda
+kaynak/ikili degismedi. Ana b0f22bc ajan kurulum commit'inin Source/Config/
+uproject delta'si yok; oyun derlemesi setup icin tekrarlanmadi. Aktif commit'siz
+peer duzeltmeleri bu izole kanitin kapsami disindadir.
+
+Ana projedeki baslangic **705/705** save halen byte-byte korundu; bu kontrol
+aninda toplam724 save vardi. Yeni dosyalari yalniz O66'ya atfetmiyoruz.
+Izole Saved snapshot'lari, runtime loglari ve test edilen Editor modulu
+mmo_o66_agent_integration_20261011 kanit dizininde ve harici yedek ZIP'tedir.
+Testler loaded achievement olum subscriber sayacini olcmez; somut ek kontrol
+PLAYTEST_CHECKLIST O66 altinda aciktir. Shipping/cooked/dedicated, timed
+respawn, forced GC, Blueprint ve remote death/XP PIE kaniti yoktur.

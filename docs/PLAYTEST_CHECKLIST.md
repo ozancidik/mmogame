@@ -5423,3 +5423,30 @@ uzak istemci ownership, GC, oyuncu kaydi ve XP/loot kredisi bu matrisin kaniti d
 - [ ] Zorlanmis GC, component-only kapanis, hedef owner EndPlay, EndPlay
   olmadan olum, zaten kapanmis incoming kaynaktan dogrudan ApplyEffect,
   timer/hitch scheduling ve gercek kill XP/loot atfi ayrica test edilmeli.
+
+
+## O66 — Ic ice hasarda olum/XP cezasi tekilligi (2026-10-10)
+
+Native authority testi 126 case / 1512 check: ApplyDamage, ignoring-defense ve
+TakeDamage dis/ic girisleri; oyuncu kontrolcusu ve kontrolcusuz karakter;
+normal/nonfatal/lethal/zero-HP nested damage, callback Heal, nested olumden
+sonra Revive ve sonraki yeni olum. Bu gercek server metot/delegate/XP yoludur;
+uzak istemci RPC tasimasi, Blueprint graph veya sureli respawn oynanisi degildir.
+
+- [ ] Listen host + uzak oyuncuda tek-seferlik can callback'i icinden ikinci
+  olumcul hasari tetikle: ayni olum OnDeath/OnCharacterDied bir kez, mevcut XP
+  cezasini bir kez uygulamali; remote HP/olum/HUD dogru guncellenmeli.
+- [ ] Normal olumcul ve olumcul olmayan vurus, olumden sonra ek hasarin reddi,
+  efekt temizligi ve respawn geri sayimini karsilastir; ikinci olum yayini veya
+  ikinci XP kesintisi olmamali. Sureli respawn bu native testte beklenmedi.
+- [ ] Olum oncesi health callback'inde Heal ile HP pozitif birakilirsa olum
+  olmamali. Ic olumden sonra Revive ile canli birakilirsa dis frame yeniden
+  oldurmemeli; daha sonraki gercek olum yeni ceza/bildirim verebilmeli.
+- [ ] Can callback'leri icinde oyuncu/hedef EndPlay/Destroy, forced GC,
+  disconnect/travel, gercek katkili mob kill XP/loot ve dedicated runtime
+  ayri kontrol edilmeli; O66 bunlarin tamamlandigi veya canli oyunda bu
+  recursion'i tetikleyen belirli bir Blueprint dinleyicisi bulundugu iddiasi degil.
+- [ ] Ilk kaydi yuklenmis authority oyuncusunda nested olumcul callback sonrasi
+  achievement Deaths sayaci +1 olmali; zaten oluyken hasar sayaci degistirmemeli;
+  Revive ve sonraki gercek olum tekrar +1 vermeli. O66 gercek OnDeath tekilligini
+  sayar, fakat yuklenmis achievement subscriber sayacini/kayit yuvasini olcmez.

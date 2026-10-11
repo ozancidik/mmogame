@@ -60,7 +60,8 @@ Specific open integration check: loaded authority-player achievement death count
 
 Finish current setup and O66 integration evidence first. Then use Franklin's report to select one confirmed actionable network/security defect, keeping the known player-name identity gap distinct from newly found issues and from fixes already present in unverified peer edits. Record the chosen report finding and exact reviewed snapshot before implementation. Assign UE implementation, independent QA, network/security review and backend review when persistence is involved; allocate disjoint ownership and an isolated worktree. Do not preselect a defect or report a fix passed before the report and integration results arrive.
 
-Final parent result: **PENDING**.
+Final parent result: see the final acceptance below; the preceding checklist
+records the initial handoff state.
 
 ## Parent acceptance checkpoint — setup complete, integration continues
 
@@ -91,3 +92,36 @@ Gameplay integration remains pending separately: the a702590 baseline passed
 its checks, but peer source commit `43e87ca` arrived during verification.
 Ramanujan fast-forwarded the isolated integration tree to that commit and is
 renewing the affected builds/tests. Do not attribute older results to it.
+
+## Final parent acceptance — 2026-10-11
+
+Setup committed as `b0f22bc443717de64efa56aa92b0134cbe5a65a9`: 35 explicit paths
+(29 new worker paths, three preserved Codex compatibility definitions, root
+routing and two review/task records). Parent removed EOF-only blank lines in
+new owned role/report files, reran full TOML/YAML validation and checked the
+staged diff; the original twelve definitions remained unchanged. Scripts were
+unchanged from both 34/34 fixture runs. All 992 tracked paths outside the setup
+allowlist retained their bytes across this commit.
+
+The gameplay continuation is now accepted on committed gameplay base
+`43e87ca221dd5dd63033a8050089f0c272801fc0` plus the unchanged O66 patch.
+Editor/Game compile and link passed, then all eleven current checks passed,
+including O66 1512/1512, XP206, FirstKill10, achievements35, daily30, mail41,
+Summer/Winter and NetSmoke17829. The earlier a702590 seventeen-check run is
+retained separately. Parent verified source/binary hashes and all 705 original
+main saves. Exact evidence: `%TEMP%/mmo_o66_agent_integration_20261011/REPORT.md`;
+the O66 section in CHECKLIST_FIXES records the scope and limits.
+
+Loaded achievement death-counter integration, actual remote-client gameplay,
+Blueprint/GC/timed respawn and dedicated-server checks remain open in
+PLAYTEST_CHECKLIST; no PIE success is claimed. Main peer edits remain outside
+this acceptance. The new custom catalog remains NOT_RELOADED in this chat;
+actual default dispatch with specialist instructions continues to satisfy the
+mandatory-agent policy. Canonical fresh-session/Claude dispatch is unverified.
+
+**Complete:** requested setup, independent reviews and the existing gameplay
+continuation are integrated. The five-minute automation continues with real
+specialists. Next bounded task: recheck the mail review against the then-current
+committed source, coordinate with its active owner, and implement legacy mailbox
+migration/recovery conservation tests if still missing. Reward crash settlement
+and verified account identity remain separate tasks.

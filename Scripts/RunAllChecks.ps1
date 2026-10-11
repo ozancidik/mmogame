@@ -271,6 +271,11 @@ Step "DoT kaynak yok olusu ve reentrant pending tick" {
     $LASTEXITCODE -eq 0
 }
 
+Step "Ic ice hasarda olum tekilligi ve XP cezasi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestReentrantDeath.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 Step "Oyuncu DoT kaynaginin EndPlay ve callback sonrasi yenilenmesi" {
     & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestDotEndPlay.ps1") | Out-Host
     $LASTEXITCODE -eq 0

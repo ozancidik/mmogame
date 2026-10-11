@@ -443,7 +443,9 @@ float UMMOStatsComponent::ApplyDamageCommon(float RawDamage, AActor* /*DamageIns
 	Health = FMath::Clamp(Health - ActualDamage, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(Health, MaxHealth);
 
-	if (Health <= 0.f)
+	// A health listener may already have completed death through nested damage.
+	// Recheck after that callback so one death cannot publish or charge XP twice.
+	if (!bIsDead && Health <= 0.f)
 	{
 		bIsDead = true;
 		OnDeath.Broadcast();
