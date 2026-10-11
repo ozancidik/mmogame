@@ -122,10 +122,14 @@ bool FMMOMailStore::Load(const FString& Name, TArray<FMMOMail>& OutMails)
 			return false; // kurtarilamadi: bos sayip ustune yazma
 		}
 	}
+	if (!IFileManager::Get().FileExists(*Path))
+	{
+		return true; // kutu yok = bos
+	}
 	FString Raw;
 	if (!FFileHelper::LoadFileToString(Raw, *Path))
 	{
-		return true; // kutu yok = bos
+		return false; // var olan kutu okunamadi: bos sayip ustune yazma
 	}
 	if (!FromJson(Raw, OutMails))
 	{

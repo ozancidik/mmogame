@@ -5467,3 +5467,50 @@ Ayrinti: `docs/SECURITY_AUDIT.md` K-1 yeni yuz F1-F5 "Durum" satirlari. Iki iste
 - [ ] Basarim dosyasi olmayan Lv>1 kayitli karakterle gir (dosyayi elle bir kenara al): seviye/gorev basarimlari ACIK
   gorunmeli ama "Basarim: ... (+altin)" bildirimi ve altin artisi OLMAMALI; logda `[MMOACH] Basarim dosyasi yok`.
 - [ ] Posta: ad degisip kayit yapilmamisken `/posta gonder`: yeni mesaj "once MMOSave ile kaydet ya da eski adina don".
+
+## O68 — Var olan posta kutusunda okuma hatasi (2026-10-11)
+
+O68 izole a1f6145 adayi: 9 kontrol adimi PASS (Editor/Game build, fixed24,
+Mail104_retry1, ValidateData, StaticLint, Summer/Winter smoke, NetSmoke).
+Tarihsel aac6dff baseline 24 case 15 PASS/9 FAIL, native=0/runner=1;
+denied_reads=4, writes/moves/deletes=1/1/1. Current fixed24: 24 PASS,
+native/runner=0, denied_reads=4, writes/moves/deletes=0/0/0; eski mail korunur.
+Mail104: 104 unique PASS, tek beklenen GUID Move error; ilk TEMP prelaunch
+scope hatasi korunarak harness retry ile duzeltildi, urun/runner degismedi.
+104 PASS, unasserted fee_clamp_refund conservation kaniti degildir (gorev notu).
+NetSmoke port17918, join/welcome=1/1, hata=0/0, owned cleanup native=-1/-1:
+baglanti/gozlem PASS; PIE/RPC/HUD veya temiz native cikis kaniti degildir.
+Main source4 entegrasyonu + mainEditorbuild PASS (native=0, fresh B906...DLL);
+250 input, tum Saved ve live746 korunumu QA kanitinda. Parent final unowned
+audit degisim0; docs copy/commit PENDING. Mainruntime/PIE yok; NR1/NR3 OPEN.
+Ayrinti: [O68 gorev kaydi](tasks/MAIL_READ_FAILURE_2026-10-11.md).
+
+- [ ] Listen host + uzak istemci normal /posta gonder ve 10 sn toplama yolunu
+  denesin; rolleri degistir. Sentetik A/B karakterleri ve ayri test verisiyle
+  mesaj/altin bir kez gelsin, ek + ucret dogru dusulsun; bos/yeni kutu normal
+  calissin. Bu madde gercek sohbet/RPC/HUD/zamanlayici gozlemi gerektirir.
+- [ ] Operator kontrollu fault ile yalniz sentetik kopyadaki mevcut alici
+  kutusunun okumasi basarisiz, FileExists=true ve yazimi izinli kalsin.
+  Hatali okumanin log/debugger/operator kanitini kaydet; /posta sayisinin 0
+  olmasi hata kaniti degildir. Gonderim basarisiz olmali, eski kutunun byte/hash
+  ve mesaji korunmali; sender iade ve karakter kayit sonucunu ayri gozle.
+  Yeni headless fault komutu PIE'da reddedilir; PIE icin ayri kontrollu duzenek
+  yoksa bu maddeyi acik birak. Canli Saved/ACL/dosya uzerinde hata yaratma.
+- [ ] Ayni gozlemlenebilir okuma hatasi sentetik recipient kutusundayken
+  listen host ve uzak istemcide toplama tetiklensin: mesaj/altin verilmemeli,
+  kutu degismemeli. CollectMail=0 tek basina basarili bos okuma veya hata ayrimi
+  yapmaz; yeni oyuncu hata bildirimi eklendi diye kabul etme.
+- [ ] Fault kalkinca eski mail normal okunup bir kez toplansin; yeni gonderim
+  eski maili korusun. Hizli tekrar, cooldown ve altin tavani gibi mevcut
+  kapilari host/uzak istemcide kontrol et; native store testi bunlari kanitlamaz.
+- [ ] Refund sonrasi karakter SaveOwner basarisizligi, kopma/travel ve yeniden
+  baslatma tutarliligini ayri sentetik senaryoda incele. O68 refund-savefail
+  kaybini, cift dosyali settlement veya crash/restart dayanikliligini cozmez.
+  Canli sunucuyu/veriyi zorla kapatma veya bozma talimati degildir.
+- [ ] NR1 kosullu WriteBox/.tmp/quarantine/refund zinciri ve NR3 guvenilir
+  kimlik/legacy staging aktivasyonu ayri yetkili islerde dogrulanmali: ikisi OPEN.
+  Peer cleanup basariliysa eski .tmp recovery zinciri engellenir; tmp-write/Delete
+  veya tmp-quarantine/Delete birlikte hatasinin sonucu henuz runtime ile kanitlanmadi.
+  Count=0 belirsizligi, explicit Replace yazimi, existence/read yarisi ve
+  FileExists=false'nin izin hatasini gizleyebilmesi de bu duzeltmede aciktir.
+  Gercek remote exploit veya tamamlanmis migration kaniti ileri surulmez.

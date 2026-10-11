@@ -39,6 +39,7 @@ public:
 
 	// Diskten kutu. Dosya yoksa bos liste ve true; bozuksa .bad'a tasinir (eski .tmp de .tmp.bad'e), bos liste ve true.
 	// Ana dosya yok ama .tmp varsa (yazim ortasinda cokme) once .tmp geri konur; konamazsa false.
+	// Var olan dosya okunamazsa false ve bos liste; Append/TakeAll yeni kutu yazmaz.
 	static bool Load(const FString& Name, TArray<FMMOMail>& OutMails);
 	// Kutuyu verilen listeyle degistirir (atomik yazim). CollectMail teslim edilemeyenleri kutuda birakmak icin kullanir.
 	static bool Replace(const FString& Name, const TArray<FMMOMail>& Mails);
