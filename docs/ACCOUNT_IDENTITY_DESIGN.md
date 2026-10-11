@@ -449,3 +449,74 @@ başlarsa yapılır.
    "Evet" ise B'den önce Adım 7 (asenkron doğrulama, yüksek iterasyon) ve ağ şifrelemesi gerekir, ya da C beklenir.
 3. **Hesap modunda ad değiştirme kapalı kalabilir mi?** "Evet" ise B-full ertelenir (öneri). "Hayır, oyuncu adını
    değiştirebilmeli" ise B-full (`CharacterId`, §4.7) bu işin parçası olur ve maliyet yaklaşık 2-3 katına çıkar.
+
+## 10. Kisa vadeli ara onlem (2026-10-11, hesap modundan once)
+
+Durum: **oneri**, kod yazilmadi, PIE'da denenmedi. Kaynak: `SECURITY_AUDIT.md` K-1 "yeni yuz (2026-10-11): Ad degistirerek
+karakter catallama", bulgular F1-F5 (satirlar commit `43e87ca`). Karar adayi: `DECISIONS_NEEDED.md` "Ad degistirme kisiti
+(uzak istemci)".
+
+### 10.1 Neden B-min'i beklemeden
+
+B-min (§4) bayrak arkasinda ve Adim 0-5 is ister. O gelene kadar bugunku bayraksiz modda tek bir uzak istemci, kayitli
+karakterinin adini yeni bir ada degistirip cikarak karakteri iki yuvaya kopyalayabiliyor (F1: `MMOCharacter.cpp:1631-1640`
+yeni ada izin veriyor, `:952-957` cikista yeni yuvaya tam envanterle yaziyor, `:1243-1252` K-1 korumasi yalniz dolu yuvayi
+koruyor, eski yuva silinmiyor). Posta/ticaret/depo ile altin her turda ikiye katlanir. Bu, §4.5'teki "kapanan aciklar"
+listesinde olmayan, ad degistirmenin kendisinden dogan bir yol: hesap modunda ad degismedigi icin B-min onu da kapatir, ama
+bayrak kapaliyken acik kalir.
+
+### 10.2 Onlem: uzak istemci yalniz hic kaydedilmemis karakterin adini degistirebilir
+
+- `ServerSetName_Implementation` (`MMOCharacter.cpp:1576`, kontrol `:1631-1640`'in yerine): `!IsLocallyControlled()` ise ve `ActiveSaveSlot` yuvasi
+  diskte VARSA ret ("Kayitli karakterin adi degistirilemez"). Kontrol `Store->Exists(ActiveSaveSlot)` olmali; yeni karakter
+  dali (`:1394`) dosya yokken de `ActiveSaveSlot`'u atadigi icin `IsEmpty()` yetmez.
+- Yeni karakter ilk otomatik kayda (60 sn, `:933`) ya da ilk `MMOSave`'e kadar adini secebilir; sonra ad kilitlenir.
+- Host (yerel denetleyici) ve yonetici muaf: self-test'ler, NetSmokeTest ve host test akisi bozulmaz. Host diske zaten tam
+  erisimli oldugu icin bu bir guvenlik siniri degil (§4.3 madde 3 ile ayni gerekce).
+- Kayitli-ad reddi de soguma damgasini vursun (F5: bugun `:1635-1639` damgasiz donuyor, cevrimdisi adlar sinirsiz
+  sorgulanabiliyor).
+- Bu onlem §4.3 madde 5'in (hesap modunda uzak `ServerSetName` her zaman ret) bayraksiz ve daha gevsek hali. B-min gelince
+  `MMOAccount::AllowsRename` cagrisi bu kosulun yerine gecer; ikisi cakismaz.
+- Etkisi: kayitli bir karakterin adi uzaktan degistirilemez. Bugun diskte elle secilmis karakter adi yok (§2.4: 724 dosyanin
+  hepsi `Gezgin######` / `CIDIK-<hex>`), yani mevcut oyuncu verisine pratik etkisi yok. Oyuncu `Gezgin######` adiyla
+  kaydedildiyse adini degistiremez; yeni karakterle (yeni `?Name=`) baslamasi gerekir. Kabul edilip edilmeyecegi kullanici
+  karari.
+
+### 10.3 Linux harf varyanti notu
+
+- Bugun yuva adi harf buyuklugunu koruyor (`GetSaveSlotName`, `MMOCharacter.cpp:1113-1144`) ve `Exists` dosya sisteminin
+  kuralina uyuyor (`MMOLocalFileCharacterStore.cpp:32`, `DoesSaveGameExist`). Windows'ta `MMOSave_Ali` ve `MMOSave_ALI` ayni
+  dosya; harf duyarli bir dosya sisteminde (ileride Linux sunucu) iki ayri karakter olur (F4). Posta kutusu ise zaten kucuk
+  harfle anahtarli (`MMOMailStore.cpp:39`), yani Linux'ta `ALI` adini alan biri `Ali`'nin kutusunu toplayabilir
+  [Muhtemel, kod okumasi; Linux'ta denenmedi].
+- §4.2'deki `names/` anahtari zaten kucuk harf, ama `.sav` yuvasi oyle degil. Yuva adini kanonik kucuk harfe cevirmek icin
+  **tek seferlik goc** gerekir: mevcut karisik harfli `MMOSave_*.sav` dosyalari kucuk harfli ada kopyalanir (tasinmaz, §4.6
+  ve §4.7 ilkesi), ayni kucuk harf adina iki dosya dusuyorsa (Linux'ta `Ali` ve `ALI`) otomatik birlestirilmez, yoneticiye
+  raporlanir. Basarim (`Saved/MMOAchievements/<yuva>.json`) ve gunluk (`Saved/MMODaily/<yuva>.json`) dosyalari da ayni
+  gocle kopyalanmali. Windows'ta goc pratikte yalniz dosya adi harflerini degistirir.
+- Goc yapilana kadar ara yol: `Exists`'i harf duyarsiz yapmak (`ListSlotNames` + `IgnoreCase`); goc gerektirmez ama Linux'ta
+  zaten var olan iki varyanti birlestirmez.
+- §7.2 kontrol 8 (yuva anahtari = `GetSaveSlotName()`) kucuk harf goc yapilmazsa yalniz harf duyarsiz karsilastirmayla gecer;
+  uygulama sirasinda bu secim acikca yazilmali.
+
+### 10.4 Basarim/gunluk/posta dosyalarinin kimlige baglanmasi (bulgularin aciklamasi)
+
+§4.1 "dosyalar ada gore anahtarli kalabilir, ad sahipli ve degismez olunca yeterli" diyor. 2026-10-11 bulgulari bunun
+**ad degistirilebildigi surece** tutmadigini gosteriyor:
+- Basarim ve gunluk bilesenleri `43e87ca`'da canli ada degil `GetActiveSaveSlot()`'a bagli (`MMOAchievementComponent.cpp:232-244`,
+  `MMODailyComponent.cpp:199-211` ayni desen; §2.3 tablosundaki `<GetSaveSlotName>.json` notu duzenleme sirasinda yazilmisti, guncel
+  baglama budur). Ad degisip karakter yeni yuvaya yazilinca dosyanin yeni yola tasinmasi yalniz `TryLoad` icinde
+  (`MMOAchievementComponent.cpp:278-290`, `MMODailyComponent.cpp:245-258`). Bilesen `EndPlay`'i (`:99-110`, `:80-91`)
+  `TryLoad` cagirmadigi icin ad degistirip hemen cikan oyuncunun yan dosyasi eski adda kalir, yeni yuvada bos baslar ve
+  seviye/gorev basarimlari hemen yeniden verilir (F2: Lv80 + 90 gorev icin ~25.900 altin/dongu [Hesap]).
+- `MMOLoad` "kayit yok" dali (`MMOCharacter.cpp:1382-1397`) yuklu karakterde `ActiveSaveSlot`'u degistirip `LoadSerial`
+  artisiyla basarim/gunlugu sifirliyor (F3; bugun yalniz host/yonetici yolu).
+- Posta canli PlayerState adina bagli (`MMOMailComponent.cpp:40-54`), yuvaya degil; B2 korumasi (`:155-163`) yalniz ad
+  degisip yuva yazilmamis aradaki pencereyi kapatiyor.
+- Ders: yan dosyalari "karakterle birlikte tasimak" yerine **degismeyen bir kimlige** baglamak gerekir. B-min'de bu kimlik
+  sahipli ve degismez ad (yeterli, cunku ad degismez); ad degistirme istenirse B-full `CharacterId` (§4.7) zorunlu olur ve
+  basarim/gunluk/posta yollari ad yerine `CharacterId`'den turetilir. Bu durumda ad degisimi yalniz `names/` dosyasini
+  gunceller, hicbir oyun dosyasi tasinmaz; F1-F3 tasarim geregi olusamaz.
+- Ara onlem (§10.2) bu sorunu uzak istemci icin yan dosyalara dokunmadan kapatir, cunku kayitli karakterin adi degismez.
+  Savunma derinligi icin bilesen `EndPlay`'inde tasima adimi ayri bir kucuk duzeltme olarak onerildi (`SECURITY_AUDIT.md` K-1
+  yeni yuz).

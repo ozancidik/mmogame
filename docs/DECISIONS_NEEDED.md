@@ -205,3 +205,31 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
 - **Kul mobu efekti (Burn):** Lore "kor gibi yakar" der, kod yavaslatma/zehir verir; yakma efekti DoT sorunu cozulmeden anlamsiz kalir, eklenmedi. Lore'u kodla mi, kodu Lore'la mi uyumlu tutalim?
 - **Lv46-80 yeni icerigin sayilari:** mob/gorev/beceri degerlerinin hepsi PLACEHOLDER; ilk oyun testi `PLAYTEST_LV46_80.md`. Yan gorev XP'leri bilerek ~%6-7 esikte (pace-notr); mevcut Lv61+ grind gorevleri ~%40-50 verir. Yeni yan gorevler de o kalibi mi izlesin?
 - **Zayif cep (COZULDU, 2026-10-09):** Uçurum Gezgini cebi (`-5500,4500`) ilk doldurmada 1-3/6 veriyordu; neden `DontSpawnIfColliding` ile cakisan noktalar ve 4 sn'lik bekleme idi. `AMMOMobSpawner::TopUp` artik mob basina ayni turda 3'e kadar baska nokta dener: tum Winter cepleri 5-6/6, elitler ilk turda dogdu (mob sayisi ~55 -> 79).
+
+## Yeni karar adayi (2026-10-11: guvenlik denetimi; KOD DEGISTIRILMEDI)
+
+- **Ad degistirme kisiti (uzak istemci):** DURUM: ACIK (2026-10-11), duzeltme planlandi, karar bekliyor.
+  - **Sorun [Kesin, kod okumasi; PIE'da denenmedi]:** uzak istemci kayitli karakterinin adini kaydi olmayan yeni bir ada
+    degistirip cikinca karakter yeni yuvaya tam envanterle yaziliyor, eski yuva silinmiyor: ayni karakter iki adda.
+    Posta/ticaret/depo ile tek istemcide altin ve esya her turda ikiye katlanir. Ayrica basarim/gunluk dosyasi eski adda
+    kaldigi icin yeni adla seviye/gorev basarimlari tekrar alinir (Lv80 + 90 gorev icin ~25.900 altin/dongu [Hesap]; bu
+    kaynak `EconomyModel.py`'de yok, model basarimi tek seferlik sayiyor). Ayrinti ve dosya:satir (commit `43e87ca`):
+    `SECURITY_AUDIT.md` K-1 "yeni yuz (2026-10-11)", F1-F5.
+  - **Oneri [Muhtemel]:** uzak istemci yalniz **hic kaydedilmemis yeni karakterin** adini degistirebilsin (kosul: karakterin
+    `ActiveSaveSlot` yuvasi diskte yok). Host ve yonetici muaf. Kayitli-ad reddi de 30 sn soguma baslatsin (ad sorgulamayi
+    yavaslatir). Kalici cozum hesap modu (`ACCOUNT_IDENTITY_DESIGN.md` B-min; ara onlem §10).
+  - **Etkisi:** kaydedilmis bir karakterin adi uzaktan degistirilemez; yeni karakter ilk kayda (60 sn otomatik kayit ya da
+    `MMOSave`) kadar adini secebilir. Bugun diskte elle secilmis karakter adi yok (`ACCOUNT_IDENTITY_DESIGN.md` §2.4), yani
+    mevcut veriye pratik etkisi yok; `Gezgin######` adiyla kaydedilen oyuncu adini degistiremez, yeni karakter acmasi gerekir.
+    Host'un kendi `MMOSetName`'i ve self-test'ler degismez.
+  - **Secenekler:** (a) oneri (yalniz yeni karakter); (b) uzak istemcide ad degistirmeyi tamamen kapat (en basit, yeni
+    oyuncu da `?Name=` ile baglanmak zorunda); (c) ad degistirmeye izin ver ama karakteri ve yan dosyalari tasi, eski yuvayi
+    sil (dosya tasima/silme hatasi = veri kaybi riski; B-full `CharacterId` olmadan onerilmez); (d) hesap moduna kadar bekle
+    (catallama acik kalir; LAN'da tanidiklarla kabul edilebilir mi?).
+  - **Kullanicinin vermesi gereken karar:** kayitli karakter icin ad degistirme oyun ozelligi olarak gerekli mi? "Hayir" ise
+    (a) ya da (b) uygulanir (kucuk, sicak dosya `MMOCharacter.cpp`'de ayri commit). "Evet" ise kalici yol B-full
+    (`ACCOUNT_IDENTITY_DESIGN.md` §4.7, karar 3) ve o gelene kadar yine (a) gecici onlem olarak onerilir.
+  - **Gereken veri:** olcum degil, karar girdisi. Duzeltme sonrasi dogrulama: iki istemcili NetSmokeTest varyanti (kayitli
+    karakterin uzak ad degisimi reddedilmeli; ad degistir + cik + yeni adla gir sonrasi basarim altini ikinci kez gelmemeli).
+    Ilgili `[MMOMETRIC]`: bir karakterin `ev=gold src=basarim` toplami tablonun tek seferlik toplamini (65.050 altin,
+    28 satir [Kesin, `EconomyModel.py` ciktisi]) asarsa ya da ayni basarim iki kez gorulurse istismar isaretidir.

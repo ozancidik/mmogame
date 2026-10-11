@@ -91,6 +91,102 @@ Düzeltme (öncelik sırasıyla):
 - `ServerSetName` yalnızca görünen adı değiştirsin, yuvayı değiştiremesin; çağrıya 30 sn cooldown ekle.
 - Yazmadan önce `.bak` döndür (son 3 sürüm), ezme olayını geri alınabilir yap.
 
+#### K-1 yeni yuz (2026-10-11): Ad degistirerek karakter catallama (fork)
+
+**DURUM: ACIK (2026-10-11), duzeltme planlandi.** Kod henuz DEGISMEDI; asagidaki maddelerin hicbiri kapanmadi.
+Kaynak: 2026-10-11'de iki bagimsiz denetim (qa-kontrolcu, ag-guvenlik-denetcisi), ikisi de commit `43e87ca`'yi inceledi.
+Satirlar `43e87ca` icindir; `MMOCharacter.cpp` o commit'ten bu yana (HEAD `b0f22bc` ve calisma agaci) degismedi.
+Hepsi **kod okumasiyla** bulundu: PIE'da, NetSmokeTest'te ya da gercek uzak istemciyle denenmedi.
+Ciddiyet K-1 ile ayni (herkese acik oturumda KRITIK, LAN'da YUKSEK), cunku tek bir uzak istemci yeter.
+
+Bu yuz, yukaridaki senaryo 1'in (ezme) tersidir: `ActiveSaveSlot` korumasi baskasinin yuvasini ezmeyi engelliyor, ama
+karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
+
+**F1. Ad degistirerek karakter catallama (ana bulgu)**
+- `Source/MyProject/Private/Characters/MMOCharacter.cpp:1631-1640` (`ServerSetName_Implementation`): uzak istemci yalniz
+  diskte kaydi OLAN bir ada gecemez (`NameStore->Exists(CandidateSlot)`). Kaydi olmayan her yeni ada gecebilir; kendi
+  karakterinin kayitli olup olmadigina bakilmaz.
+- `MMOCharacter.cpp:952-957` (`UnPossessed`) ve `:1093-1096` (`EndPlay`): cikista `SaveCharacterForTravel(true)` karakteri
+  `GetSaveSlotName()`, yani YENI adin yuvasina tam envanter, altin, depo ve gorevlerle yazar. `:933` 60 sn otomatik kayit da
+  ayni yuvaya yazar. Basarili yazimdan sonra `ActiveSaveSlot` yeni yuva olur (`:1211-1213`).
+- `MMOCharacter.cpp:1243-1252` (`BuildCharacterSaveRequest`): K-1 korumasi yalniz hedef yuva ZATEN VARSA yazimi reddeder.
+  Yeni ad icin hedef yok, yazim gecer.
+- Eski yuva silinmez (`MMOCharacter.cpp` ve `MMOLocalFileCharacterStore.cpp` icinde silme cagrisi yok). Eski `.sav` son
+  kayitli haliyle (en cok 60 sn onceki otomatik kayit) diskte kalir.
+- Senaryo: kayitli `Ali` (ornek 100.000 altin) `MMOSetName Ali2` yazar ve cikar. Diskte artik `MMOSave_Ali` ve `MMOSave_Ali2`
+  ayni karakterdir. Ayni istemci sirayla `?Name=Ali2` ve `?Name=Ali` ile girip iki oturumda da altini posta, ticaret ya da
+  depo uzerinden ucuncu bir karaktere aktarir. Altin ve esya her turda ikiye katlanir; tur sinirsiz tekrarlanabilir
+  (her yeni ad icin 30 sn ad sogumasi, `MMOCharacter.h:461`). Ikinci istemci gerekmez.
+- Posta B2 korumasi (`MMOMailComponent.cpp:155-163`, `IsNameChanged`) yalniz ad degisip yeni yuva henuz yazilmamisken
+  islemi durdurur. Yeni adla yeniden girildiginde ad ve yuva eslesir, koruma devreye girmez.
+
+**F2. Basarim ve gunluk yan dosyalari cikista yeni yuvaya tasinmiyor**
+- Tasima yalniz `TryLoad` icinde var: `MMOAchievementComponent.cpp:278-290`, `MMODailyComponent.cpp:245-258` (bagli yuva
+  `GetActiveSaveSlot()` degisince dosya yeni yola yazilir). `TryLoad` periyodik taramada (5 sn) ve olay anlarinda calisir.
+- Bilesen `EndPlay`'i (`MMOAchievementComponent.cpp:99-110`, `MMODailyComponent.cpp:80-91`) `TryLoad` cagirmaz, yalniz eski
+  `StoragePath`'e `SaveNow()` yapar. Karakter ise cikista yeni yuvaya yazilir (F1). Sonuc: ad degistirip, sonraki otomatik
+  kayittan once cikan oyuncunun basarim ve gunluk dosyasi eski adda kalir, yeni yuvada hic dosya olmaz.
+- Yeni adla girince basarimlar bos yuklenir. `EvaluateAll` (`MMOAchievementComponent.cpp:403-433`) seviye ve tamamlanan gorev
+  basarimlarini canli durumdan hemen yeniden verir (`ProgressOf`, `:119-135`). Lv80 ve 90 gorevli bir karakter icin
+  (`MMOAchievementDatabase.cpp:42-48, 62-64`) [Hesap]: seviye 100+300+800+1.500+3.000+5.000+10.000 = 20.700, gorev
+  200+1.000+4.000 = 5.200, toplam **25.900 altin (~26.000) her ad degistirme dongusunde**, ayrica unvanlar. Gunluk gorevler de
+  yeni yuvada ayni gun sifirdan acilir (Lv80'de 15 x 80 x (1+1+2) = 4.800 altin/gun ek; oldurme ve gorev teslimi ister).
+- Bu ekonomi kalemi `EconomyModel.py`'deki basarim/gunluk satirlarinda yok (model tek seferlik basarim varsayiyor).
+
+**F3. `MMOLoad` "kayit yok" dali yuvayi degistirip basarim/gunlugu sifirliyor**
+- `MMOCharacter.cpp:1382-1397` (`LoadCharacter`): canli adin yuvasi yoksa yuklu karakter bellekte kalir ama `ActiveSaveSlot`
+  yeni yuvaya atanir, `bClassChoicePending = true` olur ve `:1369` `++LoadSerial` basarim ve gunluk bilesenlerini
+  `ResetLoadedState` ile sifirlayip yeni (bos) yuvadan yukletir (`MMOAchievementComponent.cpp:266-276`,
+  `MMODailyComponent.cpp:233-244`). Sonraki kayit karakteri yeni yuvaya yazar, eski yuva kalir: F1 ile ayni catallama ve F2
+  ile ayni odul tekrari. Bu pawn'da baslangic paketi daha once verilmediyse (yuklenen karakterde verilmez) `GrantStarterPack`
+  (`:1330-1351`) bir kez daha calisir.
+- Erisim: uzak `ServerLoadCharacter` yalniz yoneticiye acik (`:1552-1562`); host yerel `MMOLoad` (`:1494-1499`) ve host ad
+  degistirmede kayitli-ad kontrolune tabi degil. Yani bugun **yalniz host/yonetici** yolu. Host diske zaten tam erisimli
+  oldugu icin guvenlik siniri degil, ama kazara catallama ve test verisinin bozulmasi riski var. Ciddiyet: DUSUK.
+
+**F4. Linux'ta buyuk/kucuk harf ad varyanti ayri `.sav` yaratiyor**
+- Yuva adi harf buyuklugunu korur: `GetSaveSlotName` (`MMOCharacter.cpp:1113-1144`) ve `CandidateSlot` (`:1615`).
+  `Exists` `UGameplayStatics::DoesSaveGameExist`'e gider (`MMOLocalFileCharacterStore.cpp:32`), yani dosya sisteminin
+  kuralina uyar. Yalniz cevrimici oyuncu cakismasi harf duyarsiz (`:1622`).
+- Windows'ta `MMOSave_ALI` ile `MMOSave_Ali` ayni dosyadir. Harf duyarli bir dosya sisteminde (Linux dedicated/listen sunucu)
+  ise farkli dosyalardir: `:1635` ve `:1244-1245` kontrolleri gecer, `Ali` cevrimdisiyken uzak istemci `ALI` adini alip ayri
+  bir yuva olusturur.
+- Posta kutusu ise kucuk harfe cevrilmis adla anahtarli (`MMOMailStore.cpp:39`) ve toplayan taraf canli PlayerState adini
+  kullaniyor (`MMOMailComponent.cpp:40-54`, `:305`). Bu yuzden Linux'ta `ALI` adini alan biri `Ali`'nin posta kutusunu (ekli
+  altinla birlikte) toplayabilir [Muhtemel, kod okumasi].
+- Proje bugun Windows listen-server'da calisiyor; bu madde **Linux'ta denenmedi**, sunucu Linux'a tasininca gecerli olur.
+
+**F5. Kayitli-ad reddinde soguma yok (ad sorgulama)**
+- `MMOCharacter.cpp:1635-1639`: "Bu ad kayitli bir karaktere ait" reddi `LastSetNameServerTime`'i guncellemeden doner;
+  damga yalniz basarili degisimde vurulur (`:1641-1644`). Bu §9.4'teki "basarisiz dogrulama soguma baslatmaz" kuraliyla
+  tutarli, ama burada bilgi sizdiriyor.
+- Senaryo: uzak istemci aday ad listesini tek tek `MMOSetName` ile dener. Kayitli (cevrimdisi) adlar bedava ve sinirsiz
+  hizda "kayitli" diye doner; kayitli olmayan bir tahmin adi gercekten degistirir ve 30 sn soguma baslatir. Cevrimdisi
+  karakter adlari boylece listelenir ve K-1 senaryo 2'ye (`?Name=` ile calma) girdi olur. Ciddiyet: DUSUK-ORTA.
+
+**Onerilen kisa vadeli cozum (kod henuz yazilmadi):**
+- Uzak istemci (`!IsLocallyControlled()`) icin `ServerSetName` yalniz **hic kaydedilmemis yeni karaktere** izin versin:
+  kosul `Store->Exists(ActiveSaveSlot) == false` (yalniz `ActiveSaveSlot.IsEmpty()` yetmez, cunku yeni karakter dali
+  `:1394` dosya yokken de `ActiveSaveSlot`'u atiyor). Ilk otomatik kayittan (60 sn) sonra ad kilitlenir. Host ve yonetici
+  muaf (test akisi bozulmasin). Bu tek kosul F1'i, uzak istemci icin F2'yi ve kayitli karakterler icin F5'i kapatir.
+- F5 icin ek: kayitli-ad reddi de soguma damgasini vursun (yeni karakterin ad denemesi de yavaslasin).
+- F2 icin ek (savunma derinligi): basarim ve gunluk bileseninin `EndPlay`'i `SaveNow()`'dan once `TryLoad()` (ya da yalniz
+  tasima adimini) cagirsin. Not: bilesen `EndPlay`'i karakterin kaydindan sonra mi calisiyor, siralama dogrulanmali.
+- F3 icin: karakter zaten yukluyken (`bInitialLoadComplete` ve dolu `ActiveSaveSlot`) `MMOLoad` "kayit yok" dalina dusmesin;
+  "Bu adin kaydi yok" deyip hicbir sey degistirmesin.
+- F4 icin: harf duyarsiz `Exists` (`ListSlotNames` + `IgnoreCase`) ya da yuva adini kanonik kucuk harfe cevirme; ikincisi
+  mevcut `.sav` dosyalari icin tek seferlik goc ister (`ACCOUNT_IDENTITY_DESIGN.md` "Kisa vadeli ara onlem").
+- Karar: `DECISIONS_NEEDED.md` "Ad degistirme kisiti (uzak istemci)". Dokunulacak dosya sicak (`MMOCharacter.cpp`); Codex
+  kurallarina gore ayri, kucuk bir commit.
+
+**Kalici cozum:** `docs/ACCOUNT_IDENTITY_DESIGN.md` hesap modu (B-min): ad hesaba ait ve degismez (§4.3 adim 5, hesap
+modunda uzak `ServerSetName` her zaman ret). Ad degismeyince F1, F2, F3 (uzak) ve F5 kendiliginden kapanir; F4 icin
+`names/` anahtari zaten kucuk harf.
+
+**Dogrulama plani (yapilmadi):** iki istemcili NetSmokeTest varyanti: (1) kayitli karakter uzaktan ad degistirmeyi denesin,
+ret beklenir; (2) yeni karakter adini degistirebilsin; (3) ad degistir + hemen cik, sonra yeni adla gir: basarim altini
+ikinci kez verilmemeli. Bugunku kodda (1) ve (3) **basarisiz olmasi beklenir**; once kirmizi, duzeltmeden sonra yesil.
+
 ---
 
 ### Y-2. SaveGame yükleme doğrulaması eksik, dosya imzasız
