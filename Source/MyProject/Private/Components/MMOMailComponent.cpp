@@ -116,7 +116,9 @@ FString UMMOMailComponent::ResultText(EMMOMailResult R)
 	// Ayni metin (B3): ayri mesajlar oyuncu adlarinin varligini sorgulamaya (oracle) yarardi.
 	case EMMOMailResult::UnknownTarget:
 	case EMMOMailResult::NoGold:        return TEXT("Posta gonderilemedi: alici bulunamadi ya da altin yetersiz (ek + gonderim ucreti).");
-	case EMMOMailResult::NameChanged:   return TEXT("Adin degisti: posta icin yeniden gir.");
+	// Kayitli karakterin adi uzaktan degistirilemez (K-1 F1); bu durum yalniz henuz kaydedilmemis yeni karakterde ya da host'ta
+	// olur: karakter yeni adla kaydedilince (MMOSave / otomatik kayit) posta acilir. "Yeniden gir" yanlis yonlendiriyordu.
+	case EMMOMailResult::NameChanged:   return TEXT("Adin degisti ve karakter yeni adla henuz kaydedilmedi: posta icin once MMOSave ile kaydet ya da eski adina don.");
 	case EMMOMailResult::BadGold:       return TEXT("Gecersiz altin miktari (en fazla 1.000.000).");
 	case EMMOMailResult::EmptyMail:     return TEXT("Bos posta gonderilemez: mesaj ya da altin ekle.");
 	case EMMOMailResult::TextTooLong:   return TEXT("Mesaj en fazla 200 karakter olabilir.");
@@ -236,13 +238,22 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	LastSendTime = Now(); // altin callback'i bu fonksiyonu yeniden cagirsa bile ikinci gonderim cooldown'a takilir
 	const int32 Charge = static_cast<int32>(Total);
 	const TWeakObjectPtr<AMMOCharacter> WeakOwner(Owner);
-	const auto Refund = [&WeakOwner, Charge]()
+	const int32 GoldBefore = Inv->Gold;
+	// Iade, GERCEKTEN dusulen miktarla yapilir: once/sonra farki [0, Charge] araligina kirpilir. Altin callback'i (Blueprint
+	// OnGoldChanged vb.) araya altin eklediyse fark kucuk cikar ve iade de kuculur; callback altin harcadiysa iade Charge'i
+	// asmaz. Iki durumda da iade fazladan altin uretmez.
+	int32 Deducted = 0;
+	const auto Refund = [&WeakOwner, &Deducted]()
 	{
+		if (Deducted <= 0)
+		{
+			return;
+		}
 		if (AMMOCharacter* C = WeakOwner.Get())
 		{
 			if (UMMOInventoryComponent* I = C->GetInventory())
 			{
-				I->AddGoldFrom(Charge, TEXT("posta-iade"));
+				I->AddGoldFrom(Deducted, TEXT("posta-iade"));
 			}
 		}
 	};
@@ -260,7 +271,15 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 		if (UMMOInventoryComponent* I = C->GetInventory())
 		{
 			I->AddGoldFrom(-FeeFor(Gold), TEXT("posta_ucret"));
+			Deducted = static_cast<int32>(FMath::Clamp<int64>(static_cast<int64>(GoldBefore) - I->Gold, 0, Charge));
 		}
+	}
+	// Tam ucret + ek dusulemediyse (callback araya girip bakiyeyi azaltti ya da fark olculemedi) posta gonderilmez:
+	// aksi halde alici odenmemis eki alirdi.
+	if (Deducted < Charge)
+	{
+		Refund();
+		return EMMOMailResult::StoreError;
 	}
 	if (!WeakOwner.IsValid() || !SaveOwner())
 	{

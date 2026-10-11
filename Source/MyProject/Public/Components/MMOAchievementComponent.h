@@ -89,7 +89,10 @@ private:
 	// Yuklu degilse yukler (karakter kaydi yuklendikten sonra, karakterin ActiveSaveSlot'una gore; canli ada gore DEGIL).
 	// Karakter yeniden yuklendiyse (LoadSerial) kirli durumu ESKI yola yazar, sifirlar ve yeniden yukler. Ayni karakter
 	// verisi ad degisimi + kayitla yeni yuvaya tasindiysa durumu da tasir (sifirlamaz: ad degistirip odul tekrari yok).
+	// Ana dosya/.tmp var ama okunamiyor ya da kurtarilamiyorsa false (yukleme ertelenir; bos sanilip odul tekrar verilmez).
 	bool TryLoad();
+	// Lv>1 karakterin basarim dosyasi yoksa/bozuksa: o an saglanan seviye/gorev/altin basarimlarini ODULSUZ acik isaretler.
+	void MarkCurrentProgressUnlockedSilently();
 	// Basariyla diske yazildiysa (veya test modunda) true.
 	bool SaveNow();
 	void SaveIfDirty();

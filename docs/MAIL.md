@@ -32,17 +32,26 @@ Baglanti: `MMOCharacter.h/.cpp` (alt nesne, `IsTravelSaveCommitted()` erisimcisi
   2. ucret + ek dusulur; 3. gonderen karakter **senkron kaydedilir** (`SaveCharacterForTravel`; bolge gecisi kaydi ucustaysa da false doner) -
      basarisizsa iade, kutuya yazilmaz, "Posta su an gonderilemedi"; 4. kutuya yazilir - basarisizsa iade + tekrar kayit.
   En kotu durumda (kayit sonrasi kutu yazimindan once cokme ya da iade kaydi basarisiz) altin **kaybolur**, kopyalanmaz.
+- **Iade = gercekten dusulen miktar (2026-10-11):** gonderim oncesi/sonrasi altin farki `[0, ucret+ek]` araligina kirpilir ve iade bu
+  farktir; altin callback'i (Blueprint `OnGoldChanged` vb.) araya altin eklese ya da harcasa da iade fazladan altin uretmez. Fark ucret+ekten
+  kucukse (tam odeme dogrulanamadi) posta gonderilmez, dusulen kadar iade edilir. Native testte callback araya girme senaryosu YOK.
 - **Toplama (QA O2):** kutu yuklenir; eki altin tavanini (`UMMOInventoryComponent::MaxGold`) asacak posta **kutuda kalir** (oyuncuya bir kez uyari);
   kalanlarla kutu once diske yazilir (`Replace`), sonra altin verilir, sonra karakter kaydedilir. Bolge gecisi onaylanmissa toplama atlanir
   (posta yeni bolgede alinir). Dongu ortasinda sahip duserse teslim edilmeyenler kutuya geri yazilir (kutu bu arada dolduysa loglanip kaybolur).
 - **Ad degisimi (guvenlik B2):** canli ad (`GetSaveSlotName`) karakterin `GetActiveSaveSlot()` degerinden farkliysa (ad degisti, karakter yeni ada
-  henuz yazilmadi) gonderim reddedilir ("Adin degisti: posta icin yeniden gir") ve toplama atlanir: eski/yeni yuvada ayni altinla catallama olmasin.
+  henuz yazilmadi) gonderim reddedilir ve toplama atlanir: eski/yeni yuvada ayni altinla catallama olmasin. Mesaj (2026-10-11): "Adin degisti ve
+  karakter yeni adla henuz kaydedilmedi: posta icin once MMOSave ile kaydet ya da eski adina don." (eski "yeniden gir" yanlis yonlendiriyordu).
+  Not: uzak istemci artik kayitli karakterin adini degistiremez (`SECURITY_AUDIT.md` K-1 yeni yuz F1); bu durum yalniz henuz kaydedilmemis yeni
+  karakterde ya da host'ta olusur. B2 korumasi tek basina catallamayi kapatmiyordu (yeni adla yeniden girince ad ve yuva eslesir); kapatan F1 kuralidir.
 - **Ad tarama (B3):** "alici yok" ve "altin yetersiz" ayni genel mesaji verir, altin kontrolu varlik kontrolunden once yapilir ve basarisiz
   alici denemesi de 5 sn cooldown baslatir.
 - **Hedef adi (C1):** temizleme adi sessizce degistiremez (`Al!i` -> `Ali` reddedilir; yalniz bosluk = `_`). Onay mesaji gercek kutu adini yazar.
-- **Disk yazimi (A4):** `.tmp` -> `Move` basarisizsa dogrudan nihai yola yazma denenir. Ikisi de basarisizsa: ana dosya duruyorsa `.tmp` silinir
-  ve yazim basarisiz sayilir; ana dosya yok ve `.tmp` tamsa yazim gerceklesmis sayilir (bir sonraki `Load` onu geri koyar - aksi halde iade edilen
-  posta kurtarmayla geri gelir ve altin kopyalanirdi).
+- **Disk yazimi (A4, 2026-10-11 guncel):** `.tmp` yazimi basarisizsa `.tmp` silinir ve yazim basarisiz sayilir. `.tmp` -> `Move` basarisizsa
+  dogrudan nihai yola yazma denenir. Ikisi de basarisizsa `.tmp` silinir ve yazim basarisiz sayilir (cagiran iade eder) - ana dosya olsun olmasin.
+  Eskiden ana dosya yokken (ilk posta) `.tmp` birakilip "basarili" sayiliyordu; simdi yalniz `.tmp` SILINEMEZSE (kurtarmada geri gelecegi icin)
+  basarili sayilir. Boylece iade edilmis posta sonraki `Load`'da `.tmp`'den dirilip bir de teslim edilmez.
+- **Bozuk kutu (2026-10-11):** `Load` bozuk ana dosyayi `.bad`'e ayirirken yanindaki eski `.tmp`'yi de `.tmp.bad`'e ayirir (olmazsa siler);
+  aksi halde ana dosya artik olmadigi icin sonraki `Load` eski `.tmp`'yi geri koyar, toplanmis/iade edilmis posta dirilirdi.
 - **Kayit yuklenmeden altin verilmez:** `AMMOCharacter::IsInitialLoadComplete()` sart; yoksa karakter kaydi yuklenirken altin ustune yazilir, kutu bosaldigi icin altin yok olurdu.
 - **Yarim yazim kurtarma (QA D3):** atomik yazim `.tmp` -> `Move` hedefi once siler; arada cokme olursa yalniz `.tmp` kalir. `Load` ana dosya yoksa `.tmp`'yi geri koyar.
 - **Alici varligi:** cevrimici oyuncu ya da `Saved/SaveGames/MMOSave_<ad>.sav` dosyasi. Bu, yerel depoya baglidir.

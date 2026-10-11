@@ -35,6 +35,11 @@ Her **UTC gunu** icin 3 gorev, gece yarisi UTC'de yenilenir:
   yukleme aninda sabitlenir (EndPlay'de `MMOSave_Default.json`'a yazma yok). Ad degistirmek bos dosya yukletip gunlukleri tekrar aldirmaz;
   karakter yeni ada kaydedilince durum yeni yola tasinir. Karakter diskten yeniden yuklenirse (`MMOLoad`) eski durum eski yola yazilir, yeniden
   yuklenir ve `QuestBaseline` bugunku ilerleme korunarak simdiki gorev sayisina gore yeniden alinir. Yarim kalan `.tmp` yazimi yuklemede geri konur.
+- **2026-10-11 (K-1 F2, 2. tur; derlendi, mevcut 53 kontrol gecti, yeni davranislar icin native test YOK):** EndPlay, yuklu ise `SaveNow`'dan
+  once `TryLoad()` cagirir (ad degistirip hemen cikan karakterin dosyasi da yeni yuvaya tasinir; karakter kaydi bilesen EndPlay'inden ONCE
+  calisir, motor kodundan dogrulandi). `.tmp` geri konamiyorsa ya da ana dosya okunamiyorsa yukleme ERTELENIR (bugunun gorevleri sifirdan
+  acilmaz, dosyanin ustune yazilmaz). Basarimdaki "dosya yoksa odulsuz acik say" savunmasi gunlukte YOK: kayip dosya ayni gunun gorevlerini
+  yeniden acar (uzak istemci yolu `SECURITY_AUDIT.md` K-1 F1 ad kilidiyle kapali; host/dosya silme yolu acik).
 - **Disk yazilamazsa odul yok:** tamamlanma diske yazilamazsa `bDone` geri alinir, odul verilmez, sonraki degerlendirmede yeniden denenir.
 - Mobda izleme yok (AMMOCharacter mobun da tabani).
 

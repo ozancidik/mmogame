@@ -5450,3 +5450,20 @@ uzak istemci RPC tasimasi, Blueprint graph veya sureli respawn oynanisi degildir
   achievement Deaths sayaci +1 olmali; zaten oluyken hasar sayaci degistirmemeli;
   Revive ve sonraki gercek olum tekrar +1 vermeli. O66 gercek OnDeath tekilligini
   sayar, fakat yuklenmis achievement subscriber sayacini/kayit yuvasini olcmez.
+
+## K1F — Ad degistirme kilidi ve yan dosya tasima (2026-10-11, 2. tur; derlendi, PIE/uzak istemci YOK)
+
+Ayrinti: `docs/SECURITY_AUDIT.md` K-1 yeni yuz F1-F5 "Durum" satirlari. Iki istemcili listen-server oturumu gerekir.
+- [ ] Uzak istemci, kaydi olan karakterle (`?Name=X`, en az bir kayit sonrasi) `MMOSetName Y`: "Kayitli karakterin adi
+  degistirilemez" mesaji; ad X kalmali, cikista `MMOSave_Y.sav` OLUSMAMALI.
+- [ ] Uzak istemci, yeni karakterle (kayit dosyasi yok, girdikten sonra 60 sn icinde) `MMOSetName Y`: kabul; mesaj "ilk
+  kayittan sonra ad degistirilemez" uyarisi icermeli. `MMOSave` sonrasi ikinci `MMOSetName Z` reddedilmeli.
+- [ ] Uzak yeni karakter, cevrimdisi kayitli bir adi (`MMOSetName <kayitli>`) denesin: "kayitli bir karaktere ait" reddi ve
+  hemen ardindan baska bir adda "... sn beklemelisin" (F5: soguma damgasi).
+- [ ] Host: `MMOSetName Yeni` + `MMOLoad` (Yeni'nin kaydi yok): "Bu adin kaydi yok: yuklu karakter degismedi"; basarim ve
+  gunluk ilerlemesi (`/basarim`, `/gunluk`) sifirlanmamali, baslangic paketi gelmemeli.
+- [ ] Host: `MMOSetName Yeni` + `MMOSave` + 5 sn icinde cik; `Saved/MMOAchievements/MMOSave_Yeni.json` ve
+  `Saved/MMODaily/MMOSave_Yeni.json` olusmali (EndPlay tasimasi). Yeni adla girince basarim altini ikinci kez gelmemeli.
+- [ ] Basarim dosyasi olmayan Lv>1 kayitli karakterle gir (dosyayi elle bir kenara al): seviye/gorev basarimlari ACIK
+  gorunmeli ama "Basarim: ... (+altin)" bildirimi ve altin artisi OLMAMALI; logda `[MMOACH] Basarim dosyasi yok`.
+- [ ] Posta: ad degisip kayit yapilmamisken `/posta gonder`: yeni mesaj "once MMOSave ile kaydet ya da eski adina don".

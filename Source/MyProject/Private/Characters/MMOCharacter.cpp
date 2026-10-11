@@ -1363,6 +1363,20 @@ bool AMMOCharacter::LoadCharacter()
 		return false;
 	}
 
+	// SECURITY_AUDIT K-1 F3: karakter zaten yukluyken (MMOLoad, yalniz host/yonetici) canli adin kaydi yoksa HICBIR SEY
+	// degistirme. Eskiden "yeni karakter" dalina dusup yuklu karakteri bellekte tutarak ActiveSaveSlot'u bos yeni yuvaya
+	// ceviriyor, LoadSerial'i artirip basarim/gunluk durumunu sifirliyordu: sonraki kayit catallama + odul tekrari demekti.
+	// Bu donus LoadSerial/bInitialLoadComplete'e dokunmadan once olmali.
+	if (bInitialLoadComplete && !ActiveSaveSlot.IsEmpty())
+	{
+		IMMOCharacterStore* ReloadStore = UMMOCharacterStoreSubsystem::Get(this);
+		if (ReloadStore && !ReloadStore->Exists(GetSaveSlotName()))
+		{
+			MMONotify::ToOwner(this, TEXT("Bu adin kaydi yok: yuklu karakter degismedi."), FColor::Orange, 4.f);
+			return false;
+		}
+	}
+
 	// Manuel MMOLoad ve otomatik yukleme ayni guvenlik kapisindan gecer. Onceki bir
 	// yukleme basarili olsa bile simdiki dosya okunamazsa autosave onu ezmesin.
 	bInitialLoadComplete = false;
@@ -1597,12 +1611,36 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			return;
 		}
 	}
+	// SECURITY_AUDIT K-1 yeni yuz (F1): uzak istemci yalniz HIC kaydedilmemis karakterin adini degistirebilir. Kayitli karakter
+	// yeni ada gecip cikinca yeni yuvaya tam envanterle yazilir, eski yuva diskte kalir (catallama, altin/esya ikiye katlanir).
+	// Kosul diskteki yuva: ActiveSaveSlot.IsEmpty() YETMEZ, yeni karakter dali yuvayi dosya yokken de atar. Bos ActiveSaveSlot
+	// (yukleme henuz bitmedi) catallama degil: hicbir sey yuklenmedi, yeni ad kendi kaydini yukler. Host/yerel ve yonetici muaf.
+	const bool bRemoteNameRules = UsesRemoteNameRules();
+	bool bNameAdmin = MMOAdmin::IsServerAdmin(Cast<APlayerController>(GetController()));
+#if !UE_BUILD_SHIPPING
+	// Headless testte denetleyici yereldir (= yonetici sayilir); test bayragi uzak ve yonetici DISI oyuncuyu benzetir.
+	if (bTestRemoteNameRules)
+	{
+		bNameAdmin = false;
+	}
+#endif
+	if (bRemoteNameRules && !bNameAdmin && !ActiveSaveSlot.IsEmpty())
+	{
+		// Magaza yoksa yuvanin durumu dogrulanamaz: reddet (muhafazakar).
+		IMMOCharacterStore* OwnStore = UMMOCharacterStoreSubsystem::Get(this);
+		if (!OwnStore || OwnStore->Exists(ActiveSaveSlot))
+		{
+			MMONotify::ToOwner(this, TEXT("Kayitli karakterin adi degistirilemez. Yeni ad icin yeni karakterle (?Name=) baglan."),
+				FColor::Orange, 6.f);
+			return;
+		}
+	}
 	// Soguma (SECURITY_AUDIT Y-7): uzak istemci 30 sn, host/yerel konsol 5 sn (test akisi bozulmasin ama
 	// arkadaslara bildirim yagmasi da olmasin). Reddedilince sahibe ipucu gider (Reject).
 	const UWorld* CooldownWorld = GetWorld();
 	if (CooldownWorld)
 	{
-		const float CooldownDuration = IsLocallyControlled() ? SetNameCooldownLocal : SetNameCooldown;
+		const float CooldownDuration = bRemoteNameRules ? SetNameCooldown : SetNameCooldownLocal;
 		const float CooldownLeft = CooldownDuration - (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime);
 		if (CooldownLeft > 0.f)
 		{
@@ -1628,12 +1666,17 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	}
 	// Uzak istemci diskte kaydi olan (baska birine ait) bir adi alamaz: aksi halde SaveCharacterForTravel
 	// bu karakter icin surekli reddedilir ve host'un bolge gecisi kilitlenir (QA O-3). Kendi yuvasina donus serbest.
-	if (!IsLocallyControlled() && !ActiveSaveSlot.Equals(CandidateSlot, ESearchCase::IgnoreCase))
+	if (bRemoteNameRules && !ActiveSaveSlot.Equals(CandidateSlot, ESearchCase::IgnoreCase))
 	{
 		// Magaza yoksa varlik dogrulanamaz: ad degisikligi reddedilir (muhafazakar).
 		IMMOCharacterStore* NameStore = UMMOCharacterStoreSubsystem::Get(this);
 		if (!NameStore || NameStore->Exists(CandidateSlot))
 		{
+			// F5: bu ret de soguma baslatir; aksi halde cevrimdisi kayitli adlar bedava ve sinirsiz hizda sorgulanirdi.
+			if (CooldownWorld)
+			{
+				LastSetNameServerTime = CooldownWorld->GetTimeSeconds();
+			}
 			MMONotify::ToOwner(this, TEXT("Bu ad kayitli bir karaktere ait: degistirilemedi. Kendi karakterin icin ?Name= ile yeniden baglan."), FColor::Orange, 6.f);
 			return;
 		}
@@ -1660,9 +1703,21 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			FriendsComponent->AnnouncePresence(true);
 		}
 	}
-	MMONotify::ToOwner(this,
-		FString::Printf(TEXT("Adin '%s' olarak ayarlandi. Kalici kayit icin simdi MMOSave/MMOLoad kullan."), *Trimmed),
+	MMONotify::ToOwner(this, bRemoteNameRules && !bNameAdmin
+		? FString::Printf(TEXT("Adin '%s' olarak ayarlandi. Ilk kayittan (MMOSave ya da 60 sn otomatik kayit) sonra ad degistirilemez."), *Trimmed)
+		: FString::Printf(TEXT("Adin '%s' olarak ayarlandi. Kalici kayit icin simdi MMOSave kullan."), *Trimmed),
 		FColor(120, 200, 255), 3.f);
+}
+
+bool AMMOCharacter::UsesRemoteNameRules() const
+{
+#if !UE_BUILD_SHIPPING
+	if (bTestRemoteNameRules)
+	{
+		return true;
+	}
+#endif
+	return !IsLocallyControlled();
 }
 
 void AMMOCharacter::PawnClientRestart()

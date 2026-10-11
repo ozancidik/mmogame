@@ -452,7 +452,8 @@ başlarsa yapılır.
 
 ## 10. Kisa vadeli ara onlem (2026-10-11, hesap modundan once)
 
-Durum: **oneri**, kod yazilmadi, PIE'da denenmedi. Kaynak: `SECURITY_AUDIT.md` K-1 "yeni yuz (2026-10-11): Ad degistirerek
+Durum: **uygulandi (2026-10-11, commit'lenmedi)**, derlendi, mevcut testler gecti; yeni kural icin native test ve PIE YOK
+(§10.2 ve F3/F5; F4 / §10.3 uygulanmadi). Ayrinti `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari. Kaynak: `SECURITY_AUDIT.md` K-1 "yeni yuz (2026-10-11): Ad degistirerek
 karakter catallama", bulgular F1-F5 (satirlar commit `43e87ca`). Karar adayi: `DECISIONS_NEEDED.md` "Ad degistirme kisiti
 (uzak istemci)".
 

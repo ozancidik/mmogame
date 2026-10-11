@@ -208,7 +208,10 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
 
 ## Yeni karar adayi (2026-10-11: guvenlik denetimi; KOD DEGISTIRILMEDI)
 
-- **Ad degistirme kisiti (uzak istemci):** DURUM: ACIK (2026-10-11), duzeltme planlandi, karar bekliyor.
+- **Ad degistirme kisiti (uzak istemci):** DURUM: secenek (a) GECICI ONLEM OLARAK UYGULANDI (2026-10-11, commit'lenmedi; derlendi,
+  native test/PIE yok; `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari). Kullanici karari hala ACIK: kayitli karakter icin ad
+  degistirme oyun ozelligi olarak gerekli mi? Ayrica yeni karar: basarim dosyasi olmayan Lv>1 karakterde seviye/gorev/altin basarimlari
+  odulsuz acik sayiliyor (`ACHIEVEMENTS.md`); sistem oncesi karakterlerin geriye donuk odul almamasi kabul mu?
   - **Sorun [Kesin, kod okumasi; PIE'da denenmedi]:** uzak istemci kayitli karakterinin adini kaydi olmayan yeni bir ada
     degistirip cikinca karakter yeni yuvaya tam envanterle yaziliyor, eski yuva silinmiyor: ayni karakter iki adda.
     Posta/ticaret/depo ile tek istemcide altin ve esya her turda ikiye katlanir. Ayrica basarim/gunluk dosyasi eski adda

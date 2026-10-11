@@ -34,15 +34,21 @@ namespace
 	}
 
 	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
-	void AchRecoverTmp(const FString& Path)
+	// false = .tmp var ama geri konamadi: cagiran "dosya yok" sanip odulleri yeniden vermemeli ve uzerine yazmamali.
+	bool AchRecoverTmp(const FString& Path)
 	{
 		const FString Tmp = Path + TEXT(".tmp");
 		IFileManager& FM = IFileManager::Get();
 		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
 		{
+			if (!FM.Move(*Path, *Tmp, true, true))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarilamadi (yukleme ertelendi): %s"), *Tmp);
+				return false;
+			}
 			UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarildi: %s"), *Tmp);
-			FM.Move(*Path, *Tmp, true, true);
 		}
+		return true;
 	}
 }
 
@@ -101,6 +107,16 @@ void UMMOAchievementComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PeriodicTimer);
+	}
+	// K-1 F2: once TryLoad, sonra yaz. Karakter yuvasi degistiyse (ad degisimi + kayit) dosya yeni yuvaya tasinir; aksi halde
+	// eski yolda kalir ve yeni adla girince bos dosya okunup seviye/gorev basarim altini ikinci kez verilirdi.
+	// Siralama (motor kodundan dogrulandi, UE 5.7): Destroy -> APawn::Destroyed -> UnPossessed (karakter yeni yuvaya yazilir,
+	// ActiveSaveSlot guncellenir) -> AActor::Destroyed -> RouteEndPlay -> AMMOCharacter::EndPlay (kendi kaydi, sonra
+	// Super::EndPlay) -> AActor::EndPlay -> bilesen EndPlay'leri. Yani bu noktada ActiveSaveSlot karakter kaydindan SONRAKI
+	// guncel yuvadir. Yuklenmemis bilesende TryLoad cagrilmaz (cikista dosya okumaya gerek yok).
+	if (HasAuthorityInternal() && bLoaded)
+	{
+		TryLoad();
 	}
 	if (HasAuthorityInternal() && bDirty)
 	{
@@ -296,14 +312,24 @@ bool UMMOAchievementComponent::TryLoad()
 	{
 		return false;
 	}
-	LoadedSerial = C->GetLoadSerial();
 	if (bPersistenceEnabled)
 	{
 		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Slot + TEXT(".json"));
-		AchRecoverTmp(Path);
-		FString Raw;
-		if (FFileHelper::LoadFileToString(Raw, *Path))
+		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir).
+		// "Dosya yok" sanilirsa odul tekrar verilir ve diskteki gercek durumun ustune yazilirdi.
+		if (!AchRecoverTmp(Path))
 		{
+			return false;
+		}
+		bool bHadValidFile = false;
+		FString Raw;
+		if (IFileManager::Get().FileExists(*Path))
+		{
+			if (!FFileHelper::LoadFileToString(Raw, *Path))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Basarim dosyasi okunamadi (yukleme ertelendi): %s"), *Path);
+				return false;
+			}
 			FMMOAchievementCounters Loaded;
 			TArray<FName> LoadedUnlocked;
 			FString LoadedTitle;
@@ -312,6 +338,7 @@ bool UMMOAchievementComponent::TryLoad()
 				Counters = Loaded;
 				Unlocked = LoadedUnlocked;
 				ActiveTitle = LoadedTitle;
+				bHadValidFile = true;
 			}
 			else
 			{
@@ -320,10 +347,59 @@ bool UMMOAchievementComponent::TryLoad()
 			}
 		}
 		StoragePath = Path;
+		LoadedSlot = Slot;
+		LoadedSerial = C->GetLoadSerial();
+		bLoaded = true;
+		if (!bHadValidFile)
+		{
+			MarkCurrentProgressUnlockedSilently();
+		}
+		return true;
 	}
+	LoadedSerial = C->GetLoadSerial();
 	LoadedSlot = Slot;
 	bLoaded = true;
 	return true;
+}
+
+void UMMOAchievementComponent::MarkCurrentProgressUnlockedSilently()
+{
+	// K-1 F2 savunma derinligi: Lv>1 karakterin basarim dosyasi HIC yoksa (ya da bozuktu) dosya kaybolmus/tasinmamis
+	// sayilir: o an zaten saglanan seviye/gorev/altin basarimlari ODULSUZ acik isaretlenir ve hemen yazilir. Aksi halde
+	// bos dosya yuklenip (ad degisimi, F3, silinen dosya) ~26.000 altinlik seviye/gorev odulu tekrar verilirdi.
+	// Bedeli: basarim sistemi gelmeden once Lv>1 olmus karakterler bu basarimlarin altinini geriye donuk ALMAZ (unvanlar acilir).
+	// Oldurme/olum sayaclari dosyayla birlikte kaybolur, odulleri yeniden kazanilarak alinir (sayac sifirdan baslar).
+	const AMMOCharacter* Owner = GetOwnerCharacter();
+	const UMMOStatsComponent* S = Owner ? Owner->GetStats() : nullptr;
+	const int32 Level = S ? S->Level : 0;
+	if (Level <= 1)
+	{
+		return;
+	}
+	const UMMOInventoryComponent* Inv = Owner->GetInventory();
+	const UMMOQuestComponent* Q = Owner->GetQuestComponent();
+	const int32 QuestsDone = Q ? Q->CompletedQuests.Num() : 0;
+	FMMOAchievementCounters Probe = Counters;
+	Probe.PeakGold = FMath::Max(Probe.PeakGold, Inv ? FMath::Min(Inv->Gold, MaxCounter) : 0);
+	int32 Marked = 0;
+	for (const FMMOAchievementDef& D : FMMOAchievementDatabase::GetAll())
+	{
+		const bool bSnapshotKind = D.Kind == EMMOAchievementKind::ReachLevel || D.Kind == EMMOAchievementKind::QuestsDone
+			|| D.Kind == EMMOAchievementKind::GoldHeld;
+		if (bSnapshotKind && !Unlocked.Contains(D.Id) && IsSatisfied(D, Probe, Level, QuestsDone))
+		{
+			Unlocked.Add(D.Id);
+			++Marked;
+		}
+	}
+	Counters.PeakGold = Probe.PeakGold;
+	if (Marked > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Basarim dosyasi yok, Lv%d karakter: %d basarim odulsuz acik isaretlendi (%s)"),
+			Level, Marked, *StoragePath);
+		bDirty = true;
+		SaveNow();
+	}
 }
 
 bool UMMOAchievementComponent::SaveNow()

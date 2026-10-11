@@ -93,7 +93,11 @@ Düzeltme (öncelik sırasıyla):
 
 #### K-1 yeni yuz (2026-10-11): Ad degistirerek karakter catallama (fork)
 
-**DURUM: ACIK (2026-10-11), duzeltme planlandi.** Kod henuz DEGISMEDI; asagidaki maddelerin hicbiri kapanmadi.
+**DURUM (2026-10-11, 2. tur duzeltme, commit'lenmedi; derlendi, RunSystemTests 61/53/89 + SaveLifecycle 26 + NetSmokeTest
+GECTI; yeni davranislar icin native test HENUZ YOK, PIE/uzak istemciyle denenmedi):** F1 DUZELTILDI (kisa vadeli onlem),
+F2 DUZELTILDI (uzak istemci icin F1 ile kapali; host/F3 icin EndPlay tasima + dosyasiz Lv>1 savunmasi), F3 DUZELTILDI,
+F5 DUZELTILDI, F4 ACIK (Linux; yalniz not, kod degismedi). Kalici cozum (hesap modu) ACIK. Her maddenin altinda "Durum".
+Asagidaki bulgu satirlari `43e87ca` icindir; duzeltme satirlari calisma agacindaki `MMOCharacter.cpp` icindir.
 Kaynak: 2026-10-11'de iki bagimsiz denetim (qa-kontrolcu, ag-guvenlik-denetcisi), ikisi de commit `43e87ca`'yi inceledi.
 Satirlar `43e87ca` icindir; `MMOCharacter.cpp` o commit'ten bu yana (HEAD `b0f22bc` ve calisma agaci) degismedi.
 Hepsi **kod okumasiyla** bulundu: PIE'da, NetSmokeTest'te ya da gercek uzak istemciyle denenmedi.
@@ -119,6 +123,12 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
   (her yeni ad icin 30 sn ad sogumasi, `MMOCharacter.h:461`). Ikinci istemci gerekmez.
 - Posta B2 korumasi (`MMOMailComponent.cpp:155-163`, `IsNameChanged`) yalniz ad degisip yeni yuva henuz yazilmamisken
   islemi durdurur. Yeni adla yeniden girildiginde ad ve yuva eslesir, koruma devreye girmez.
+- **Durum: DUZELTILDI (2026-10-11, kod okumasi + derleme; native test/PIE yok).** `ServerSetName_Implementation`
+  (`MMOCharacter.cpp:1614-1637`): uzak istemci (yonetici disi) icin `ActiveSaveSlot` doluysa ve `Store->Exists(ActiveSaveSlot)`
+  (magaza yoksa da) ret: "Kayitli karakterin adi degistirilemez". Bos `ActiveSaveSlot` (yukleme bitmedi) catallama
+  sayilmaz, izinli. Host/yerel ve yonetici muaf. Test kancasi: `SetRemoteNameRulesForTest(true)` (yalniz non-shipping;
+  yerel pawn'a uzak + yonetici disi kurallarini uygular). Eski yuvanin silinmesi gibi bir tasima YOK: kural yalniz
+  catallamayi baslatan ad degisimini engeller.
 
 **F2. Basarim ve gunluk yan dosyalari cikista yeni yuvaya tasinmiyor**
 - Tasima yalniz `TryLoad` icinde var: `MMOAchievementComponent.cpp:278-290`, `MMODailyComponent.cpp:245-258` (bagli yuva
@@ -132,6 +142,15 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
   200+1.000+4.000 = 5.200, toplam **25.900 altin (~26.000) her ad degistirme dongusunde**, ayrica unvanlar. Gunluk gorevler de
   yeni yuvada ayni gun sifirdan acilir (Lv80'de 15 x 80 x (1+1+2) = 4.800 altin/gun ek; oldurme ve gorev teslimi ister).
 - Bu ekonomi kalemi `EconomyModel.py`'deki basarim/gunluk satirlarinda yok (model tek seferlik basarim varsayiyor).
+- **Durum: DUZELTILDI (2026-10-11; native test/PIE yok).** Uzak istemci kayitli karakterin adini artik degistiremez (F1),
+  yani uzak yol kapali. Savunma derinligi: (1) basarim ve gunluk bileseni `EndPlay`'i, yuklu ise `SaveNow`'dan once
+  `TryLoad()` cagirir (`MMOAchievementComponent.cpp:111`, `MMODailyComponent.cpp:92`); motor sirasi (UE 5.7 kaynagindan):
+  `APawn::Destroyed` -> `UnPossessed` (karakter yeni yuvaya yazilir, `ActiveSaveSlot` guncellenir) -> `RouteEndPlay` ->
+  `AMMOCharacter::EndPlay` -> `AActor::EndPlay` -> bilesen `EndPlay`; yani tasima guncel yuvaya gider. (2) Basarim:
+  Lv>1 karakterin dosyasi yoksa ya da bozuksa o an saglanan ReachLevel/QuestsDone/GoldHeld basarimlari ODULSUZ acik
+  isaretlenip yazilir (`MarkCurrentProgressUnlockedSilently`, `:365`). Bedeli: basarim sisteminden once Lv>1 olmus kayitli
+  karakterler bu basarimlarin altinini geriye donuk almaz (unvanlar acilir); oldurme/olum sayaclari sifirdan baslar.
+  Gunluk icin benzer savunma yok (ayni gunun gorevleri yeni dosyada sifirdan acilir; uzak yol F1 ile kapali).
 
 **F3. `MMOLoad` "kayit yok" dali yuvayi degistirip basarim/gunlugu sifirliyor**
 - `MMOCharacter.cpp:1382-1397` (`LoadCharacter`): canli adin yuvasi yoksa yuklu karakter bellekte kalir ama `ActiveSaveSlot`
@@ -143,6 +162,11 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
 - Erisim: uzak `ServerLoadCharacter` yalniz yoneticiye acik (`:1552-1562`); host yerel `MMOLoad` (`:1494-1499`) ve host ad
   degistirmede kayitli-ad kontrolune tabi degil. Yani bugun **yalniz host/yonetici** yolu. Host diske zaten tam erisimli
   oldugu icin guvenlik siniri degil, ama kazara catallama ve test verisinin bozulmasi riski var. Ciddiyet: DUSUK.
+- **Durum: DUZELTILDI (2026-10-11; native test/PIE yok).** `LoadCharacter` (`MMOCharacter.cpp:1366-1378`): karakter
+  zaten yukluyken (`bInitialLoadComplete` ve dolu `ActiveSaveSlot`) canli adin kaydi yoksa "Bu adin kaydi yok: yuklu
+  karakter degismedi" der ve `LoadSerial`, `ActiveSaveSlot`, `bInitialLoadComplete`'e dokunmadan doner; basarim/gunluk
+  sifirlanmaz, baslangic paketi verilmez. (Onerilen bilesen-tarafi "sifirlama" yerine kaynakta kesildi: daha az kod, ayni
+  sonuc.) Host kendi adini degistirip `MMOSave` yaparsa karakter yine yeni yuvaya yazilir: host muaf, bilincli.
 
 **F4. Linux'ta buyuk/kucuk harf ad varyanti ayri `.sav` yaratiyor**
 - Yuva adi harf buyuklugunu korur: `GetSaveSlotName` (`MMOCharacter.cpp:1113-1144`) ve `CandidateSlot` (`:1615`).
@@ -155,6 +179,8 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
   kullaniyor (`MMOMailComponent.cpp:40-54`, `:305`). Bu yuzden Linux'ta `ALI` adini alan biri `Ali`'nin posta kutusunu (ekli
   altinla birlikte) toplayabilir [Muhtemel, kod okumasi].
 - Proje bugun Windows listen-server'da calisiyor; bu madde **Linux'ta denenmedi**, sunucu Linux'a tasininca gecerli olur.
+- **Durum: ACIK (kod degismedi, bilerek).** F1 duzeltmesi kayitli karakterin harf varyantina gecmesini de engeller, ama
+  `?Name=ALI` ile dogrudan baglanma yolu Linux'ta hala ayri yuva acar. Cozum yollari `ACCOUNT_IDENTITY_DESIGN.md` §10.3.
 
 **F5. Kayitli-ad reddinde soguma yok (ad sorgulama)**
 - `MMOCharacter.cpp:1635-1639`: "Bu ad kayitli bir karaktere ait" reddi `LastSetNameServerTime`'i guncellemeden doner;
@@ -163,8 +189,12 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
 - Senaryo: uzak istemci aday ad listesini tek tek `MMOSetName` ile dener. Kayitli (cevrimdisi) adlar bedava ve sinirsiz
   hizda "kayitli" diye doner; kayitli olmayan bir tahmin adi gercekten degistirir ve 30 sn soguma baslatir. Cevrimdisi
   karakter adlari boylece listelenir ve K-1 senaryo 2'ye (`?Name=` ile calma) girdi olur. Ciddiyet: DUSUK-ORTA.
+- **Durum: DUZELTILDI (2026-10-11; native test yok).** Kayitli-ad reddi artik soguma damgasini vurur
+  (`MMOCharacter.cpp:1675`); kayitli karakter zaten F1 kilidine takilip aday ada hic bakmaz. Kalan: yeni (kaydedilmemis)
+  karakter 30 sn'de bir aday deneyebilir; `?Name=` ile yeniden baglanmak sogumasiz ayni bilgiyi verir (yeniden baglanti
+  maliyeti dahilinde).
 
-**Onerilen kisa vadeli cozum (kod henuz yazilmadi):**
+**Onerilen kisa vadeli cozum (2026-10-11'de uygulandi; F4 haric, yukaridaki "Durum" satirlari):**
 - Uzak istemci (`!IsLocallyControlled()`) icin `ServerSetName` yalniz **hic kaydedilmemis yeni karaktere** izin versin:
   kosul `Store->Exists(ActiveSaveSlot) == false` (yalniz `ActiveSaveSlot.IsEmpty()` yetmez, cunku yeni karakter dali
   `:1394` dosya yokken de `ActiveSaveSlot`'u atiyor). Ilk otomatik kayittan (60 sn) sonra ad kilitlenir. Host ve yonetici
@@ -185,7 +215,8 @@ modunda uzak `ServerSetName` her zaman ret). Ad degismeyince F1, F2, F3 (uzak) v
 
 **Dogrulama plani (yapilmadi):** iki istemcili NetSmokeTest varyanti: (1) kayitli karakter uzaktan ad degistirmeyi denesin,
 ret beklenir; (2) yeni karakter adini degistirebilsin; (3) ad degistir + hemen cik, sonra yeni adla gir: basarim altini
-ikinci kez verilmemeli. Bugunku kodda (1) ve (3) **basarisiz olmasi beklenir**; once kirmizi, duzeltmeden sonra yesil.
+ikinci kez verilmemeli. `43e87ca` kodunda (1) ve (3) **basarisiz olmasi beklenirdi**; 2026-10-11 duzeltmesinden sonra
+yesil beklenir ama hala kosulmadi. Native test icin kanca: `AMMOCharacter::SetRemoteNameRulesForTest` (test-muhendisi).
 
 ---
 

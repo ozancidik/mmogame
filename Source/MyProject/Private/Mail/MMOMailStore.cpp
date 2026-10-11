@@ -131,6 +131,16 @@ bool FMMOMailStore::Load(const FString& Name, TArray<FMMOMail>& OutMails)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Bozuk posta kutusu .bad olarak ayrildi: %s"), *Path);
 		IFileManager::Get().Move(*(Path + TEXT(".bad")), *Path, true);
+		// Eski bir .tmp de duruyorsa onu da ayir: ana dosya artik yok, bir sonraki Load o .tmp'yi "yarim yazim" sanip geri
+		// koyardi (zaten toplanmis ya da iade edilmis posta dirilirdi = altin kopyalama).
+		if (IFileManager::Get().FileExists(*Tmp))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Bozuk kutunun eski .tmp'si .tmp.bad olarak ayrildi: %s"), *Tmp);
+			if (!IFileManager::Get().Move(*(Tmp + TEXT(".bad")), *Tmp, true))
+			{
+				IFileManager::Get().Delete(*Tmp, false, true, true);
+			}
+		}
 		OutMails.Reset();
 	}
 	return true;
@@ -149,7 +159,14 @@ static bool WriteBox(const FString& Name, const TArray<FMMOMail>& Mails)
 	IFileManager& FM = IFileManager::Get();
 	if (!FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 	{
-		return false; // ana dosyaya dokunulmadi
+		// Ana dosyaya dokunulmadi; cagiran basarisiz sayar (gonderimde iade eder). Yarim/tam .tmp kalirsa ve ana dosya yoksa
+		// (ilk posta) bir sonraki Load onu geri koyardi: iade edilmis posta teslim de edilirdi. Bu yuzden .tmp silinir.
+		FM.Delete(*Tmp, false, true, true);
+		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
+		{
+			UE_LOG(LogTemp, Error, TEXT("[MMOMAIL] Basarisiz yazimin .tmp'si silinemedi (kurtarmada geri gelebilir): %s"), *Tmp);
+		}
+		return false;
 	}
 	if (FM.Move(*Path, *Tmp, true, true))
 	{
@@ -169,9 +186,15 @@ static bool WriteBox(const FString& Name, const TArray<FMMOMail>& Mails)
 		FM.Delete(*Tmp, false, true, true);
 		return false;
 	}
-	// Ana dosya yok, .tmp tam ve yeni icerikte: bir sonraki Load onu geri koyar. Basarisiz desek cagiran iade/teslim
-	// etmez ama kurtarma yeni icerigi yine yazardi (Append'de altin kopyalanirdi); bu yuzden yazim GERCEKLESMIS sayilir.
-	return FM.FileExists(*Tmp);
+	// Ana dosya yok (ilk posta), .tmp tam ve yeni icerikte. Yazim BASARISIZ sayilir ve .tmp silinir: cagiran iade eder,
+	// sonraki Load .tmp'yi geri koyup iade edilmis postayi bir de teslim etmesin (cift teslim). Silme de basarisizsa .tmp
+	// kurtarmada geri gelecegi icin yazim GERCEKLESMIS sayilir (iade edilmez; altin kopyalanmaz).
+	if (FM.Delete(*Tmp, false, true, true) || !FM.FileExists(*Tmp))
+	{
+		return false;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Basarisiz yazimin .tmp'si silinemedi; kurtarmada teslim edilecek, yazim basarili sayildi: %s"), *Tmp);
+	return true;
 }
 
 bool FMMOMailStore::Append(const FString& Name, const FMMOMail& Mail)
@@ -232,4 +255,5 @@ void FMMOMailStore::DeleteBox(const FString& Name)
 	IFileManager::Get().Delete(*Path, false, true, true);
 	IFileManager::Get().Delete(*(Path + TEXT(".bad")), false, true, true);
 	IFileManager::Get().Delete(*(Path + TEXT(".tmp")), false, true, true);
+	IFileManager::Get().Delete(*(Path + TEXT(".tmp.bad")), false, true, true);
 }

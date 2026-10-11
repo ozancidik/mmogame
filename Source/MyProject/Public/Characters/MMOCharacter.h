@@ -153,6 +153,8 @@ public:
 	// (host her zaman Player0 oldugu icin guvenli, ama misafirler degil). Kalici bir
 	// kimlik sistemi olmadan tam duzeltilemez, ama oyuncuya EN AZINDAN kendi adini
 	// sabitleyecek bir arac ver - MMOSave/MMOLoad'dan ONCE cagrilmali.
+	// Uzak istemci (yonetici disi) yalniz hic kaydedilmemis karakterin adini degistirebilir (K-1 F1, catallama);
+	// ilk kayittan sonra ad kilitlenir. Host/yerel ve yonetici muaf.
 	UFUNCTION(Exec)
 	void MMOSetName(const FString& NewName);
 
@@ -177,6 +179,9 @@ public:
 	{
 		if (HasAuthority()) { bInitialLoadComplete = bLoadComplete; ActiveSaveSlot = Slot; LoadSerial = Serial; }
 	}
+	// Testler (ad degistirme kisiti, K-1 F1/F5): headless sunucuda yerel kontrollu pawn'a uzak istemci ad kurallarini
+	// uygular (kayitli karakter reddi, kayitli-ad reddinde soguma, 30 sn soguma); pawn yonetici sayilmaz.
+	void SetRemoteNameRulesForTest(bool bRemote) { if (HasAuthority()) bTestRemoteNameRules = bRemote; }
 #endif
 	// Bolge gecisinin kullandigi asenkron kayit: callback yalniz yazim tamamlandiginda cagrilir; basarisiz
 	// yazimda veya sonuc "eski" ise (ayni yuvaya daha yeni bir yazim basladi) false ile cagrilir ve
@@ -460,6 +465,11 @@ protected:
 	float LastSetNameServerTime = -100.f;
 	static constexpr float SetNameCooldown = 30.f;
 	static constexpr float SetNameCooldownLocal = 5.f;
+	// Uzak istemci ad kurallari (kayitli karakter kilidi, kayitli-ad reddi, 30 sn soguma) bu pawn'a uygulanir mi.
+	bool UsesRemoteNameRules() const;
+#if !UE_BUILD_SHIPPING
+	bool bTestRemoteNameRules = false;
+#endif
 
 	// Can/mana iksiri ve parsomenler ayni kisa kullanim kapisini paylasir. Bu damga
 	// istemcide Reliable RPC yigilmalarini, sunucuda ise dogrudan RPC spam'ini keser.

@@ -30,15 +30,21 @@ namespace
 	constexpr int32 DailyMaxReward = 10000000;
 
 	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
-	void DailyRecoverTmp(const FString& Path)
+	// false = .tmp var ama geri konamadi: cagiran "dosya yok" sanip ayni gunun gorevlerini sifirdan acmamali, uzerine yazmamali.
+	bool DailyRecoverTmp(const FString& Path)
 	{
 		const FString Tmp = Path + TEXT(".tmp");
 		IFileManager& FM = IFileManager::Get();
 		if (!FM.FileExists(*Path) && FM.FileExists(*Tmp))
 		{
+			if (!FM.Move(*Path, *Tmp, true, true))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarilamadi (yukleme ertelendi): %s"), *Tmp);
+				return false;
+			}
 			UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarildi: %s"), *Tmp);
-			FM.Move(*Path, *Tmp, true, true);
 		}
+		return true;
 	}
 }
 
@@ -82,6 +88,13 @@ void UMMODailyComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PeriodicTimer);
+	}
+	// K-1 F2: once TryLoad, sonra yaz: karakter yuvasi degistiyse gunluk dosyasi yeni yuvaya tasinir (aksi halde yeni adla
+	// ayni gunun gorevleri sifirdan acilirdi). Siralama MMOAchievementComponent::EndPlay'deki gibi: karakter kaydi
+	// (UnPossessed / AMMOCharacter::EndPlay) bilesen EndPlay'inden ONCE calisir, ActiveSaveSlot burada gunceldir.
+	if (HasAuthorityInternal() && bLoaded)
+	{
+		TryLoad();
 	}
 	if (HasAuthorityInternal() && bDirty)
 	{
@@ -264,13 +277,22 @@ bool UMMODailyComponent::TryLoad()
 	{
 		return false;
 	}
-	LoadedSerial = C->GetLoadSerial();
 	if (bPersistenceEnabled)
 	{
 		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Slot + TEXT(".json"));
-		DailyRecoverTmp(Path);
+		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir).
+		if (!DailyRecoverTmp(Path))
+		{
+			return false;
+		}
 		FString Raw;
-		if (FFileHelper::LoadFileToString(Raw, *Path))
+		const bool bFileExists = IFileManager::Get().FileExists(*Path);
+		if (bFileExists && !FFileHelper::LoadFileToString(Raw, *Path))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Gunluk gorev dosyasi okunamadi (yukleme ertelendi): %s"), *Path);
+			return false;
+		}
+		if (bFileExists)
 		{
 			int32 Day = 0, Base = 0;
 			TArray<FMMODailyBounty> Loaded;
@@ -306,6 +328,7 @@ bool UMMODailyComponent::TryLoad()
 		QuestBaseline = FMath::Max(0, QuestsNow - ClaimProgress);
 		bDirty = true;
 	}
+	LoadedSerial = C->GetLoadSerial(); // yalniz basarili yuklemede (ertelenen yukleme eski seriyi birakmaz)
 	LoadedSlot = Slot;
 	bLoaded = true;
 	return true;
