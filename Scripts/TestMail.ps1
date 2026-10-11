@@ -35,12 +35,13 @@ $cases = @($lines | Select-String '\[MMO_MAIL_CASE\] (PASS|FAIL) check=')
 $summaries = @($lines | Select-String '\[MMO_MAIL_TEST\] (PASS|FAIL) checks=')
 $passes = @($lines | Select-String '\[MMO_MAIL_TEST\] PASS checks=(\d+) reason=')
 $errors = @($lines | Select-String '\[MMO_MAIL_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation')
-# Dizin olan kutu yolu senaryosu (tmp_first_mail_*) motorda TAM BIR "Error moving file" satiri uretir (Move 10x0.5 sn dener).
-# Yalniz testin GUID'li mmomail_ztestmaild_ dosyasina ait bu satir beklenir ve hata sayilmaz; sayisi 1 degilse senaryo kosmamistir.
+# Dizin olan kutu yolu senaryosu (tmp_first_mail_*): tur 4 (Y-NEW-2) ile WriteBox'un .tmp -> ana Move'u tekrar denemesiz;
+# motor "Error moving file" satiri (ve 10x0.5 sn bekleme) URETMEZ. Testin mmomail_ztestmaild_ dosyasina ait bu satir 0 olmali;
+# gorulurse tekrar denemeli (sunucuyu donduran) yola donulmustur.
 $expectedLockPattern = "LogFileManager: Error: Error moving file '[^']*mmomail_ztestmaild_"
 $expectedLock = @($errors | Where-Object { $_.Line -match $expectedLockPattern })
 $errors = @($errors | Where-Object { $_.Line -notmatch $expectedLockPattern })
-Write-Output "[MMO_MAIL_RUNNER] expected_move_error_lines=$($expectedLock.Count) (beklenen 1)"
+Write-Output "[MMO_MAIL_RUNNER] expected_move_error_lines=$($expectedLock.Count) (beklenen 0)"
 @($lines | Select-String '\[MMO_MAIL_NOTE\]') | ForEach-Object { Write-Output $_.Line }
 $summaries | ForEach-Object { Write-Output $_.Line }
 $errors | ForEach-Object { Write-Output $_.Line }
@@ -50,7 +51,7 @@ if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported 
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Matches[1] } } | Sort-Object -Unique)
 # Esik = bilinen kontrol sayisi (104: 41 eski + 48 ayristirma/K1/kilit/ad/B3/C1/O2/D3 + 15 guvenlik tur 2: .tmp temizligi,
 # bozuk kutunun .tmp.bad'i, callback'li iade); kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 104) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 1)
+$consistent = ($reported -ge 104) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
 Write-Output "[MMO_MAIL_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

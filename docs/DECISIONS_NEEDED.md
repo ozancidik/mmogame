@@ -236,3 +236,14 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
     karakterin uzak ad degisimi reddedilmeli; ad degistir + cik + yeni adla gir sonrasi basarim altini ikinci kez gelmemeli).
     Ilgili `[MMOMETRIC]`: bir karakterin `ev=gold src=basarim` toplami tablonun tek seferlik toplamini (65.050 altin,
     28 satir [Kesin, `EconomyModel.py` ciktisi]) asarsa ya da ayni basarim iki kez gorulurse istismar isaretidir.
+
+## Yeni karar adayi (2026-10-11: guvenlik tur 4, Y-NEW-1)
+
+- **Turkce harfli oyuncu/klan adi:** DURUM: adlar artik yalniz ASCII `[A-Za-z0-9 _-]` (tek yardimci `Public/Core/MMONameRules.h`;
+  ad cakismasi kontrolleri kanonik anahtarla: bosluk -> `_`, ASCII kucuk harf). Neden: `FChar::IsAlnum` Turkce harfleri
+  geciriyor, `ESearchCase::IgnoreCase` yalniz ASCII'de harf duyarsiz, NTFS ise Unicode'da da harf duyarsiz: buyuk ve kucuk
+  O-umlautlu iki ad farkli sayilip AYNI `MMOSave_*.sav` dosyasina yaziliyordu (ayni kayda ikinci oturum). Bedeli: Turkce harfli ad
+  secilemez (baglanti adindan harf atilir, `MMOSetName` reddeder); ASCII disi eski kayit/posta kutusu icin migrasyon YOK (o adlar
+  erisilemez kalir; eski Turkce harfli klan adlari yuklemede korunur, yenisi kurulamaz). Karar: Turkce harfli ad gerekli mi?
+  "Evet" ise sonra ICU tabanli kanonik anahtar (tam Unicode case-fold + normalizasyon, dosya adi = anahtarin guvenli kodlamasi)
+  ve eski kayitlar icin tek seferlik tasima.

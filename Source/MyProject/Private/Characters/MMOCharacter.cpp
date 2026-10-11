@@ -21,6 +21,7 @@
 #include "Core/MMOGameMode.h"
 #include "Core/MMOGameState.h"
 #include "Core/MMOAdmin.h"
+#include "Core/MMONameRules.h"
 #include "Items/MMOConsumableTypes.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -1123,23 +1124,9 @@ FString AMMOCharacter::GetSaveSlotName() const
 	}
 	// PlayerState adi bir platformdan da gelebilir. Yol ayirici/nokta gibi karakterleri
 	// save dosya adina tasima; bosluklarin eski kayitlardaki '_' eslemesini koru.
-	FString SafeName;
-	SafeName.Reserve(FMath::Min(Name.Len(), 32));
-	for (const TCHAR Ch : Name)
-	{
-		if (SafeName.Len() >= 32)
-		{
-			break;
-		}
-		if (FChar::IsAlnum(Ch) || Ch == TEXT('_') || Ch == TEXT('-'))
-		{
-			SafeName.AppendChar(Ch);
-		}
-		else if (Ch == TEXT(' '))
-		{
-			SafeName.AppendChar(TEXT('_'));
-		}
-	}
+	// Tur 4 (Y-NEW-1): yalniz ASCII (MMONameRules::SlotKey). Unicode harf NTFS'te harf duyarsiz eslesip iki farkli adi ayni
+	// dosyaya yaziyordu. ASCII disi eski kayitlar (MMOSave_<Turkce harfli ad>) icin migrasyon yok: bu adlar artik secilemez.
+	const FString SafeName = MMONameRules::SlotKey(Name);
 	return FString(TEXT("MMOSave_")) + (SafeName.IsEmpty() ? TEXT("Default") : SafeName);
 }
 
@@ -1374,6 +1361,16 @@ bool AMMOCharacter::LoadCharacter()
 		IMMOCharacterStore* ReloadStore = UMMOCharacterStoreSubsystem::Get(this);
 		if (ReloadStore && !ReloadStore->Exists(GetSaveSlotName()))
 		{
+			// Tur 4 (Y-NEW-6): kaydi henuz yazilmamis yeni karakterin pawn'i yeniden possess edildi (UnPossessed bayragi
+			// kapatti; kayit basarisiz/atlanmisti). Canli ad AYNI yuvayi veriyor ve diskte kayit yok: bellekteki karakter o
+			// yuvanin tek sahibidir, catallama olmaz. Kayit/basarim/gunluk kapisi yeniden acilir (LoadSerial, envanter degismez).
+			if (!bInitialLoadComplete && !bTravelSaveCommitted && GetPlayerState() && IsPlayerControlled()
+				&& MMONameRules::SameCanonical(ActiveSaveSlot, GetSaveSlotName()))
+			{
+				bInitialLoadComplete = true;
+				UE_LOG(LogTemp, Display, TEXT("[MMOSave] Kaydi olmayan yeni karakter yeniden possess edildi; kayit yeniden acildi (%s)"), *ActiveSaveSlot);
+				return false; // yeni karakter (kayit yok)
+			}
 			MMONotify::ToOwner(this, TEXT("Bu adin kaydi yok: yuklu karakter degismedi."), FColor::Orange, 4.f);
 			return false;
 		}
@@ -1605,13 +1602,11 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 		Reject(TEXT("Ad 1-20 karakter olmali"));
 		return;
 	}
-	for (const TCHAR Ch : Trimmed)
+	// Tur 4 (Y-NEW-1): yalniz ASCII (FChar::IsAlnum Unicode harfleri gecirirdi; NTFS'te harf duyarsiz eslesip baska kayda yazilirdi).
+	if (!MMONameRules::HasOnlyAllowedChars(Trimmed))
 	{
-		if (!FChar::IsAlnum(Ch) && Ch != TEXT('_') && Ch != TEXT('-') && Ch != TEXT(' '))
-		{
-			Reject(TEXT("Adda yalniz harf, rakam, bosluk, '_' ve '-' olabilir"));
-			return;
-		}
+		Reject(MMONameRules::AllowedCharsHint());
+		return;
 	}
 	// SECURITY_AUDIT K-1 yeni yuz (F1): uzak istemci yalniz HIC kaydedilmemis karakterin adini degistirebilir. Kayitli karakter
 	// yeni ada gecip cikinca yeni yuvaya tam envanterle yazilir, eski yuva diskte kalir (catallama, altin/esya ikiye katlanir).
@@ -1630,13 +1625,23 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 	// arkadaslara bildirim yagmasi da olmasin). Reddedilince sahibe ipucu gider (Reject).
 	// Tur 3 (Y8): soguma diske bakan her Exists kontrolunden ONCE: reddedilen istekler de diske sinirsiz hizda dokunmasin.
 	const UWorld* CooldownWorld = GetWorld();
+	const TCHAR* const NameLockedText = TEXT("Ad kilitli: karakter ilk kez kaydedildikten sonra (MMOSave, otomatik kayit ya da takas/klan/arkadas/posta islemi kaydi) adi degistirilemez. Baska ad = yeni karakter: cikip ?Name=YeniAd ile baglan (bu karakterin ilerlemesi tasinmaz).");
 	if (CooldownWorld)
 	{
 		const float CooldownDuration = bRemoteNameRules ? SetNameCooldown : SetNameCooldownLocal;
 		const float CooldownLeft = CooldownDuration - (CooldownWorld->GetTimeSeconds() - LastSetNameServerTime);
 		if (CooldownLeft > 0.f)
 		{
-			Reject(FString::Printf(TEXT("Ad degistirmek icin %.0f sn beklemelisin"), FMath::CeilToFloat(CooldownLeft)));
+			// Tur 4 (DUSUK-5): ad kilidi reddinden sonraki denemeler "X sn bekle" degil kilit metnini gorsun (beklemek
+			// kilidi acmaz). Kapi ayni: soguma bitince kilit kontrolu yine diskten yapilir (host/yonetici muafiyeti degismez).
+			if (bNameLockRejected)
+			{
+				MMONotify::ToOwner(this, NameLockedText, FColor::Orange, 8.f);
+			}
+			else
+			{
+				Reject(FString::Printf(TEXT("Ad degistirmek icin %.0f sn beklemelisin"), FMath::CeilToFloat(CooldownLeft)));
+			}
 			return;
 		}
 	}
@@ -1651,21 +1656,23 @@ void AMMOCharacter::ServerSetName_Implementation(const FString& NewName)
 			{
 				LastSetNameServerTime = CooldownWorld->GetTimeSeconds();
 			}
-			MMONotify::ToOwner(this, TEXT("Ad kilitli: karakter ilk kez kaydedildikten sonra (MMOSave, otomatik kayit ya da takas/klan/arkadas/posta islemi kaydi) adi degistirilemez. Baska ad = yeni karakter: cikip ?Name=YeniAd ile baglan (bu karakterin ilerlemesi tasinmaz)."),
-				FColor::Orange, 8.f);
+			bNameLockRejected = true;
+			MMONotify::ToOwner(this, NameLockedText, FColor::Orange, 8.f);
 			return;
 		}
 	}
 	// Ayni oturumdaki iki karakter ayni save dosyasina yazmasin. Windows dosya
 	// adlari buyuk/kucuk harf ayirt etmez; bosluk ve '_' da ayni slotu uretir.
-	const FString CandidateSlot = FString(TEXT("MMOSave_")) + Trimmed.Replace(TEXT(" "), TEXT("_"));
+	// Tur 4: karsilastirma kanonik anahtarla (MMONameRules::CanonicalKey: ASCII, bosluk -> '_', kucuk harf).
+	const FString CandidateSlot = FString(TEXT("MMOSave_")) + MMONameRules::SlotKey(Trimmed);
+	const FString CandidateKey = MMONameRules::CanonicalKey(Trimmed);
 	if (const UWorld* World = GetWorld())
 	{
 		for (TActorIterator<AMMOCharacter> It(World); It; ++It)
 		{
 			const AMMOCharacter* Other = *It;
-			if (Other != this && Other->IsPlayerControlled()
-				&& Other->GetSaveSlotName().Equals(CandidateSlot, ESearchCase::IgnoreCase))
+			const APlayerState* OtherPS = Other != this && Other->IsPlayerControlled() ? Other->GetPlayerState() : nullptr;
+			if (OtherPS && MMONameRules::CanonicalKey(OtherPS->GetPlayerName()) == CandidateKey)
 			{
 				Reject(TEXT("Bu ad su an baska bir oyuncuda"));
 				return;

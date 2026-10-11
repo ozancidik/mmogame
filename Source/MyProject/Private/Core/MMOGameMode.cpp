@@ -4,6 +4,7 @@
 #include "Core/MMOMobSpawner.h"
 #include "Core/MMOGameState.h"
 #include "Core/MMOAdmin.h"
+#include "Core/MMONameRules.h"
 #include "Characters/MMOMob.h"
 #include "Components/CapsuleComponent.h"
 #include "World/MMOVendorNPC.h"
@@ -376,13 +377,13 @@ namespace
 {
 	// Baglanti secenegindeki (?Name=) baslangic adini ServerSetName ile AYNI karakter kuralina sokar
 	// (harf/rakam, '_', '-', bosluk; en cok 20 karakter: motor ?Name= degerini 20'ye keser). Kontrol karakterleri (satir sonu vb.) sohbet
-	// satirlarini taklit etmek icin kullanilabildiginden atilir.
+	// satirlarini taklit etmek icin kullanilabildiginden atilir. Tur 4 (Y-NEW-1): yalniz ASCII harf/rakam (MMONameRules).
 	FString SanitizeInitialName(const FString& In)
 	{
 		FString Out;
 		for (const TCHAR Ch : In.TrimStartAndEnd())
 		{
-			if (FChar::IsAlnum(Ch) || Ch == TEXT('_') || Ch == TEXT('-') || Ch == TEXT(' '))
+			if (MMONameRules::IsAllowedNameChar(Ch))
 			{
 				Out.AppendChar(Ch);
 			}
@@ -449,6 +450,7 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 	}
 
 	FString UseName = NewName;
+	bool bAssignedRandomName = false; // DUSUK-4: "yeni karakter / ilerleme tasinmaz" uyarisi yalniz Gezgin atamasinda
 	if (!bNameChange)
 	{
 		// Baslangic adi: guvensiz karakterleri at; bos kalirsa ya da OS kullanici adi kalibindaysa rastgele ad ver.
@@ -456,10 +458,11 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 		UseName = Clean;
 		// PreLogin yalniz o an var olan PlayerController'lara bakar; iki istemci ayni anda ayni ?Name= ile
 			// girerse ikisi de gecer (ayni kayit yuvasi = esya cogaltma). Burada diger denetleyicilerle tekrar kontrol et.
+			// Tur 4 (Y-NEW-1): ham ad degil kanonik anahtar (ASCII, bosluk -> '_', kucuk harf) karsilastirilir.
 			bool bNameInUse = false;
 			if (!Clean.IsEmpty())
 			{
-				const FString CleanKey = Clean.Replace(TEXT(" "), TEXT("_"));
+				const FString CleanKey = MMONameRules::CanonicalKey(Clean);
 				if (const UWorld* CheckWorld = GetWorld())
 				{
 					for (FConstPlayerControllerIterator CIt = CheckWorld->GetPlayerControllerIterator(); CIt; ++CIt)
@@ -467,8 +470,7 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 						const APlayerController* Other = CIt->Get();
 						if (Other && Other != Controller && Other->PlayerState)
 						{
-							const FString OtherKey = Other->PlayerState->GetPlayerName().TrimStartAndEnd().Replace(TEXT(" "), TEXT("_"));
-							if (OtherKey.Equals(CleanKey, ESearchCase::IgnoreCase))
+							if (MMONameRules::CanonicalKey(Other->PlayerState->GetPlayerName()) == CleanKey)
 							{
 								bNameInUse = true;
 								break;
@@ -483,6 +485,7 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 			// (kayit yuvasi = ad; var olan bir yuva baska birinin karakterini yukler/ezer).
 			const UWorld* World = GetWorld();
 			bool bAssigned = false;
+			bAssignedRandomName = true;
 			for (int32 Attempt = 0; Attempt < 16; ++Attempt)
 			{
 				const FString Candidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999));
@@ -494,7 +497,7 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 					for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 					{
 						const APlayerController* PC = It->Get();
-						if (PC && PC->PlayerState && PC->PlayerState->GetPlayerName().Equals(Candidate, ESearchCase::IgnoreCase))
+						if (PC && PC->PlayerState && MMONameRules::CanonicalKey(PC->PlayerState->GetPlayerName()) == MMONameRules::CanonicalKey(Candidate))
 						{
 							bTaken = true;
 							break;
@@ -519,13 +522,20 @@ void AMMOGameMode::ChangeName(AController* Controller, const FString& NewName, b
 
 	// Baglanti adi degistirildiyse (gecersiz karakter, kullanimda, OS varsayilan adi) oyuncu kayit yuvasinin
 	// neden baska oldugunu bilsin. Istemci HUD'u bu anda henuz hazir degil: kisa gecikmeyle sohbet satiri.
-	if (UseName != NewName && Controller)
+	// Yalniz bas/son bosluk kirpildiysa ad (ve yuva) ayni: uyari yok.
+	if (UseName != NewName && UseName != NewName.TrimStartAndEnd() && Controller)
 	{
 		if (UWorld* NoticeWorld = GetWorld())
 		{
 			const TWeakObjectPtr<AController> WeakController(Controller);
 			// Ad kilidi (K-1 F1): bu ad ilk kayittan sonra degistirilemez; oyuncu bunu bilmeden ilerleme yaparsa kaybeder.
-			const FString Notice = FString::Printf(TEXT("Baglanti adin uygun olmadigi icin bu oturumda adin '%s' (yeni karakter). Bu ad ilk kayittan sonra (MMOSave, otomatik kayit, takas/klan/arkadas/posta islemi) kilitlenir. Kayitli karakterin icin cik ve gecerli bir ?Name=Ad ile yeniden baglan; burada yapilan ilerleme ona tasinmaz."), *UseName);
+			// DUSUK-4: "yeni karakter / ilerleme tasinmaz" yalniz rastgele (Gezgin) ad atandiginda dogru; temizlenen ad
+			// (ornegin "Ali!" -> "Ali") o adin kendi kaydini yukler, ona yalniz hangi karakterlerin atildigi soylenir.
+			const FString Notice = bAssignedRandomName
+				? FString::Printf(TEXT("Baglanti adin kullanilamadigi icin (bos/gecersiz, su an baska oyuncuda ya da sistem varsayilan adi) bu oturumda adin '%s' (yeni karakter). %s. Bu ad ilk kayittan sonra (MMOSave, otomatik kayit, takas/klan/arkadas/posta islemi) kilitlenir. Kayitli karakterin icin cik ve gecerli bir ?Name=Ad ile yeniden baglan; burada yapilan ilerleme ona tasinmaz."),
+					*UseName, MMONameRules::AllowedCharsHint())
+				: FString::Printf(TEXT("Baglanti adindaki izinsiz karakterler atildi: adin '%s'. %s. Farkli bir ad istiyorsan cik ve ?Name=Ad ile yeniden baglan."),
+					*UseName, MMONameRules::AllowedCharsHint());
 			FTimerHandle NoticeHandle;
 			NoticeWorld->GetTimerManager().SetTimer(NoticeHandle, FTimerDelegate::CreateWeakLambda(this, [WeakController, Notice]()
 			{
@@ -564,9 +574,15 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 	{
 		return;
 	}
-	// Kayit yuvasi adiyla ayni normallestirme: bosluk -> '_', buyuk/kucuk harf duyarsiz.
+	// Kayit yuvasi adiyla ayni normallestirme: kanonik anahtar (ASCII, bosluk -> '_', kucuk harf; MMONameRules).
 	// Motor (AGameModeBase::InitNewPlayer) ?Name= degerini 20 karakterle keser; ayni kesimle karsilastir.
-	const FString RequestedKey = SanitizeInitialName(Requested.Left(20)).Replace(TEXT(" "), TEXT("_"));
+	// Temizlenince bos kalan ad ChangeName'de rastgele (Gezgin) ad alir: burada reddedilmez.
+	const FString CleanRequested = SanitizeInitialName(Requested.Left(20));
+	if (CleanRequested.IsEmpty())
+	{
+		return;
+	}
+	const FString RequestedKey = MMONameRules::CanonicalKey(CleanRequested);
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
 		const APlayerController* PC = It->Get();
@@ -574,8 +590,7 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 		{
 			continue;
 		}
-		const FString OnlineKey = PC->PlayerState->GetPlayerName().TrimStartAndEnd().Replace(TEXT(" "), TEXT("_"));
-		if (OnlineKey.Equals(RequestedKey, ESearchCase::IgnoreCase))
+		if (MMONameRules::CanonicalKey(PC->PlayerState->GetPlayerName()) == RequestedKey)
 		{
 			ErrorMessage = TEXT("Bu ad su an baska bir oyuncu tarafindan kullaniliyor.");
 			return;

@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Mail/MMOMailStore.h"
+#include "Core/MMONameRules.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/FileHelper.h"
@@ -94,23 +95,9 @@ namespace
 
 FString FMMOMailStore::SanitizeName(const FString& Name)
 {
-	FString Safe;
-	Safe.Reserve(FMath::Min(Name.Len(), MaxNameLength));
-	for (const TCHAR Ch : Name)
-	{
-		if (Safe.Len() >= MaxNameLength)
-		{
-			break;
-		}
-		if (FChar::IsAlnum(Ch) || Ch == TEXT('_') || Ch == TEXT('-'))
-		{
-			Safe.AppendChar(Ch);
-		}
-		else if (Ch == TEXT(' '))
-		{
-			Safe.AppendChar(TEXT('_'));
-		}
-	}
+	// Tur 4 (Y-NEW-1): yalniz ASCII (karakter kayit yuvasi ile ayni kural, MMONameRules::SlotKey). Turkce harfli eski kutular
+	// (MMOMail_<ad>.json) icin migrasyon yok; o adlar artik oyuncu adi olarak secilemez.
+	const FString Safe = MMONameRules::SlotKey(Name, MaxNameLength);
 	return Safe.IsEmpty() ? FString(TEXT("Default")) : Safe;
 }
 
@@ -285,13 +272,19 @@ static bool WriteBox(const FString& Name, const TArray<FMMOMail>& Mails)
 		// (ilk posta) bir sonraki Load onu geri koyardi: iade edilmis posta teslim de edilirdi. Bu yuzden .tmp silinir.
 		FM.Delete(*Tmp, false, true, true);
 		FM.Delete(*Bak, false, true, true);
-		if (!bHadMain && FM.FileExists(*Tmp))
+		// Tur 4 (QA DUSUK-2): ilk postada (ana dosya yok) silinemeyen .tmp kurtarmada ana kutu olarak geri konup iade edilmis
+		// postayi teslim ederdi. .tmp.bad'a ayrilir (kurtarma onu okumaz); o da olmazsa asagidaki ilk-posta politikasiyla ayni:
+		// yazim GERCEKLESMIS sayilir (true, iade yok; altin kopyalanmaz, en kotu kaybolur).
+		if (!bHadMain && FM.FileExists(*Tmp) && !MailMoveNoRetry(Tmp + TEXT(".bad"), Tmp))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Basarisiz yazimin .tmp'si silinemedi (kurtarmada geri gelebilir): %s"), *Tmp);
+			UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Basarisiz ilk yazimin .tmp'si silinemedi/ayrilamadi; teslim edilebilir, yazim basarili sayildi: %s"), *Tmp);
+			return true;
 		}
 		return false;
 	}
-	bool bWritten = FM.Move(*Path, *Tmp, true, true);
+	// Tur 4 (Y-NEW-2): tekrar denemesiz Move. Motorun varsayilan 10x0.5 sn denemesi kilitli bir .tmp/ana dosyada sunucuyu ~5.5 sn
+	// dondururdu; basarisizlikta asagidaki dogrudan yazim / .bak geri koyma yolu ayni kalir.
+	bool bWritten = MailMoveNoRetry(Path, Tmp);
 	if (!bWritten)
 	{
 		// A4: Move basarisiz (kilit, antivirus vb.): dogrudan nihai yola yazmayi dene.
@@ -318,8 +311,17 @@ static bool WriteBox(const FString& Name, const TArray<FMMOMail>& Mails)
 	// Onceden kutu yoktu (ilk posta): eski durum = dosya yok. Yarim/tam yazilmis ana dosya ve .tmp silinir: cagiran iade eder,
 	// sonraki Load iade edilmis postayi bir de teslim etmesin (cift teslim). Silinemeyen dosya kurtarmada/okumada teslim
 	// edilebilecegi icin o durumda yazim GERCEKLESMIS sayilir (iade edilmez; altin kopyalanmaz, en kotu kaybolur).
-	FM.Delete(*Path, false, true, true);
+	// Tur 4 (QA DUSUK-3): ana dosya KOSULSUZ silinmez. bHadMain bir FileExists yanlis negatifinden geldiyse burada duran dosya
+	// gercek (eski) kutudur: silinmek yerine .bad'a ayrilir (incelenebilir; Load .bad'i okumaz, iade edilen posta teslim edilmez).
+	if (FM.FileExists(*Path) && !MailMoveNoRetry(Path + TEXT(".bad"), Path))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MMOMAIL] Basarisiz ilk yazimin ana dosyasi .bad'a ayrilamadi: %s"), *Path);
+	}
 	FM.Delete(*Tmp, false, true, true);
+	if (FM.FileExists(*Tmp))
+	{
+		MailMoveNoRetry(Tmp + TEXT(".bad"), Tmp); // silinemeyen .tmp kurtarmada geri konmasin (QA DUSUK-2)
+	}
 	if (!FM.FileExists(*Path) && !FM.FileExists(*Tmp))
 	{
 		return false;

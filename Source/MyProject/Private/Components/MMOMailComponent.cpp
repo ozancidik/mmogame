@@ -111,7 +111,7 @@ FString UMMOMailComponent::ResultText(EMMOMailResult R)
 	switch (R)
 	{
 	case EMMOMailResult::Ok:            return TEXT("Posta gonderildi.");
-	case EMMOMailResult::BadTarget:     return TEXT("Gecersiz alici adi.");
+	case EMMOMailResult::BadTarget:     return TEXT("Gecersiz alici adi (yalniz harf a-z/A-Z, rakam, bosluk, _ ve -; Turkce harf yok).");
 	case EMMOMailResult::Self:          return TEXT("Kendine posta gonderemezsin.");
 	// Ayni metin (B3): ayri mesajlar oyuncu adlarinin varligini sorgulamaya (oracle) yarardi.
 	case EMMOMailResult::UnknownTarget:
@@ -231,13 +231,17 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 		return EMMOMailResult::UnknownTarget;
 	}
 	// Alici kutusu okunamiyor/bozuk/kurtarilamiyorsa (Load false) hicbir sey dusulmez: Count'un "0" demesine guvenilmez.
+	// Tur 4 (Y-NEW-5): bu iki ret de sogumaya yazilir. Yalniz alici VAR iken olusurlar; damgasiz kalsalar "kutu dolu / okunamadi"
+	// cevabi UnknownTarget'tan (damgali) hizli ayrilip cevrimdisi ad varligi sinirsiz hizda sorgulanabilirdi.
 	TArray<FMMOMail> TargetBox;
 	if (!FMMOMailStore::Load(To, TargetBox))
 	{
+		LastSendTime = Now();
 		return EMMOMailResult::StoreError;
 	}
 	if (TargetBox.Num() >= FMMOMailStore::MaxMailsPerBox)
 	{
+		LastSendTime = Now();
 		return EMMOMailResult::BoxFull;
 	}
 

@@ -419,7 +419,7 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 
 			// Ana dosya yok, .tmp var ama kilitli (geri konamiyor): yukleme ertelenir, ana dosya olusturulmaz, .tmp bozulmaz.
 			// Tur 3 (Y1): kurtarma Move'u tekrar denemesiz (motor "Error moving file" satiri ve 5 sn bekleme YOK; calistirici
-			// 0 satir bekler) ve basarisizlikta 60 sn geri cekilir; kilit kalkinca test geri cekilmeyi temizleyip yeniden dener.
+			// 0 satir bekler) ve basarisizlikta 10 sn (tur 4) geri cekilir; kilit kalkinca test geri cekilmeyi temizleyip yeniden dener.
 			const FString SeedTmp = FreshJson(4);
 			FFileHelper::SaveStringToFile(SeedTmp, *(PathOf(SlotK) + TEXT(".tmp")));
 			TUniquePtr<IFileHandle> TmpLock(PF.OpenWrite(*(PathOf(SlotK) + TEXT(".tmp")), true, false));

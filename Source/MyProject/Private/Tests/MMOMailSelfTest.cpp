@@ -336,7 +336,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	{
 		// Ilk posta (ana dosya yok), .tmp tam yazildi ama ana yola tasinamiyor ve dogrudan yazilamiyor (yol bir dizin): gonderim
 		// basarisiz sayilir, altin iade edilir, .tmp silinir; dizin kalkinca kutu bos kalir (iade edilen posta teslim de edilmez).
-		// Not: motor Move'u 10x0.5 sn dener ve bir "Error moving file" satiri basar (calistirici yalniz bu satiri bekler).
+		// Not: tur 4 (Y-NEW-2) ile Move tekrar denemesiz: "Error moving file" satiri ve 5 sn bekleme YOK (calistirici 0 satir bekler).
 		const FString NameD = TEXT("ZTestMailD_") + Tag;
 		FMMOMailStore::DeleteBox(NameD);
 		const FString Path = FMMOMailStore::GetBoxPath(NameD);

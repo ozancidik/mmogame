@@ -9,9 +9,11 @@
 #include "Components/MMOQuestComponent.h"
 #include "Core/MMONotify.h"
 #include "Core/MMOMetrics.h"
+#include "Core/MMONameRules.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "TimerManager.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformTime.h"
@@ -30,12 +32,13 @@ namespace
 	constexpr int32 DailyMaxTarget = 10000;
 	constexpr int32 DailyMaxReward = 10000000;
 
-	// Y1: .tmp kurtarmasi basarisizsa bu kadar sure yeniden denenmez (yukleme ertelenir).
-	constexpr double DailyRecoveryBackoffSeconds = 60.0;
+	// Y1: .tmp kurtarmasi basarisizsa bu kadar sure yeniden denenmez (yukleme ertelenir). Tur 4: 60 -> 10 sn; ertelenen
+	// yuklemede gorev ilerlemesi sayilmaz, pencere kisa tutulur. Oyuncu mesaji bu sureyi gosterir.
+	constexpr double DailyRecoveryBackoffSeconds = 10.0;
 
 	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
 	// false = .tmp var ama geri konamadi: cagiran "dosya yok" sanip ayni gunun gorevlerini sifirdan acmamali, uzerine yazmamali.
-	// Tasima tekrar denemesiz (Y1): motorun 10x0.5 sn beklemesi sunucuyu dondururdu; cagiran 60 sn geri cekilir.
+	// Tasima tekrar denemesiz (Y1): motorun 10x0.5 sn beklemesi sunucuyu dondururdu; cagiran DailyRecoveryBackoffSeconds geri cekilir.
 	bool DailyRecoverTmp(const FString& Path)
 	{
 		const FString Tmp = Path + TEXT(".tmp");
@@ -44,7 +47,7 @@ namespace
 		{
 			if (!FM.Move(*Path, *Tmp, true, true, false, true))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarilamadi (yukleme 60 sn ertelendi): %s"), *Tmp);
+				UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarilamadi (yukleme %.0f sn ertelendi): %s"), DailyRecoveryBackoffSeconds, *Tmp);
 				return false;
 			}
 			UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Yarim kalan yazim kurtarildi: %s"), *Tmp);
@@ -54,8 +57,28 @@ namespace
 
 	// Yuva tasimasi diske yazildiktan sonra eski yuvanin dosyalari silinir (Y7): eski ad yeniden kullanilinca eski gunluk
 	// dosyasi (catal) yuklenmesin. .bad dosyalari incelemek icin kalir.
-	void DailyDeleteOldSlotFiles(const FString& OldPath)
+	// Tur 4 (Y-NEW-3/4): eski yol yeni yolla kanonik olarak ayni dosyaysa ya da eski yuva su an cevrimici BASKA bir oyuncunun
+	// yuvasiysa silinmez (bkz. MMOAchievementComponent AchDeleteOldSlotFiles).
+	void DailyDeleteOldSlotFiles(const FString& OldPath, const FString& NewPath, const AActor* Self)
 	{
+		if (FPaths::ConvertRelativePathToFull(OldPath).ToLower() == FPaths::ConvertRelativePathToFull(NewPath).ToLower())
+		{
+			return;
+		}
+		const FString OldSlot = FPaths::GetBaseFilename(OldPath);
+		if (const UWorld* World = Self ? Self->GetWorld() : nullptr)
+		{
+			for (TActorIterator<AMMOCharacter> It(World); It; ++It)
+			{
+				const AMMOCharacter* Other = *It;
+				if (Other && Other != Self && Other->IsPlayerControlled()
+					&& (MMONameRules::SameCanonical(Other->GetActiveSaveSlot(), OldSlot) || MMONameRules::SameCanonical(Other->GetSaveSlotName(), OldSlot)))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[MMODAILY] Eski yuva dosyasi silinmedi: %s su an baska bir cevrimici oyuncuya ait"), *OldSlot);
+					return;
+				}
+			}
+		}
 		IFileManager::Get().Delete(*OldPath, false, true, true);
 		IFileManager::Get().Delete(*(OldPath + TEXT(".tmp")), false, true, true);
 	}
@@ -304,7 +327,7 @@ bool UMMODailyComponent::TryLoad()
 	{
 		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"), Slot + TEXT(".json"));
 		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir,
-		// basarisiz .tmp kurtarmasindan sonra 60 sn).
+		// basarisiz .tmp kurtarmasindan sonra DailyRecoveryBackoffSeconds).
 		if (FPlatformTime::Seconds() < RecoveryRetryAt)
 		{
 			return false;
@@ -393,13 +416,15 @@ bool UMMODailyComponent::SaveNow()
 	const FString& Path = StoragePath;
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 	const FString Tmp = Path + TEXT(".tmp");
+	// Tur 4 (Y-NEW-2): tekrar denemesiz Move (kilitli dosyada motorun 10x0.5 sn denemesi sunucuyu ~5.5 sn dondururdu).
+	// Basarisizlikta bDirty kalir: sonraki olay/periyodik kayit ya da EndPlay yeniden dener; yarim .tmp yuklemede geri konur.
 	if (FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)
-		&& IFileManager::Get().Move(*Path, *Tmp, true, true))
+		&& IFileManager::Get().Move(*Path, *Tmp, true, true, false, true))
 	{
 		bDirty = false;
 		if (!PendingOldStoragePath.IsEmpty())
 		{
-			DailyDeleteOldSlotFiles(PendingOldStoragePath);
+			DailyDeleteOldSlotFiles(PendingOldStoragePath, Path, GetOwner());
 			PendingOldStoragePath.Reset();
 		}
 		return true;
@@ -586,7 +611,8 @@ void UMMODailyComponent::CmdList()
 	}
 	if (!TryLoad())
 	{
-		NotifyChat(TEXT("Gunluk gorevler su an yuklenemiyor; birkac saniye sonra tekrar dene."));
+		// Ertelenen yukleme en gec kurtarma geri cekilmesi kadar (DailyRecoveryBackoffSeconds) sonra yeniden denenir.
+		NotifyChat(FString::Printf(TEXT("Gunluk gorevler su an yuklenemiyor; %.0f sn sonra tekrar dene."), DailyRecoveryBackoffSeconds));
 		return;
 	}
 	if (const AMMOCharacter* Owner = GetOwnerCharacter())

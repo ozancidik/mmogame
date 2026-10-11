@@ -7,9 +7,11 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOQuestComponent.h"
 #include "Core/MMONotify.h"
+#include "Core/MMONameRules.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
 #include "HAL/FileManager.h"
@@ -33,12 +35,13 @@ namespace
 		return static_cast<int32>(FMath::Clamp(V, 0.0, static_cast<double>(UMMOAchievementComponent::MaxCounter)));
 	}
 
-	// Y1: .tmp kurtarmasi basarisizsa bu kadar sure yeniden denenmez (yukleme ertelenir).
-	constexpr double AchRecoveryBackoffSeconds = 60.0;
+	// Y1: .tmp kurtarmasi basarisizsa bu kadar sure yeniden denenmez (yukleme ertelenir). Tur 4: 60 -> 10 sn; ertelenen
+	// yuklemede olaylar (oldurme vb.) sayilmaz, pencere kisa tutulur. Oyuncu mesaji bu sureyi gosterir.
+	constexpr double AchRecoveryBackoffSeconds = 10.0;
 
 	// Atomik yazim (.tmp -> Move) hedefi once siler: arada cokerse yalniz .tmp kalir. Ana dosya yoksa onu geri koy.
 	// false = .tmp var ama geri konamadi: cagiran "dosya yok" sanip odulleri yeniden vermemeli ve uzerine yazmamali.
-	// Tasima tekrar denemesiz (Y1): motorun 10x0.5 sn beklemesi sunucuyu dondururdu; cagiran 60 sn geri cekilir.
+	// Tasima tekrar denemesiz (Y1): motorun 10x0.5 sn beklemesi sunucuyu dondururdu; cagiran AchRecoveryBackoffSeconds geri cekilir.
 	bool AchRecoverTmp(const FString& Path)
 	{
 		const FString Tmp = Path + TEXT(".tmp");
@@ -47,7 +50,7 @@ namespace
 		{
 			if (!FM.Move(*Path, *Tmp, true, true, false, true))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarilamadi (yukleme 60 sn ertelendi): %s"), *Tmp);
+				UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarilamadi (yukleme %.0f sn ertelendi): %s"), AchRecoveryBackoffSeconds, *Tmp);
 				return false;
 			}
 			UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Yarim kalan yazim kurtarildi: %s"), *Tmp);
@@ -57,8 +60,29 @@ namespace
 
 	// Yuva tasimasi diske yazildiktan sonra eski yuvanin dosyalari silinir (Y7): eski ad yeniden kullanilinca eski basarim
 	// dosyasi (catal) yuklenmesin. .bad dosyalari incelemek icin kalir.
-	void AchDeleteOldSlotFiles(const FString& OldPath)
+	// Tur 4 (Y-NEW-3/4): silmeden once (1) eski yol yeni yolla kanonik olarak (harf duyarsiz, tam yol) ayni dosyaysa silinmez
+	// (NTFS harf duyarsiz: "MMOSave_Ali" -> "MMOSave_ali" tasimasi yeni yazilan dosyanin kendisini silerdi); (2) eski yuva su an
+	// cevrimici BASKA bir oyuncunun yuvasiysa (canli adi ya da yukledigi yuva) silinmez: o dosya artik onundur.
+	void AchDeleteOldSlotFiles(const FString& OldPath, const FString& NewPath, const AActor* Self)
 	{
+		if (FPaths::ConvertRelativePathToFull(OldPath).ToLower() == FPaths::ConvertRelativePathToFull(NewPath).ToLower())
+		{
+			return;
+		}
+		const FString OldSlot = FPaths::GetBaseFilename(OldPath);
+		if (const UWorld* World = Self ? Self->GetWorld() : nullptr)
+		{
+			for (TActorIterator<AMMOCharacter> It(World); It; ++It)
+			{
+				const AMMOCharacter* Other = *It;
+				if (Other && Other != Self && Other->IsPlayerControlled()
+					&& (MMONameRules::SameCanonical(Other->GetActiveSaveSlot(), OldSlot) || MMONameRules::SameCanonical(Other->GetSaveSlotName(), OldSlot)))
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[MMOACH] Eski yuva dosyasi silinmedi: %s su an baska bir cevrimici oyuncuya ait"), *OldSlot);
+					return;
+				}
+			}
+		}
 		IFileManager::Get().Delete(*OldPath, false, true, true);
 		IFileManager::Get().Delete(*(OldPath + TEXT(".tmp")), false, true, true);
 	}
@@ -338,7 +362,7 @@ bool UMMOAchievementComponent::TryLoad()
 	{
 		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"), Slot + TEXT(".json"));
 		// Ana dosya ya da .tmp VAR ama okunamiyor/kurtarilamiyorsa yukleme ERTELENIR (false; 5 sn sonra yeniden denenir,
-		// basarisiz .tmp kurtarmasindan sonra 60 sn). "Dosya yok" sanilirsa odul tekrar verilir ve diskteki gercek durumun
+		// basarisiz .tmp kurtarmasindan sonra AchRecoveryBackoffSeconds). "Dosya yok" sanilirsa odul tekrar verilir ve diskteki gercek durumun
 		// ustune yazilirdi.
 		if (FPlatformTime::Seconds() < RecoveryRetryAt)
 		{
@@ -462,13 +486,16 @@ bool UMMOAchievementComponent::SaveNow()
 	const FString& Path = StoragePath;
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
 	const FString Tmp = Path + TEXT(".tmp");
+	// Tur 4 (Y-NEW-2): tekrar denemesiz Move (kilitli dosyada motorun 10x0.5 sn denemesi sunucuyu ~5.5 sn dondururdu).
+	// Basarisizlikta bDirty kalir: sonraki periyodik SaveIfDirty (30 sn aralik) ya da EndPlay yeniden dener; yarim .tmp
+	// yuklemede AchRecoverTmp ile geri konur.
 	if (FFileHelper::SaveStringToFile(Json, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)
-		&& IFileManager::Get().Move(*Path, *Tmp, true, true))
+		&& IFileManager::Get().Move(*Path, *Tmp, true, true, false, true))
 	{
 		bDirty = false;
 		if (!PendingOldStoragePath.IsEmpty())
 		{
-			AchDeleteOldSlotFiles(PendingOldStoragePath);
+			AchDeleteOldSlotFiles(PendingOldStoragePath, Path, GetOwner());
 			PendingOldStoragePath.Reset();
 		}
 		return true;
@@ -636,7 +663,8 @@ void UMMOAchievementComponent::CmdList()
 	}
 	if (!TryLoad())
 	{
-		NotifyChat(TEXT("Basarimlar su an yuklenemiyor; birkac saniye sonra tekrar dene."));
+		// Ertelenen yukleme en gec kurtarma geri cekilmesi kadar (AchRecoveryBackoffSeconds) sonra yeniden denenir.
+		NotifyChat(FString::Printf(TEXT("Basarimlar su an yuklenemiyor; %.0f sn sonra tekrar dene."), AchRecoveryBackoffSeconds));
 		return;
 	}
 	const AMMOCharacter* Owner = GetOwnerCharacter();

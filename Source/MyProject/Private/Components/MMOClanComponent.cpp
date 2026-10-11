@@ -2,6 +2,7 @@
 
 #include "Components/MMOClanComponent.h"
 #include "Characters/MMOCharacter.h"
+#include "Core/MMONameRules.h"
 #include "Components/MMOStatsComponent.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Save/MMOCharacterSaveJson.h"
@@ -448,14 +449,36 @@ bool UMMOClanComponent::IsValidClanName(const FString& Name)
 	{
 		return false;
 	}
+	// Tur 4 (Y-NEW-1): yalniz ASCII harf/rakam (FChar::IsAlnum Unicode harfleri de gecirir; ad kurallariyla ayni yardimci).
 	for (const TCHAR Ch : Name)
 	{
-		if (!FChar::IsAlnum(Ch))
+		if (!MMONameRules::IsAsciiAlnum(Ch))
 		{
 			return false;
 		}
 	}
 	return true;
+}
+
+namespace
+{
+	// Kayittan YUKLENEN klan adi: tur 4 oncesi kurulmus Turkce harfli klanlar (migrasyon yok) yuklemede silinmesin diye eski
+	// kural (Unicode harf/rakam, kontrol karakteri yok). Yeni klan kurmak IsValidClanName (yalniz ASCII) ister.
+	bool ClanLegacyLoadedNameValid(const FString& Name)
+	{
+		if (Name.Len() < UMMOClanComponent::MinNameLength || Name.Len() > UMMOClanComponent::MaxNameLength)
+		{
+			return false;
+		}
+		for (const TCHAR Ch : Name)
+		{
+			if (!FChar::IsAlnum(Ch))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
 }
 
 void UMMOClanComponent::NotifyOwner(const FString& Text) const
@@ -566,7 +589,7 @@ void UMMOClanComponent::CmdCreate(const FString& Name)
 	const FString N = Name.TrimStartAndEnd();
 	if (!IsValidClanName(N))
 	{
-		NotifyOwner(FString::Printf(TEXT("Klan adi %d-%d karakter olmali; yalniz harf ve rakam. Kullanim: /klan kur ad"), MinNameLength, MaxNameLength));
+		NotifyOwner(FString::Printf(TEXT("Klan adi %d-%d karakter olmali; yalniz harf (a-z, A-Z; Turkce harf yok) ve rakam. Kullanim: /klan kur ad"), MinNameLength, MaxNameLength));
 		return;
 	}
 
@@ -942,7 +965,7 @@ void UMMOClanComponent::ApplySaveData(const FMMOCharacterSaveData& In)
 
 	// Eski kayitlarda bos gelir; bozuk/gecersiz ad klansiz sayilir.
 	const FString N = In.ClanName.TrimStartAndEnd();
-	if (!IsValidClanName(N))
+	if (!ClanLegacyLoadedNameValid(N))
 	{
 		ClanName.Empty();
 		ClanMembershipId.Invalidate();

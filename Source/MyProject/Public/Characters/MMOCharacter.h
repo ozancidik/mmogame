@@ -467,6 +467,8 @@ protected:
 	float LastSetNameServerTime = -100.f;
 	static constexpr float SetNameCooldown = 30.f;
 	static constexpr float SetNameCooldownLocal = 5.f;
+	// Tur 4 (DUSUK-5): bu pawn'da ad kilidi reddi oldu mu (yalniz sunucu). Soguma suresince "X sn bekle" yerine kilit metni gosterilir.
+	bool bNameLockRejected = false;
 	// Uzak istemci ad kurallari (kayitli karakter kilidi, kayitli-ad reddi, 30 sn soguma) bu pawn'a uygulanir mi.
 	bool UsesRemoteNameRules() const;
 #if !UE_BUILD_SHIPPING
