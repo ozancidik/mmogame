@@ -35,14 +35,21 @@ $cases = @($lines | Select-String '\[MMO_ACH_CASE\] (PASS|FAIL) check=')
 $summaries = @($lines | Select-String '\[MMO_ACH_TEST\] (PASS|FAIL) checks=')
 $passes = @($lines | Select-String '\[MMO_ACH_TEST\] PASS checks=(\d+) reason=')
 $errors = @($lines | Select-String '\[MMO_ACH_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation')
+# Kilitli .tmp senaryosu (locked_tmp_*) motorda TAM BIR "Error moving file" satiri uretir (Move 10x0.5 sn dener). Yalniz testin
+# GUID'li ZAchLockTmp_ dosyasina ait bu satir beklenir ve hata sayilmaz; sayisi 1 degilse senaryo kosmamis/kaymis demektir.
+$expectedLockPattern = "LogFileManager: Error: Error moving file '[^']*MMOSave_ZAchLockTmp_"
+$expectedLock = @($errors | Where-Object { $_.Line -match $expectedLockPattern })
+$errors = @($errors | Where-Object { $_.Line -notmatch $expectedLockPattern })
+Write-Output "[MMO_ACH_RUNNER] expected_lock_error_lines=$($expectedLock.Count) (beklenen 1)"
 $summaries | ForEach-Object { Write-Output $_.Line }
 $errors | ForEach-Object { Write-Output $_.Line }
 # Kontrol sayisi, ozet satiri ve tek tek CASE satirlari birbiriyle tutarli olmali (sessizce eksik kosan test gecmesin).
 $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Matches[1] } } | Sort-Object -Unique)
-# Esik = bilinen kontrol sayisi (61: 35 eski + 26 kalicilik/B1/A5/C3/O1/D3); kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 61) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
+# Esik = bilinen kontrol sayisi (82: 35 eski + 26 kalicilik/B1/A5/C3/O1/D3 + 21 guvenlik tur 2: F2 EndPlay tasimasi, dosyasiz/bozuk
+# Lv>1 odulsuz isaretleme, kilitli ana dosya/.tmp ertelemesi); kontrol silinirse/atlanirsa kosu KALIR.
+$consistent = ($reported -ge 82) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 1)
 Write-Output "[MMO_ACH_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

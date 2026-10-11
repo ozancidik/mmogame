@@ -384,6 +384,27 @@ Step "Diyalog LLM kota rezervasyon ve iade sinirlari" {
     $LASTEXITCODE -eq 0
 }
 
+# Basarim/gunluk/posta/ad kilidi: Scripts/RunSystemTests.ps1 ile ayni calistiricilar (kontrol esikleri calistiricilarin icinde).
+Step "Basarim ve unvan" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestAchievements.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Gunluk gorev" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestDaily.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Posta" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestMail.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
+Step "Ad kilidi" {
+    & powershell -NoProfile -File (Join-Path $PSScriptRoot "TestNameLock.ps1") | Out-Host
+    $LASTEXITCODE -eq 0
+}
+
 foreach ($map in @("Summer_scene", "Winter_scene")) {
     Step "Duman testi $map" {
         & powershell -NoProfile -File (Join-Path $PSScriptRoot "SmokeTest.ps1") -Map $map | Out-Host

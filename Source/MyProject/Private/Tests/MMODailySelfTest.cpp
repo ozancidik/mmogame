@@ -10,7 +10,9 @@
 #include "Save/MMOSaveGame.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerState.h"
+#include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformFileManager.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Guid.h"
@@ -306,10 +308,151 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 			}
 		}
 	}
+
+	// --- Guvenlik tur 2 (K-1 F2 + okunamayan dosya): EndPlay'de yuva tasimasi, MMOLoad serisi, kilitli ana dosya ve
+	// kurtarilamayan .tmp (yukleme ertelenir, gorev sifirdan acilmaz, odul yok, dosya ezilmez). GUID'li yuvalar. ---
+	{
+		const FString Tag2 = FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(8);
+		const FString SlotE = TEXT("MMOSave_ZDayE_") + Tag2;        // F2: eski yuva
+		const FString SlotF = TEXT("MMOSave_ZDayF_") + Tag2;        // F2: ad degisimi + kayit sonrasi yeni yuva
+		const FString SlotL = TEXT("MMOSave_ZDayL_") + Tag2;        // F2 seri: MMOLoad oncesi yuva
+		const FString SlotM = TEXT("MMOSave_ZDayM_") + Tag2;        // F2 seri: MMOLoad ile yuklenen baska karakter
+		const FString SlotJ = TEXT("MMOSave_ZDayLockMain_") + Tag2; // kilitli ana dosya
+		const FString SlotK = TEXT("MMOSave_ZDayLockTmp_") + Tag2;  // ana dosya yok, kilitli .tmp (calistirici bu adi bekler)
+		const int32 Day = 20261011;
+		const FString DayDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMODaily"));
+		IFileManager& FM = IFileManager::Get();
+		IPlatformFile& PF = FPlatformFileManager::Get().GetPlatformFile();
+		auto PathOf = [&DayDir](const FString& Slot) { return FPaths::Combine(DayDir, Slot + TEXT(".json")); };
+		auto ReadSlot = [&PathOf](const FString& Slot, TArray<FMMODailyBounty>& OutB)
+		{
+			FString Raw; int32 OutDay = 0, OutBase = 0;
+			return FFileHelper::LoadFileToString(Raw, *PathOf(Slot)) && FromJson(Raw, OutDay, OutBase, OutB) && OutB.Num() == BountyCount;
+		};
+		auto ReadRaw = [](const FString& FilePath) { FString Raw; FFileHelper::LoadFileToString(Raw, *FilePath); return Raw; };
+		auto FreshJson = [Day](int32 KillAnyProgress)
+		{
+			TArray<FMMODailyBounty> Fresh;
+			BuildBounties(10, 1000, Fresh);
+			Fresh[0].Progress = KillAnyProgress;
+			FString Json; ToJson(Day, 0, Fresh, Json);
+			return Json;
+		};
+		const FName Orc(TEXT("Orc"));
+		auto Spawn = [&](float Dy)
+		{
+			return TStrongObjectPtr<AMMOCharacter>(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(9000, Dy, 0), FRotator::ZeroRotator, Params));
+		};
+		TStrongObjectPtr<AMMOCharacter> R1 = Spawn(0.f), R2 = Spawn(4000.f), R3 = Spawn(8000.f);
+		UMMODailyComponent* E1 = R1.IsValid() ? R1->GetDailyComponent() : nullptr;
+		UMMODailyComponent* E2 = R2.IsValid() ? R2->GetDailyComponent() : nullptr;
+		UMMODailyComponent* E3 = R3.IsValid() ? R3->GetDailyComponent() : nullptr;
+		const bool bFixture2 = E1 && E2 && E3 && R2->GetInventory() && R1->GetStats() && R2->GetStats() && R3->GetStats();
+		Check(bFixture2, TEXT("r2_fixture"));
+		if (bFixture2)
+		{
+			FMMOCharacterSaveData Seed; Seed.Gold = 123; Seed.NextInstanceId = 50;
+			R2->GetInventory()->ApplySaveData(Seed);
+			for (AMMOCharacter* R : { R1.Get(), R2.Get(), R3.Get() })
+			{
+				R->GetStats()->Level = 10; R->GetStats()->ExperienceToNextLevel = 1000; R->GetStats()->Experience = 0;
+				R->GetDailyComponent()->SetDayForTest(Day);
+			}
+
+			// F2: kirli durum (yazma hatasiyla bekletilmis) varken karakter yeni yuvaya yazildi (ayni LoadSerial) ve yok edildi:
+			// EndPlay once TryLoad ile durumu YENI yuvaya tasir; eski yuvaya yazmaz (yeni adla gorevler sifirdan acilmaz).
+			R1->SetSaveIdentityForTest(true, SlotE, 1);
+			E1->NotifyMobKilled(Orc); // yukler, gunu kurar, 1, diske
+			E1->SetSaveFailForTest(true);
+			E1->NotifyMobKilled(Orc); // 2, diske gitmedi
+			E1->SetSaveFailForTest(false);
+			{
+				TArray<FMMODailyBounty> B;
+				Check(ReadSlot(SlotE, B) && B[0].Progress == 1 && E1->GetBounties()[0].Progress == 2, TEXT("f2_fixture_dirty_pending"));
+			}
+			R1->SetSaveIdentityForTest(true, SlotF, 1);
+			R1->Destroy();
+			{
+				TArray<FMMODailyBounty> B;
+				Check(ReadSlot(SlotF, B) && B[0].Progress == 2, TEXT("f2_endplay_moves_dirty_state_to_new_slot"));
+			}
+			{
+				TArray<FMMODailyBounty> B;
+				Check(ReadSlot(SlotE, B) && B[0].Progress == 1, TEXT("f2_endplay_old_slot_not_written"));
+			}
+			const int32 G2 = R2->GetInventory()->Gold;
+			R2->SetSaveIdentityForTest(true, SlotF, 1);
+			E2->EvaluateAll();
+			Check(E2->GetBounties().Num() == BountyCount && E2->GetBounties()[0].Progress == 2 && E2->GetDayKey() == Day && R2->GetInventory()->Gold == G2,
+				TEXT("f2_new_slot_reload_continues"));
+
+			// F2 seri (MMOLoad: baska karakter yuklendi, LoadSerial artti): kirli durum ESKI yuvaya yazilir, yeni yuvaya TASINMAZ.
+			R3->SetSaveIdentityForTest(true, SlotL, 1);
+			E3->NotifyMobKilled(Orc);
+			E3->SetSaveFailForTest(true);
+			E3->NotifyMobKilled(Orc); // 2, kirli
+			E3->SetSaveFailForTest(false);
+			R3->SetSaveIdentityForTest(true, SlotM, 2);
+			R3->Destroy();
+			{
+				TArray<FMMODailyBounty> BL, BM;
+				const bool bNewCarries = ReadSlot(SlotM, BM) && BM[0].Progress == 2;
+				Check(ReadSlot(SlotL, BL) && BL[0].Progress == 2 && !bNewCarries, TEXT("f2_serial_change_flushes_old_slot_only"));
+				// Gozlem (kontrol degil): EndPlay'de yeni yuva dosyasizken gorev referansi yeniden alinip bos gorev listesi yazilabilir.
+				UE_LOG(LogTemp, Display, TEXT("[MMO_DAILY_NOTE] serial_endplay_new_slot_file_exists=%d parses=%d"),
+					FM.FileExists(*PathOf(SlotM)) ? 1 : 0, ReadSlot(SlotM, BM) ? 1 : 0);
+			}
+
+			// Ana dosya VAR ama okunamiyor (ozel kilit): yukleme ertelenir, gorev uretilmez, odul yok, dosya ezilmez.
+			const FString SeedMain = FreshJson(9);
+			FM.MakeDirectory(*DayDir, true);
+			FFileHelper::SaveStringToFile(SeedMain, *PathOf(SlotJ));
+			TUniquePtr<IFileHandle> MainLock(PF.OpenWrite(*PathOf(SlotJ), true, false));
+			Check(MainLock.IsValid() && FM.FileExists(*PathOf(SlotJ)), TEXT("locked_main_fixture"));
+			const int32 G2b = R2->GetInventory()->Gold;
+			R2->SetSaveIdentityForTest(true, SlotJ, 2);
+			E2->NotifyMobKilled(Orc);
+			Check(E2->GetBounties().IsEmpty() && R2->GetInventory()->Gold == G2b, TEXT("locked_main_defers_load"));
+			MainLock.Reset();
+			Check(ReadRaw(PathOf(SlotJ)) == SeedMain && !FM.FileExists(*(PathOf(SlotJ) + TEXT(".tmp"))), TEXT("locked_main_not_overwritten"));
+			E2->NotifyMobKilled(Orc);
+			Check(E2->GetBounties().Num() == BountyCount && E2->GetBounties()[0].Progress == 10 && R2->GetInventory()->Gold == G2b,
+				TEXT("locked_main_loads_after_release"));
+
+			// Ana dosya yok, .tmp var ama kilitli (geri konamiyor): yukleme ertelenir, ana dosya olusturulmaz, .tmp bozulmaz.
+			// Not: motor Move'u 10x0.5 sn dener ve bir "Error moving file" satiri basar (calistirici yalniz bu satiri bekler).
+			const FString SeedTmp = FreshJson(4);
+			FFileHelper::SaveStringToFile(SeedTmp, *(PathOf(SlotK) + TEXT(".tmp")));
+			TUniquePtr<IFileHandle> TmpLock(PF.OpenWrite(*(PathOf(SlotK) + TEXT(".tmp")), true, false));
+			Check(TmpLock.IsValid() && !FM.FileExists(*PathOf(SlotK)), TEXT("locked_tmp_fixture"));
+			R2->SetSaveIdentityForTest(true, SlotK, 3);
+			E2->EvaluateAll();
+			Check(E2->GetBounties().IsEmpty() && !FM.FileExists(*PathOf(SlotK)) && R2->GetInventory()->Gold == G2b, TEXT("locked_tmp_defers_load"));
+			TmpLock.Reset();
+			Check(ReadRaw(PathOf(SlotK) + TEXT(".tmp")) == SeedTmp, TEXT("locked_tmp_kept_intact"));
+			E2->EvaluateAll();
+			Check(E2->GetBounties().Num() == BountyCount && E2->GetBounties()[0].Progress == 4 && R2->GetInventory()->Gold == G2b
+				&& FM.FileExists(*PathOf(SlotK)) && !FM.FileExists(*(PathOf(SlotK) + TEXT(".tmp"))), TEXT("locked_tmp_recovered_after_release"));
+		}
+		for (TStrongObjectPtr<AMMOCharacter>* R : { &R1, &R2, &R3 })
+		{
+			if (::IsValid(R->Get())) (*R)->Destroy();
+		}
+		for (const FString& Slot : { SlotE, SlotF, SlotL, SlotM, SlotJ, SlotK })
+		{
+			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
+			{
+				FM.Delete(*(PathOf(Slot) + Ext), false, true, true);
+			}
+		}
+	}
 	return bPassed; // Ayni senkron kare: gercek saat/ag/zamanlayici kaniti degil; gun anahtari zorlanir, disk kaliciligi GUID'li yuvalarla dogrulanir.
 }
 // Bu testin KANITLAMADIKLARI: gercek LoadCharacter/MMOSetName/MMOLoad akisi (kimlik SetSaveIdentityForTest ile verilir), gercek UTC gun
 // donumu ve 5 sn zamanlayici, gercek cikista PlayerState'in kopma ani (SetPlayerState(nullptr) ile benzetilir), ag ve PIE.
+// F2 bolumu EndPlay'in TryLoad cagrisini ve tasima mantigini dogrular; motorun gercek yok etme sirasini (UnPossessed kaydi ->
+// ActiveSaveSlot guncellemesi -> bilesen EndPlay) KANITLAMAZ: yuva degisimi Destroy'dan once elle verilir. Dosya kilidi ayni
+// surecteki ozel (paylasimsiz) bir tutamakla benzetilir; antivirus/ag surucusu gibi gercek dis kilitler denenmedi.
 
 namespace
 {

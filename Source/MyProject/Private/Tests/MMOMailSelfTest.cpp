@@ -7,7 +7,10 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Save/MMOSaveGame.h"
 #include "Engine/World.h"
+#include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformFileManager.h"
+#include "Tests/MMOPurchaseCallbackProbe.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Guid.h"
@@ -304,6 +307,116 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		FMMOMailStore::DeleteBox(NameT);
 	}
 
+	// --- Guvenlik tur 2: basarisiz yazimda .tmp temizligi (iade edilen/bosaltilan posta dirilmez), bozuk kutunun eski .tmp'si ---
+	IFileManager& FM = IFileManager::Get();
+	IPlatformFile& PF = FPlatformFileManager::Get().GetPlatformFile();
+	{
+		// .tmp yazilamadi (salt-okunur eski .tmp, ana dosya yok): WriteBox false doner ve .tmp'yi siler; sonraki Load eski icerigi
+		// "yarim yazim" sanip geri koymaz.
+		const FString NameR = TEXT("ZTestMailR_") + Tag;
+		FMMOMailStore::DeleteBox(NameR);
+		const FString Path = FMMOMailStore::GetBoxPath(NameR);
+		const FString Tmp = Path + TEXT(".tmp");
+		TArray<FMMOMail> Stale;
+		FMMOMail M; M.From = TEXT("Ali"); M.Text = TEXT("eski"); M.Gold = 70;
+		Stale.Add(M);
+		FString Json;
+		FMMOMailStore::ToJson(Stale, Json);
+		FM.MakeDirectory(*FPaths::GetPath(Path), true);
+		FFileHelper::SaveStringToFile(Json, *Tmp);
+		PF.SetReadOnly(*Tmp, true);
+		Check(FM.FileExists(*Tmp) && PF.IsReadOnly(*Tmp) && !FM.FileExists(*Path), TEXT("tmp_write_fail_fixture"));
+		Check(!FMMOMailStore::Replace(NameR, TArray<FMMOMail>()), TEXT("tmp_write_fail_returns_false"));
+		Check(!FM.FileExists(*Tmp), TEXT("tmp_write_fail_cleans_tmp"));
+		TArray<FMMOMail> Loaded;
+		Check(FMMOMailStore::Load(NameR, Loaded) && Loaded.IsEmpty(), TEXT("tmp_write_fail_no_resurrect"));
+		FMMOMailStore::DeleteBox(NameR);
+	}
+	{
+		// Ilk posta (ana dosya yok), .tmp tam yazildi ama ana yola tasinamiyor ve dogrudan yazilamiyor (yol bir dizin): gonderim
+		// basarisiz sayilir, altin iade edilir, .tmp silinir; dizin kalkinca kutu bos kalir (iade edilen posta teslim de edilmez).
+		// Not: motor Move'u 10x0.5 sn dener ve bir "Error moving file" satiri basar (calistirici yalniz bu satiri bekler).
+		const FString NameD = TEXT("ZTestMailD_") + Tag;
+		FMMOMailStore::DeleteBox(NameD);
+		const FString Path = FMMOMailStore::GetBoxPath(NameD);
+		const FString Tmp = Path + TEXT(".tmp");
+		FM.MakeDirectory(*Path, true);
+		Check(FM.DirectoryExists(*Path) && !FM.FileExists(*Path) && FMMOMailStore::Count(NameD) == 0, TEXT("tmp_first_mail_fixture"));
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(true);
+		InvA->Gold = 10000;
+		const EMMOMailResult R = A->SendMail(NameD, 300, TEXT("dizin"), true);
+		Check(R == EMMOMailResult::StoreError && InvA->Gold == 10000, TEXT("tmp_first_mail_write_fail_refunds"));
+		Check(!FM.FileExists(*Tmp), TEXT("tmp_first_mail_write_fail_cleans_tmp"));
+		FM.DeleteDirectory(*Path, false, true);
+		TArray<FMMOMail> Loaded;
+		Check(!FM.DirectoryExists(*Path) && FMMOMailStore::Load(NameD, Loaded) && Loaded.IsEmpty(), TEXT("tmp_refunded_first_mail_not_resurrected"));
+		FMMOMailStore::DeleteBox(NameD);
+	}
+	{
+		// Bozuk ana dosya + eski .tmp: ana dosya .bad, .tmp .tmp.bad olur; sonraki Load .tmp'yi geri koymaz; DeleteBox ikisini de siler.
+		const FString NameQ = TEXT("ZTestMailQ_") + Tag;
+		FMMOMailStore::DeleteBox(NameQ);
+		const FString Path = FMMOMailStore::GetBoxPath(NameQ);
+		const FString Tmp = Path + TEXT(".tmp");
+		TArray<FMMOMail> Old;
+		FMMOMail M; M.From = TEXT("Ali"); M.Text = TEXT("toplanmis"); M.Gold = 90;
+		Old.Add(M);
+		FString Json;
+		FMMOMailStore::ToJson(Old, Json);
+		FM.MakeDirectory(*FPaths::GetPath(Path), true);
+		FFileHelper::SaveStringToFile(TEXT("{{{ bozuk"), *Path);
+		FFileHelper::SaveStringToFile(Json, *Tmp);
+		TArray<FMMOMail> Loaded;
+		Check(FMMOMailStore::Load(NameQ, Loaded) && Loaded.IsEmpty() && FM.FileExists(*(Path + TEXT(".bad"))) && FM.FileExists(*(Tmp + TEXT(".bad")))
+			&& !FM.FileExists(*Tmp) && !FM.FileExists(*Path), TEXT("corrupt_box_stale_tmp_quarantined"));
+		Check(FMMOMailStore::Load(NameQ, Loaded) && Loaded.IsEmpty(), TEXT("corrupt_box_stale_tmp_not_resurrected"));
+		FMMOMailStore::DeleteBox(NameQ);
+		Check(!FM.FileExists(*(Path + TEXT(".bad"))) && !FM.FileExists(*(Tmp + TEXT(".bad"))), TEXT("deletebox_removes_quarantine_files"));
+	}
+
+	// --- Guvenlik tur 2: iade, gonderim sirasinda altin callback'i araya girdiginde gercek dusulen miktarla yapilir ---
+	{
+		FMMOMailStore::DeleteBox(NameB);
+		TStrongObjectPtr<UMMOPurchaseCallbackProbe> Probe(NewObject<UMMOPurchaseCallbackProbe>());
+		InvA->OnGoldChanged.AddDynamic(Probe.Get(), &UMMOPurchaseCallbackProbe::OnGold);
+		// Callback altin HARCAR, sonra kayit basarisiz: iade yalniz postanin dustugu kadar; callback'in harcamasi geri gelmez.
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(false);
+		InvA->Gold = 10000;
+		Probe->Calls = 0;
+		Probe->Callback = [InvA](int32) { InvA->AddGoldFrom(-1000, TEXT("test-harcama")); };
+		const EMMOMailResult RSpend = A->SendMail(NameB, 300, TEXT("iade-harcama"), true);
+		Check(RSpend == EMMOMailResult::StoreError && FMMOMailStore::Count(NameB) == 0 && Probe->Calls >= 1, TEXT("refund_spend_callback_store_error_box_unchanged"));
+		Check(InvA->Gold == 10000 - 1000, TEXT("refund_spend_callback_exact_refund"));
+		// Callback altin EKLER (bakiye net dusmez): posta kaydedilmeden reddedilir (alici odenmemis eki almaz), altin uretilmez.
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(true);
+		InvA->Gold = 10000;
+		Probe->Calls = 0;
+		Probe->Callback = [InvA](int32) { InvA->AddGoldFrom(1000, TEXT("test-hediye")); };
+		const int32 SaveCalls0 = A->GetSaveCallsForTest();
+		const EMMOMailResult RGift = A->SendMail(NameB, 300, TEXT("iade-hediye"), true);
+		Check(RGift == EMMOMailResult::StoreError && FMMOMailStore::Count(NameB) == 0 && A->GetSaveCallsForTest() == SaveCalls0,
+			TEXT("refund_gift_callback_mail_refused_before_save"));
+		Check(InvA->Gold <= 10000 + 1000, TEXT("refund_gift_callback_no_gold_created"));
+		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] gift_callback final_gold=%d start=10000 gift=1000 charge=%d (oyuncu ucreti+eki kaybeder, altin uretilmez)"),
+			InvA->Gold, 300 + FeeFor(300));
+		// Gozlem (kontrol degil): callback bakiyeyi ucretten azina indirirse ucret 0'a kirpilir ama Deducted=Charge sayilir;
+		// sonra kayit basarisiz olursa iade gercek dusulenden fazladir (en fazla ucret kadar altin uretimi).
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(false);
+		InvA->Gold = 1000;
+		Probe->Calls = 0;
+		Probe->Callback = [InvA](int32) { InvA->AddGoldFrom(-495, TEXT("test-harcama")); };
+		const EMMOMailResult RClamp = A->SendMail(NameB, 500, TEXT("kirpma"), true);
+		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] fee_clamp_refund result=%d final_gold=%d no_creation_max=%d"),
+			static_cast<int32>(RClamp), InvA->Gold, 1000 - 495);
+		InvA->OnGoldChanged.RemoveDynamic(Probe.Get(), &UMMOPurchaseCallbackProbe::OnGold);
+		A->SetSaveResultForTest(true);
+		FMMOMailStore::DeleteBox(NameB);
+	}
+
 	FMMOMailStore::DeleteBox(NameA); FMMOMailStore::DeleteBox(NameB);
 	for (TStrongObjectPtr<AMMOCharacter>* P : {&CA, &CB, &CC}) { if (P->IsValid()) (*P)->Destroy(); }
 	return bPassed; // Ayni senkron kare: PlayerState adi, kayit yukleme, /posta komutu, zamanlayici ve ag kaniti degil.
@@ -312,6 +425,9 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 // gercek kosul IsInitialLoadComplete/IsTravelSaveCommitted/GetSaveSlotName != ActiveSaveSlot burada kosulmaz), gercek
 // SaveCharacterForTravel diske yazimi, kutuya yazma (Append) hatasinda iade + tekrar kayit dali, A4 Move hatasi yedegi
 // (dosya kilidi motorda Error satiri ve bekleme uretir), A3 toplama dongusunde sahibin dusmesi, 10 sn zamanlayici, ag/PIE.
+// Guvenlik tur 2 bolumu: .tmp temizligi salt-okunur eski .tmp ve dizin olan kutu yoluyla benzetilir (gercek disk dolu/antivirus
+// kilidi degil); .tmp silme de basarisiz olursa "yazim basarili sayilir" dali (son care) kosulmaz. Iade callback'i
+// UMMOPurchaseCallbackProbe ile benzetilir; Blueprint OnGoldChanged degil.
 
 namespace
 {

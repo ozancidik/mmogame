@@ -1,12 +1,13 @@
-# Basarim, gunluk gorev ve posta sistemlerinin native testlerini tek komutta calistirir (derlemeden SONRA; editor kapali olmali).
-# RunAllChecks.ps1 Codex ile ortak oldugu icin bu testler orada adim degil; Codex dosyayi commit'leyince oraya tasinabilir.
+# Basarim, gunluk gorev, posta ve ad kilidi native testlerini tek komutta calistirir (derlemeden SONRA; editor kapali olmali).
+# Ayni dort calistirici Scripts/RunAllChecks.ps1'de de adimdir; bu betik yalniz bu dordunu hizlica kosmak icindir.
 # Kullanim: powershell -File Scripts\RunSystemTests.ps1
 $ErrorActionPreference = 'Stop'
 $tests = @(
-    # Kontrol sayisi esikleri her calistiricinin icinde (61 / 53 / 89); kalicilik testleri Saved/ altina GUID'li dosya yazip siler.
+    # Kontrol sayisi esikleri her calistiricinin icinde (82 / 67 / 104 / 23); kalicilik testleri Saved/ altina GUID'li dosya yazip siler.
     @{ Name = 'Basarim ve unvan (TestAchievements)'; Script = 'TestAchievements.ps1' },
     @{ Name = 'Gunluk gorev (TestDaily)';            Script = 'TestDaily.ps1' },
-    @{ Name = 'Posta (TestMail)';                    Script = 'TestMail.ps1' }
+    @{ Name = 'Posta (TestMail)';                    Script = 'TestMail.ps1' },
+    @{ Name = 'Ad kilidi (TestNameLock)';            Script = 'TestNameLock.ps1' }
 )
 $failed = @()
 foreach ($t in $tests) {
