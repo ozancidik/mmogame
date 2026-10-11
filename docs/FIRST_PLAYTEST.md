@@ -9,7 +9,10 @@ ama **hiçbiri gerçek oyunda oynanmadı**. Önce 1–3 çalışmıyorsa diğerl
 ## Hazırlık
 1. Editörü aç, `Summer_scene` açık olsun. Play ayarları: 2 oyuncu, "Play As Listen Server" (zaten ayarlı).
 2. Her iki pencerede konsol: `` ` `` tuşu. Adlandırma: host'ta `MMOSetName Host`, istemcide `MMOSetName Istemci`
-   (misafir `PlayerN` adları arkadaş listesine eklenemez).
+   (misafir `PlayerN` adları arkadaş listesine eklenemez). Ad kısıtları (2026-10-11): 1-20 karakter, yalnız ASCII harf/rakam,
+   boşluk, `_`, `-` (Türkçe harf yok). Uzak istemci (yönetici değil) adını yalnız karakterinin **henüz kaydı yokken** değiştirebilir:
+   girdikten sonra ilk `MMOSave` / 60 sn otomatik kayıttan önce yaz. O adın önceki oturumdan kaydı varsa "Ad kilitli" reddi gelir;
+   ad değişikliği denemeleri arasında istemcide 30 sn, host'ta 5 sn soğuma var. Host bu kilide tabi değil.
 3. Sınıf seç (üstteki Savaşçı/Okçu/Büyücü/Rahip düğmeleri).
 
 ## 1) Temel döngü (5 dk) — bozuksa dur

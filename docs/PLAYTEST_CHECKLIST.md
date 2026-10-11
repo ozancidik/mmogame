@@ -779,6 +779,9 @@ regresyondur.
 > Tam duzeltme icin gercek bir kimlik sistemi (platform login veya yerel profil dosyasi) gerekir — bunu sen istemeden kurmadim. Bunun yerine her oyuncunun kendi adini sabitlemesini saglayan bir arac ekledim: `MMOSetName <isim>` konsol komutu.
 
 - [ ] **MMOSetName testi:** Misafir istemciden konsola `MMOSetName Ahmet` yaz → ekranda onay mesaji gorunmeli. Sonra `MMOSave` ile kaydet, cik, tekrar gir, `MMOSetName Ahmet` + `MMOLoad` yap → karakterin (level/altin/ekipman) korunmus olmali.
+  **GUNCEL (2026-10-11, K-1 ad kilidi):** bu akis artik uzak istemcide boyle calismaz: ilk kayittan sonra ad kilitlenir, uzak `MMOLoad` yalniz
+  yoneticiye acik. Dogru yol: cik ve `?Name=Ahmet` ile yeniden baglan (kayit otomatik yuklenir). Ad yalniz ASCII (Turkce harf yok). Guncel
+  maddeler: K1F / K1G / K1H (dosya sonu).
 - [ ] **Cakisma senaryosu (bilgi amacli, muhtemelen test etmeyeceksin):** Iki farkli "misafir" ile ayri gecelerde, hicbiri MMOSetName kullanmadan baglanip ilerleme kaydet → sonraki gece FARKLI bir kisi ikinci baglanirsa onceki misafirin kaydini gorebilir/ezebilir. Bunu gormek istersen bilerek tetikleyebilirsin, ama gercek bir tehlike oldugu icin oncelik MMOSetName'i alistirmak.
 
 ---
@@ -2916,6 +2919,7 @@ Kapsam: `MMOClanComponent.cpp/.h`, `ServerSendChat` klan/`/g` dalları, `ClientR
 - [ ] **Test (ORTA-3):** A (lider), B (zaten klanda) yanında, C (klansız) biraz daha uzakta (<600u). A `/klan davet` → C'ye davet gitmeli (sorun varsa "Oyuncu zaten bir klanda" görülür). Sonra A, C'ye 3 sn arayla davet tekrarlasın; 30 sn geçmeden başka bir klan lideri E, C'ye davet atmayı denesin → E'nin davetinin bloke olup olmadığına bak (süresiz bloke = bulgu).
 
 **DÜŞÜK-1: Ad doğrulaması `FChar::IsAlnum` — Unicode harfleri kabul edebilir (doğrulanmalı).** `IsValidClanName` satır 88-102. `iswalpha` tabanlı olduğu için Kiril/Yunan/Latin-1 harfleri de geçebilir; "Dеmir" (Kiril `е`) ile "Demir" gözle aynı ama farklı ad → taklit/aldatma. Türkçe `ı/İ` için `Equals(IgnoreCase)` `ı`↔`I` eşlemez ve `İ`'nin davranışı platforma bağlı: "KIRMIZI" ile "kırmızı" farklı klan sayılabilir (beklenen/istenen davranışı kullanıcı belirlesin). HUD fontunda Türkçe/Kiril glif eksikse kare görünebilir. Öneri: izin listesi (`A-Z a-z 0-9` + `çğıöşüÇĞİÖŞÜ`), eşsizlik anahtarını Türkçe farkındalıklı katla (`İ→i, I→ı` değil; basit: ASCII'ye indir ve karşılaştır).
+**GUNCEL (2026-10-11, `d031b90`):** yeni klan adı artık yalnız ASCII harf/rakam (`MMONameRules::IsAsciiAlnum`); Türkçe/Kiril harfli ad kurulamaz. Eski Türkçe harfli klan adları yüklemede korunur (`ClanLegacyLoadedNameValid`). Türkçe harf desteği karar adayı (`DECISIONS_NEEDED.md` "guvenlik tur 4").
 - [ ] **Test (DÜŞÜK-1):** `/klan kur Çelik`, `/klan kur Işık`, `/klan kur Dеmir` (Kiril `е`) dene → hangileri kabul ediliyor not et; kabul edilenlerin isim plakasında doğru çizildiğini (kare/boş değil) doğrula. Biri `/klan kur ışık`, diğeri `/klan kur IŞIK` ile çakışıp çakışmadığını gör.
 
 **DÜŞÜK-2: `ApplySaveData` zaten klandaki karakterde (manuel `MMOLoad`) eski klanı liderli bırakabilir.** Satır ~516-557: oyuncu klandayken `MMOLoad` ile kayıtta farklı/boş klan gelirse eski klan için `EnsureLeader` çağrılmıyor → eski klanın çevrimiçi üyeleri liderin gittiği klanda liderli kalmaz; ayrıca klana "ayrıldı" bildirimi gitmez. `ServerLoadCharacter` yalnız yerel kontrolcü için çalışıyor (host hata ayıklama), bu yüzden düşük. Öneri: `ApplySaveData` başında mevcut klan farklıysa `CmdLeave` benzeri temizlik (`EnsureLeader(OldName, true)` + bildirim).
@@ -3267,6 +3271,9 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 - [ ] **Ezme engeli:** Karakter A ile oyna ve kaydet. Yeni bir karakter B icin `MMOSetName A` (kucuk/buyuk harf fark etmez) dene: ad cakismasi cevrimici A varsa zaten reddedilir; A cevrimdisiyken B `MMOSetName A` yapip `MMOSave` yazsin: "Bu ad baska bir kayda ait" uyarisi cikmali, A'nin kayit dosyasi (`MMOSave_A.sav`) DEGISMEMELI (degistirilme zamanini kontrol et). Oyundan cikinca da A'nin dosyasi ezilmemeli.
 - [ ] **Sahiplenme yolu:** Ayni durumda `MMOLoad` yaz: A'nin kaydi yuklenir (bilinen sinir: kimlik dogrulama yok, bu yol hala acik); ardindan `MMOSave` calismali.
 - [ ] **Yeni ada tasima:** Kayitli A karakteri `MMOSetName YeniAd` (dosyasi olmayan ad) + `MMOSave`: yeni dosya yazilmali, hata olmamali; eski dosya yetim kalir (onceki davranis).
+  **GUNCEL (2026-10-11):** uzak (yonetici disi) istemcide kayitli karakter icin bu adim artik "Ad kilitli" ile REDDEDILIR (K-1 F1); yalniz host/yonetici
+  yapabilir. Host'ta eski `.sav` yine kalir, ama basarim/gunluk yan dosyalari yeni yuvaya tasinip eskileri silinir (K1G son madde). Uzak B'nin
+  `MMOSetName A` denemesi de "kayitli bir karaktere ait" ile reddedilir ve soguma baslatir.
 - [ ] **Regresyon:** Normal oynanista otomatik kayit (60 sn), cikista kayit ve `MMOTravel` ile harita gecisi eskisi gibi calismali (`SaveCharacterForTravel` hata dondurmemeli).
 
 ## Istege bagli sunucu katilim parolasi (SECURITY_AUDIT K-1/B-13) — 2026-10-04 (DERLENMEDI)
@@ -3283,6 +3290,8 @@ Kapsam: `UMMOStatsComponent/UMMOInventoryComponent/UMMOQuestComponent::ApplySave
 
 - [ ] **Host ve istemci adi:** Adsiz oyuna gir (host ve istemci); `/who` ve sohbet gonderen etiketinde Windows kullanici adin **gorunmemeli**, `Gezgin######` gorunmeli.
 - [ ] **Kasitli ad:** `open <host>:7777?Name=Ozan` ile baglan: ad `Ozan` kalmali. `MMOSetName Ozan2` da calismali.
+  **GUNCEL (2026-10-11):** uzak istemcide `MMOSetName Ozan2` yalniz `Ozan`'in kaydi yoksa (ilk kayittan / 60 sn otomatik kayittan once) calisir;
+  kayit varsa "Ad kilitli" reddi beklenir. Turkce harfli ad (`?Name=Özge`) ASCII disi harf atilarak (`zge`) kabul edilir, bildirim gelir.
 - [ ] **Kayit:** `Saved/SaveGames` altinda yeni `MMOSave_Gezgin######.sav` olusur (onceki `MMOSave_<KULLANICI>-<hex>.sav` dosyalari yetim kalir).
 - [ ] **Derleme:** `AGameModeBase::ChangeName` imzasi (`AController*, const FString&, bool`) UE 5.7'de dogrulanmali; fark varsa derleme hatasi verir.
 
@@ -5521,6 +5530,8 @@ Native testler (basarim 82, gunluk 67, posta 104, ad kilidi 23, O68 24) gecti; a
 - [ ] Uzak istemci kayitli karakterle `MMOSetName Y` (red) ve HEMEN ardindan `MMOSetName Z`: ikincisi "... sn beklemelisin"
   (F1 reddi de soguma baslatir). Red metni ilk kayit yollarini (MMOSave, otomatik kayit, takas/klan/arkadas/posta) ve
   "ilerleme tasinmaz" bilgisini okunur sekilde gostermeli (uzun satir HUD'da tasmamali).
+  **GUNCEL (tur 4, `d031b90`, DUSUK-5):** ad kilidi reddinden sonra soguma suresince ikinci deneme "... sn beklemelisin" DEGIL, yine kilit
+  metnini gostermeli (`bNameLockRejected`). "sn beklemelisin" yalniz kilit disi retlerden (or. kayitli-ad reddi) sonra beklenir.
 - [ ] Gecersiz baglanti adiyla (`?Name=` bos/gecersiz) gir: 3 sn sonra sohbette yeni "bu oturumda adin ... (yeni karakter)"
   bildirimi tam ve okunur gorunmeli.
 - [ ] Misafir adli (`PlayerNNN`) oyuncuyu `/arkadas ekle`: ipucu "?Name=Ad ile yeniden baglanmali" demeli (MMOSetName degil).
@@ -5529,3 +5540,18 @@ Native testler (basarim 82, gunluk 67, posta 104, ad kilidi 23, O68 24) gecti; a
 - [ ] Posta: normal gonder/topla sonrasi `Saved/MMOMail` altinda `.bak` ya da `.tmp` dosyasi KALMAMALI.
 - [ ] Host: `MMOSetName Yeni` + `MMOSave` + cik: `Saved/MMOAchievements/MMOSave_<eski>.json` ve `Saved/MMODaily/...<eski>.json`
   SILINMIS, `..._Yeni.json` var olmali (Y7).
+
+## K1H — Guvenlik/QA tur 4: ASCII ad kurali, kanonik anahtar, tekrar denemesiz Move, eski yuva silme korumasi (2026-10-11; `d031b90`, PIE YOK)
+
+Native testler (`7932979`: basarim 96, gunluk 81, posta 130, ad kilidi 58) gecti; asagidakiler PIE/listen-server ister. K1F/K1G maddelerini tekrar etmez.
+- [ ] Uzak yeni karakter `MMOSetName Ömer`: "Adda yalniz harf (a-z, A-Z; Turkce harf yok), rakam, bosluk, _ ve - kullanilabilir" reddi; ad degismemeli.
+- [ ] `?Name=Ömer` ile baglan: ad `mer` olmali ve 3 sn sonra "Baglanti adindaki izinsiz karakterler atildi: adin 'mer'..." bildirimi gelmeli
+  ("yeni karakter" uyarisi OLMAMALI; o yalniz `Gezgin######` atamasinda). Diskte `MMOSave_mer.sav` varsa o karakter yuklenir (bilinen sinir, karar adayi).
+- [ ] Cevrimici `Ali Veli` varken ikinci istemci `?Name=ali_veli` ile baglanmayi denesin: "Bu ad su an baska bir oyuncu tarafindan kullaniliyor" reddi.
+- [ ] Klan: `/klan kur Kılıç` reddedilmeli (yalniz ASCII harf/rakam); daha once kurulmus Turkce harfli bir klan varsa yuklenince korunmali.
+- [ ] Host (kayitli `A`) `MMOSetName B`; ardindan baska bir istemci `?Name=A` ile baglansin; sonra host `MMOSave` (+5 sn bekle):
+  host'un yan dosyalari `MMOSave_B.json`'a tasinmali, ama `Saved/MMOAchievements/MMOSave_A.json` SILINMEMELI (artik cevrimici A'nin yuvasi;
+  logda `Eski yuva dosyasi silinmedi`).
+- [ ] Posta: dolu (20 postalik) kutuya gonder ("kutusu dolu"), hemen ardindan baska aliciya gonder: "5 saniye bekle" cooldown'u gelmeli (Y-NEW-5).
+- [ ] Posta kutusu dosyasi baska bir surecte acik/kilitliyken (sentetik kopya) `/posta gonder`: sunucu belirgin donmamali (eskiden ~5,5 sn),
+  gonderim "su an gonderilemedi" ile bitmeli ve gonderenin altini net degismemeli (okuma kilitliyse hic dusulmez, yazim kilitliyse iade edilir).

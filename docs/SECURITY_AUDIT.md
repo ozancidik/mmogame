@@ -93,13 +93,18 @@ Düzeltme (öncelik sırasıyla):
 
 #### K-1 yeni yuz (2026-10-11): Ad degistirerek karakter catallama (fork)
 
-**DURUM (2026-10-11, 2. tur duzeltme, commit'lenmedi; derlendi, RunSystemTests 61/53/89 + SaveLifecycle 26 + NetSmokeTest
-GECTI; yeni davranislar icin native test HENUZ YOK, PIE/uzak istemciyle denenmedi):** F1 DUZELTILDI (kisa vadeli onlem),
-F2 DUZELTILDI (uzak istemci icin F1 ile kapali; host/F3 icin EndPlay tasima + dosyasiz Lv>1 savunmasi), F3 DUZELTILDI,
-F5 DUZELTILDI, F4 ACIK (Linux; yalniz not, kod degismedi). Kalici cozum (hesap modu) ACIK. Her maddenin altinda "Durum".
+**DURUM (guncel, 2026-10-11 aksami; tur 2 `afba349`, tur 3 `2bb2023`, tur 4 `d031b90`, testler `7932979`):** F1, F2, F3, F5
+DUZELTILDI ve native testli: `Scripts/RunSystemTests.ps1` basarim **96** / gunluk **81** / posta **130** / ad kilidi **58**
+kontrol GECTI, `RunAllChecks.ps1 -SkipBuild` GECTI (commit mesajlari; bu belge denetcisi testleri yeniden kosmadi). Tur 3/4'te
+kapanan Y1-Y4, Y6-Y8 ve Y-NEW-1..6 asagida "Tur 3/4 bulgulari". F4 (Linux harf varyanti) ACIK, kalan dusuk maddeler asagida.
+PIE ve gercek uzak istemciyle HICBIRI denenmedi. Kalici cozum (hesap modu) ACIK.
+*Gecmis kayit (tur 2 aninda):* commit'lenmemisti; RunSystemTests 61/53/89 + SaveLifecycle 26 + NetSmokeTest GECTI; yeni
+davranislar icin native test yoktu. F1/F2/F3/F5 "Durum" satirlarindaki "native test yok" ifadeleri o ana aittir; ad kilidi
+testi `7932979` ile eklendi.
 Asagidaki bulgu satirlari `43e87ca` icindir; duzeltme satirlari calisma agacindaki `MMOCharacter.cpp` icindir.
 Kaynak: 2026-10-11'de iki bagimsiz denetim (qa-kontrolcu, ag-guvenlik-denetcisi), ikisi de commit `43e87ca`'yi inceledi.
-Satirlar `43e87ca` icindir; `MMOCharacter.cpp` o commit'ten bu yana (HEAD `b0f22bc` ve calisma agaci) degismedi.
+Satirlar `43e87ca` icindir; `MMOCharacter.cpp` o commit'ten bulgu anina kadar (HEAD `b0f22bc`) degismemisti, sonra tur 2-4
+duzeltmeleriyle degisti: asagidaki bulgu satirlari artik kaymistir (guncel satirlar `ACCOUNT_IDENTITY_DESIGN.md` §2.2, §10.2).
 Hepsi **kod okumasiyla** bulundu: PIE'da, NetSmokeTest'te ya da gercek uzak istemciyle denenmedi.
 Ciddiyet K-1 ile ayni (herkese acik oturumda KRITIK, LAN'da YUKSEK), cunku tek bir uzak istemci yeter.
 
@@ -181,6 +186,10 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
 - Proje bugun Windows listen-server'da calisiyor; bu madde **Linux'ta denenmedi**, sunucu Linux'a tasininca gecerli olur.
 - **Durum: ACIK (kod degismedi, bilerek).** F1 duzeltmesi kayitli karakterin harf varyantina gecmesini de engeller, ama
   `?Name=ALI` ile dogrudan baglanma yolu Linux'ta hala ayri yuva acar. Cozum yollari `ACCOUNT_IDENTITY_DESIGN.md` §10.3.
+- **Durum guncellemesi (tur 4, `d031b90`):** ASCII ad kurali Windows'taki Unicode harf varyantini kapatti (Y-NEW-1, asagida);
+  cevrimici cakisma kontrolleri kanonik anahtarla (ASCII kucuk harf). Ancak yuva adi (`MMONameRules::SlotKey`) harf buyuklugunu
+  korur ve `Exists` dosya sistemine uyar: Linux'ta cevrimdisi `Ali`'nin `ALI` varyanti hala ayri `.sav` acar ve posta kutusu
+  (`MMOMailStore.cpp:108`, kucuk harf) paylasilir. F4 ACIK; Linux'ta denenmedi.
 
 **F5. Kayitli-ad reddinde soguma yok (ad sorgulama)**
 - `MMOCharacter.cpp:1635-1639`: "Bu ad kayitli bir karaktere ait" reddi `LastSetNameServerTime`'i guncellemeden doner;
@@ -193,6 +202,45 @@ karakterin **yeni ve bos bir yuvaya kopyalanmasini** engellemiyor.
   (`MMOCharacter.cpp:1675`); kayitli karakter zaten F1 kilidine takilip aday ada hic bakmaz. Kalan: yeni (kaydedilmemis)
   karakter 30 sn'de bir aday deneyebilir; `?Name=` ile yeniden baglanmak sogumasiz ayni bilgiyi verir (yeniden baglanti
   maliyeti dahilinde).
+
+**Tur 3/4 bulgulari (2026-10-11; qa-kontrolcu + ag-guvenlik-denetcisi, kod okumasi; duzeltmeler `2bb2023` ve `d031b90`,
+testler `7932979`; PIE YOK).** Satirlar `d031b90` sonrasi HEAD icindir. Etiketler commit mesajlarindan; tur 3 "Y5" etiketinin
+icerigi commit mesajlarinda ve kodda bulunamadi (bu belge dogrulayamadi).
+
+| Etiket | Bulgu (kisa) | Durum ve yer |
+|---|---|---|
+| Y1 | `.tmp` kurtarma/karantina `Move`'u motorun 10x0,5 sn tekrar denemesiyle sunucuyu dondurabiliyordu | KAPANDI (tur 3). Tekrar denemesiz `Move` (`MMOMailStore.cpp:38-41`); basarisizlikta geri cekilme: posta 60 sn (`:19`), basarim/gunluk tur 4'te 60 -> 10 sn (`MMOAchievementComponent.cpp:40`, `MMODailyComponent.cpp:37`) |
+| Y2 | Bozuk/okunamayan posta kutusu bos sayilip ustune yazilabiliyordu | KAPANDI (tur 3, `a0cb86d` ustune). `Load` bozuk kutuyu `.bad`'a ayirip false doner, `.bak` varsa geri koyar (`MMOMailStore.cpp:205-236`); `SendMail` alici kutusunu `Load` ile okur, false'ta hicbir sey dusulmez (`StoreError`, `MMOMailComponent.cpp:236-241`) |
+| Y3 | `LoadCharacter` F3 erken donusu `bInitialLoadComplete`'e de bakiyordu | KAPANDI (tur 3). Kosul yalniz `!ActiveSaveSlot.IsEmpty()` (`MMOCharacter.cpp:1359`) |
+| Y4 (QA ORTA-1) | Posta `WriteBox` yedeksiz yaziyordu: basarisiz `Move` eski kutuyu kaybettirebilirdi | KAPANDI (tur 3). Once `.bak` kopyasi (alinamazsa hic yazilmaz), `.tmp` -> `Move`, olmazsa dogrudan yazim, o da olmazsa `.bak` geri konur (`MMOMailStore.cpp:246-310`); kurtarma sirasi `.bak` > `.tmp` (`:65-93`) |
+| Y6 | Bozuk basarim/gunluk dosyasinin eski `.tmp`'si sonra "yarim yazim" sanilip geri konabiliyordu | KAPANDI (tur 3). Eski `.tmp` -> `.tmp.bad` (`MMOAchievementComponent.cpp:399-405`, gunlukte ayni desen `MMODailyComponent.cpp:359-366`) |
+| Y7 | Yuva tasimasindan sonra eski yan dosyalar kaliyordu (eski ad yeniden alininca catal yuklenirdi) | KAPANDI (tur 3). Yeni yol basariyla yazildiktan sonra eski `.json` + `.json.tmp` silinir (`MMOAchievementComponent.cpp:496-500`) |
+| Y8 (QA DUSUK-2) | Ad degistirme sogumasi disk `Exists` kontrolunden sonra geliyordu; F1 reddi soguma vurmuyordu | KAPANDI (tur 3). Soguma once (`MMOCharacter.cpp:1624-1647`), F1 reddi de damga vurur (`:1654-1659`) |
+| Y-NEW-1 | Unicode/harf varyanti: `FChar::IsAlnum` Turkce harfleri geciriyor, `IgnoreCase` yalniz ASCII'de harf duyarsiz, NTFS Unicode'da da harf duyarsiz: buyuk/kucuk O-umlautlu iki ad farkli sayilip AYNI `.sav`'a yaziliyordu (ayni kayda ikinci oturum); `A B` / `A_B` gibi ayni yuvayi veren adlar uc yerde ayri ayri (ham ad + `Replace` + `IgnoreCase`) karsilastiriliyordu | **KAPANDI (`d031b90`).** Yalniz ASCII `[A-Za-z0-9 _-]` (`Public/Core/MMONameRules.h`); PreLogin (`MMOGameMode.cpp:577-598`), ChangeName (`:459-481`) ve ServerSetName (`MMOCharacter.cpp:1664-1681`) cakismayi tek `CanonicalKey` (bosluk -> `_`, ASCII kucuk harf) ile yapar (test: `S T` / `s_t` / `S_T`, ad kilidi 58 kontrol). Migrasyon yok (karar: `DECISIONS_NEEDED.md` "guvenlik tur 4") |
+| Y-NEW-2 | Posta `WriteBox` ve basarim/gunluk `SaveNow` `Move`'u kilitli dosyada ~5,5 sn donduruyordu | KAPANDI (`d031b90`). Tekrar denemesiz (`MMOMailStore.cpp:285-293`, `MMOAchievementComponent.cpp:489-493`); test `Error moving file` satiri 0 bekler |
+| Y-NEW-3/4 | Eski yuva silme: harf duyarsiz ayni dosyayi (`MMOSave_Ali` -> `MMOSave_ali`) ya da cevrimici baska oyuncunun yuvasini silebiliyordu | KAPANDI (`d031b90`). `AchDeleteOldSlotFiles` (`MMOAchievementComponent.cpp:66-88`) ve `DailyDeleteOldSlotFiles` iki durumda silmez |
+| Y-NEW-5 | Posta `BoxFull`/`StoreError` sogumaya yazilmiyordu: cevrimdisi ad varligi sinirsiz hizda sorgulanabilirdi | KAPANDI (`d031b90`, `MMOMailComponent.cpp:233-246`) |
+| Y-NEW-6 | Kaydi olmayan yeni karakter ayni yuvayla yeniden possess edilince kayit kapisi kapali kaliyordu | KAPANDI (`d031b90`, `MMOCharacter.cpp:1364-1373`) |
+| QA DUSUK-3 (tur 4) | Ilk postada basarisiz yazim ana dosyayi kosulsuz siliyordu | KAPANDI: ana dosya `.bad`'a ayrilir, silinemeyen `.tmp` `.tmp.bad` olur; o da olmazsa yazim basarili sayilir (iade yok: altin kopyalanmaz, en kotu kaybolur) (`MMOMailStore.cpp:271-283, 311-330`) |
+
+**Kalan acik / dusuk maddeler (guncel; hepsi kod okumasi, PIE/olcum YOK):**
+- **`.bad` ustune yazma (DUSUK):** bozuk dosya `Move(..., bReplace=true)` ile ayrilir (`MMOMailStore.cpp:214`, `:316`;
+  `MMOAchievementComponent.cpp:398`; `MMODailyComponent.cpp:360`). Ayni kutu/dosya ikinci kez bozulursa onceki `.bad` kaybolur
+  (inceleme kaniti gider; oyun verisi degil). Basarim/gunlukte bu `Move`'un donusu denetlenmez.
+- **`WriteBox` false ama yeni icerik diskte (DUSUK):** kutu varken `Move` ve dogrudan yazim basarisiz sayilip `.bak` geri konamazsa
+  (`MMOMailStore.cpp:300-309`) `WriteBox` false doner ve gonderen iade alir; dogrudan yazim aslinda tam yazildiysa sonraki `Load`
+  yeni kutuyu okur ve posta da teslim edilir (altin kopyasi). Iki ust uste dosya sistemi hatasi gerektirir. Ilgili mutasyon
+  "c2" (anlik `.bak` geri koyma) surec icinde ulasilamadigi icin testle yakalanmadi (`7932979` mesaji).
+- **Cokme aninda posta kaybi (DUSUK, bilerek):** sira ucret dus -> gonderen kaydi -> kutuya yaz (`MMOMailComponent.cpp:271-318`).
+  Gonderen kaydi ile kutu yazimi arasinda cokme altini kaybettirir, kopyalamaz (tasarim tercihi, K1).
+- **Baglanti adinda harf kirpma (DUSUK):** `?Name=Ömer` -> `mer` (`MMOGameMode.cpp:381-392`); `mer` kaydi varsa o yuklenir,
+  oyuncuya yalniz 3 sn sonra bildirim gider (`:537`). Karar adayi: kirpmak yerine reddetmek (`DECISIONS_NEEDED.md`).
+- **F4 Linux harf varyanti:** ACIK (yukarida F4 "Durum guncellemesi"). ASCII kurali bunu cozmez.
+- **Birden cok sunucu sureci (DUSUK, bugun tek surec):** posta deposunda surecler arasi kilit yok (`MMOMailStore.cpp`'de
+  kilit/lock yok; geri cekilme haritasi da surec ici `static`, `:21-25`). Ayni `Saved/` klasorunu kullanan iki sunucu ayni kutuyu
+  oku-degistir-yaz ile ezebilir. Ad sahipligi tasarimindaki tek-surec varsayimiyla ayni (`ACCOUNT_IDENTITY_DESIGN.md` §9).
+- **Turkce harfli eski kayitlar:** migrasyon yok; ASCII disi `MMOSave_*` / posta kutulari erisilemez kalir (karar adayi ICU
+  tabanli kanonik anahtar, `DECISIONS_NEEDED.md`).
 
 **Onerilen kisa vadeli cozum (2026-10-11'de uygulandi; F4 haric, yukaridaki "Durum" satirlari):**
 - Uzak istemci (`!IsLocallyControlled()`) icin `ServerSetName` yalniz **hic kaydedilmemis yeni karaktere** izin versin:
@@ -217,6 +265,8 @@ modunda uzak `ServerSetName` her zaman ret). Ad degismeyince F1, F2, F3 (uzak) v
 ret beklenir; (2) yeni karakter adini degistirebilsin; (3) ad degistir + hemen cik, sonra yeni adla gir: basarim altini
 ikinci kez verilmemeli. `43e87ca` kodunda (1) ve (3) **basarisiz olmasi beklenirdi**; 2026-10-11 duzeltmesinden sonra
 yesil beklenir ama hala kosulmadi. Native test icin kanca: `AMMOCharacter::SetRemoteNameRulesForTest` (test-muhendisi).
+Guncel (2026-10-11): bu kancayla native `Scripts/TestNameLock.ps1` (58 kontrol, (1) ve (2)'nin tek surec benzetimi) GECTI;
+iki istemcili NetSmokeTest varyanti ve (3) gercek ag uzerinde hala kosulmadi.
 
 ---
 

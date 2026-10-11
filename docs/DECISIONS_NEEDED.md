@@ -206,10 +206,11 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
 - **Lv46-80 yeni icerigin sayilari:** mob/gorev/beceri degerlerinin hepsi PLACEHOLDER; ilk oyun testi `PLAYTEST_LV46_80.md`. Yan gorev XP'leri bilerek ~%6-7 esikte (pace-notr); mevcut Lv61+ grind gorevleri ~%40-50 verir. Yeni yan gorevler de o kalibi mi izlesin?
 - **Zayif cep (COZULDU, 2026-10-09):** Uçurum Gezgini cebi (`-5500,4500`) ilk doldurmada 1-3/6 veriyordu; neden `DontSpawnIfColliding` ile cakisan noktalar ve 4 sn'lik bekleme idi. `AMMOMobSpawner::TopUp` artik mob basina ayni turda 3'e kadar baska nokta dener: tum Winter cepleri 5-6/6, elitler ilk turda dogdu (mob sayisi ~55 -> 79).
 
-## Yeni karar adayi (2026-10-11: guvenlik denetimi; KOD DEGISTIRILMEDI)
+## Yeni karar adayi (2026-10-11: guvenlik denetimi; denetim aninda kod degistirilmedi, sonra (a) uygulandi)
 
-- **Ad degistirme kisiti (uzak istemci):** DURUM: secenek (a) GECICI ONLEM OLARAK UYGULANDI (2026-10-11, commit'lenmedi; derlendi,
-  native test/PIE yok; `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari). Kullanici karari hala ACIK: kayitli karakter icin ad
+- **Ad degistirme kisiti (uzak istemci):** DURUM: secenek (a) GECICI ONLEM OLARAK UYGULANDI (2026-10-11, commit `afba349`, tur 3
+  `2bb2023` ve tur 4 `d031b90` ile sikilastirildi; native test `Scripts/TestNameLock.ps1` 58 kontrol GECTI (`7932979`), PIE/gercek
+  uzak istemci YOK; `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari). Kullanici karari hala ACIK: kayitli karakter icin ad
   degistirme oyun ozelligi olarak gerekli mi? Ayrica yeni karar: basarim dosyasi olmayan Lv>1 karakterde seviye/gorev/altin basarimlari
   odulsuz acik sayiliyor (`ACHIEVEMENTS.md`); sistem oncesi karakterlerin geriye donuk odul almamasi kabul mu?
   - **Sorun [Kesin, kod okumasi; PIE'da denenmedi]:** uzak istemci kayitli karakterinin adini kaydi olmayan yeni bir ada
@@ -247,3 +248,15 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
   erisilemez kalir; eski Turkce harfli klan adlari yuklemede korunur, yenisi kurulamaz). Karar: Turkce harfli ad gerekli mi?
   "Evet" ise sonra ICU tabanli kanonik anahtar (tam Unicode case-fold + normalizasyon, dosya adi = anahtarin guvenli kodlamasi)
   ve eski kayitlar icin tek seferlik tasima.
+- **Baglanti adinda izinsiz harf: kirpmak mi, reddetmek mi? [Kesin, kod okumasi; PIE'da denenmedi]:** bugun `?Name=` degerinden
+  ASCII disi harfler sessizce atilir (`MMOGameMode.cpp:381-392` `SanitizeInitialName`): `?Name=Ömer` -> `mer`. Kalan ad bos
+  degilse oyuncu o adin kaydini yukler (`mer` adli bir kayit varsa o karakter), yalniz 3 sn sonra "izinsiz karakterler atildi"
+  bildirimi gelir (`:537`). Kimlik zaten ad oldugu icin (K-1) yeni bir yetki acmaz, ama kazara baska kayda girme ve kafa
+  karisikligi riski var. Secenekler: (a) bugunku gibi kirp + bildir; (b) `PreLogin`'de ASCII disi harf iceren adi
+  "Adda Turkce harf kullanilamaz" diye reddet (oyuncu dogru adla yeniden baglanir); (c) kirp ama kalan adin kaydi varsa
+  rastgele `Gezgin######` ver. Oneri [Muhtemel]: (b), en az sasirtan.
+- **Uzak ad degistirme kilidinin kapsami:** kilit "kaydi olan karakter adini degistiremez" (`MMOCharacter.cpp:1648-1663`) ve
+  yukaridaki "Ad degistirme kisiti" kararina bagli. Tur 4 ile kilitten sonraki denemeler soguma boyunca kilit metnini gorur
+  (`bNameLockRejected`, `:1637-1640`). Acik soru ayni: kayitli karakter icin ad degistirme ozelligi istenirse kalici yol
+  B-full (`ACCOUNT_IDENTITY_DESIGN.md` §4.7) ve ICU anahtari birlikte tasarlanmali; istenmiyorsa "Ad degistirme kisiti"
+  maddesinin (b) secenegi (uzak istemcide ad degistirmeyi tamamen kapat) daha basit.

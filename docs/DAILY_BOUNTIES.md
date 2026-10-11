@@ -1,6 +1,6 @@
 # Gunluk gorevler (2026-10-11)
 
-Durum: **kodda, derlendi ve headless test edildi (53 kontrol); oyun icinde (PIE) denenmedi.** `docs/ACHIEVEMENTS.md` ile ayni kalip, Codex'in
+Durum: **kodda, derlendi ve headless test edildi (`Scripts/TestDaily.ps1` 81 kontrol, `7932979`); oyun icinde (PIE) denenmedi.** `docs/ACHIEVEMENTS.md` ile ayni kalip, Codex'in
 dosyalarindan bagimsiz yeni dosyalarla eklendi.
 
 ## Ne yapar
@@ -20,7 +20,9 @@ Her **UTC gunu** icin 3 gorev, gece yarisi UTC'de yenilenir:
 ## Dosyalar
 
 `Public/Components/MMODailyComponent.h`, `Private/Components/MMODailyComponent.cpp` (bilesen, saf mantik, JSON), `Private/Tests/MMODailySelfTest.cpp` +
-`Scripts/TestDaily.ps1` (native test, 53 kontrol; kalicilik/B1/LoadSerial/A5/.tmp dahil). Baglanti: `MMOCharacter.h/.cpp` (alt nesne + `IsInitialLoadComplete()` erisimcisi),
+`Scripts/TestDaily.ps1` (native test, 81 kontrol; kalicilik/B1/LoadSerial/A5/.tmp, 10 sn geri cekilme penceresi, kilitli ana dosyada hizli basarisiz
+`SaveNow` (bDirty kalir), eski yuva silme: basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya dahil; `Error moving file` satiri 0 beklenir;
+`RunSystemTests.ps1` ve `RunAllChecks.ps1` adimi). Baglanti: `MMOCharacter.h/.cpp` (alt nesne + `IsInitialLoadComplete()` erisimcisi),
 `MMOQuestComponent.cpp::NotifyMobKilled` (olduruldu sinyali, basarimlardan sonra), `MMOPlayerController.cpp` (`/gunluk`).
 
 ## Tasarim kararlari
@@ -40,6 +42,11 @@ Her **UTC gunu** icin 3 gorev, gece yarisi UTC'de yenilenir:
   calisir, motor kodundan dogrulandi). `.tmp` geri konamiyorsa ya da ana dosya okunamiyorsa yukleme ERTELENIR (bugunun gorevleri sifirdan
   acilmaz, dosyanin ustune yazilmaz). Basarimdaki "dosya yoksa odulsuz acik say" savunmasi gunlukte YOK: kayip dosya ayni gunun gorevlerini
   yeniden acar (uzak istemci yolu `SECURITY_AUDIT.md` K-1 F1 ad kilidiyle kapali; host/dosya silme yolu acik).
+- **2026-10-11 tur 3 (`2bb2023`) + tur 4 (`d031b90`); native test 81 kontrol GECTI (`7932979`), PIE YOK:** basarimla ayni desen.
+  Yan dosyalar `<yuva>.json` / `.json.tmp` / `.json.bad`; bozuk dosya ayrilirken eski `.tmp` `.json.tmp.bad` olur (Y6, `MMODailyComponent.cpp:359-366`).
+  `.tmp` kurtarma ve `SaveNow` `Move`'u motor tekrar denemesi olmadan; kurtarma basarisizsa yukleme **10 sn** ertelenir (tur 4'te 60 -> 10 sn,
+  `:37`, `:337`). Yuva tasimasi yeni yola basariyla yazildiktan sonra eski `.json` ve `.json.tmp` silinir (Y7, `DailyDeleteOldSlotFiles` `:62`,
+  cagri `:427`); eski yol yeni yolla harf duyarsiz ayniysa ya da eski yuva cevrimici baska bir oyuncunundaysa silinmez (Y-NEW-3/4).
 - **Disk yazilamazsa odul yok:** tamamlanma diske yazilamazsa `bDone` geri alinir, odul verilmez, sonraki degerlendirmede yeniden denenir.
 - Mobda izleme yok (AMMOCharacter mobun da tabani).
 

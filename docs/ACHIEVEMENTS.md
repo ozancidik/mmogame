@@ -17,7 +17,7 @@ yeni dosyalarla eklendi.
 |---|---|
 | `Public/Achievements/MMOAchievementTypes.h`, `Private/Achievements/MMOAchievementDatabase.cpp` | veri tablosu (`MakeAch`), yeni satir = tek satir |
 | `Public/Components/MMOAchievementComponent.h`, `Private/Components/MMOAchievementComponent.cpp` | sunucu-otoriteli izleme, odul, kalicilik, komutlar |
-| `Private/Tests/MMOAchievementSelfTest.cpp`, `Scripts/TestAchievements.ps1` | native test (61 kontrol: tablo/mantik/JSON + GUID'li yuvalarla disk kaliciligi, B1 ad degisimi, LoadSerial, A5, C3, O1, .tmp) ve calistirici |
+| `Private/Tests/MMOAchievementSelfTest.cpp`, `Scripts/TestAchievements.ps1` | native test (96 kontrol, `7932979`: tablo/mantik/JSON + GUID'li yuvalarla disk kaliciligi, B1 ad degisimi, LoadSerial, A5, C3, O1, .tmp, 10 sn geri cekilme penceresi, kilitli ana dosyada hizli basarisiz `SaveNow` (bDirty kalir), eski yuva silme: basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya) ve calistirici (`Error moving file` satiri 0 bekler); `RunSystemTests.ps1` ve `RunAllChecks.ps1` adimi |
 | `Scripts/ValidateData.py`, `Scripts/TestValidateData.py` | tablo denetimi + 4 negatif senaryo |
 
 Mevcut dosyalarda yalniz kucuk baglanti: `MMOCharacter.h/.cpp` (alt nesne), `MMOQuestComponent.cpp::NotifyMobKilled` (olduruldu sinyali,
@@ -46,6 +46,15 @@ gorev ilerlemesinden SONRA), `MMOPlayerController.cpp` (`/basarim` sohbet komutu
     - Lv>1 karakterin dosyasi yoksa (ya da bozuktu): o an saglanan seviye/gorev/altin basarimlari ODULSUZ acik isaretlenip yazilir. Bedeli:
       basarim sisteminden once Lv>1 olmus kayitli karakterler bu basarimlarin altinini geriye donuk ALMAZ (unvanlar acilir). Denge karari
       kullanicinin; istenmezse `MarkCurrentProgressUnlockedSilently` cagrisi kaldirilir (uzak istemci yolu F1 ad kilidiyle zaten kapali).
+  - **2026-10-11 tur 3 (`2bb2023`) + tur 4 (`d031b90`); native test 96 kontrol GECTI (`7932979`), PIE YOK:**
+    - Yan dosyalar: `<yuva>.json`, yarim yazim `<yuva>.json.tmp`, bozuk dosya `<yuva>.json.bad`; bozuk dosya ayrilirken eski `.tmp` de
+      `.json.tmp.bad` olur (olmazsa silinir), yoksa sonra "yarim yazim" sanilip eski durum dirilirdi (Y6, `MMOAchievementComponent.cpp:395-406`).
+    - `.tmp` kurtarma `Move`'u ve `SaveNow` `Move`'u motor tekrar denemesi olmadan (Y1/Y-NEW-2; kilitli dosyada ~5,5 sn donma yok). Kurtarma
+      basarisizsa yukleme **10 sn** ertelenir (tur 4'te 60 -> 10 sn, `:40`, `:367-375`); oyuncu mesaji gercek sureyi yazar. `SaveNow` basarisizsa
+      `bDirty` kalir, sonraki periyodik kayit ya da EndPlay yeniden dener (`:486-503`).
+    - Eski yuva silme (Y7 + Y-NEW-3/4, `AchDeleteOldSlotFiles` `:66-88`): yuva tasimasi yeni yola **basariyla yazildiktan sonra** eski
+      `.json` ve `.json.tmp` silinir (`.bad` inceleme icin kalir). Silinmez: eski yol yeni yolla harf duyarsiz tam yol olarak ayniysa
+      (`MMOSave_Ali` -> `MMOSave_ali`, NTFS'te ayni dosya) ya da eski yuva su an cevrimici BASKA bir oyuncunun canli adi/yukledigi yuvasiysa.
 - **Disk yazilamazsa odul yok:** acilma diske yazilamazsa `Unlocked` geri alinir ve odul verilmez; 5 sn sonra yeniden denenir. Ayni unvan
   tekrar secilirse diske yazilmaz.
 
