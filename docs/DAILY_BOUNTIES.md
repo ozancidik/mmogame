@@ -1,6 +1,6 @@
 # Gunluk gorevler (2026-10-11)
 
-Durum: **kodda, derlendi ve headless test edildi (30 kontrol); oyun icinde (PIE) denenmedi.** `docs/ACHIEVEMENTS.md` ile ayni kalip, Codex'in
+Durum: **kodda, derlendi ve headless test edildi (53 kontrol); oyun icinde (PIE) denenmedi.** `docs/ACHIEVEMENTS.md` ile ayni kalip, Codex'in
 dosyalarindan bagimsiz yeni dosyalarla eklendi.
 
 ## Ne yapar
@@ -20,7 +20,7 @@ Her **UTC gunu** icin 3 gorev, gece yarisi UTC'de yenilenir:
 ## Dosyalar
 
 `Public/Components/MMODailyComponent.h`, `Private/Components/MMODailyComponent.cpp` (bilesen, saf mantik, JSON), `Private/Tests/MMODailySelfTest.cpp` +
-`Scripts/TestDaily.ps1` (native test, 30 kontrol). Baglanti: `MMOCharacter.h/.cpp` (alt nesne + `IsInitialLoadComplete()` erisimcisi),
+`Scripts/TestDaily.ps1` (native test, 53 kontrol; kalicilik/B1/LoadSerial/A5/.tmp dahil). Baglanti: `MMOCharacter.h/.cpp` (alt nesne + `IsInitialLoadComplete()` erisimcisi),
 `MMOQuestComponent.cpp::NotifyMobKilled` (olduruldu sinyali, basarimlardan sonra), `MMOPlayerController.cpp` (`/gunluk`).
 
 ## Tasarim kararlari

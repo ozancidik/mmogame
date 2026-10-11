@@ -76,6 +76,8 @@ public:
 	void InitForTest() { bPersistenceEnabled = false; bLoaded = true; }
 	// Kayit hatasi enjeksiyonu: SaveNow false doner (acilma geri alinir, odul verilmez).
 	void SetSaveFailForTest(bool bFail) { bTestFailSaves = bFail; }
+	// SaveNow cagri sayisi (C3: ayni unvan tekrar secilince diske yazilmamali).
+	int32 GetSaveCallsForTest() const { return TestSaveCalls; }
 	static bool RunSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
@@ -104,6 +106,7 @@ private:
 	FString LoadedSlot;
 	uint32 LoadedSerial = 0;
 	bool bTestFailSaves = false;
+	int32 TestSaveCalls = 0;
 	bool bLoaded = false;
 	bool bDirty = false;
 	bool bEvaluating = false;

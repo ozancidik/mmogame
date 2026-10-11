@@ -150,10 +150,168 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(A->SendMail(NameB, 100, TEXT("tasar"), true) == EMMOMailResult::BoxFull && InvA->Gold == GoldBefore, TEXT("live_box_full_no_charge"));
 	}
 
+	// --- D1: "/posta gonder" ayristirma; altin YALNIZ "<rakamlar>g" bicimi ---
+	{
+		struct FMailParseCase { const TCHAR* Args; const TCHAR* Name; int32 Gold; const TCHAR* Text; const TCHAR* Label; };
+		const int32 Over = FMMOMailStore::MaxGoldPerMail + 1;
+		const FMailParseCase Cases[] = {
+			{ TEXT("Ali 500g selam"),               TEXT("Ali"), 500,     TEXT("selam"),                TEXT("parse_gold_suffix") },
+			{ TEXT("Ali 500G selam"),               TEXT("Ali"), 500,     TEXT("selam"),                TEXT("parse_gold_suffix_upper") },
+			{ TEXT("Ali 0g selam"),                 TEXT("Ali"), 0,       TEXT("selam"),                TEXT("parse_zero_gold") },
+			{ TEXT("Ali 100 kere tesekkurler"),     TEXT("Ali"), 0,       TEXT("100 kere tesekkurler"), TEXT("parse_plain_number_is_text") },
+			{ TEXT("Ali +"),                        TEXT("Ali"), 0,       TEXT("+"),                    TEXT("parse_symbol_is_text") },
+			{ TEXT("Ali 99999999999g x"),           TEXT("Ali"), Over,    TEXT("x"),                    TEXT("parse_huge_caps_to_limit_plus_one") },
+			{ TEXT("Ali 1000001g x"),               TEXT("Ali"), Over,    TEXT("x"),                    TEXT("parse_limit_plus_one") },
+			{ TEXT("Ali 1000000g"),                 TEXT("Ali"), 1000000, TEXT(""),                     TEXT("parse_limit_exact_no_text") },
+			{ TEXT("Ali 500g"),                     TEXT("Ali"), 500,     TEXT(""),                     TEXT("parse_gold_without_text") },
+			{ TEXT(""),                             TEXT(""),    0,       TEXT(""),                     TEXT("parse_empty_args") },
+			{ TEXT("Ali"),                          TEXT("Ali"), 0,       TEXT(""),                     TEXT("parse_name_only") },
+			{ TEXT("  Ali   500g   selam dunya  "), TEXT("Ali"), 500,     TEXT("selam dunya"),          TEXT("parse_extra_spaces") },
+			{ TEXT("Ali g selam"),                  TEXT("Ali"), 0,       TEXT("g selam"),              TEXT("parse_bare_g_is_text") },
+			{ TEXT("Ali -5g selam"),                TEXT("Ali"), 0,       TEXT("-5g selam"),            TEXT("parse_negative_is_text") },
+			{ TEXT("Ali 5x0g selam"),               TEXT("Ali"), 0,       TEXT("5x0g selam"),           TEXT("parse_non_digit_is_text") },
+		};
+		for (const FMailParseCase& PC : Cases)
+		{
+			FString N, T; int32 G = -1;
+			ParseSendArgs(PC.Args, N, G, T);
+			Check(N.Equals(PC.Name, ESearchCase::CaseSensitive) && G == PC.Gold && T.Equals(PC.Text, ESearchCase::CaseSensitive), PC.Label);
+		}
+		FString N, T; int32 G = 0;
+		ParseSendArgs(TEXT("Ali 99999999999g x"), N, G, T);
+		const int32 GoldBefore = InvA->Gold;
+		Check(A->SendMail(NameB, G, T, true) == EMMOMailResult::BadGold && InvA->Gold == GoldBefore, TEXT("parse_huge_rejected_by_send"));
+	}
+
+	// --- K1: ucret dusulur -> gonderen karakter kaydedilir -> SONRA kutuya yazilir; kayit olmazsa iade, kutu bos ---
+	FMMOMailStore::DeleteBox(NameB);
+	InvA->Gold = 10000; InvB->Gold = 0;
+	{
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(true);
+		const int32 Calls0 = A->GetSaveCallsForTest();
+		Check(A->SendMail(NameB, 300, TEXT("k1"), true) == EMMOMailResult::Ok, TEXT("k1_send_ok"));
+		Check(A->GetSaveCallsForTest() >= Calls0 + 1 && FMMOMailStore::Count(NameB) == 1 && InvA->Gold == 10000 - 300 - FeeFor(300), TEXT("k1_sender_saved_charged_and_boxed"));
+		A->AdvanceTimeForTest(6.0);
+		A->SetSaveResultForTest(false);
+		const int32 Calls1 = A->GetSaveCallsForTest();
+		const int32 GoldBefore = InvA->Gold;
+		Check(A->SendMail(NameB, 300, TEXT("k1-hata"), true) == EMMOMailResult::StoreError, TEXT("k1_save_fail_store_error"));
+		Check(InvA->Gold == GoldBefore, TEXT("k1_save_fail_refunds_gold"));
+		Check(FMMOMailStore::Count(NameB) == 1, TEXT("k1_save_fail_box_not_appended"));
+		Check(A->GetSaveCallsForTest() == Calls1 + 1, TEXT("k1_save_attempted_before_box"));
+		A->SetSaveResultForTest(true);
+	}
+
+	// --- Bolge gecisi kilidi (kayit yuklenmedi / gecis kaydi onaylandi): gonderim ve toplama yok ---
+	{
+		A->AdvanceTimeForTest(6.0);
+		A->SetTravelLockedForTest(true);
+		const int32 GA = InvA->Gold;
+		const int32 CallsA = A->GetSaveCallsForTest();
+		Check(A->SendMail(NameB, 100, TEXT("kilit"), true) == EMMOMailResult::StoreError && InvA->Gold == GA && FMMOMailStore::Count(NameB) == 1
+			&& A->GetSaveCallsForTest() == CallsA, TEXT("lock_send_rejected_no_charge"));
+		A->SetTravelLockedForTest(false);
+		Check(A->SendMail(NameB, 0, TEXT("kilit-sonrasi"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(NameB) == 2, TEXT("lock_released_send_ok"));
+		B->SetTravelLockedForTest(true);
+		Check(B->CollectMail() == 0 && InvB->Gold == 0 && FMMOMailStore::Count(NameB) == 2, TEXT("lock_collect_skipped_box_kept"));
+		B->SetTravelLockedForTest(false);
+	}
+
+	// --- B2: ad degismis (canli ad != kayit yuvasi) karakter posta gonderemez/toplayamaz ---
+	{
+		A->AdvanceTimeForTest(6.0);
+		A->SetNameChangedForTest(true);
+		const int32 GA = InvA->Gold;
+		Check(A->SendMail(NameB, 100, TEXT("ad"), true) == EMMOMailResult::NameChanged && InvA->Gold == GA && FMMOMailStore::Count(NameB) == 2, TEXT("rename_send_rejected_no_charge"));
+		A->SetNameChangedForTest(false);
+		B->SetNameChangedForTest(true);
+		Check(B->CollectMail() == 0 && InvB->Gold == 0 && FMMOMailStore::Count(NameB) == 2, TEXT("rename_collect_skipped_box_kept"));
+		B->SetNameChangedForTest(false);
+		const int32 CallsB = B->GetSaveCallsForTest();
+		Check(B->CollectMail() == 2 && InvB->Gold == 300 && FMMOMailStore::Count(NameB) == 0, TEXT("unlocked_collect_delivers_all"));
+		Check(B->GetSaveCallsForTest() == CallsB + 1, TEXT("collect_saves_after_gold"));
+	}
+
+	// --- B3: alici yok / altin yetersiz ayni metin; altin kontrolu varlik kontrolunden once; basarisiz arama bekleme baslatir ---
+	Check(ResultText(EMMOMailResult::UnknownTarget).Equals(ResultText(EMMOMailResult::NoGold), ESearchCase::CaseSensitive), TEXT("b3_unknown_and_nogold_same_text"));
+	{
+		A->AdvanceTimeForTest(6.0);
+		const int32 GA = InvA->Gold;
+		InvA->Gold = 5;
+		Check(A->SendMail(NameB, 100, TEXT("x"), false) == EMMOMailResult::NoGold, TEXT("b3_nogold_checked_before_existence"));
+		InvA->Gold = GA;
+		Check(A->SendMail(NameB, 100, TEXT("x"), false) == EMMOMailResult::UnknownTarget && InvA->Gold == GA, TEXT("b3_nogold_no_cooldown_unknown_no_charge"));
+		Check(A->SendMail(NameB, 100, TEXT("x"), true) == EMMOMailResult::Cooldown && InvA->Gold == GA && FMMOMailStore::Count(NameB) == 0, TEXT("b3_failed_lookup_starts_cooldown"));
+	}
+
+	// --- C1: temizleme adi sessizce degistirmesin; yalniz bosluk '_' ile esdeger ---
+	{
+		const FString NameV = TEXT("ZTestMail_V_") + Tag;
+		FMMOMailStore::DeleteBox(NameV);
+		A->AdvanceTimeForTest(6.0);
+		Check(A->SendMail(TEXT("ZTestMail.V_") + Tag, 0, TEXT("x"), true) == EMMOMailResult::BadTarget, TEXT("c1_dot_in_name_rejected"));
+		Check(A->SendMail(TEXT("ZTestMail!V_") + Tag, 0, TEXT("x"), true) == EMMOMailResult::BadTarget, TEXT("c1_symbol_in_name_rejected"));
+		Check(A->SendMail(TEXT("ZTestMail/V_") + Tag, 0, TEXT("x"), true) == EMMOMailResult::BadTarget, TEXT("c1_path_char_rejected"));
+		Check(A->SendMail(FString::ChrN(FMMOMailStore::MaxNameLength + 1, TEXT('q')), 0, TEXT("x"), true) == EMMOMailResult::BadTarget
+			&& FMMOMailStore::Count(NameV) == 0, TEXT("c1_overlong_name_rejected"));
+		Check(A->SendMail(NameV, 0, TEXT("alt cizgi"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(NameV) == 1, TEXT("c1_underscore_name_accepted"));
+		A->AdvanceTimeForTest(6.0);
+		Check(A->SendMail(TEXT("ZTestMail V_") + Tag, 0, TEXT("bosluk"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(NameV) == 2, TEXT("c1_space_equals_underscore"));
+		FMMOMailStore::DeleteBox(NameV);
+	}
+
+	// --- O2: altin tavanini (MaxGold) asacak posta kutuda KALIR; asmayanlar teslim edilir ---
+	{
+		FMMOMailStore::DeleteBox(NameB);
+		const int32 Max = UMMOInventoryComponent::MaxGold;
+		InvB->Gold = Max - 100;
+		FMMOMail M1; M1.From = TEXT("Ali"); M1.Text = TEXT("sigar"); M1.Gold = 60;
+		FMMOMail M2 = M1; M2.Text = TEXT("tasar"); M2.Gold = 500;
+		FMMOMail M3 = M1; M3.Text = TEXT("yalniz mesaj"); M3.Gold = 0;
+		const bool bSeeded = FMMOMailStore::Append(NameB, M1) && FMMOMailStore::Append(NameB, M2) && FMMOMailStore::Append(NameB, M3);
+		const int32 CallsB = B->GetSaveCallsForTest();
+		Check(bSeeded && B->CollectMail() == 2 && InvB->Gold == Max - 40, TEXT("o2_fitting_mail_delivered"));
+		TArray<FMMOMail> Left;
+		Check(FMMOMailStore::Load(NameB, Left) && Left.Num() == 1 && Left[0].Text == TEXT("tasar") && Left[0].Gold == 500, TEXT("o2_over_cap_mail_stays_in_box"));
+		Check(B->GetSaveCallsForTest() == CallsB + 1, TEXT("o2_delivery_saved"));
+		Check(B->CollectMail() == 0 && InvB->Gold == Max - 40 && FMMOMailStore::Count(NameB) == 1, TEXT("o2_retry_still_kept"));
+		InvB->AddGoldFrom(-1000, TEXT("test"));
+		Check(B->CollectMail() == 1 && InvB->Gold == Max - 1040 + 500 && FMMOMailStore::Count(NameB) == 0, TEXT("o2_delivered_after_spending"));
+	}
+
+	// --- D3: yarim kalan atomik yazim (.tmp) kurtarma ---
+	{
+		const FString NameT = TEXT("ZTestMailT_") + Tag;
+		FMMOMailStore::DeleteBox(NameT);
+		const FString Path = FMMOMailStore::GetBoxPath(NameT);
+		const FString Tmp = Path + TEXT(".tmp");
+		TArray<FMMOMail> Seed;
+		FMMOMail M; M.From = TEXT("Ali"); M.Text = TEXT("yarim"); M.Gold = 70;
+		Seed.Add(M);
+		FString Json;
+		FMMOMailStore::ToJson(Seed, Json);
+		IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), true);
+		FFileHelper::SaveStringToFile(Json, *Tmp);
+		TArray<FMMOMail> Loaded;
+		Check(FMMOMailStore::Load(NameT, Loaded) && Loaded.Num() == 1 && Loaded[0].Gold == 70, TEXT("d3_tmp_only_box_recovered"));
+		Check(IFileManager::Get().FileExists(*Path) && !IFileManager::Get().FileExists(*Tmp), TEXT("d3_tmp_promoted_to_main"));
+		Seed.Add(M);
+		FMMOMailStore::ToJson(Seed, Json);
+		FFileHelper::SaveStringToFile(Json, *Tmp); // ana dosya varken eski .tmp
+		Check(FMMOMailStore::Count(NameT) == 1, TEXT("d3_main_wins_over_stale_tmp"));
+		Check(FMMOMailStore::Append(NameT, M) && FMMOMailStore::Count(NameT) == 2 && !IFileManager::Get().FileExists(*Tmp), TEXT("d3_next_write_replaces_stale_tmp"));
+		FMMOMailStore::DeleteBox(NameT);
+	}
+
 	FMMOMailStore::DeleteBox(NameA); FMMOMailStore::DeleteBox(NameB);
 	for (TStrongObjectPtr<AMMOCharacter>* P : {&CA, &CB, &CC}) { if (P->IsValid()) (*P)->Destroy(); }
 	return bPassed; // Ayni senkron kare: PlayerState adi, kayit yukleme, /posta komutu, zamanlayici ve ag kaniti degil.
 }
+// Bu testin KANITLAMADIKLARI: kilit/ad-degisimi gercek karar mantigi (IsOwnerLocked/IsNameChanged test modunda bayraktan okunur;
+// gercek kosul IsInitialLoadComplete/IsTravelSaveCommitted/GetSaveSlotName != ActiveSaveSlot burada kosulmaz), gercek
+// SaveCharacterForTravel diske yazimi, kutuya yazma (Append) hatasinda iade + tekrar kayit dali, A4 Move hatasi yedegi
+// (dosya kilidi motorda Error satiri ve bekleme uretir), A3 toplama dongusunde sahibin dusmesi, 10 sn zamanlayici, ag/PIE.
 
 namespace
 {

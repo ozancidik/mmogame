@@ -328,6 +328,7 @@ bool UMMOAchievementComponent::TryLoad()
 
 bool UMMOAchievementComponent::SaveNow()
 {
+	++TestSaveCalls; // yalniz test sayaci (C3)
 	if (bTestFailSaves)
 	{
 		return false;

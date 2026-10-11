@@ -171,6 +171,12 @@ public:
 #if !UE_BUILD_SHIPPING
 	// Headless hata enjeksiyonu: yalniz ertelenen yazimlari, en fazla iki denemede reddeder.
 	void FailDeferredSavesForTest(int32 Count) { if (HasAuthority()) TestDeferredSaveFailures = FMath::Clamp(Count, 0, 2); }
+	// Testler (basarim/gunluk kalicilik): kayit kimligini (ilk yukleme tamam, aktif yuva, yukleme sayaci) disk ve
+	// LoadCharacter olmadan ayarlar; canli ad PlayerState'ten ayri kalir (ad degisimi / MMOLoad benzetimi).
+	void SetSaveIdentityForTest(bool bLoadComplete, const FString& Slot, uint32 Serial)
+	{
+		if (HasAuthority()) { bInitialLoadComplete = bLoadComplete; ActiveSaveSlot = Slot; LoadSerial = Serial; }
+	}
 #endif
 	// Bolge gecisinin kullandigi asenkron kayit: callback yalniz yazim tamamlandiginda cagrilir; basarisiz
 	// yazimda veya sonuc "eski" ise (ayni yuvaya daha yeni bir yazim basladi) false ile cagrilir ve

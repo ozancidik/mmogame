@@ -17,7 +17,7 @@ yeni dosyalarla eklendi.
 |---|---|
 | `Public/Achievements/MMOAchievementTypes.h`, `Private/Achievements/MMOAchievementDatabase.cpp` | veri tablosu (`MakeAch`), yeni satir = tek satir |
 | `Public/Components/MMOAchievementComponent.h`, `Private/Components/MMOAchievementComponent.cpp` | sunucu-otoriteli izleme, odul, kalicilik, komutlar |
-| `Private/Tests/MMOAchievementSelfTest.cpp`, `Scripts/TestAchievements.ps1` | native test (36 kontrol) ve calistirici |
+| `Private/Tests/MMOAchievementSelfTest.cpp`, `Scripts/TestAchievements.ps1` | native test (61 kontrol: tablo/mantik/JSON + GUID'li yuvalarla disk kaliciligi, B1 ad degisimi, LoadSerial, A5, C3, O1, .tmp) ve calistirici |
 | `Scripts/ValidateData.py`, `Scripts/TestValidateData.py` | tablo denetimi + 4 negatif senaryo |
 
 Mevcut dosyalarda yalniz kucuk baglanti: `MMOCharacter.h/.cpp` (alt nesne), `MMOQuestComponent.cpp::NotifyMobKilled` (olduruldu sinyali,

@@ -20,7 +20,7 @@ Codex'in dosyalarindan bagimsiz yeni dosyalarla eklendi. 2026-10-11 QA duzeltmel
 |---|---|
 | `Public/Mail/MMOMailStore.h`, `Private/Mail/MMOMailStore.cpp` | disk deposu, ad temizleme, dogrulamali JSON, `TakeAll`, `Replace`, yarim yazim (.tmp) kurtarma |
 | `Public/Components/MMOMailComponent.h`, `Private/Components/MMOMailComponent.cpp` | gonderim kurallari, toplama, `ParseSendArgs`, `/posta` komutlari |
-| `Private/Tests/MMOMailSelfTest.cpp`, `Scripts/TestMail.ps1` | native test (41 kontrol) |
+| `Private/Tests/MMOMailSelfTest.cpp`, `Scripts/TestMail.ps1` | native test (89 kontrol: ayristirma tablosu, K1 kayit sirasi, kilit/ad degisimi, B3, C1, O2 tavan, .tmp kurtarma dahil) |
 
 Baglanti: `MMOCharacter.h/.cpp` (alt nesne, `IsTravelSaveCommitted()` erisimcisi), `MMOPlayerController.cpp` (`/posta` sohbet komutu, `/yardim`).
 

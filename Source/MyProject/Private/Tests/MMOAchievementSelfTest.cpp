@@ -9,7 +9,12 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Save/MMOSaveGame.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerState.h"
+#include "HAL/FileManager.h"
 #include "Misc/CoreMisc.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Guid.h"
+#include "Misc/Paths.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
 #include "UObject/StrongObjectPtr.h"
@@ -153,8 +158,184 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 	}
 
 	Char->Destroy();
-	return bPassed; // Ayni senkron kare: PlayerState/diske yazma/ag/timer kaniti degil; yalniz mantik, tablo ve JSON dogrulamasi.
+
+	// --- Kalicilik (gercek disk, GUID'li yuvalar): A6 erken olay, O1 sabit yol/Default yok, C3, gidis-donus, B1, LoadSerial, A5, D3 ---
+	{
+		const FString Tag = FGuid::NewGuid().ToString(EGuidFormats::Digits).Left(8);
+		const FString NameA = TEXT("ZAchA_") + Tag; // ilk canli ad = ilk kayit yuvasi
+		const FString NameB = TEXT("ZAchB_") + Tag; // ad degisimi sonrasi canli ad
+		const FString SlotA = TEXT("MMOSave_") + NameA;
+		const FString SlotB = TEXT("MMOSave_") + NameB;
+		const FString SlotC = TEXT("MMOSave_ZAchC_") + Tag;
+		const FString SlotD = TEXT("MMOSave_ZAchD_") + Tag;
+		const FString AchDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("MMOAchievements"));
+		IFileManager& FM = IFileManager::Get();
+		auto PathOf = [&AchDir](const FString& Slot) { return FPaths::Combine(AchDir, Slot + TEXT(".json")); };
+		auto ReadSlot = [&PathOf](const FString& Slot, FMMOAchievementCounters& OutC, TArray<FName>& OutU, FString& OutT)
+		{
+			FString Raw;
+			return FFileHelper::LoadFileToString(Raw, *PathOf(Slot)) && FromJson(Raw, OutC, OutU, OutT);
+		};
+		auto WriteSlotFile = [&FM, &AchDir](const FString& FilePath, int32 Kills, const TArray<FName>& U, const FString& Title)
+		{
+			FMMOAchievementCounters Seed; Seed.KillTotal = Kills;
+			FString Json;
+			FM.MakeDirectory(*AchDir, true);
+			return ToJson(Seed, U, Title, Json) && FFileHelper::SaveStringToFile(Json, *FilePath);
+		};
+		const FString DefaultPath = PathOf(TEXT("MMOSave_Default"));
+		const int64 DefaultSize0 = FM.FileSize(*DefaultPath);
+		const FDateTime DefaultStamp0 = FM.GetTimeStamp(*DefaultPath);
+		const FName Kill10(TEXT("Ach_Kill10"));
+		const FName Goblin(TEXT("Goblin"));
+
+		TStrongObjectPtr<AMMOCharacter> P1(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(0, 5000, 0), FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<APlayerState> PS1(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<AMMOCharacter> P2(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(0, 10000, 0), FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<APlayerState> PS2(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params));
+		UMMOAchievementComponent* A1 = P1.IsValid() ? P1->GetAchievementComponent() : nullptr;
+		UMMOAchievementComponent* A2 = P2.IsValid() ? P2->GetAchievementComponent() : nullptr;
+		UMMOInventoryComponent* Inv1 = P1.IsValid() ? P1->GetInventory() : nullptr;
+		UMMOInventoryComponent* Inv2 = P2.IsValid() ? P2->GetInventory() : nullptr;
+		const bool bFixture = A1 && A2 && Inv1 && Inv2 && PS1.IsValid() && PS2.IsValid();
+		Check(bFixture, TEXT("persist_fixture"));
+		if (bFixture)
+		{
+			FMMOCharacterSaveData Seed; Seed.Gold = 123; Seed.NextInstanceId = 50;
+			Inv1->ApplySaveData(Seed);
+			Inv2->ApplySaveData(Seed);
+			const int32 G1 = Inv1->Gold;
+			const int32 G2 = Inv2->Gold;
+			PS1->SetPlayerName(NameA);
+			P1->SetPlayerState(PS1.Get());
+
+			// A6/O1: karakter kaydi yuklenmeden gelen olaylar SAYILMAZ (kuyruga alinmaz) ve hicbir dosya yazilmaz.
+			A1->NotifyMobKilled(Goblin); A1->OnOwnerDied(); A1->EvaluateAll(); A1->CmdTitle(TEXT("Acemi"));
+			Check(A1->GetCounters().KillTotal == 0 && A1->GetCounters().Deaths == 0 && A1->GetSaveCallsForTest() == 0 && !FM.FileExists(*PathOf(SlotA)), TEXT("a6_unloaded_events_dropped_no_write"));
+			P1->SetSaveIdentityForTest(false, SlotA, 1);
+			A1->NotifyMobKilled(Goblin);
+			Check(A1->GetCounters().KillTotal == 0 && !FM.FileExists(*PathOf(SlotA)), TEXT("a6_slot_without_initial_load_ignored"));
+			P1->SetSaveIdentityForTest(true, TEXT("MMOSave_Default"), 1);
+			A1->NotifyMobKilled(Goblin);
+			Check(A1->GetCounters().KillTotal == 0 && A1->GetSaveCallsForTest() == 0, TEXT("o1_default_slot_never_bound"));
+			P1->SetSaveIdentityForTest(true, FString(), 1);
+			A1->NotifyMobKilled(Goblin);
+			Check(A1->GetCounters().KillTotal == 0 && A1->GetSaveCallsForTest() == 0, TEXT("o1_empty_slot_never_bound"));
+
+			// Yukleme tamamlaninca ilk olay yuklemeyi tetikler ve SAYILIR (zamanlayicidan once gelen oldurme kaybolmaz).
+			P1->SetSaveIdentityForTest(true, SlotA, 1);
+			A1->NotifyMobKilled(Goblin);
+			Check(A1->GetCounters().KillTotal == 1, TEXT("a6_first_event_after_load_counts"));
+			for (int32 i = 0; i < 9; ++i) A1->NotifyMobKilled(Goblin);
+			{
+				FMMOAchievementCounters C; TArray<FName> U; FString T;
+				Check(A1->IsUnlocked(Kill10) && Inv1->Gold == G1 + 50 && ReadSlot(SlotA, C, U, T) && U.Contains(Kill10) && C.KillTotal == 10, TEXT("persist_unlock_on_disk_with_reward"));
+			}
+
+			// C3: ayni unvan tekrar secilince / bos unvan tekrar temizlenince diske yazilmaz.
+			const int32 Saves0 = A1->GetSaveCallsForTest();
+			A1->CmdTitle(TEXT("Acemi"));
+			const int32 Saves1 = A1->GetSaveCallsForTest();
+			A1->CmdTitle(TEXT("acemi"));
+			A1->CmdTitle(TEXT("Acemi"));
+			Check(A1->ActiveTitle == TEXT("Acemi") && Saves1 == Saves0 + 1 && A1->GetSaveCallsForTest() == Saves1, TEXT("c3_same_title_not_rewritten"));
+			A1->CmdTitle(TEXT(""));
+			const int32 Saves2 = A1->GetSaveCallsForTest();
+			A1->CmdTitle(TEXT(""));
+			Check(A1->ActiveTitle.IsEmpty() && Saves2 == Saves1 + 1 && A1->GetSaveCallsForTest() == Saves2, TEXT("c3_clear_twice_written_once"));
+			A1->CmdTitle(TEXT("Acemi"));
+
+			// O1: kirli (30 sn araligi nedeniyle henuz yazilmamis) durum, PlayerState koptuktan sonra EndPlay'de yukleme aninda
+			// sabitlenen yola yazilir; MMOSave_Default.json'a dokunulmaz.
+			A1->NotifyMobKilled(Goblin); A1->NotifyMobKilled(Goblin); A1->OnOwnerDied();
+			{
+				FMMOAchievementCounters C; TArray<FName> U; FString T;
+				Check(ReadSlot(SlotA, C, U, T) && C.KillTotal == 10 && A1->GetCounters().KillTotal == 12, TEXT("persist_dirty_pending_before_endplay"));
+			}
+			P1->SetPlayerState(nullptr);
+			PS1->Destroy();
+			P1->Destroy();
+			{
+				FMMOAchievementCounters C; TArray<FName> U; FString T;
+				Check(ReadSlot(SlotA, C, U, T) && C.KillTotal == 12 && C.Deaths == 1 && U.Contains(Kill10) && T == TEXT("Acemi"), TEXT("o1_endplay_saves_to_pinned_path"));
+			}
+			Check(FM.FileSize(*DefaultPath) == DefaultSize0 && FM.GetTimeStamp(*DefaultPath) == DefaultStamp0, TEXT("o1_default_file_untouched"));
+
+			// Gidis-donus: ayni yuvayla yeni bilesen diskten yukler; sayaclar/acilmalar/unvan ayni, odul TEKRAR verilmez.
+			PS2->SetPlayerName(NameA);
+			P2->SetPlayerState(PS2.Get());
+			P2->SetSaveIdentityForTest(true, SlotA, 1);
+			A2->NotifyMobKilled(Goblin);
+			Check(A2->GetCounters().KillTotal == 13 && A2->GetCounters().Deaths == 1 && A2->GetCounters().Kills.FindRef(Goblin) == 13
+				&& A2->IsUnlocked(Kill10) && A2->ActiveTitle == TEXT("Acemi"), TEXT("persist_roundtrip_fresh_component"));
+			Check(Inv2->Gold == G2, TEXT("persist_reload_no_regrant"));
+
+			// B1: canli ad degisti ama karakter yeni ada yazilmadi (ActiveSaveSlot ayni): durum sifirlanmaz, odul tekrar yok,
+			// canli adin yoluna dosya acilmaz (yuva canli ada DEGIL ActiveSaveSlot'a bagli).
+			PS2->SetPlayerName(NameB);
+			A2->NotifyMobKilled(Goblin);
+			A2->EvaluateAll();
+			Check(A2->GetCounters().KillTotal == 14 && A2->IsUnlocked(Kill10) && Inv2->Gold == G2, TEXT("b1_rename_keeps_state_no_regrant"));
+			Check(!FM.FileExists(*PathOf(SlotB)), TEXT("b1_rename_does_not_bind_live_name"));
+
+			// Karakter yeni ada basariyla yazildi (ActiveSaveSlot degisti): durum yeni yuvaya TASINIR, sifirlanmaz.
+			P2->SetSaveIdentityForTest(true, SlotB, 1);
+			A2->NotifyMobKilled(Goblin);
+			{
+				FMMOAchievementCounters C; TArray<FName> U; FString T;
+				Check(ReadSlot(SlotB, C, U, T) && C.KillTotal >= 14 && U.Contains(Kill10) && A2->GetCounters().KillTotal == 15 && Inv2->Gold == G2, TEXT("b1_slot_move_carries_state"));
+			}
+
+			// LoadSerial (MMOLoad): kirli durum ESKI yola yazilir, sonra yeni yuklenen karakterin yuvasi yuklenir.
+			Check(WriteSlotFile(PathOf(SlotC), 3, TArray<FName>(), FString()), TEXT("serial_seed_written"));
+			A2->NotifyMobKilled(Goblin); // 16, 30 sn araligi nedeniyle kirli
+			P2->SetSaveIdentityForTest(true, SlotC, 2);
+			A2->NotifyMobKilled(Goblin);
+			{
+				FMMOAchievementCounters C; TArray<FName> U; FString T;
+				Check(ReadSlot(SlotB, C, U, T) && C.KillTotal == 16, TEXT("serial_reload_flushes_old_state_to_old_path"));
+			}
+			Check(A2->GetCounters().KillTotal == 4 && !A2->IsUnlocked(Kill10) && A2->ActiveTitle.IsEmpty() && Inv2->Gold == G2, TEXT("serial_reload_loads_new_slot"));
+
+			// A5: yazma basarisizken acilma geri alinir ve odul verilmez; yazma duzelince tekrar denenir ve TEK kez odenir.
+			A2->SetSaveFailForTest(true);
+			for (int32 i = 0; i < 6; ++i) A2->NotifyMobKilled(Goblin);
+			Check(A2->GetCounters().KillTotal == 10 && !A2->IsUnlocked(Kill10) && Inv2->Gold == G2, TEXT("a5_failed_write_no_unlock_no_reward"));
+			A2->EvaluateAll();
+			Check(!A2->IsUnlocked(Kill10) && Inv2->Gold == G2, TEXT("a5_still_deferred_while_failing"));
+			A2->SetSaveFailForTest(false);
+			A2->EvaluateAll();
+			Check(A2->IsUnlocked(Kill10) && Inv2->Gold == G2 + 50, TEXT("a5_retry_after_fix_pays"));
+			A2->EvaluateAll();
+			A2->NotifyMobKilled(Goblin);
+			{
+				FMMOAchievementCounters C; TArray<FName> U; FString T;
+				Check(Inv2->Gold == G2 + 50 && ReadSlot(SlotC, C, U, T) && U.Contains(Kill10), TEXT("a5_paid_once_and_on_disk"));
+			}
+
+			// D3: yarim kalan yazim (yalniz .tmp) yuklemede geri konur.
+			Check(WriteSlotFile(PathOf(SlotD) + TEXT(".tmp"), 7, TArray<FName>{ Kill10 }, TEXT("Acemi")), TEXT("tmp_seed_written"));
+			P2->SetSaveIdentityForTest(true, SlotD, 3);
+			A2->NotifyMobKilled(Goblin);
+			Check(A2->GetCounters().KillTotal == 8 && A2->IsUnlocked(Kill10) && A2->ActiveTitle == TEXT("Acemi") && Inv2->Gold == G2 + 50
+				&& FM.FileExists(*PathOf(SlotD)) && !FM.FileExists(*(PathOf(SlotD) + TEXT(".tmp"))), TEXT("d3_tmp_recovered_on_load"));
+		}
+		if (::IsValid(P2.Get())) { P2->SetPlayerState(nullptr); P2->Destroy(); } // EndPlay son kirli durumu SlotD'ye yazar (asagida silinir)
+		if (::IsValid(P1.Get())) { P1->SetPlayerState(nullptr); P1->Destroy(); }
+		if (::IsValid(PS2.Get())) PS2->Destroy();
+		if (::IsValid(PS1.Get())) PS1->Destroy();
+		for (const FString& Slot : { SlotA, SlotB, SlotC, SlotD })
+		{
+			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
+			{
+				FM.Delete(*(PathOf(Slot) + Ext), false, true, true);
+			}
+		}
+	}
+	return bPassed; // Ayni senkron kare: ag/timer kaniti degil; mantik, tablo, JSON ve (GUID'li yuvalarla) disk kaliciligi dogrulanir.
 }
+// Bu testin KANITLAMADIKLARI: gercek LoadCharacter/MMOSetName/MMOLoad akisi (kimlik SetSaveIdentityForTest ile verilir), 5 sn
+// zamanlayici ve 30 sn kayit araligi zamanlamasi, gercek cikista PlayerState'in kopma ani (burada SetPlayerState(nullptr) ile benzetilir), ag replikasyonu, PIE.
 
 namespace
 {
