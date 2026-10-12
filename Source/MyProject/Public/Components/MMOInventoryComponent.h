@@ -70,6 +70,9 @@ public:
 
 	/** AddGold + olcum gunlugu kaynak etiketi (loot/gorev/satis/satin_alma/yukseltme/iyilestirme/ticaret). Sadece otorite. */
 	void AddGoldFrom(int32 Amount, const TCHAR* Source);
+	/** This call's signed, clamped mutation, captured before synchronous delegates. Nested mutations are excluded.
+	 *  Returns zero without authority or with an unusable owner/component. Same notifications as AddGoldFrom. */
+	int32 AddGoldFromWithAppliedDelta(int32 Amount, const TCHAR* Source);
 
 	// Sarf malzemesi tavanlari: kayit (ApplySaveData) ayni sinirlari uygular, boylece calisma
 	// zamaninda tutulan her adet kaydet-yukle sonrasi da kalir (eskiden AddItem sinirsizdi, yukleme kirpardi).
@@ -220,6 +223,7 @@ protected:
 	void OnRep_Items();
 
 	void AddGoldInternal(int32 Amount, const TCHAR* Source, bool bNotify = true);
+	int32 ApplyGoldInternal(int32 Amount, const TCHAR* Source, bool bNotify);
 
 	bool HasAuthorityInternal() const;
 	void EquipByInstanceIdInternal(int32 InstanceId, bool bRecordFirstEquip);

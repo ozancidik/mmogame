@@ -564,7 +564,7 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		const EMMOMailResult RSpend = A->SendMail(NameB, 300, TEXT("iade-harcama"), true);
 		Check(RSpend == EMMOMailResult::StoreError && FMMOMailStore::Count(NameB) == 0 && Probe->Calls >= 1, TEXT("refund_spend_callback_store_error_box_unchanged"));
 		Check(InvA->Gold == 10000 - 1000, TEXT("refund_spend_callback_exact_refund"));
-		// Callback altin EKLER (bakiye net dusmez): posta kaydedilmeden reddedilir (alici odenmemis eki almaz), altin uretilmez.
+		// Callback altin EKLER: tam odenen posta gonderilir; mesru hediye korunur, yalniz ek ve ucret dusulur.
 		A->AdvanceTimeForTest(6.0);
 		A->SetSaveResultForTest(true);
 		InvA->Gold = 10000;
@@ -572,19 +572,27 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Probe->Callback = [InvA](int32) { InvA->AddGoldFrom(1000, TEXT("test-hediye")); };
 		const int32 SaveCalls0 = A->GetSaveCallsForTest();
 		const EMMOMailResult RGift = A->SendMail(NameB, 300, TEXT("iade-hediye"), true);
-		Check(RGift == EMMOMailResult::StoreError && FMMOMailStore::Count(NameB) == 0 && A->GetSaveCallsForTest() == SaveCalls0,
-			TEXT("refund_gift_callback_mail_refused_before_save"));
-		Check(InvA->Gold <= 10000 + 1000, TEXT("refund_gift_callback_no_gold_created"));
-		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] gift_callback final_gold=%d start=10000 gift=1000 charge=%d (oyuncu ucreti+eki kaybeder, altin uretilmez)"),
+		TArray<FMMOMail> GiftBox;
+		Check(RGift == EMMOMailResult::Ok && FMMOMailStore::Load(NameB, GiftBox) && GiftBox.Num() == 1
+			&& GiftBox[0].Gold == 300 && GiftBox[0].Text == TEXT("iade-hediye") && A->GetSaveCallsForTest() == SaveCalls0 + 1,
+			TEXT("refund_gift_callback_paid_mail_saved"));
+		Check(InvA->Gold == 10000 + 1000 - 300 - FeeFor(300), TEXT("refund_gift_callback_preserves_gift_exact_charge"));
+		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] gift_callback final_gold=%d start=10000 gift=1000 charge=%d (hediye korunur, tam odenen posta gonderilir)"),
 			InvA->Gold, 300 + FeeFor(300));
-		// Callback bakiyeyi ucretten azina indirirse ucret hic dusulmez (tur 3: kirpilmaz), posta reddedilir ve iade yalniz
-		// dusulen ek kadardir: final_gold no_creation_max'i (1000 - 495 = 505) asmamali (eskiden NOTE, artik kontrol).
+		FMMOMailStore::DeleteBox(NameB);
+		// Callback bakiyeyi ucretten azina indirirse posta kayittan once reddedilir; gercek posta kesintileri
+		// iade edilir, callback'in 495 harcamasi korunur. Son bakiye tam 505 olmali.
 		A->AdvanceTimeForTest(6.0);
 		A->SetSaveResultForTest(false);
 		InvA->Gold = 1000;
 		Probe->Calls = 0;
 		Probe->Callback = [InvA](int32) { InvA->AddGoldFrom(-495, TEXT("test-harcama")); };
+		const int32 SaveCalls1 = A->GetSaveCallsForTest();
 		const EMMOMailResult RClamp = A->SendMail(NameB, 500, TEXT("kirpma"), true);
+		Check(RClamp == EMMOMailResult::StoreError && FMMOMailStore::Count(NameB) == 0 && Probe->Calls >= 1,
+			TEXT("refund_fee_clamp_rejected_box_unchanged"));
+		Check(InvA->Gold == 505, TEXT("refund_fee_clamp_exact_actual_debits"));
+		Check(A->GetSaveCallsForTest() == SaveCalls1, TEXT("refund_fee_clamp_before_save"));
 		UE_LOG(LogTemp, Display, TEXT("[MMO_MAIL_NOTE] fee_clamp_refund result=%d final_gold=%d no_creation_max=%d"),
 			static_cast<int32>(RClamp), InvA->Gold, 1000 - 495);
 		Check(RClamp == EMMOMailResult::StoreError && InvA->Gold <= 1000 - 495 && FMMOMailStore::Count(NameB) == 0, TEXT("fee_clamp_refund_no_creation"));

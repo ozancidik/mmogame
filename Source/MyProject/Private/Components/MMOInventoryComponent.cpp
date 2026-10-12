@@ -396,9 +396,20 @@ void UMMOInventoryComponent::AddGoldFrom(int32 Amount, const TCHAR* Source)
 
 void UMMOInventoryComponent::AddGoldInternal(int32 Amount, const TCHAR* Source, bool bNotify)
 {
-	if (!HasAuthorityInternal() || Amount == 0)
+	ApplyGoldInternal(Amount, Source, bNotify);
+}
+
+int32 UMMOInventoryComponent::AddGoldFromWithAppliedDelta(int32 Amount, const TCHAR* Source)
+{
+	return ApplyGoldInternal(Amount, Source, true);
+}
+
+int32 UMMOInventoryComponent::ApplyGoldInternal(int32 Amount, const TCHAR* Source, bool bNotify)
+{
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner) || Owner->IsActorBeingDestroyed() || !Owner->HasAuthority() || IsBeingDestroyed() || Amount == 0)
 	{
-		return;
+		return 0;
 	}
 
 	// GUVENLIK/BUG-HUNT (qa-kontrolcu bulgusu, hardening): Gold+Amount int32'de tasarsa
@@ -408,25 +419,34 @@ void UMMOInventoryComponent::AddGoldInternal(int32 Amount, const TCHAR* Source, 
 	const int64 Sum = (int64)Gold + (int64)Amount;
 	const int32 OldGold = Gold;
 	Gold = (int32)FMath::Clamp<int64>(Sum, 0, MaxGold);
+	const int32 AppliedDelta = Gold - OldGold;
 	// Record this mutation before delegates can change balance, source or possession.
 	// Source belongs to this call; nested plain AddGold calls retain their own default.
 	if (const APawn* OwnerPawn = Cast<APawn>(GetOwner()); OwnerPawn && OwnerPawn->IsPlayerControlled() && Gold != OldGold)
 	{
 		UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=gold who=%s src=%s amount=%d balance=%d"),
 			MMOMetrics::Seconds(), *MMOMetrics::WhoName(OwnerPawn), Source ? Source : TEXT("diger"),
-			Gold - OldGold, Gold);
+			AppliedDelta, Gold);
 	}
-	if (!bNotify) return; // Trade publishes current final balance after both sides settle.
+	if (!bNotify) return AppliedDelta; // Trade publishes current final balance after both sides settle.
+	const TWeakObjectPtr<UMMOInventoryComponent> WeakThis(this);
+	const TWeakObjectPtr<AActor> WeakOwner(Owner);
 	OnGoldChanged.Broadcast(Gold);
 
 	// Tavan asimi sessiz olmasin: kazanc kirpildiysa sahibe haber ver (ticarette once reddedildigi icin
 	// buraya yalnizca loot/gorev/satis gibi tek tarafli kazanclar duser).
 	if (Amount > 0 && Sum > MaxGold)
 	{
-		MMONotify::ToOwner(GetOwner(), FString::Printf(TEXT("Altin siniri (%d): fazlasi kaybedildi"), MaxGold),
-			FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		const UMMOInventoryComponent* Live = WeakThis.Get();
+		AActor* LiveOwner = WeakOwner.Get();
+		if (Live && !Live->IsBeingDestroyed() && LiveOwner && !LiveOwner->IsActorBeingDestroyed()
+			&& LiveOwner->HasAuthority() && Live->GetOwner() == LiveOwner)
+		{
+			MMONotify::ToOwner(LiveOwner, FString::Printf(TEXT("Altin siniri (%d): fazlasi kaybedildi"), MaxGold),
+				FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		}
 	}
-
+	return AppliedDelta; // No post-delegate balance read: callbacks may spend, gift or destroy the owner/component.
 }
 
 int32 UMMOInventoryComponent::GetAddRoom(FName ItemId) const

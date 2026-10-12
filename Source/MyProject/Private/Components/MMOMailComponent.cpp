@@ -178,9 +178,14 @@ bool UMMOMailComponent::SaveOwner()
 EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, const FString& Text, bool bRecipientExists)
 {
 	AMMOCharacter* Owner = GetOwnerCharacter();
-	UMMOInventoryComponent* Inv = Owner ? Owner->GetInventory() : nullptr;
+	UMMOInventoryComponent* Inv = IsValid(Owner) ? Owner->GetInventory() : nullptr;
+	if (!IsValid(Owner) || Owner->IsActorBeingDestroyed() || !Owner->HasAuthority() || IsBeingDestroyed()
+		|| !IsValid(Inv) || Inv->IsBeingDestroyed() || Inv->GetOwner() != Owner || Owner->GetMailComponent() != this)
+	{
+		return EMMOMailResult::StoreError;
+	}
 	const FString Me = GetMyName();
-	if (!HasAuthorityInternal() || !Inv || !FMMOMailStore::IsDeliverableName(Me) || IsOwnerLocked(*Owner))
+	if (!FMMOMailStore::IsDeliverableName(Me) || IsOwnerLocked(*Owner))
 	{
 		return EMMOMailResult::StoreError;
 	}
@@ -248,23 +253,40 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	LastSendTime = Now(); // altin callback'i bu fonksiyonu yeniden cagirsa bile ikinci gonderim cooldown'a takilir
 	const int32 Charge = static_cast<int32>(Total);
 	const TWeakObjectPtr<AMMOCharacter> WeakOwner(Owner);
-	const int32 GoldBefore = Inv->Gold;
-	// Iade, bu kodun GERCEKTEN dustugu miktarla yapilir: her dusum yalniz bakiye o an yetiyorsa yapilir (kirpilmaz) ve
-	// tam tutari Deducted'a eklenir. Altin callback'i (Blueprint OnGoldChanged vb.) araya girip altin harcasa ya da eklese de
-	// iade dusulenden fazla olamaz (altin uretilmez). Bakiye ucrete yetmeyecek kadar azaldiysa ucret hic dusulmez.
-	int32 Deducted = 0;
-	const auto Refund = [&WeakOwner, &Deducted]()
+	const TWeakObjectPtr<UMMOInventoryComponent> WeakInv(Inv);
+	const TWeakObjectPtr<UMMOMailComponent> WeakMail(this);
+	const uint32 OriginalLoadSerial = Owner->GetLoadSerial();
+	const FString OriginalActiveSaveSlot = Owner->GetActiveSaveSlot();
+	const auto GetEligibleInventory = [&WeakOwner, &WeakInv, &WeakMail, &Me, OriginalLoadSerial, &OriginalActiveSaveSlot]() -> UMMOInventoryComponent*
 	{
-		if (Deducted <= 0)
+		AMMOCharacter* C = WeakOwner.Get();
+		UMMOInventoryComponent* I = WeakInv.Get();
+		UMMOMailComponent* Mail = WeakMail.Get();
+		if (!C || C->IsActorBeingDestroyed() || !C->HasAuthority() || !I || I->IsBeingDestroyed()
+			|| !Mail || Mail->IsBeingDestroyed() || C->GetInventory() != I || C->GetMailComponent() != Mail
+			|| I->GetOwner() != C || Mail->GetOwner() != C || C->GetLoadSerial() != OriginalLoadSerial
+			|| !C->GetActiveSaveSlot().Equals(OriginalActiveSaveSlot, ESearchCase::IgnoreCase)
+			|| Mail->IsOwnerLocked(*C) || Mail->IsNameChanged(*C)
+			|| !Mail->GetMyName().Equals(Me, ESearchCase::CaseSensitive))
+		{
+			return nullptr;
+		}
+		return I;
+	};
+	// Only this attempt's clamped attachment/fee mutations are refundable. Callback spending/gifts are independent.
+	// A reload starts a new balance generation, even when owner, components, name and save slot stay the same.
+	int32 Deducted = 0;
+	const auto Refund = [&GetEligibleInventory, &Deducted]()
+	{
+		const int32 Amount = Deducted;
+		Deducted = 0; // Consume before publishing the refund's synchronous gold callback.
+		if (Amount <= 0)
 		{
 			return;
 		}
-		if (AMMOCharacter* C = WeakOwner.Get())
+		if (UMMOInventoryComponent* I = GetEligibleInventory())
 		{
-			if (UMMOInventoryComponent* I = C->GetInventory())
-			{
-				I->AddGoldFrom(Deducted, TEXT("posta-iade"));
-			}
+			I->AddGoldFrom(Amount, TEXT("posta-iade"));
 		}
 	};
 
@@ -274,32 +296,32 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	// Olcum: ek (aliciya gecen altin) "posta", ucret (altin sink'i) "posta_ucret" kalemiyle ayri [MMOMETRIC] satiri basar.
 	if (Gold > 0)
 	{
-		// Bakiye yukarida (Inv->Gold >= Total) dogrulandi ve arada altin degismedi: dusum tam ve kirpilmasiz.
-		Inv->AddGoldFrom(-Gold, TEXT("posta"));
-		Deducted += Gold;
+		UMMOInventoryComponent* I = GetEligibleInventory();
+		if (!I) return EMMOMailResult::StoreError;
+		Deducted -= I->AddGoldFromWithAppliedDelta(-Gold, TEXT("posta"));
 	}
-	int64 NetDrop = 0;
-	if (AMMOCharacter* C = WeakOwner.Get())
+	if (UMMOInventoryComponent* I = GetEligibleInventory())
 	{
-		if (UMMOInventoryComponent* I = C->GetInventory())
-		{
-			const int32 Fee = FeeFor(Gold);
-			if (I->Gold >= Fee)
-			{
-				I->AddGoldFrom(-Fee, TEXT("posta_ucret"));
-				Deducted += Fee;
-			}
-			NetDrop = static_cast<int64>(GoldBefore) - I->Gold;
-		}
+		Deducted -= I->AddGoldFromWithAppliedDelta(-FeeFor(Gold), TEXT("posta_ucret"));
 	}
-	// Tam ucret + ek dusulemediyse ya da bakiye net olarak o kadar dusmediyse (callback araya girip altin ekledi/harcadi)
-	// posta gonderilmez (muhafazakar); iade yalniz Deducted kadardir.
-	if (Deducted < Charge || NetDrop < Charge)
+	else
 	{
 		Refund();
 		return EMMOMailResult::StoreError;
 	}
-	if (!WeakOwner.IsValid() || !SaveOwner())
+	// Tam ucret + ek dusulemediyse (callback araya girip bakiyeyi azaltti) posta gonderilmez:
+	// aksi halde alici odenmemis eki alirdi.
+	if (Deducted != Charge || !GetEligibleInventory())
+	{
+		Refund();
+		return EMMOMailResult::StoreError;
+	}
+	if (!WeakMail.Get()->SaveOwner())
+	{
+		Refund();
+		return EMMOMailResult::StoreError;
+	}
+	if (!GetEligibleInventory())
 	{
 		Refund();
 		return EMMOMailResult::StoreError;
@@ -312,9 +334,13 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	if (!FMMOMailStore::Append(To, M))
 	{
 		Refund();
-		SaveOwner(); // basarisizsa diskte dusulmus altin kalir: altin kaybolur ama kopyalanmaz
+		if (GetEligibleInventory())
+		{
+			WeakMail.Get()->SaveOwner(); // basarisizsa diskte dusulmus altin kalir: altin kaybolur ama kopyalanmaz
+		}
 		return EMMOMailResult::StoreError;
 	}
+	Deducted = 0;
 	return EMMOMailResult::Ok;
 }
 

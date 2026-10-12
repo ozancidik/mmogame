@@ -5555,3 +5555,55 @@ Native testler (`7932979`: basarim 96, gunluk 81, posta 130, ad kilidi 58) gecti
 - [ ] Posta: dolu (20 postalik) kutuya gonder ("kutusu dolu"), hemen ardindan baska aliciya gonder: "5 saniye bekle" cooldown'u gelmeli (Y-NEW-5).
 - [ ] Posta kutusu dosyasi baska bir surecte acik/kilitliyken (sentetik kopya) `/posta gonder`: sunucu belirgin donmamali (eskiden ~5,5 sn),
   gonderim "su an gonderilemedi" ile bitmeli ve gonderenin altini net degismemeli (okuma kilitliyse hic dusulmez, yazim kilitliyse iade edilir).
+
+
+## O69 — Posta kesintisi/iadesinde callback muhasebesi (2026-10-11)
+
+O69 tarihsel a0cb86d baseline kabul: Editor build exit 0; native 0/runner 1,
+160 benzersiz check: 127 PASS/33 FAIL, 20 gozlem; normal kapanis, engine error yok.
+Raw clamp-savefail 520/505, clamp-saveok eksik ucretle posta, gift-savefail 10684/11000.
+On peer-160 build0/runtime NOT_RUN ayridir. Kabul edilen d031 peer-176:
+Editor0, native0/runner1, 148 PASS/28 FAIL, 22 gozlem; clamp505 peer'da zaten dogru.
+Gift-saveok yanlis red:11000/save0/mail0; gift-savefail11000 ama Save calismadi.
+Serial seam attachment1500/fee1520 yerine1000 bekler; ApplySaveData+serial seam'i
+actual LoadCharacter/remote kaniti degil. .bak/cleanup176'da; d031/f70 suite PASS, PIE OPEN.
+O68 dar-24: kilit altinda bos disposable maildir; .bak/tum sidecar kapsami yok.
+Plan: her dogrudan kesintinin gercek kirpilmis tutarini broadcast oncesi kaydet;
+ic callback harcama/hediyesini mail odemesi veya iadesi sayma.
+Prod3 B735/4179/45D2 source onayi bildirildi; QA107 uyarlama/review+suite serbest.
+Fixed Editor native0/Result Succeeded (DLL69C54...), wrapper1 final peer PID15076 DEFER.
+O ilk denemede Game/runtime NOT_RUN; Editor main766/prior763/original746 korundu.
+Sonraki Game native0/wrapper0, Result Succeeded, EXE4A32...; main767/original746 korundu.
+d031 fixed176 176PASS/22gozlem baseline ayni; Mail107 107PASS; native/runner/wrapper0.
+Fixed24 TEMP FullName prelaunch hatasi korundu; projection1 24PASS, IO4/0/0/0; Gold60 60PASS.
+Dar24 bos/exclusive parent kosullu, .bak kaniti yok; runtime cikis0.
+Tarihsel d031 RECOVERY: Trade230/Purchase174/Upgrade132/static/data/Summer/Winter0;
+NetSmoke runner0, intentional native-1/-1 (normal kapanis kaniti degil).
+Guncel f70 prod3+legacy133 kaynak uyumu parent/Singer/Boyle APPROVE bildirildi.
+Guncel f70 fresh Editor/Game native/wrapper0; Refund176 176PASS, Mail133 133PASS.
+Conditional24/Gold60/Trade230/Purchase174 PASS ve native/runner/wrapper0; main787/5123Saved korundu.
+Guncel full14 suite parent ACCEPT: Upgrade132/data/lint/SummerWinter0; NetSmoke runner/wrapper0,
+intentional native-1/-1, port17765 errors0; normal cikis/RPC kaniti degil.
+Main6 entegrasyon+verification COMPLETE; peer11/eight peer dosya+runner141 korundu. Main Editor0, Mail144 exact144PASS/native-runner-wrapper0.
+Main176 POLICY_NOT_RUN: runner/wrapper1 nativeN/A, UE oncesi isolated-worktree politikasi; bypass/retry yok, gameplay hatasi degil. Isolated176 PASS ayridir.
+Main DLL08BF...; Mail144 gift10684/clamp505, errors0/normal shutdown; inputs/Saved/live787/original746/prior763 korundu. PIE/NR1/NR3 OPEN; Git/TEMP teslim+commit kaydi parent kapsaminda.
+Ayrinti: [O69 gorev kaydi](tasks/MAIL_REFUND_ACCOUNTING_2026-10-11.md).
+
+- [ ] Listen host + uzak istemcide sentetik A/B ile normal altinli/metin-only
+  posta gonder/topla; ek, ucret, cooldown ve tek teslim dogru olsun. Rolleri
+  degistir; HUD/sohbet ve 10 sn zamanlayici gozlemini kaydet.
+- [ ] Ayri sentetik duzenekte ilk gold callback'i bakiyeyi ucretten az biraksin:
+  1000 baslangic, 500 ek, 20 ucret, callback -495; gercek debit receipt esas;
+  eksik odeme Save oncesi reddedilsin, final 505 ve posta yok olsun.
+  Gold callback'inin harcamasi iade edilmemeli; canli Saved/ACL bozma.
+- [ ] Callback +1000 hediye versin: 10000 baslangic, 300 ek, 16 ucret.
+  Save basariliysa final 10684 ve bir 300-altin mail; Save basarisizligi ayri
+  operator kontrollu sentetik duzenekte final 11000 ve posta yok olmali.
+  Native probe sonucu gercek Blueprint/RPC/HUD kaniti yerine gecmez.
+- [ ] Callback harcama/hediye, hizli yeniden giris ve owner disconnect/travel
+  durumlarini host/uzak istemcide gozle; sadece mailin gercek kesintisi
+  iade edilmeli. Same-name reload/LoadSerial degisimi charge/refund/save boyunca
+  kontrol edilsin; native seam gercek reload kaniti degil. Gozlem yoksa acik kalsin.
+- [ ] Refund-savefail, crash/restart settlement ve NR1/NR3 ayri yetkili
+  senaryolarda incelensin; O69 bunlari cozdu diye kabul etme. Remote erisim
+  ve exploit tetiklenebilirligi kanitlanmadi; canli veriye fault uygulama.
