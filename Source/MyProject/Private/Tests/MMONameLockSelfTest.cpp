@@ -28,6 +28,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerState.h"
 #include "HAL/FileManager.h"
+#include "HAL/PlatformTime.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/CoreMisc.h"
@@ -122,6 +123,28 @@ namespace
 			Check(!FMMOMailStore::IsDeliverableName(TEXT("Default")) && !FMMOMailStore::IsDeliverableName(TEXT("default"))
 				&& !FMMOMailStore::IsDeliverableName(TEXT("Player123")) && FMMOMailStore::IsDeliverableName(TEXT("Gezgin2"))
 				&& FMMOMailStore::IsDeliverableName(TEXT("Player")), TEXT("y5_mail_reserved_not_deliverable"));
+			// Tur 5 sinir durumlari (test turu 5): "player" + YALNIZ rakam (en az bir) ayrilmis; harf/isaret/bosluk karisan ya da
+			// "player" ile baslamayan adlar degil. Kanonik anahtar harf duyarsiz (PLAYER12, pLaYeR007).
+			Check(!IsReservedName(TEXT("Player")) && IsReservedName(TEXT("Player0")) && IsReservedName(TEXT("PLAYER12")) && IsReservedName(TEXT("pLaYeR007"))
+				&& IsReservedName(TEXT("Player99999999999999999999")) && !IsReservedName(TEXT("Player12a")) && !IsReservedName(TEXT("Players1"))
+				&& !IsReservedName(TEXT("Player-12")) && !IsReservedName(TEXT("Player_12")) && !IsReservedName(TEXT("12Player")) && !IsReservedName(TEXT("XPlayer12"))
+				&& !IsReservedName(TEXT("PlayerOne")), TEXT("y5_rules_reserved_player_digit_boundaries"));
+			Check(IsReservedName(TEXT("Default")) && IsReservedName(TEXT("DEFAULT")) && IsReservedName(TEXT("dEfAuLt")) && !IsReservedName(TEXT("Defaults"))
+				&& !IsReservedName(TEXT("Default1")) && !IsReservedName(TEXT("MyDefault")) && !IsReservedName(TEXT("Def ault")), TEXT("y5_rules_reserved_default_variants"));
+			// IsReservedName KIRPMAZ: kurala kanonik YUVA anahtari bakar. "Default " -> "default_" (MMOSave_Default_ ayri dosya), " default"
+			// -> "_default", yalniz bosluk -> "___": bunlar ortak Default yuvasi DEGIL. Bos ad -> "default" (ayrilmis). Giris noktalari
+			// (PreLogin/ChangeName/ServerSetName/SendMail) once kirpar; kirpilmis bicim ayrilmis (asagida giris noktasi kontrolleri).
+			Check(CanonicalKey(TEXT("Default ")).Equals(TEXT("default_"), CS) && !IsReservedName(TEXT("Default "))
+				&& CanonicalKey(TEXT(" default")).Equals(TEXT("_default"), CS) && !IsReservedName(TEXT(" default"))
+				&& CanonicalKey(TEXT("   ")).Equals(TEXT("___"), CS) && !IsReservedName(TEXT("   ")) && IsReservedName(FString())
+				&& IsReservedName(FString(TEXT(" Default ")).TrimStartAndEnd()) && IsReservedName(FString(TEXT(" Player7 ")).TrimStartAndEnd()),
+				TEXT("y5_rules_reserved_untrimmed_is_other_slot"));
+			// CanonicalSlot: "mmosave_" + kanonik anahtar; bosluk/'_' ve harf buyuklugu esdeger, ASCII disi atilir, bos -> mmosave_default.
+			Check(CanonicalSlot(TEXT("Ali Veli")).Equals(TEXT("mmosave_ali_veli"), CS) && CanonicalSlot(TEXT("ALI_VELI")).Equals(CanonicalSlot(TEXT("ali veli")), CS)
+				&& CanonicalSlot(FString()).Equals(TEXT("mmosave_default"), CS) && CanonicalSlot(MMONameLockMix(FString(), { DotlessI, SCedilla }, TEXT(""))).Equals(TEXT("mmosave_default"), CS)
+				&& CanonicalSlot(TEXT("A/b.c")).Equals(TEXT("mmosave_abc"), CS) && CanonicalSlot(MMONameLockMix(TEXT("Ku"), { SCedilla }, TEXT(" Z"))).Equals(TEXT("mmosave_ku_z"), CS)
+				&& !CanonicalSlot(TEXT("Ali")).Equals(CanonicalSlot(TEXT("Ali2")), CS) && SameCanonical(CanonicalSlot(TEXT("Ali Veli")), TEXT("MMOSave_Ali_Veli")),
+				TEXT("y5_rules_canonical_slot_equivalence"));
 			// Gozlem (kontrol degil): eski kural FChar::IsAlnum bu harfleri kabul ediyor mu (mutasyon/ClanLegacy yorumu icin).
 			UE_LOG(LogTemp, Display, TEXT("[MMO_NAMELOCK_NOTE] fchar_isalnum O_umlaut=%d dotless_i=%d s_cedilla=%d"),
 				FChar::IsAlnum(UpperOUml) ? 1 : 0, FChar::IsAlnum(DotlessI) ? 1 : 0, FChar::IsAlnum(SCedilla) ? 1 : 0);
@@ -339,6 +362,13 @@ namespace
 				// Yuva adi: ASCII disi harfler atilir (eski FChar::IsAlnum yolu onlari dosya adina tasirdi).
 				Check(HoldUni->GetSaveSlotName().Equals(SlotOf(NameOf(TEXT("x"))), CS), TEXT("y1_save_slot_drops_unicode_letters"));
 				Check(HoldSpace->GetSaveSlotName().Equals(SlotOf(NameOf(TEXT("S_T"))), CS), TEXT("y1_save_slot_space_to_underscore"));
+				// Test turu 5: MMONameRules::CanonicalSlot(canli ad) == GetSaveSlotName() (harf duyarsiz): basarim/gunluk eski yuva korumasi
+				// pawn'siz PlayerState'i bu esdegerlikle tanir.
+				Check(MMONameRules::CanonicalSlot(LiveName(HoldSpace)).Equals(HoldSpace->GetSaveSlotName().ToLower(), CS)
+					&& MMONameRules::CanonicalSlot(LiveName(HoldCase)).Equals(HoldCase->GetSaveSlotName().ToLower(), CS)
+					&& MMONameRules::CanonicalSlot(LiveName(HoldUni)).Equals(HoldUni->GetSaveSlotName().ToLower(), CS)
+					&& MMONameRules::CanonicalSlot(NHoldSpace.ToUpper()).Equals(HoldSpace->GetSaveSlotName().ToLower(), CS),
+					TEXT("y5_canonical_slot_matches_save_slot_name"));
 
 				// PreLogin: cevrimici ad ile ayni kanonik anahtar (bosluk/'_' ve harf buyuklugu esdeger) ikinci baglantida reddedilir.
 				auto PreLoginError = [GM](const FString& Requested)
@@ -363,6 +393,20 @@ namespace
 				FString GuestErr;
 				GM->PreLogin(FString(), TEXT("127.0.0.1"), FUniqueNetIdRepl(), GuestErr);
 				Check(PreLoginError(FString(TEXT(" ")) + NPreFree + TEXT(" ")).IsEmpty() && GuestErr.IsEmpty(), TEXT("y5_prelogin_trim_and_guest_accepted"));
+				// Test turu 5: bas/son bosluklu ayrilmis ad kirpilinca ayrilmis -> ret; harf buyuklugu/sinir varyantlari da ret.
+				Check(!PreLoginError(TEXT(" Default ")).IsEmpty() && !PreLoginError(TEXT("PLAYER12")).IsEmpty() && !PreLoginError(TEXT("player0")).IsEmpty(),
+					TEXT("y5_prelogin_reserved_trimmed_and_case_rejected"));
+				// Kontrol: ayrilmis kurala benzeyen ama ayrilmamis adlar PreLogin'den gecer (GUID'li: cevrimici kimseyle cakismaz).
+				Check(PreLoginError(FString(TEXT("Player")) + TEXT("Z") + Tag).IsEmpty() && PreLoginError(FString(TEXT("PlayerOne")) + Tag.Left(4)).IsEmpty()
+					&& PreLoginError(FString(TEXT("Default")) + TEXT("x") + Tag.Left(4)).IsEmpty(), TEXT("y5_prelogin_lookalike_names_accepted"));
+				// URL kodlu ad (?Name=%C3%96mer...): ParseOption cozmez; '%' izinsiz karakter -> temizleme adi degisir -> ret. Cozulmus
+				// bicim (O-umlaut) yukarida y5_prelogin_altered_name_rejected ile reddedilir: iki yolda da kayit acilmaz.
+				const FString UrlEncodedUni = FString(TEXT("%C3%96mer")) + Tag;
+				const FString UrlEncodedSpace = FString(TEXT("Ali%20")) + Tag;
+				const FString ErrUrlUni = PreLoginError(UrlEncodedUni);
+				Check(!ErrUrlUni.IsEmpty() && !PreLoginError(FString(TEXT("%C3%96")) + TEXT("x")).IsEmpty(), TEXT("y5_prelogin_url_encoded_unicode_rejected"));
+				// Gozlem: URL kodlu bosluk da cozulmez, ret edilir (bosluklu ad ?Name= ile ancak ham bosluk olarak gelirse kabul edilir).
+				UE_LOG(LogTemp, Display, TEXT("[MMO_NAMELOCK_NOTE] prelogin_url_encoded_space rejected=%d"), PreLoginError(UrlEncodedSpace).IsEmpty() ? 0 : 1);
 
 				// ChangeName (baslangic adi): ayni kanonik anahtar cevrimiciyse rastgele Gezgin adi atanir.
 				auto NewcomerName = [Newcomer]() { return Newcomer->PlayerState ? Newcomer->PlayerState->GetPlayerName() : FString(); };
@@ -395,6 +439,59 @@ namespace
 				GM->ChangeName(Newcomer, FString(TEXT(" ")) + NFree + TEXT(" "), false);
 				Check(NewcomerName().Equals(NFree, CS), TEXT("y5_changename_trimmed_free_name_kept"));
 
+				// Test turu 5 (e): ayni kanonik yuvaya dusen iki motor misafir adi (Player256 / player256: farkli sunucu sureclerinde ayni
+				// PlayerId) farkli Gezgin adlari alir. Iki ChangeName ayni tohumla (FMath::RandInit) kosulur: ikinci misafirin ILK adayi
+				// birincinin aldigi addir; cevrimici aday kontrolu olmasa ikisi ayni Gezgin yuvasina duserdi.
+				AMMOPlayerController* Guest1 = World->SpawnActor<AMMOPlayerController>();
+				AMMOPlayerController* Guest2 = World->SpawnActor<AMMOPlayerController>();
+				ExtraControllers.Add(Guest1); ExtraControllers.Add(Guest2);
+				const bool bGuests = Guest1 && Guest2 && Guest1->PlayerState && Guest2->PlayerState;
+				auto GuestName = [](const AMMOPlayerController* G) { return G && G->PlayerState ? G->PlayerState->GetPlayerName() : FString(); };
+				FString GuestName1, GuestName2, SeedFirstCandidate;
+				if (bGuests)
+				{
+					Guest1->SetActorTickEnabled(false); Guest2->SetActorTickEnabled(false);
+					const int32 GuestSeed = 20261011;
+					FMath::RandInit(GuestSeed);
+					SeedFirstCandidate = FString::Printf(TEXT("Gezgin%06d"), FMath::RandRange(0, 999999)); // ChangeName'in ilk aday formulu
+					FMath::RandInit(GuestSeed);
+					GM->ChangeName(Guest1, TEXT("Player256"), false);
+					GuestName1 = GuestName(Guest1);
+					FMath::RandInit(GuestSeed);
+					GM->ChangeName(Guest2, TEXT("player256"), false);
+					GuestName2 = GuestName(Guest2);
+					FMath::RandInit(static_cast<int32>(FPlatformTime::Cycles()));
+				}
+				Check(bGuests && GuestName1.StartsWith(TEXT("Gezgin"), CS) && GuestName2.StartsWith(TEXT("Gezgin"), CS)
+					&& MMONameRules::CanonicalKey(GuestName1) != MMONameRules::CanonicalKey(GuestName2)
+					&& !MMONameRules::IsReservedName(GuestName1) && !MMONameRules::IsReservedName(GuestName2)
+					&& !Store->Exists(SlotOf(GuestName1)) && !Store->Exists(SlotOf(GuestName2)), TEXT("y5_changename_same_slot_guests_distinct_gezgin"));
+				// Ayni tohum gercekten ayni ilk adayi uretti mi (yani ikinci misafirde cakisma dali kosuldu mu): birinci misafir ilk adayi aldi.
+				Check(bGuests && GuestName1.Equals(SeedFirstCandidate, CS) && !GuestName2.Equals(SeedFirstCandidate, CS), TEXT("y5_changename_guest_collision_path_exercised"));
+				if (bGuests)
+				{
+					// URL kodlu ad ('%' izinsiz) ve bas/son bosluklu ayrilmis ad -> Gezgin; ayrilmisa benzeyen gecerli adlar aynen kalir.
+					GM->ChangeName(Guest1, FString(TEXT("%C3%96mer")) + Tag, false);
+					const FString AfterUrl = GuestName(Guest1);
+					GM->ChangeName(Guest2, TEXT(" Player7 "), false);
+					const FString AfterTrimReserved = GuestName(Guest2);
+					GM->ChangeName(Guest2, TEXT("  default  "), false);
+					const FString AfterTrimDefault = GuestName(Guest2);
+					Check(AfterUrl.StartsWith(TEXT("Gezgin"), CS) && !AfterUrl.Contains(TEXT("mer")), TEXT("y5_changename_url_encoded_gets_gezgin"));
+					Check(AfterTrimReserved.StartsWith(TEXT("Gezgin"), CS) && AfterTrimDefault.StartsWith(TEXT("Gezgin"), CS), TEXT("y5_changename_trimmed_reserved_gets_gezgin"));
+					const FString LookPlayer = FString(TEXT("PlayerZ")) + Tag;
+					const FString LookPlayerOne = FString(TEXT("PlayerOne")) + Tag.Left(4);
+					GM->ChangeName(Guest1, LookPlayer, false);
+					GM->ChangeName(Guest2, LookPlayerOne, false);
+					Check(GuestName(Guest1).Equals(LookPlayer, CS) && GuestName(Guest2).Equals(LookPlayerOne, CS), TEXT("y5_changename_lookalike_names_kept"));
+				}
+				else
+				{
+					Check(false, TEXT("y5_changename_url_encoded_gets_gezgin"));
+					Check(false, TEXT("y5_changename_trimmed_reserved_gets_gezgin"));
+					Check(false, TEXT("y5_changename_lookalike_names_kept"));
+				}
+
 				// ServerSetName: canli bir oyuncuyla ayni kanonik anahtara gecis reddedilir; Unicode harfli ad reddedilir.
 				Req->MMOSetName(NameOf(TEXT("s_t")));
 				const bool bSpaceKept = LiveName(Req).Equals(NReq, CS);
@@ -412,6 +509,10 @@ namespace
 				const bool bPlayerKept = LiveName(Req).Equals(NReq, CS);
 				Req->MMOSetName(TEXT("default"));
 				Check(bPlayerKept && LiveName(Req).Equals(NReq, CS), TEXT("y5_setname_reserved_rejected"));
+				Req->MMOSetName(TEXT(" PLAYER12 "));
+				const bool bTrimKept = LiveName(Req).Equals(NReq, CS);
+				Req->MMOSetName(TEXT("DEFAULT"));
+				Check(bTrimKept && LiveName(Req).Equals(NReq, CS), TEXT("y5_setname_reserved_trimmed_case_rejected"));
 				Req->MMOSetName(NFree.ToLower());
 				Check(LiveName(Req).Equals(NReq, CS) && NewcomerName().Equals(NFree, CS), TEXT("y5_setname_pawnless_online_name_rejected"));
 				Req->MMOSetName(NReqOk); // kontrol: serbest ad kabul edilir (bu adim sogumayi baslatir; sona konuldu)
@@ -566,6 +667,10 @@ namespace
 // ("Player<Id>") yolu yerine ChangeName dogrudan cagrilarak; Y-NEW-6 G dali LoadCharacter dogrudan cagrilarak (0.6 sn AutoLoad
 // zamanlayicisi ve gercek UnPossess/Possess dongusu olmadan) dogrulanir. Eski Turkce harfli klan adinin korunmasi FChar::IsAlnum'un
 // bu platformdaki sonucuna baglidir (NOTE satiri).
+// Test turu 5 bolumu: URL kodlu ad ("%C3%96mer") PreLogin'e ham Options dizesiyle verilir; motorun/istemcinin ?Name= degerini gercek
+// baglantida yuzde-kodlayip kodlamadigi denenmedi (ham '%' ve cozulmus O-umlaut ikisi de reddedilir). Ayni kanonik yuvali iki misafir
+// motorun gercek InitNewPlayer "Player<Id>" yolu yerine ChangeName dogrudan cagrilarak ve FMath::RandInit ile ayni tohum verilerek
+// sinanir (ilk aday cakismasi zorlanir); iki farkli sunucu surecinde ayni PlayerId'nin alinmasi tek surecte benzetilir. PIE/ag yok.
 
 namespace
 {

@@ -10,7 +10,9 @@
 #include "Components/MMOQuestComponent.h"
 #include "Save/MMOSaveGame.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/SpectatorPawn.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
@@ -545,10 +547,16 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 		const FString NameS = TEXT("ZAchFS_") + Tag3; // canli adi bu yuvayi veren cevrimici oyuncu senaryosu
 		const FString SlotS = TEXT("MMOSave_") + NameS, SlotT = TEXT("MMOSave_ZAchFT_") + Tag3, SlotU = TEXT("MMOSave_ZAchFU_") + Tag3;
 		const FString SlotY = TEXT("MMOSave_ZAchFY_") + Tag3; // diger oyuncunun ilgisiz yuvasi
+		// Test turu 5: pawn'siz / izleyici pawn'li bagli oyuncu (GameState->PlayerArray) senaryolarinin yuvalari.
+		const FString SlotV1 = TEXT("MMOSave_ZAchFV1_") + Tag3, SlotV2 = TEXT("MMOSave_ZAchFV2_") + Tag3, SlotV3 = TEXT("MMOSave_ZAchFV3_") + Tag3;
+		const FString SlotV4 = TEXT("MMOSave_ZAchFV4_") + Tag3, SlotV5 = TEXT("MMOSave_ZAchFV5_") + Tag3;
 		const FName Goblin(TEXT("Goblin"));
 		TStrongObjectPtr<AMMOCharacter> X(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 0, 0), FRotator::ZeroRotator, Params));
 		TStrongObjectPtr<AMMOCharacter> Y(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 5000, 0), FRotator::ZeroRotator, Params));
 		TStrongObjectPtr<APlayerState> PSY(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<APlayerState> PSV(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params)); // pawn'siz bagli oyuncu
+		TStrongObjectPtr<APlayerState> PSX(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params)); // X'in kendi PS'i (son adim)
+		TStrongObjectPtr<ASpectatorPawn> Spec(World->SpawnActor<ASpectatorPawn>(ASpectatorPawn::StaticClass(), Location + FVector(20000, 10000, 0), FRotator::ZeroRotator, Params));
 		UMMOAchievementComponent* BX = X.IsValid() ? X->GetAchievementComponent() : nullptr;
 		const bool bFixture3 = BX && Y.IsValid() && PSY.IsValid();
 		if (bFixture3)
@@ -598,11 +606,54 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 			BX->PendingOldStoragePath = FPaths::Combine(AchDir, SlotT.ToUpper() + TEXT(".json"));
 			BX->bDirty = true;
 			Check(BX->SaveNow() && Has(SlotT) && BX->PendingOldStoragePath.IsEmpty(), TEXT("f_canonical_same_file_not_deleted"));
+
+			// --- Test turu 5: eski yuva, pawn'i OLMAYAN (ya da AMMOCharacter olmayan izleyici pawn'li) bagli bir oyuncunun canli adinin
+			// yuvasiysa silinmez. Yukaridaki pawn dongusu (TActorIterator<AMMOCharacter>) onu gormez; yalniz GameState->PlayerArray gorur. ---
+			const AGameStateBase* GS = World->GetGameState();
+			const bool bPawnlessFixture = GS && PSV.IsValid() && PSX.IsValid() && Spec.IsValid() && GS->PlayerArray.Contains(PSV.Get())
+				&& GS->PlayerArray.Contains(PSX.Get()) && !PSV->GetPawn() && !X->GetPlayerState();
+			Check(bPawnlessFixture, TEXT("y5_fixture_pawnless_player_state_listed"));
+			if (bPawnlessFixture)
+			{
+				// X su an SlotT'de; pawn'siz PSV'nin canli adi SlotT'nin adi: T -> V1 tasimasi T'yi silmemeli.
+				PSV->SetPlayerName(TEXT("ZAchFT_") + Tag3);
+				X->SetSaveIdentityForTest(true, SlotV1, 1);
+				BX->NotifyMobKilled(Goblin);
+				Check(Has(SlotV1) && Has(SlotT), TEXT("y5_old_slot_of_pawnless_player_kept"));
+				// Kanonik esdeger canli ad (kucuk harf, '_' yerine bosluk) ayni yuvadir: V1 -> V2 tasimasi V1'i silmemeli.
+				PSV->SetPlayerName(TEXT("zachfv1 ") + Tag3.ToLower());
+				X->SetSaveIdentityForTest(true, SlotV2, 1);
+				BX->NotifyMobKilled(Goblin);
+				Check(Has(SlotV2) && Has(SlotV1), TEXT("y5_old_slot_of_pawnless_canonical_variant_kept"));
+				// Kontrol: pawn'siz oyuncunun adi ilgisizse eski yuva silinir (koruma asiri genis degil).
+				PSV->SetPlayerName(TEXT("ZAchFNone_") + Tag3);
+				X->SetSaveIdentityForTest(true, SlotV3, 1);
+				BX->NotifyMobKilled(Goblin);
+				Check(Has(SlotV3) && !Has(SlotV2), TEXT("y5_old_slot_pawnless_unrelated_name_deleted"));
+				// Pawn VAR ama AMMOCharacter degil (izleyici): yine yalniz PlayerArray gorur. V3 -> V4 tasimasi V3'u silmemeli.
+				Spec->SetPlayerState(PSV.Get());
+				PSV->SetPlayerName(TEXT("ZAchFV3_") + Tag3);
+				X->SetSaveIdentityForTest(true, SlotV4, 1);
+				BX->NotifyMobKilled(Goblin);
+				Check(PSV->GetPawn() == Spec.Get() && Has(SlotV4) && Has(SlotV3), TEXT("y5_old_slot_of_spectator_pawn_player_kept"));
+				Spec->SetPlayerState(nullptr);
+				PSV->SetPlayerName(TEXT("ZAchFNone_") + Tag3);
+				// Tasinan karakterin KENDI PlayerState'i eski adi tasiyorsa koruma sayilmaz (SelfPS haric tutulur): V4 silinir.
+				PSX->SetPlayerName(TEXT("ZAchFV4_") + Tag3);
+				X->SetPlayerState(PSX.Get());
+				X->SetSaveIdentityForTest(true, SlotV5, 1);
+				BX->NotifyMobKilled(Goblin);
+				Check(Has(SlotV5) && !Has(SlotV4), TEXT("y5_own_player_state_old_name_not_a_guard"));
+				X->SetPlayerState(nullptr);
+			}
 		}
 		if (::IsValid(Y.Get())) { Y->SetSaveIdentityForTest(false, SlotY, 1); Y->SetTravelSaveCommitted(true); Y->SetPlayerState(nullptr); Y->Destroy(); }
-		if (::IsValid(X.Get())) X->Destroy(); // EndPlay son durumu SlotT'ye yazar (asagida silinir)
+		if (::IsValid(X.Get())) { X->SetPlayerState(nullptr); X->Destroy(); } // EndPlay son durumu son yuvaya yazar (asagida silinir)
+		if (::IsValid(Spec.Get())) { Spec->SetPlayerState(nullptr); Spec->Destroy(); }
 		if (::IsValid(PSY.Get())) PSY->Destroy();
-		for (const FString& Slot : { SlotP, SlotQ, SlotR, SlotS, SlotT, SlotU, SlotY })
+		if (::IsValid(PSV.Get())) PSV->Destroy();
+		if (::IsValid(PSX.Get())) PSX->Destroy();
+		for (const FString& Slot : { SlotP, SlotQ, SlotR, SlotS, SlotT, SlotU, SlotY, SlotV1, SlotV2, SlotV3, SlotV4, SlotV5 })
 		{
 			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
 			{
@@ -620,6 +671,8 @@ bool UMMOAchievementComponent::RunSelfTest(UWorld* World, FString& OutError, int
 // Tur 4 bolumu: "cevrimici baska oyuncu" PlayerState'li ama denetleyicisiz bir pawn ile benzetilir; kanonik-ayni-dosya korumasi TryLoad
 // yolundan ulasilamadigi icin (ASCII yuvalarda harf farki tasima sayilmaz) bekleyen eski yol test icinden verilir. 10 sn geri cekilme
 // RecoveryRetryAt'tan okunur; gercek 10 sn bekleme kosulmaz.
+// Test turu 5 bolumu: "pawn'siz bagli oyuncu" GameState->PlayerArray'e kendiliginden eklenen, denetleyicisiz bir APlayerState ile,
+// "izleyici" ASpectatorPawn'a baglanan ayni PlayerState ile benzetilir; gercek olum/izleyici gecisi, ag baglantisi ve PIE kosulmaz.
 
 namespace
 {

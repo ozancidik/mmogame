@@ -9,7 +9,9 @@
 #include "Components/MMOQuestComponent.h"
 #include "Save/MMOSaveGame.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/SpectatorPawn.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
@@ -486,10 +488,16 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 		const FString NameS = TEXT("ZDayFS_") + Tag3; // canli adi bu yuvayi veren cevrimici oyuncu senaryosu
 		const FString SlotS = TEXT("MMOSave_") + NameS, SlotT = TEXT("MMOSave_ZDayFT_") + Tag3, SlotU = TEXT("MMOSave_ZDayFU_") + Tag3;
 		const FString SlotY = TEXT("MMOSave_ZDayFY_") + Tag3; // diger oyuncunun ilgisiz yuvasi
+		// Test turu 5: pawn'siz / izleyici pawn'li bagli oyuncu (GameState->PlayerArray) senaryolarinin yuvalari.
+		const FString SlotV1 = TEXT("MMOSave_ZDayFV1_") + Tag3, SlotV2 = TEXT("MMOSave_ZDayFV2_") + Tag3, SlotV3 = TEXT("MMOSave_ZDayFV3_") + Tag3;
+		const FString SlotV4 = TEXT("MMOSave_ZDayFV4_") + Tag3, SlotV5 = TEXT("MMOSave_ZDayFV5_") + Tag3;
 		const FName Orc(TEXT("Orc"));
 		TStrongObjectPtr<AMMOCharacter> X(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 0, 0), FRotator::ZeroRotator, Params));
 		TStrongObjectPtr<AMMOCharacter> Y(World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Location + FVector(20000, 5000, 0), FRotator::ZeroRotator, Params));
 		TStrongObjectPtr<APlayerState> PSY(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params));
+		TStrongObjectPtr<APlayerState> PSV(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params)); // pawn'siz bagli oyuncu
+		TStrongObjectPtr<APlayerState> PSX(World->SpawnActor<APlayerState>(APlayerState::StaticClass(), Location, FRotator::ZeroRotator, Params)); // X'in kendi PS'i (son adim)
+		TStrongObjectPtr<ASpectatorPawn> Spec(World->SpawnActor<ASpectatorPawn>(ASpectatorPawn::StaticClass(), Location + FVector(20000, 10000, 0), FRotator::ZeroRotator, Params));
 		UMMODailyComponent* DX = X.IsValid() ? X->GetDailyComponent() : nullptr;
 		const bool bFixture3 = DX && X->GetStats() && Y.IsValid() && PSY.IsValid();
 		if (bFixture3)
@@ -535,11 +543,49 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 			DX->PendingOldStoragePath = FPaths::Combine(DayDir, SlotT.ToUpper() + TEXT(".json"));
 			DX->bDirty = true;
 			Check(DX->SaveNow() && Has(SlotT) && DX->PendingOldStoragePath.IsEmpty(), TEXT("f_canonical_same_file_not_deleted"));
+
+			// --- Test turu 5: eski yuva, pawn'i OLMAYAN (ya da AMMOCharacter olmayan izleyici pawn'li) bagli bir oyuncunun canli adinin
+			// yuvasiysa silinmez (bkz. MMOAchievementSelfTest ayni bolum; yalniz GameState->PlayerArray korumasi gorur). ---
+			const AGameStateBase* GS = World->GetGameState();
+			const bool bPawnlessFixture = GS && PSV.IsValid() && PSX.IsValid() && Spec.IsValid() && GS->PlayerArray.Contains(PSV.Get())
+				&& GS->PlayerArray.Contains(PSX.Get()) && !PSV->GetPawn() && !X->GetPlayerState();
+			Check(bPawnlessFixture, TEXT("y5_fixture_pawnless_player_state_listed"));
+			if (bPawnlessFixture)
+			{
+				PSV->SetPlayerName(TEXT("ZDayFT_") + Tag3);
+				X->SetSaveIdentityForTest(true, SlotV1, 1);
+				DX->NotifyMobKilled(Orc);
+				Check(Has(SlotV1) && Has(SlotT), TEXT("y5_old_slot_of_pawnless_player_kept"));
+				PSV->SetPlayerName(TEXT("zdayfv1 ") + Tag3.ToLower());
+				X->SetSaveIdentityForTest(true, SlotV2, 1);
+				DX->NotifyMobKilled(Orc);
+				Check(Has(SlotV2) && Has(SlotV1), TEXT("y5_old_slot_of_pawnless_canonical_variant_kept"));
+				PSV->SetPlayerName(TEXT("ZDayFNone_") + Tag3);
+				X->SetSaveIdentityForTest(true, SlotV3, 1);
+				DX->NotifyMobKilled(Orc);
+				Check(Has(SlotV3) && !Has(SlotV2), TEXT("y5_old_slot_pawnless_unrelated_name_deleted"));
+				Spec->SetPlayerState(PSV.Get());
+				PSV->SetPlayerName(TEXT("ZDayFV3_") + Tag3);
+				X->SetSaveIdentityForTest(true, SlotV4, 1);
+				DX->NotifyMobKilled(Orc);
+				Check(PSV->GetPawn() == Spec.Get() && Has(SlotV4) && Has(SlotV3), TEXT("y5_old_slot_of_spectator_pawn_player_kept"));
+				Spec->SetPlayerState(nullptr);
+				PSV->SetPlayerName(TEXT("ZDayFNone_") + Tag3);
+				PSX->SetPlayerName(TEXT("ZDayFV4_") + Tag3);
+				X->SetPlayerState(PSX.Get());
+				X->SetSaveIdentityForTest(true, SlotV5, 1);
+				DX->NotifyMobKilled(Orc);
+				Check(Has(SlotV5) && !Has(SlotV4), TEXT("y5_own_player_state_old_name_not_a_guard"));
+				X->SetPlayerState(nullptr);
+			}
 		}
 		if (::IsValid(Y.Get())) { Y->SetSaveIdentityForTest(false, SlotY, 1); Y->SetTravelSaveCommitted(true); Y->SetPlayerState(nullptr); Y->Destroy(); }
-		if (::IsValid(X.Get())) X->Destroy();
+		if (::IsValid(X.Get())) { X->SetPlayerState(nullptr); X->Destroy(); }
+		if (::IsValid(Spec.Get())) { Spec->SetPlayerState(nullptr); Spec->Destroy(); }
 		if (::IsValid(PSY.Get())) PSY->Destroy();
-		for (const FString& Slot : { SlotP, SlotQ, SlotR, SlotS, SlotT, SlotU, SlotY })
+		if (::IsValid(PSV.Get())) PSV->Destroy();
+		if (::IsValid(PSX.Get())) PSX->Destroy();
+		for (const FString& Slot : { SlotP, SlotQ, SlotR, SlotS, SlotT, SlotU, SlotY, SlotV1, SlotV2, SlotV3, SlotV4, SlotV5 })
 		{
 			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bad") })
 			{
@@ -556,6 +602,8 @@ bool UMMODailyComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Ou
 // surecteki ozel (paylasimsiz) bir tutamakla benzetilir; antivirus/ag surucusu gibi gercek dis kilitler denenmedi.
 // Tur 4 bolumu: "cevrimici baska oyuncu" PlayerState'li ama denetleyicisiz bir pawn ile benzetilir; kanonik-ayni-dosya korumasi TryLoad
 // yolundan ulasilamadigi icin bekleyen eski yol test icinden verilir. 10 sn geri cekilme RecoveryRetryAt'tan okunur (bekleme kosulmaz).
+// Test turu 5 bolumu: "pawn'siz bagli oyuncu" GameState->PlayerArray'e kendiliginden eklenen, denetleyicisiz bir APlayerState ile,
+// "izleyici" ASpectatorPawn'a baglanan ayni PlayerState ile benzetilir; gercek olum/izleyici gecisi, ag baglantisi ve PIE kosulmaz.
 
 namespace
 {

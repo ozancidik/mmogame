@@ -52,8 +52,11 @@ $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Match
 # Esik = bilinen kontrol sayisi (104: 41 eski + 48 ayristirma/K1/kilit/ad/B3/C1/O2/D3 + 15 guvenlik tur 2: .tmp temizligi,
 # bozuk kutunun .tmp.bad'i, callback'li iade) + 26 tur 3/4: ASCII ad temizleme, .bak durum makinesi (.bak alinamaz / Move+dogrudan
 # yazim basarisiz / .bak-.tmp kurtarma sirasi / bozuk ana + .bak), kilitli dosyada < 1 sn, 60 sn geri cekilme penceresi, bozuk/okunamayan
-# alici kutusu, BoxFull/StoreError sogumasi, fee_clamp kontrolu = 130; kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 130) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
+# alici kutusu, BoxFull/StoreError sogumasi, fee_clamp kontrolu = 130 + 11 test turu 5: ayrilmis alici (Player123/player9/Default/
+# default/kirpilan PLAYER0) BadTarget + altin/kutu yok, benzer adlar (PlayerOne/Player+harf/Gezgin2) teslim edilir, ayrilmis adli gonderen
+# gonderemez = 141 + 3 Sprint 1 (PR #3) iade hesabi: hediye korunur/tam ucret, fee_clamp ret + tam bakiye + kayittan once = 144;
+# kontrol silinirse/atlanirsa kosu KALIR.
+$consistent = ($reported -ge 144) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
 Write-Output "[MMO_MAIL_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

@@ -45,9 +45,11 @@ $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Match
 # Esik = bilinen kontrol sayisi (23: fixture + F1 11 + F5 3 + F3 8; + 35 tur 4: MMONameRules saf mantik 7, kanonik ad cakismasi
 # PreLogin/ChangeName/ServerSetName + Unicode temizleme + klan 17, Y8/DUSUK-5 kilit metni + Exists sayaci 5, Y3/G 6 = 58;
 # tur 5: "S-cedilla + Z -> Z kabul" kontrolu kaldirildi (davranis degisti: Unicode/izinsiz karakterli ad artik Gezgin alir) -1,
-# ayrilmis ad kurali + posta 2, PreLogin ret/kabul 3, ChangeName Gezgin/kirpma 4, ServerSetName ayrilmis + pawn'siz cevrimici ad 2 = 68);
-# kontrol silinirse/atlanirsa kosu KALIR.
-$consistent = ($reported -ge 68) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
+# ayrilmis ad kurali + posta 2, PreLogin ret/kabul 3, ChangeName Gezgin/kirpma 4, ServerSetName ayrilmis + pawn'siz cevrimici ad 2 = 68;
+# test turu 5: IsReservedName sinirlari/CanonicalSlot saf mantik 4 + canli yuva esdegerligi 1, PreLogin kirpilan/harf varyanti ret +
+# benzer ad kabul + URL kodlu ad ret 3, ayni yuvali iki misafir farkli Gezgin + cakisma dali + URL kodlu/kirpilan ayrilmis Gezgin +
+# benzer ad korunur 5, ServerSetName kirpilan/harf varyanti ret 1 = 82); kontrol silinirse/atlanirsa kosu KALIR.
+$consistent = ($reported -ge 82) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_NAMELOCK_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {

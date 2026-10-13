@@ -37,6 +37,9 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	const FString NameB = FString::Printf(TEXT("ZTestMailB_%s"), *Tag);
 	const FString NameStore = FString::Printf(TEXT("ZTestMailS_%s"), *Tag);
 	const FString NameBad = FString::Printf(TEXT("ZTestMailX_%s"), *Tag);
+	// Test turu 5: ayrilmis-ad kurali bozulursa (mutasyon) erken kontroller ortak "Default" kutusuna yazabilir; test oncesi yoksa sonda silinir.
+	const FString MailDefaultBoxPath = FMMOMailStore::GetBoxPath(TEXT("Default"));
+	const bool bMailDefaultBoxExisted = IFileManager::Get().FileExists(*MailDefaultBoxPath);
 
 	// --- Ad temizleme ---
 	Check(FMMOMailStore::SanitizeName(TEXT("A b/c.d")) == TEXT("A_bcd"), TEXT("name_sanitize_chars"));
@@ -278,6 +281,65 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 		Check(A->SendMail(TEXT("ZTestMail V_") + Tag, 0, TEXT("bosluk"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(NameV) == 2, TEXT("c1_space_equals_underscore"));
 		Check(A->SendMail(MailUniOmer, 0, TEXT("x"), true) == EMMOMailResult::BadTarget, TEXT("y1_mail_send_unicode_target_rejected"));
 		FMMOMailStore::DeleteBox(NameV);
+	}
+
+	// --- Test turu 5: ayrilmis alici adlari (MMONameRules::IsReservedName: Default/default, Player+rakam) /posta gonder'de BadTarget;
+	// alici "var" (bRecipientExists, orn. eski misafir kaydi MMOSave_Player123) olsa bile altin dusmez, kutu yazilmaz, soguma baslamaz.
+	// Ayrilmisa benzeyen adlar (PlayerOne, rakamsiz Player, Gezgin2) teslim edilebilir kalir. ---
+	{
+		const TCHAR* ReservedTargets[] = { TEXT("Player123"), TEXT("player9"), TEXT("Default"), TEXT("default"), TEXT(" PLAYER0 ") };
+		// Kural kaldirilirsa (mutasyon) bu adlara GERCEK kutu yazilabilir: test oncesi olmayan kutular sonunda dogrudan dosyadan silinir.
+		TArray<FString> ReservedBoxesCreatedByTest;
+		for (const TCHAR* R : ReservedTargets)
+		{
+			const FString P = FMMOMailStore::GetBoxPath(FString(R).TrimStartAndEnd()); // SendMail once kirpar
+			if (!IFileManager::Get().FileExists(*P)) { ReservedBoxesCreatedByTest.Add(P); }
+		}
+		InvA->Gold = 5000;
+		A->AdvanceTimeForTest(6.0);
+		const EMMOMailResult R123 = A->SendMail(TEXT("Player123"), 100, TEXT("misafir"), true);
+		const EMMOMailResult R9 = A->SendMail(TEXT("player9"), 100, TEXT("misafir"), true);
+		const EMMOMailResult RDef = A->SendMail(TEXT("Default"), 100, TEXT("ortak"), true);
+		const EMMOMailResult RDefLower = A->SendMail(TEXT("default"), 100, TEXT("ortak"), true);
+		const EMMOMailResult RTrimUpper = A->SendMail(TEXT(" PLAYER0 "), 100, TEXT("kirpma"), true);
+		Check(R123 == EMMOMailResult::BadTarget, TEXT("y5_mail_send_player123_rejected"));
+		Check(R9 == EMMOMailResult::BadTarget, TEXT("y5_mail_send_player9_lowercase_rejected"));
+		Check(RDef == EMMOMailResult::BadTarget, TEXT("y5_mail_send_default_rejected"));
+		Check(RDefLower == EMMOMailResult::BadTarget, TEXT("y5_mail_send_default_lowercase_rejected"));
+		Check(RTrimUpper == EMMOMailResult::BadTarget, TEXT("y5_mail_send_reserved_trimmed_upper_rejected"));
+		bool bNoReservedBox = true;
+		for (const FString& P : ReservedBoxesCreatedByTest) { bNoReservedBox &= !IFileManager::Get().FileExists(*P); }
+		Check(InvA->Gold == 5000 && bNoReservedBox, TEXT("y5_mail_reserved_targets_no_gold_no_box"));
+		// Saf kural: benzer ama ayrilmamis adlar teslim edilebilir; giris noktasi kirptigi icin " Default " de ayrilmis sayilir.
+		Check(FMMOMailStore::IsDeliverableName(TEXT("PlayerOne")) && FMMOMailStore::IsDeliverableName(TEXT("Player")) && FMMOMailStore::IsDeliverableName(TEXT("Gezgin2"))
+			&& FMMOMailStore::IsDeliverableName(TEXT("Player12a")) && FMMOMailStore::IsDeliverableName(TEXT("Player_12")) && FMMOMailStore::IsDeliverableName(TEXT("Defaulter"))
+			&& !FMMOMailStore::IsDeliverableName(TEXT("PLAYER12")) && !FMMOMailStore::IsDeliverableName(TEXT("DEFAULT")), TEXT("y5_mail_lookalike_names_deliverable"));
+		// Canli: ayrilmis kurala benzeyen GUID'li adlara gonderim yapilir (soguma ret'lerden baslamadi: ilk gonderim hemen Ok).
+		const FString LookPlayerOne = TEXT("PlayerOne") + Tag;
+		const FString LookPlayer = TEXT("PlayerZ") + Tag; // rakamsiz "Player" + harf
+		const FString LookGezgin = TEXT("Gezgin2") + Tag;
+		for (const FString& N : { LookPlayerOne, LookPlayer, LookGezgin }) { FMMOMailStore::DeleteBox(N); }
+		const EMMOMailResult ROne = A->SendMail(LookPlayerOne, 0, TEXT("benzer"), true);
+		Check(ROne == EMMOMailResult::Ok && InvA->Gold == 5000 - FeeFor(0) && FMMOMailStore::Count(LookPlayerOne) == 1, TEXT("y5_mail_send_playerone_ok"));
+		A->AdvanceTimeForTest(6.0);
+		Check(A->SendMail(LookPlayer, 0, TEXT("benzer"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(LookPlayer) == 1, TEXT("y5_mail_send_player_letters_ok"));
+		A->AdvanceTimeForTest(6.0);
+		Check(A->SendMail(LookGezgin, 0, TEXT("benzer"), true) == EMMOMailResult::Ok && FMMOMailStore::Count(LookGezgin) == 1, TEXT("y5_mail_send_gezgin_digit_ok"));
+		for (const FString& N : { LookPlayerOne, LookPlayer, LookGezgin }) { FMMOMailStore::DeleteBox(N); }
+		// Gonderen tarafi: canli adi ayrilmis olan (orn. eski misafir Player77) gonderemez, altin dusmez.
+		UMMOInventoryComponent* InvC = CC->GetInventory();
+		C->InitForTest(TEXT("Player77"));
+		C->AdvanceTimeForTest(6.0);
+		const int32 GoldC0 = InvC ? InvC->Gold : -1;
+		if (InvC) { InvC->Gold = 1000; }
+		const EMMOMailResult RSender = C->SendMail(NameB, 10, TEXT("misafirden"), true);
+		Check(InvC && RSender == EMMOMailResult::StoreError && InvC->Gold == 1000, TEXT("y5_mail_reserved_sender_cannot_send"));
+		if (InvC) { InvC->Gold = GoldC0; }
+		C->InitForTest(FString());
+		for (const FString& P : ReservedBoxesCreatedByTest)
+		{
+			for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bak"), TEXT(".bad") }) { IFileManager::Get().Delete(*(P + Ext), false, true, true); }
+		}
 	}
 
 	// --- O2: altin tavanini (MaxGold) asacak posta kutuda KALIR; asmayanlar teslim edilir ---
@@ -602,6 +664,10 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 	}
 
 	FMMOMailStore::DeleteBox(NameA); FMMOMailStore::DeleteBox(NameB);
+	if (!bMailDefaultBoxExisted)
+	{
+		for (const TCHAR* Ext : { TEXT(""), TEXT(".tmp"), TEXT(".bak"), TEXT(".bad") }) { IFileManager::Get().Delete(*(MailDefaultBoxPath + Ext), false, true, true); }
+	}
 	for (TStrongObjectPtr<AMMOCharacter>* P : {&CA, &CB, &CC}) { if (P->IsValid()) (*P)->Destroy(); }
 	return bPassed; // Ayni senkron kare: PlayerState adi, kayit yukleme, /posta komutu, zamanlayici ve ag kaniti degil.
 }
@@ -617,6 +683,8 @@ bool UMMOMailComponent::RunSelfTest(UWorld* World, FString& OutError, int32& Out
 // kaldiginda) .bak'in HEMEN geri konmasi ve ilk-posta hata dalinda ana dosyanin .bad'a ayrilmasi (ikisi de surec ici benzetilemeyen
 // isletim sistemi hatasi / FileExists yanlis negatifi ister). Posta 60 sn geri cekilmesinin SURESI olculmez (harita anonim isim
 // alaninda); yalniz pencere icinde yeniden denenmedigi ve kanca ile temizlendigi dogrulanir.
+// Test turu 5 bolumu: ayrilmis alici icin "alici var" bilgisi bRecipientExists=true ile verilir (gercek /posta gonder komutunun
+// MMOSave_Player123 gibi diskteki eski misafir yuvasina bakmasi kosulmaz); ayrilmis adli gonderen InitForTest adiyla benzetilir.
 
 namespace
 {

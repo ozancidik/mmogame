@@ -49,8 +49,10 @@ if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported 
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'check=(\S+)') { $Matches[1] } } | Sort-Object -Unique)
 # Esik = bilinen kontrol sayisi (67: 30 eski + 23 kalicilik/B1/A5/D5/O1/LoadSerial/D3 + 14 guvenlik tur 2: F2 EndPlay tasimasi,
 # MMOLoad serisi, kilitli ana dosya/.tmp ertelemesi) + 14 tur 3/4: 10 sn geri cekilme penceresi, kilitli ana dosyada hizli basarisiz
-# SaveNow (bDirty kalir), eski yuva silme kurallari (basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya) = 81.
-$consistent = ($reported -ge 81) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
+# SaveNow (bDirty kalir), eski yuva silme kurallari (basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya) = 81
+# + 6 test turu 5: pawn'siz / izleyici pawn'li bagli oyuncu (GameState->PlayerArray) eski yuva korumasi, kanonik varyant, ilgisiz ad
+# kontrolu, kendi PlayerState'i koruma sayilmaz = 87.
+$consistent = ($reported -ge 87) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported) -and ($expectedLock.Count -eq 0)
 Write-Output "[MMO_DAILY_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {
