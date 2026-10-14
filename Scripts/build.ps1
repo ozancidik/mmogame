@@ -5,31 +5,86 @@
     Builds Editor, Server, and Client targets with proper configuration
 .NOTES
     Requires: Visual Studio 2022 with Game Development workload, UE 5.7 installed
+
+    -Clean    deletes ONLY <project>\Binaries and <project>\Intermediate.
+    -CleanDdc deletes <project>\DerivedDataCache (explicit, separate flag; combine with -Clean for all three).
+    Saved\ is NEVER deleted (character .sav files, Saved\MMOAchievements, MMODaily, MMOMail, LLM budget counter).
+    Before deleting anything the script stops with an error if Unreal Editor or UnrealBuildTool is running.
+
+    Project lookup: -ProjectPath if given, else MyProject.uproject next to this script's parent folder
+    (Scripts\..), else -DefaultProjectPath (the owner's desktop checkout).
 #>
 
 param(
     [Parameter(Mandatory=$false)]
     [ValidateSet('Editor', 'Server', 'Client', 'All')]
     [string]$Target = 'Editor',
-    
+
     [Parameter(Mandatory=$false)]
     [ValidateSet('Development', 'Shipping', 'Debug')]
     [string]$Configuration = 'Development',
-    
+
     [Parameter(Mandatory=$false)]
-    [string]$ProjectPath = "C:\Users\OZAN CIDIK\Desktop\ozan online\MyProject\MyProject.uproject",
-    
+    [string]$ProjectPath = '',
+
+    [Parameter(Mandatory=$false)]
+    [string]$DefaultProjectPath = "C:\Users\OZAN CIDIK\Desktop\ozan online\MyProject\MyProject.uproject",
+
     [Parameter(Mandatory=$false)]
     [string]$EnginePath = "C:\Program Files\Epic Games\UE_5.7",
-    
+
     [Parameter(Mandatory=$false)]
     [switch]$Clean,
-    
+
+    [Parameter(Mandatory=$false)]
+    [switch]$CleanDdc,
+
     [Parameter(Mandatory=$false)]
     [switch]$WaitMutex
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Resolve and validate the project file. A wrong path must fail here, before any build or delete
+# (a mistyped -ProjectPath must never make -Clean delete folders next to some other file).
+function Resolve-ProjectFile {
+    $candidate = $ProjectPath
+    if ([string]::IsNullOrWhiteSpace($candidate)) {
+        $scriptProject = $null
+        if ($PSScriptRoot) {
+            $scriptProject = Join-Path (Split-Path -Parent $PSScriptRoot) 'MyProject.uproject'
+        }
+        if ($scriptProject -and (Test-Path -LiteralPath $scriptProject -PathType Leaf)) {
+            $candidate = $scriptProject
+        } else {
+            $candidate = $DefaultProjectPath
+        }
+    }
+
+    try {
+        $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction Stop
+    } catch {
+        throw "ProjectPath not found: $candidate"
+    }
+    $full = $resolved.ProviderPath
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+        throw "ProjectPath is not a file: $full"
+    }
+    if ([System.IO.Path]::GetExtension($full) -ne '.uproject') {
+        throw "ProjectPath must point to a .uproject file: $full"
+    }
+    $root = Split-Path -Parent $full
+    if ([string]::IsNullOrWhiteSpace($root) -or ($root.TrimEnd('\') -match '^[A-Za-z]:$')) {
+        throw "Refusing to use a drive root as project folder: $root"
+    }
+    $sameName = Join-Path $root ([System.IO.Path]::GetFileName($full))
+    if (-not (Test-Path -LiteralPath $sameName -PathType Leaf)) {
+        throw "Project folder $root does not contain $([System.IO.Path]::GetFileName($full))"
+    }
+    return $full
+}
+
+$ProjectPath = Resolve-ProjectFile
 
 function Write-Log {
     param([string]$Message, [string]$Level = 'INFO')
@@ -80,11 +135,13 @@ function Invoke-Build {
     )
     
     $buildScript = "$EnginePath\Engine\Build\BatchFiles\Build.bat"
+    # Start-Process joins -ArgumentList with spaces and does not quote: the project path contains
+    # spaces ("OZAN CIDIK", "ozan online"), so the whole -Project=... value is quoted here.
     $arguments = @(
         $TargetName,
         'Win64',
         $Config,
-        "-Project=$ProjectPath"
+        ('"-Project={0}"' -f $ProjectPath)
     )
     
     if ($WaitMutex) {
@@ -105,19 +162,37 @@ function Invoke-Build {
     }
 }
 
+function Assert-NoUnrealRunning {
+    # A running editor / build holds files in Binaries/Intermediate/DDC; deleting under it leaves a half state.
+    $names = @('UnrealEditor', 'UnrealEditor-Cmd', 'UnrealBuildTool', 'LiveCodingConsole')
+    $running = @(Get-Process -ErrorAction Stop | Where-Object { $names -contains $_.ProcessName })
+    if ($running.Count -gt 0) {
+        $list = ($running | ForEach-Object { "$($_.ProcessName) (pid $($_.Id))" }) -join ', '
+        throw "Clean aborted: close these first: $list"
+    }
+}
+
 function Clean-Build {
-    Write-Log "Cleaning build artifacts..."
-    $dirs = @(
-        "$(Split-Path $ProjectPath)\Binaries",
-        "$(Split-Path $ProjectPath)\Intermediate",
-        "$(Split-Path $ProjectPath)\DerivedDataCache",
-        "$(Split-Path $ProjectPath)\Saved"
-    )
-    
-    foreach ($dir in $dirs) {
-        if (Test-Path $dir) {
+    param([bool]$IncludeBuild, [bool]$IncludeDdc)
+
+    Assert-NoUnrealRunning
+
+    $root = Split-Path -Parent $ProjectPath
+    # Only regenerated build output. Saved\ (character saves, achievements, daily, mail, LLM budget) is never listed.
+    $names = @()
+    if ($IncludeBuild) {
+        $names += 'Binaries', 'Intermediate'
+    }
+    if ($IncludeDdc) {
+        $names += 'DerivedDataCache'
+    }
+
+    Write-Log "Cleaning build artifacts in $root ($($names -join ', '))..."
+    foreach ($name in $names) {
+        $dir = Join-Path $root $name
+        if (Test-Path -LiteralPath $dir -PathType Container) {
             Write-Log "Removing $dir"
-            Remove-Item -Path $dir -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction Stop
         }
     }
     Write-Log "Clean completed"
@@ -131,8 +206,8 @@ if (-not (Test-Prerequisites)) {
     exit 1
 }
 
-if ($Clean) {
-    Clean-Build
+if ($Clean -or $CleanDdc) {
+    Clean-Build -IncludeBuild ([bool]$Clean) -IncludeDdc ([bool]$CleanDdc)
 }
 
 $success = $true

@@ -6,6 +6,20 @@
 #include "HAL/PlatformFilemanager.h"
 #include "GenericPlatform/GenericPlatformFile.h"
 
+// NOT USED (QA/security round 6, docs/SIX_MAP_PLAN.md section 1.5): there is no database backend in this module.
+// Every DB operation below fails closed with LastError = DbMigratorNotImplemented; migrations are applied with
+// psql/Flyway. Keep or delete this class = owner decision S15 (do not delete without it).
+namespace
+{
+	const TCHAR* const DbMigratorNotImplemented = TEXT("not implemented: no database backend");
+
+	// Forward migrations only: V{n}__*_rollback.sql must never run in the forward direction.
+	bool DbMigratorIsRollbackFile(const FString& FileName)
+	{
+		return FileName.EndsWith(TEXT("_rollback.sql"), ESearchCase::IgnoreCase);
+	}
+}
+
 UDatabaseMigrator::UDatabaseMigrator()
 	: CurrentVersion(0)
 	, MigrationDirectory(FPaths::ProjectDir() / TEXT("Migrations"))
@@ -49,8 +63,9 @@ bool UDatabaseMigrator::CreateSchemaVersionTable()
 
 int32 UDatabaseMigrator::GetAppliedVersion()
 {
-	// TODO: Implement actual database query
-	// For now, return 0 to indicate no migrations applied
+	// No backend: the applied version is unknown. 0 = "not initialized" (header contract) + LastError.
+	LastError = DbMigratorNotImplemented;
+	UE_LOG(LogTemp, Warning, TEXT("[DatabaseMigrator] GetAppliedVersion: %s"), *LastError);
 	return 0;
 }
 
@@ -58,7 +73,7 @@ bool UDatabaseMigrator::RunMigrations()
 {
 	if (!IsDatabaseInitialized())
 	{
-		LastError = TEXT("Database not initialized");
+		LastError = FString::Printf(TEXT("Database not initialized: %s"), *LastError);
 		return false;
 	}
 
@@ -87,7 +102,8 @@ bool UDatabaseMigrator::RunMigration(int32 Version)
 	IFileManager& FileManager = IFileManager::Get();
 	TArray<FString> Files;
 	FileManager.FindFiles(Files, *MigrationDirectory, *MigrationFile);
-	
+	Files.RemoveAll([](const FString& File) { return DbMigratorIsRollbackFile(File); });
+
 	if (Files.Num() == 0)
 	{
 		LastError = FString::Printf(TEXT("Migration file not found for version %d"), Version);
@@ -150,16 +166,18 @@ bool UDatabaseMigrator::RollbackMigration(int32 Version)
 
 bool UDatabaseMigrator::RecordMigration(int32 Version, const FString& Name)
 {
-	// TODO: Implement actual database insert
-	// INSERT INTO schema_version (version, name) VALUES (?, ?)
-	return true;
+	// Would be: INSERT INTO schema_version (version, name) VALUES (?, ?). No backend: fail closed.
+	LastError = DbMigratorNotImplemented;
+	UE_LOG(LogTemp, Warning, TEXT("[DatabaseMigrator] RecordMigration(%d, %s): %s"), Version, *Name, *LastError);
+	return false;
 }
 
 bool UDatabaseMigrator::RemoveMigrationRecord(int32 Version)
 {
-	// TODO: Implement actual database delete
-	// DELETE FROM schema_version WHERE version = ?
-	return true;
+	// Would be: DELETE FROM schema_version WHERE version = ?. No backend: fail closed.
+	LastError = DbMigratorNotImplemented;
+	UE_LOG(LogTemp, Warning, TEXT("[DatabaseMigrator] RemoveMigrationRecord(%d): %s"), Version, *LastError);
+	return false;
 }
 
 bool UDatabaseMigrator::ExecuteSQLFile(const FString& FilePath)
@@ -176,24 +194,20 @@ bool UDatabaseMigrator::ExecuteSQLFile(const FString& FilePath)
 
 bool UDatabaseMigrator::ExecuteSQL(const FString& SQL)
 {
-	// TODO: Implement actual PostgreSQL execution using libpq or similar
-	// For now, log the SQL that would be executed
-	UE_LOG(LogTemp, Verbose, TEXT("[DatabaseMigrator] Executing SQL: %s"), *SQL.Left(500));
-	
-	// TODO: Actual implementation would use libpq:
-	// PGconn* conn = PQconnectdb(TCHAR_TO_UTF8(*ConnectionString));
-	// PGresult* res = PQexec(conn, TCHAR_TO_UTF8(*SQL));
-	// Check PQresultStatus(res) == PGRES_COMMAND_OK
-	// PQclear(res);
-	// PQfinish(conn);
-	
-	return true;
+	// No PostgreSQL client (libpq) is linked. Previously this returned true without running anything, so
+	// Initialize/RunMigrations reported success for SQL that never executed. Fail closed instead.
+	UE_LOG(LogTemp, Verbose, TEXT("[DatabaseMigrator] Not executing SQL: %s"), *SQL.Left(500));
+	LastError = DbMigratorNotImplemented;
+	UE_LOG(LogTemp, Warning, TEXT("[DatabaseMigrator] ExecuteSQL: %s"), *LastError);
+	return false;
 }
 
 bool UDatabaseMigrator::IsDatabaseInitialized() const
 {
-	// TODO: Check if schema_version table exists
-	return true;
+	// Would check that the schema_version table exists. No backend: fail closed.
+	LastError = DbMigratorNotImplemented;
+	UE_LOG(LogTemp, Warning, TEXT("[DatabaseMigrator] IsDatabaseInitialized: %s"), *LastError);
+	return false;
 }
 
 TArray<int32> UDatabaseMigrator::GetAvailableMigrations() const
@@ -206,6 +220,10 @@ TArray<int32> UDatabaseMigrator::GetAvailableMigrations() const
 	
 	for (const FString& File : Files)
 	{
+		if (DbMigratorIsRollbackFile(File))
+		{
+			continue; // V{n}__*_rollback.sql is not a forward migration
+		}
 		// Extract version from filename (V{Version}__name.sql)
 		FString VersionStr;
 		if (File.Split(TEXT("__"), &VersionStr, nullptr))
@@ -214,7 +232,7 @@ TArray<int32> UDatabaseMigrator::GetAvailableMigrations() const
 			int32 Version = FCString::Atoi(*VersionStr);
 			if (Version > 0)
 			{
-				Migrations.Add(Version);
+				Migrations.AddUnique(Version);
 			}
 		}
 	}
@@ -225,9 +243,10 @@ TArray<int32> UDatabaseMigrator::GetAvailableMigrations() const
 
 bool UDatabaseMigrator::ValidateSchema() const
 {
-	// TODO: Implement schema validation
-	// Check all tables exist, columns match, indexes exist, etc.
-	return true;
+	// Would check that all tables/columns/indexes exist. No backend: fail closed.
+	LastError = DbMigratorNotImplemented;
+	UE_LOG(LogTemp, Warning, TEXT("[DatabaseMigrator] ValidateSchema: %s"), *LastError);
+	return false;
 }
 
 bool UDatabaseMigrator::BP_Initialize(const FString& InConnectionString)

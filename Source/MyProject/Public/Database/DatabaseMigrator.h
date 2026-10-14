@@ -6,8 +6,14 @@
 #include "DatabaseMigrator.generated.h"
 
 /**
- * PostgreSQL database migration system
- * Handles schema versioning and migration execution
+ * PostgreSQL database migration system (STUB, NOT USED).
+ *
+ * There is no database backend (no libpq) in this module: every operation that would touch the
+ * database (ExecuteSQL, RecordMigration, RemoveMigrationRecord, IsDatabaseInitialized, ValidateSchema,
+ * GetAppliedVersion) fails closed and sets LastError = "not implemented: no database backend", so
+ * Initialize / RunMigrations / RollbackMigration always return false. Nothing in the game calls it.
+ * Migrations under Migrations/ are applied with psql or Flyway (docs/SIX_MAP_PLAN.md section 1.5).
+ * Keeping or deleting this class is owner decision S15.
  */
 UCLASS()
 class MYPROJECT_API UDatabaseMigrator : public UObject
@@ -97,8 +103,8 @@ protected:
 	/** Current schema version */
 	int32 CurrentVersion;
 
-	/** Last error message */
-	FString LastError;
+	/** Last error message (mutable: const checks also report "not implemented") */
+	mutable FString LastError;
 
 	/** Migration directory path */
 	FString MigrationDirectory;

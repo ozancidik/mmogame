@@ -128,11 +128,11 @@ bool FPacketValidator::ValidatePacketIntegrity(const TArray<uint8>& PacketData, 
 		return false;
 	}
 
-	// TODO: Implement actual checksum validation
-	// TODO: Implement sequence number validation
-	// TODO: Implement encryption validation
-
-	return true;
+	// Checksum / sequence / encryption checks are NOT implemented. Fail closed: an unimplemented
+	// integrity check must never report a packet as valid (QA/security round 6).
+	LastError = TEXT("not implemented: packet integrity (checksum/sequence/encryption) validation");
+	UE_LOG(LogTemp, Warning, TEXT("[AntiCheat] ValidatePacketIntegrity: %s"), *LastError);
+	return false;
 }
 
 void FPacketValidator::RecordValidationFailure(APlayerController* PlayerController, const FString& Reason)
@@ -285,8 +285,9 @@ bool FPacketValidator::ValidateRPCPayloadSize(const FName& RPCName, int32 Payloa
 
 bool FPacketValidator::ValidateRPCFrequency(APlayerController* PlayerController, const FName& RPCName) const
 {
-	// TODO: Implement per-RPC rate limiting
-	// Track RPC calls per second per player per RPC type
-	// For now, allow all
-	return true;
+	// Per-RPC rate limiting is NOT implemented. Fail closed instead of "allow all" so a caller
+	// cannot mistake this for a working limiter (QA/security round 6). Nothing calls ValidateRPC yet.
+	LastError = TEXT("not implemented: per-RPC rate limiting");
+	UE_LOG(LogTemp, Warning, TEXT("[AntiCheat] ValidateRPCFrequency(%s): %s"), *RPCName.ToString(), *LastError);
+	return false;
 }

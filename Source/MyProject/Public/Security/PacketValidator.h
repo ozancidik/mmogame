@@ -36,7 +36,7 @@ public:
 	 * Validates packet integrity (checksum, sequence, encryption)
 	 * @param PacketData The raw packet data
 	 * @param ExpectedSequence Expected sequence number
-	 * @return true if packet integrity is valid
+	 * @return true if packet integrity is valid. NOT IMPLEMENTED: always false (fail closed), see GetLastError().
 	 */
 	bool ValidatePacketIntegrity(const TArray<uint8>& PacketData, uint32 ExpectedSequence);
 
@@ -67,7 +67,13 @@ public:
 	 */
 	bool ShouldActionPlayer(class APlayerController* PlayerController) const;
 
+	/** Last "not implemented" / failure reason from the stub checks (ValidatePacketIntegrity, ValidateRPCFrequency). */
+	const FString& GetLastError() const { return LastError; }
+
 private:
+	/** Set by checks that are not implemented yet (they fail closed). */
+	mutable FString LastError;
+
 	/** Tracks validation failures per player */
 	TMap<TWeakObjectPtr<class APlayerController>, int32> ValidationFailures;
 
@@ -89,6 +95,6 @@ private:
 	/** Validates RPC payload size is reasonable */
 	bool ValidateRPCPayloadSize(const FName& RPCName, int32 PayloadSize) const;
 
-	/** Validates RPC frequency is not excessive */
+	/** Validates RPC frequency is not excessive. NOT IMPLEMENTED: always false (fail closed), so ValidateRPC fails too. */
 	bool ValidateRPCFrequency(class APlayerController* PlayerController, const FName& RPCName) const;
 };

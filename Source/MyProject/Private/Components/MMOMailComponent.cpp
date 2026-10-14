@@ -4,6 +4,7 @@
 #include "Characters/MMOCharacter.h"
 #include "Characters/MMOMob.h"
 #include "Components/MMOInventoryComponent.h"
+#include "Core/MMOMetrics.h"
 #include "Core/MMONotify.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
@@ -14,6 +15,8 @@
 #include "HAL/PlatformTime.h"
 #include "Misc/DateTime.h"
 #include "Misc/Paths.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogMMOMail, Log, All);
 
 UMMOMailComponent::UMMOMailComponent()
 {
@@ -276,7 +279,7 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 	// Only this attempt's clamped attachment/fee mutations are refundable. Callback spending/gifts are independent.
 	// A reload starts a new balance generation, even when owner, components, name and save slot stay the same.
 	int32 Deducted = 0;
-	const auto Refund = [&GetEligibleInventory, &Deducted]()
+	const auto Refund = [&GetEligibleInventory, &Deducted, &Me]()
 	{
 		const int32 Amount = Deducted;
 		Deducted = 0; // Consume before publishing the refund's synchronous gold callback.
@@ -287,6 +290,16 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 		if (UMMOInventoryComponent* I = GetEligibleInventory())
 		{
 			I->AddGoldFrom(Amount, TEXT("posta-iade"));
+		}
+		else
+		{
+			// Iade edilemedi (sahip/envanter gitti, yeniden yuklendi, ad/yuva degisti ya da kilitlendi): altin kaybolur
+			// (kopyalanmaz). Mantik ayni; yalniz gozlemlenebilirlik: metrik + uyari satiri.
+			const FString Who = Me.Replace(TEXT(" "), TEXT("_"));
+			UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=gold_lost who=%s src=posta-iade amount=%d"),
+				MMOMetrics::Seconds(), Who.IsEmpty() ? TEXT("?") : *Who, Amount);
+			UE_LOG(LogMMOMail, Warning, TEXT("posta iadesi yapilamadi, altin kayboldu: who=%s amount=%d"),
+				Who.IsEmpty() ? TEXT("?") : *Who, Amount);
 		}
 	};
 

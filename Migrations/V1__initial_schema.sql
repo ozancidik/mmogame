@@ -19,7 +19,7 @@ CREATE TABLE characters (
     vitality INT NOT NULL DEFAULT 12,
     unspent_stat_points INT NOT NULL DEFAULT 0,
     unspent_skill_points INT NOT NULL DEFAULT 0,
-    gold BIGINT NOT NULL DEFAULT 0,
+    gold BIGINT NOT NULL DEFAULT 0 CHECK (gold >= 0),
     map_name VARCHAR(64) NOT NULL DEFAULT 'Summer_scene',
     location_x FLOAT NOT NULL DEFAULT 0,
     location_y FLOAT NOT NULL DEFAULT 0,
@@ -45,7 +45,7 @@ CREATE TABLE character_inventory (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     character_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
     item_id VARCHAR(64) NOT NULL,
-    count INT NOT NULL DEFAULT 1,
+    count INT NOT NULL DEFAULT 1 CHECK (count >= 0),
     slot_index INT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -77,7 +77,8 @@ CREATE TABLE character_warehouse (
     instance_id INT NOT NULL,
     plus_level INT NOT NULL DEFAULT 0,
     rarity VARCHAR(16) NOT NULL DEFAULT 'Common',
-    stored_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    stored_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW() -- needed by update_warehouse_updated_at trigger (NEW.updated_at)
 );
 
 CREATE INDEX idx_warehouse_character_id ON character_warehouse(character_id);
@@ -158,7 +159,7 @@ CREATE TABLE mail (
     recipient_id UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
     subject VARCHAR(128) NOT NULL,
     body TEXT NOT NULL,
-    gold_attached BIGINT NOT NULL DEFAULT 0,
+    gold_attached BIGINT NOT NULL DEFAULT 0 CHECK (gold_attached >= 0),
     items_attached JSONB NOT NULL DEFAULT '[]',
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -175,8 +176,8 @@ CREATE TABLE auction_house (
     instance_id INT NOT NULL,
     plus_level INT NOT NULL DEFAULT 0,
     rarity VARCHAR(16) NOT NULL DEFAULT 'Common',
-    price BIGINT NOT NULL,
-    quantity INT NOT NULL DEFAULT 1,
+    price BIGINT NOT NULL CHECK (price >= 0),
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity >= 0),
     listed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '48 hours'),
     buyer_id UUID REFERENCES characters(id) ON DELETE SET NULL,
