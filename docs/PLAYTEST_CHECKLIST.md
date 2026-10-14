@@ -5547,6 +5547,9 @@ Native testler (`7932979`: basarim 96, gunluk 81, posta 130, ad kilidi 58) gecti
 - [ ] Uzak yeni karakter `MMOSetName Ömer`: "Adda yalniz harf (a-z, A-Z; Turkce harf yok), rakam, bosluk, _ ve - kullanilabilir" reddi; ad degismemeli.
 - [ ] `?Name=Ömer` ile baglan: ad `mer` olmali ve 3 sn sonra "Baglanti adindaki izinsiz karakterler atildi: adin 'mer'..." bildirimi gelmeli
   ("yeni karakter" uyarisi OLMAMALI; o yalniz `Gezgin######` atamasinda). Diskte `MMOSave_mer.sav` varsa o karakter yuklenir (bilinen sinir, karar adayi).
+  **BEKLENTI DEGISTI (tur 5, `f70e5ad`; 2026-10-14 notu):** artik kirpma yok. `?Name=Ömer` baglantisi `PreLogin`'de "Gecersiz ad: Turkce harf
+  kullanilamaz; yalniz a-z, A-Z, rakam, bosluk, _ ve - kullanilabilir." ile **reddedilmeli**; `mer` kaydi yuklenmemeli. PreLogin'i atlayan
+  bir yoldan gelirse `Gezgin######` adi + "yeni karakter" uyarisi. Ayrica `?Name=Player123` / `?Name=Default` "Bu ad ayrilmis ..." ile reddedilmeli.
 - [ ] Cevrimici `Ali Veli` varken ikinci istemci `?Name=ali_veli` ile baglanmayi denesin: "Bu ad su an baska bir oyuncu tarafindan kullaniliyor" reddi.
 - [ ] Klan: `/klan kur Kılıç` reddedilmeli (yalniz ASCII harf/rakam); daha once kurulmus Turkce harfli bir klan varsa yuklenince korunmali.
 - [ ] Host (kayitli `A`) `MMOSetName B`; ardindan baska bir istemci `?Name=A` ile baglansin; sonra host `MMOSave` (+5 sn bekle):
@@ -5607,3 +5610,20 @@ Ayrinti: [O69 gorev kaydi](tasks/MAIL_REFUND_ACCOUNTING_2026-10-11.md).
 - [ ] Refund-savefail, crash/restart settlement ve NR1/NR3 ayri yetkili
   senaryolarda incelensin; O69 bunlari cozdu diye kabul etme. Remote erisim
   ve exploit tetiklenebilirligi kanitlanmadi; canli veriye fault uygulama.
+
+## Asama 0 headless sonucu + takas onayinda cikis (2026-10-14)
+
+`SIX_MAP_PLAN.md` §11 adim 2, commit `1f4a557` (tur 6) uzerinde, editor kapali:
+- `Scripts\RunAllChecks.ps1 -SkipBuild`: cikis 0, **70/70 adim GECTI** (`%TEMP%\runall_orch_20261014.log`; 140 = adim + ozet satirlarindaki GECTI).
+- Duman Summer_scene: cikis 0, `Error:` satiri 0, 56 mob (`SpawnOne ... result=MMOMob`). Duman Winter_scene: cikis 0, hata 0, 81 mob.
+- `NetSmokeTest` (port 17850, yalniz Summer_scene listen sunucu): baglanti (sunucu) 1, `Welcomed` (istemci) 1, hata 0/0. Winter'da NetSmoke kosulmadi.
+- Native testler (RunAllChecks icinde): basarim 102, gunluk 87, posta 144, ad kilidi 82 GECTI. `TestMailRefund.ps1` (176) ana checkout'ta kosmaz (izole worktree ister), bu turda kosulmadi.
+- Adim 3 (iki pencereli PIE) yapilmadi, kullaniciyi bekliyor. Asagidaki madde dahil hicbiri PIE'de denenmedi.
+
+- [ ] **Takas onayi aninda cikis (A-1, hep-ya-hic altin):** Listen host (A) + uzak istemci (B). Iki taraf da altin teklif etsin
+  (or. A 1000, B 700; baslangic bakiyelerini yaz), ikisi de onaylasin ve **onay aninda** B oyundan ciksin (pencereyi kapat / baglantiyi kes).
+  A ve B'nin altinini oyunda ve kayitta (B yeniden girince) kontrol et: **iki oyuncunun toplam altini artmamali**
+  (takas olduysa A-1000+700 / B-700+1000, olmadiysa iki bakiye aynen). Toplam artarsa ya da bir taraf yalniz verip almazsa bulgu
+  dogrulanir. Neden: `ApplyGoldInternal` sahibi yok ediliyorsa altin degisikligini sessizce yok sayar (`MMOInventoryComponent.cpp:410`),
+  takasin dort altin cagrisi donus degerine bakmaz (`MMOTradeComponent.cpp:880-883`); ayrinti `DECISIONS_NEEDED.md`.
+  Sunucu logunda `event=trade_complete` satirindaki `balance_a`/`balance_b` degerlerini de not et.

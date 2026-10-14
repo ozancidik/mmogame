@@ -26,25 +26,25 @@ tarafından düzenleniyor (commit'lenmemiş). Bu dosyalarda satırlar kayabilir;
 | Motor `Engine/Source/Runtime/Engine/Private/GameModeBase.cpp:815-821` (`InitNewPlayer`) | Bağlantı URL'indeki `?Name=` değerini `.Left(20)` ile alıp doğrudan `ChangeName(..., false)` çağırıyor. Doğrulama yapmıyor. |
 | Motor `World.cpp:7379` | `LogNet: Login request: <URL seçenekleri>` satırını yazıyor. `?Password=` dahil tüm seçenekler sunucu loguna düşüyor. |
 | Motor `World.cpp:7425` | İstemci girişinde `GameMode->PreLoginAsync(Options, RemoteAddress, UniqueId, OnComplete)` çağrılıyor. Asenkron doğrulama için motorun hazır kancası. |
-| `Private/Core/MMOGameMode.cpp:381-392` | `SanitizeInitialName`: yalnız ASCII harf/rakam, `_`, `-` ve boşluk kalıyor (`MMONameRules::IsAllowedNameChar`, tur 4; Türkçe harf atılır: `Ömer` -> `mer`), en çok 20 karakter. |
-| `MMOGameMode.cpp:437-549` (`ChangeName`) | `bNameChange == true` ise karakterin `MMOSetName` yoluna yönlendiriliyor (443-450). Başlangıç adı çevrimiçi biriyle kanonik anahtarla (`MMONameRules::CanonicalKey`: boşluk -> `_`, ASCII küçük harf) çakışıyorsa (459-481), boş kalıyorsa ya da işletim sistemi adı kalıbındaysa `Gezgin######` veriliyor (482-519). Rastgele ad, var olan bir yuvayla çakışmasın diye `Store->Exists` ile kontrol ediliyor (494). Ad değiştiyse 3 sn sonra sohbet bildirimi; "yeni karakter" uyarısı yalnız `Gezgin` atamasında (526-548). |
-| `MMOGameMode.cpp:551-599` (`PreLogin`) | İsteğe bağlı `-MMOPassword=` / `?Password=` herkes için **tek ortak parola** (561-570). Düz `Equals` ile karşılaştırılıyor, deneme sınırı yok. Yalnız **çevrimiçi** bir adla (kanonik anahtarla) çakışan bağlantı reddediliyor (577-598); temizlenince boş kalan ad burada reddedilmiyor, `ChangeName`'de `Gezgin` alıyor. |
+| `Private/Core/MMOGameMode.cpp:381-392` | `SanitizeInitialName`: yalnız ASCII harf/rakam, `_`, `-` ve boşluk kalıyor (`MMONameRules::IsAllowedNameChar`, tur 4), en çok 20 karakter. Tur 5'ten (`f70e5ad`) beri sonucu **kırpılmış ad olarak kullanılmaz**: `InitialNameWasAltered` (397-400) temizleme baş/son boşluk dışında bir şey değiştirdiyse (`Ömer`, `Ali!`) ad reddedilir (PreLogin) ya da `Gezgin` olur (ChangeName). |
+| `MMOGameMode.cpp:445-556` (`ChangeName`; satırlar `1f4a557`) | `bNameChange == true` ise karakterin `MMOSetName` yoluna yönlendiriliyor (451-458). Başlangıç adı izinsiz karakterliyse (`bAltered`), ayrılmışsa (`MMONameRules::IsReservedName`: kanonik `default`, `player` + yalnız rakam; `bReserved`) (466-468), çevrimiçi biriyle kanonik anahtarla (`MMONameRules::CanonicalKey`: boşluk -> `_`, ASCII küçük harf) çakışıyorsa (470-491), boş kalıyorsa ya da işletim sistemi adı kalıbındaysa `Gezgin######` veriliyor (492-530). Rastgele ad, var olan bir yuvayla çakışmasın diye `Store->Exists` ile kontrol ediliyor (505). "Yeni karakter" uyarısı yalnız `Gezgin` atamasında (534-555); eski "izinsiz karakterler atıldı" bildirimi tur 5'te kalktı. |
+| `MMOGameMode.cpp:558-619` (`PreLogin`; satırlar `1f4a557`) | İsteğe bağlı `-MMOPassword=` / `?Password=` herkes için **tek ortak parola** (565-577). Düz `Equals` ile karşılaştırılıyor, deneme sınırı yok. Tur 5: temizlemenin değiştirdiği ad (595-599) ve ayrılmış ad (600-604) reddediliyor. Yalnız **çevrimiçi** bir adla (kanonik anahtarla) çakışan bağlantı reddediliyor (605-618); yalnız boşluktan oluşan ad burada reddedilmiyor, `ChangeName`'de `Gezgin` alıyor. |
 | `Private/Core/MMOAdmin.cpp:6-20` | Yönetici, listen-server host'unun yerel denetleyicisi. Dedicated sunucuda yönetici yok. |
 
 ### 2.2 Ad, kayıt yuvasına dönüşüyor
 
 | Nerede | Ne yapıyor |
 |---|---|
-| `Private/Characters/MMOCharacter.cpp:1114-1131` (`GetSaveSlotName`) | Yuva `MMOSave_` + PlayerState adı (`MMONameRules::SlotKey`, tur 4). Boşluk `_` oluyor, yalnız ASCII harf, rakam, `_`, `-`, en çok 32 karakter; harf büyüklüğü korunuyor. **Tek kimlik kaynağı bu fonksiyon.** (2026-10-11 tur 4 satırı; aşağıdaki diğer `MMOCharacter.cpp` satırları önceki çalışma ağacındandır, kaymış olabilir.) |
+| `Private/Characters/MMOCharacter.cpp:1115-1132` (`GetSaveSlotName`) | Yuva `MMOSave_` + PlayerState adı (`MMONameRules::SlotKey`, tur 4). Boşluk `_` oluyor, yalnız ASCII harf, rakam, `_`, `-`, en çok 32 karakter; harf büyüklüğü korunuyor. **Tek kimlik kaynağı bu fonksiyon.** (Bu satır ve `ServerSetName` satırı `1f4a557` içindir; aşağıdaki diğer `MMOCharacter.cpp` satırları önceki çalışma ağacındandır, kaymış olabilir.) |
 | `MMOCharacter.cpp:932, 969-979` | Possess'ten 0,6 sn sonra `AutoLoadDeferred` -> `LoadCharacter` çalışıyor. Adı bilen herkes o karakteri yüklüyor (K-1 senaryo 2). |
 | `MMOCharacter.cpp:1381-1397` | Yuva yoksa yeni karakter oluşturuluyor, başlangıç paketi veriliyor, `ActiveSaveSlot` atanıyor. |
 | `MMOCharacter.cpp:1241-1252` | K-1 kısmi koruma: yüklenen yuva ile şimdiki yuva farklıysa ve hedef yuva doluysa yazmıyor. |
-| `MMOCharacter.cpp:1589-1725` (`ServerSetName`, tur 4 satırları) | Ad değiştirme. ASCII dışı harf reddi (1606-1610); soğuma her disk kontrolünden önce (1627-1647); uzak, yönetici dışı istemci kaydı olan karakterin adını değiştiremiyor (ad kilidi, 1648-1663); çevrimiçi çakışma kanonik anahtarla (1664-1681); uzak istemci kayıtlı bir adı alamıyor, ret soğuma başlatıyor (1682-1698). Host/yönetici ad kilidine ve kayıtlı-ad kontrolüne tabi değil (ASCII kuralı, çevrimiçi çakışma ve 5 sn yerel soğuma onlar için de geçerli). |
+| `MMOCharacter.cpp:1590-1746` (`ServerSetName`, satırlar `1f4a557`) | Ad değiştirme. ASCII dışı harf reddi (1607-1611); ayrılmış ad reddi (tur 5, 1612-1617); soğuma her disk kontrolünden önce (1633-1653); uzak, yönetici dışı istemci kaydı olan karakterin adını değiştiremiyor (ad kilidi, 1655-1670); çevrimiçi çakışma kanonik anahtarla, pawn'ı olmayan bağlı oyuncular dahil (`GameState->PlayerArray`, tur 5) (1671-1702); uzak istemci kayıtlı bir adı alamıyor, ret soğuma başlatıyor (1703-1718). Host/yönetici ad kilidine ve kayıtlı-ad kontrolüne tabi değil (ASCII kuralı, çevrimiçi çakışma ve 5 sn yerel soğuma onlar için de geçerli). |
 | `MMOCharacter.cpp:1551-1561` | `ServerLoadCharacter` yalnız yöneticiye açık. "MMOLoad ile sahiplenme" uzak istemci için zaten kapalı. |
 | `MMOCharacter.cpp:952-957` (`UnPossessed`), `933` (60 sn otomatik kayıt) | Kayıt her zaman `GetSaveSlotName()` yuvasına yazılıyor. |
 | `Public/Save/MMOCharacterStore.h:47-49, 71-113` | `IMMOCharacterStore` yuva adını opak anahtar olarak kullanıyor. Yorumda "hesap sistemi gelince karakter kimliğine dönüşecek" yazıyor. |
 | `Private/Save/MMOLocalFileCharacterStore.cpp:8-44` | `Saved/SaveGames/<yuva>.sav`. `ListSlotNames` yalnız `MMOSave_*.sav` dosyalarını listeliyor (39). |
-| `MMOGameMode.cpp:658-668` | Bölge geçişinde aynı yuvaya sahip iki oyuncu reddediliyor. |
+| `MMOGameMode.cpp:677-687` (`1f4a557`) | Bölge geçişinde aynı yuvaya sahip iki oyuncu reddediliyor. |
 
 ### 2.3 Ada bağlı diğer sistemler
 
@@ -455,7 +455,8 @@ başlarsa yapılır.
 Durum: **uygulandi (2026-10-11)**: commit `afba349` (tur 2: F1-F3/F5), `2bb2023` (tur 3: ad kilidi sogumasi her disk
 kontrolunden once, F1 reddi de soguma baslatir, yan dosya temizligi), `d031b90` (tur 4: ASCII ad kurali + kanonik cakisma
 anahtari `Public/Core/MMONameRules.h`, guvenli eski yuva silme, kilitten sonra kilit metni). Native test `Scripts/TestNameLock.ps1`
-**58 kontrol GECTI** (`7932979`); PIE ve gercek uzak istemci YOK. F4 / §10.3 (Linux harf varyanti) hala ACIK. Ayrinti `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari. Kaynak: `SECURITY_AUDIT.md` K-1 "yeni yuz (2026-10-11): Ad degistirerek
+**58 kontrol GECTI** (`7932979`); guncel: tur 5 (`f70e5ad`: izinsiz karakterli ad kirpilmaz, ayrilmis adlar, pawn'siz cevrimici
+oyuncu) sonrasi **82 kontrol GECTI** (`76ceed9`; 2026-10-14 `1f4a557` uzerinde yeniden); PIE ve gercek uzak istemci YOK. F4 / §10.3 (Linux harf varyanti) hala ACIK. Ayrinti `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari. Kaynak: `SECURITY_AUDIT.md` K-1 "yeni yuz (2026-10-11): Ad degistirerek
 karakter catallama", bulgular F1-F5 (satirlar commit `43e87ca`). Karar adayi: `DECISIONS_NEEDED.md` "Ad degistirme kisiti
 (uzak istemci)".
 
@@ -484,18 +485,19 @@ bayrak kapaliyken acik kalir.
   hepsi `Gezgin######` / `CIDIK-<hex>`), yani mevcut oyuncu verisine pratik etkisi yok. Oyuncu `Gezgin######` adiyla
   kaydedildiyse adini degistiremez; yeni karakterle (yeni `?Name=`) baslamasi gerekir. Kabul edilip edilmeyecegi kullanici
   karari.
-- **Uygulama (guncel satirlar, `d031b90` sonrasi; yukaridaki maddeler oneri metnidir):** `ServerSetName_Implementation`
-  `MMOCharacter.cpp:1589`; soguma (uzak 30 sn, yerel 5 sn) her disk kontrolunden once `:1627-1647`; ad kilidi
-  (`Store->Exists(ActiveSaveSlot)`, magaza yoksa da ret) `:1648-1663`, ret `bNameLockRejected` koyar ve soguma suresince
-  sonraki denemeler "X sn bekle" yerine kilit metnini gorur; kayitli-ad reddi soguma damgasi vurur `:1682-1698`. Kaydi
-  olmayan yeni karakter ayni yuvayla yeniden possess edilirse kayit kapisi yeniden acilir (Y-NEW-6, `LoadCharacter` `:1364-1373`).
+- **Uygulama (guncel satirlar, `1f4a557`; yukaridaki maddeler oneri metnidir):** `ServerSetName_Implementation`
+  `MMOCharacter.cpp:1590`; ayrilmis ad reddi (tur 5) `:1612-1617`; soguma (uzak 30 sn, yerel 5 sn) her disk kontrolunden once
+  `:1633-1653`; ad kilidi (`Store->Exists(ActiveSaveSlot)`, magaza yoksa da ret) `:1655-1670`, ret `bNameLockRejected` koyar ve
+  soguma suresince sonraki denemeler "X sn bekle" yerine kilit metnini gorur; cevrimici cakisma pawn'siz oyuncular dahil
+  (`GameState->PlayerArray`, tur 5) `:1671-1702`; kayitli-ad reddi soguma damgasi vurur `:1703-1718`. Kaydi olmayan yeni karakter
+  ayni yuvayla yeniden possess edilirse kayit kapisi yeniden acilir (Y-NEW-6, `LoadCharacter` `:1365-1374`).
 
 ### 10.3 Linux harf varyanti notu
 
-- Bugun yuva adi harf buyuklugunu koruyor (`GetSaveSlotName`, `MMOCharacter.cpp:1114-1131`, `MMONameRules::SlotKey`) ve
+- Bugun yuva adi harf buyuklugunu koruyor (`GetSaveSlotName`, `MMOCharacter.cpp:1115-1132`, `MMONameRules::SlotKey`) ve
   `Exists` dosya sisteminin kuralina uyuyor (`MMOLocalFileCharacterStore.cpp:32`, `DoesSaveGameExist`). Windows'ta `MMOSave_Ali`
   ve `MMOSave_ALI` ayni dosya; harf duyarli bir dosya sisteminde (ileride Linux sunucu) iki ayri karakter olur (F4). Posta
-  kutusu ise zaten kucuk harfle anahtarli (`MMOMailStore.cpp:108` `GetBoxPath`), yani Linux'ta `ALI` adini alan biri `Ali`'nin
+  kutusu ise zaten kucuk harfle anahtarli (`MMOMailStore.cpp:110-115` `GetBoxPath`, `1f4a557`), yani Linux'ta `ALI` adini alan biri `Ali`'nin
   kutusunu toplayabilir [Muhtemel, kod okumasi; Linux'ta denenmedi].
 - **Tur 4 (`d031b90`) etkisi:** adlar artik yalniz ASCII oldugu icin Windows/NTFS'teki Unicode harf varyanti (buyuk/kucuk
   O-umlautlu iki "farkli" ad ayni `.sav`'a yaziliyordu, Y-NEW-1) KAPANDI. Cevrimici cakisma kontrolleri (PreLogin, ChangeName,
@@ -540,4 +542,5 @@ bayrak kapaliyken acik kalir.
   `:66-88`, gunlukte `DailyDeleteOldSlotFiles`); bozuk dosyanin eski `.tmp`'si `.tmp.bad` olur (Y6); `.tmp` kurtarma Move'u
   tekrar denemesiz, basarisizsa yukleme 10 sn ertelenir (tur 4, eskiden 60 sn). F3 dali kapali (`LoadCharacter` `:1359-1376`).
   Posta hala canli ada bagli; kutu yolu ASCII kucuk harf `Saved/MMOMail/MMOMail_<ad>.json`. Testler: basarim 96, gunluk 81,
-  posta 130, ad kilidi 58 kontrol (`7932979`).
+  posta 130, ad kilidi 58 kontrol (`7932979`). Guncel (tur 5, `76ceed9`): 102 / 87 / 144 / 82; eski yuva silme korumasi pawn'siz
+  bagli oyunculari da sayar (`GameState->PlayerArray`); bu maddedeki satirlar tur 5'te kaydi (`AchDeleteOldSlotFiles` simdi `:67-105`).

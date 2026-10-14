@@ -17,7 +17,7 @@ yeni dosyalarla eklendi.
 |---|---|
 | `Public/Achievements/MMOAchievementTypes.h`, `Private/Achievements/MMOAchievementDatabase.cpp` | veri tablosu (`MakeAch`), yeni satir = tek satir |
 | `Public/Components/MMOAchievementComponent.h`, `Private/Components/MMOAchievementComponent.cpp` | sunucu-otoriteli izleme, odul, kalicilik, komutlar |
-| `Private/Tests/MMOAchievementSelfTest.cpp`, `Scripts/TestAchievements.ps1` | native test (96 kontrol, `7932979`: tablo/mantik/JSON + GUID'li yuvalarla disk kaliciligi, B1 ad degisimi, LoadSerial, A5, C3, O1, .tmp, 10 sn geri cekilme penceresi, kilitli ana dosyada hizli basarisiz `SaveNow` (bDirty kalir), eski yuva silme: basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya) ve calistirici (`Error moving file` satiri 0 bekler); `RunSystemTests.ps1` ve `RunAllChecks.ps1` adimi |
+| `Private/Tests/MMOAchievementSelfTest.cpp`, `Scripts/TestAchievements.ps1` | native test (102 kontrol, `76ceed9`; 2026-10-14'te `1f4a557` uzerinde GECTI. Tur 5: pawn'siz cevrimici oyuncunun eski yuvasi korunur; tablo/mantik/JSON + GUID'li yuvalarla disk kaliciligi, B1 ad degisimi, LoadSerial, A5, C3, O1, .tmp, 10 sn geri cekilme penceresi, kilitli ana dosyada hizli basarisiz `SaveNow` (bDirty kalir), eski yuva silme: basari/hata/cevrimici sahip/A-B-A/kanonik ayni dosya) ve calistirici (`Error moving file` satiri 0 bekler); `RunSystemTests.ps1` ve `RunAllChecks.ps1` adimi |
 | `Scripts/ValidateData.py`, `Scripts/TestValidateData.py` | tablo denetimi + 4 negatif senaryo |
 
 Mevcut dosyalarda yalniz kucuk baglanti: `MMOCharacter.h/.cpp` (alt nesne), `MMOQuestComponent.cpp::NotifyMobKilled` (olduruldu sinyali,
@@ -48,13 +48,16 @@ gorev ilerlemesinden SONRA), `MMOPlayerController.cpp` (`/basarim` sohbet komutu
       kullanicinin; istenmezse `MarkCurrentProgressUnlockedSilently` cagrisi kaldirilir (uzak istemci yolu F1 ad kilidiyle zaten kapali).
   - **2026-10-11 tur 3 (`2bb2023`) + tur 4 (`d031b90`); native test 96 kontrol GECTI (`7932979`), PIE YOK:**
     - Yan dosyalar: `<yuva>.json`, yarim yazim `<yuva>.json.tmp`, bozuk dosya `<yuva>.json.bad`; bozuk dosya ayrilirken eski `.tmp` de
-      `.json.tmp.bad` olur (olmazsa silinir), yoksa sonra "yarim yazim" sanilip eski durum dirilirdi (Y6, `MMOAchievementComponent.cpp:395-406`).
+      `.json.tmp.bad` olur (olmazsa silinir), yoksa sonra "yarim yazim" sanilip eski durum dirilirdi (Y6, `MMOAchievementComponent.cpp:411-422`; bu maddedeki satirlar `1f4a557` icindir, tur 5'te +16 kaydi).
     - `.tmp` kurtarma `Move`'u ve `SaveNow` `Move`'u motor tekrar denemesi olmadan (Y1/Y-NEW-2; kilitli dosyada ~5,5 sn donma yok). Kurtarma
-      basarisizsa yukleme **10 sn** ertelenir (tur 4'te 60 -> 10 sn, `:40`, `:367-375`); oyuncu mesaji gercek sureyi yazar. `SaveNow` basarisizsa
-      `bDirty` kalir, sonraki periyodik kayit ya da EndPlay yeniden dener (`:486-503`).
-    - Eski yuva silme (Y7 + Y-NEW-3/4, `AchDeleteOldSlotFiles` `:66-88`): yuva tasimasi yeni yola **basariyla yazildiktan sonra** eski
+      basarisizsa yukleme **10 sn** ertelenir (tur 4'te 60 -> 10 sn, `:41`, `:381-391`); oyuncu mesaji gercek sureyi yazar. `SaveNow` basarisizsa
+      `bDirty` kalir, sonraki periyodik kayit ya da EndPlay yeniden dener (`:502-519`).
+    - Eski yuva silme (Y7 + Y-NEW-3/4, `AchDeleteOldSlotFiles` `:67-105`): yuva tasimasi yeni yola **basariyla yazildiktan sonra** eski
       `.json` ve `.json.tmp` silinir (`.bad` inceleme icin kalir). Silinmez: eski yol yeni yolla harf duyarsiz tam yol olarak ayniysa
       (`MMOSave_Ali` -> `MMOSave_ali`, NTFS'te ayni dosya) ya da eski yuva su an cevrimici BASKA bir oyuncunun canli adi/yukledigi yuvasiysa.
+  - **Tur 5 (`f70e5ad`, testler `76ceed9`: 96 -> 102 kontrol; PIE YOK):** "cevrimici baska oyuncu" kontrolu artik pawn'i olmayan
+    bagli oyunculari da sayar (`GameState->PlayerArray`, `MMOAchievementComponent.cpp:92`): olu/izleyici/henuz possess edilmemis bir
+    oyuncunun adi (kanonik varyanti dahil) eski yuvaysa dosyalar silinmez; ilgisiz adda silinir, kendi PlayerState'i koruma sayilmaz.
 - **Disk yazilamazsa odul yok:** acilma diske yazilamazsa `Unlocked` geri alinir ve odul verilmez; 5 sn sonra yeniden denenir. Ayni unvan
   tekrar secilirse diske yazilmaz.
 

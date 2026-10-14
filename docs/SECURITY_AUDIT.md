@@ -93,7 +93,12 @@ Düzeltme (öncelik sırasıyla):
 
 #### K-1 yeni yuz (2026-10-11): Ad degistirerek karakter catallama (fork)
 
-**DURUM (guncel, 2026-10-11 aksami; tur 2 `afba349`, tur 3 `2bb2023`, tur 4 `d031b90`, testler `7932979`):** F1, F2, F3, F5
+**DURUM (guncel, 2026-10-14):** tur 5 (`f70e5ad`, testler `76ceed9`) ve Sprint 1 denetimi tur 6 (`1f4a557`) sonrasi native testler
+basarim **102** / gunluk **87** / posta **144** / ad kilidi **82** kontrol GECTI ve `RunAllChecks.ps1 -SkipBuild` 70/70 adim GECTI
+(2026-10-14, `1f4a557` uzerinde; loglar `%TEMP%`, bu belge denetcisi sayilari loglardan okudu). Tur 5/6 maddeleri asagida
+"Tur 5/6 bulgulari". F4 ACIK; PIE ve gercek uzak istemciyle yine HICBIRI denenmedi.
+
+**DURUM (2026-10-11 aksami; tur 2 `afba349`, tur 3 `2bb2023`, tur 4 `d031b90`, testler `7932979`):** F1, F2, F3, F5
 DUZELTILDI ve native testli: `Scripts/RunSystemTests.ps1` basarim **96** / gunluk **81** / posta **130** / ad kilidi **58**
 kontrol GECTI, `RunAllChecks.ps1 -SkipBuild` GECTI (commit mesajlari; bu belge denetcisi testleri yeniden kosmadi). Tur 3/4'te
 kapanan Y1-Y4, Y6-Y8 ve Y-NEW-1..6 asagida "Tur 3/4 bulgulari". F4 (Linux harf varyanti) ACIK, kalan dusuk maddeler asagida.
@@ -233,14 +238,34 @@ icerigi commit mesajlarinda ve kodda bulunamadi (bu belge dogrulayamadi).
   "c2" (anlik `.bak` geri koyma) surec icinde ulasilamadigi icin testle yakalanmadi (`7932979` mesaji).
 - **Cokme aninda posta kaybi (DUSUK, bilerek):** sira ucret dus -> gonderen kaydi -> kutuya yaz (`MMOMailComponent.cpp:271-318`).
   Gonderen kaydi ile kutu yazimi arasinda cokme altini kaybettirir, kopyalamaz (tasarim tercihi, K1).
-- **Baglanti adinda harf kirpma (DUSUK):** `?Name=Ömer` -> `mer` (`MMOGameMode.cpp:381-392`); `mer` kaydi varsa o yuklenir,
-  oyuncuya yalniz 3 sn sonra bildirim gider (`:537`). Karar adayi: kirpmak yerine reddetmek (`DECISIONS_NEEDED.md`).
+- ~~**Baglanti adinda harf kirpma (DUSUK):** `?Name=Ömer` -> `mer` (`MMOGameMode.cpp:381-392`); `mer` kaydi varsa o yuklenir,
+  oyuncuya yalniz 3 sn sonra bildirim gider (`:537`). Karar adayi: kirpmak yerine reddetmek (`DECISIONS_NEEDED.md`).~~
+  **KAPANDI (tur 5, `f70e5ad`):** asagida "Tur 5/6 bulgulari" T5-1.
 - **F4 Linux harf varyanti:** ACIK (yukarida F4 "Durum guncellemesi"). ASCII kurali bunu cozmez.
 - **Birden cok sunucu sureci (DUSUK, bugun tek surec):** posta deposunda surecler arasi kilit yok (`MMOMailStore.cpp`'de
   kilit/lock yok; geri cekilme haritasi da surec ici `static`, `:21-25`). Ayni `Saved/` klasorunu kullanan iki sunucu ayni kutuyu
   oku-degistir-yaz ile ezebilir. Ad sahipligi tasarimindaki tek-surec varsayimiyla ayni (`ACCOUNT_IDENTITY_DESIGN.md` §9).
 - **Turkce harfli eski kayitlar:** migrasyon yok; ASCII disi `MMOSave_*` / posta kutulari erisilemez kalir (karar adayi ICU
   tabanli kanonik anahtar, `DECISIONS_NEEDED.md`).
+
+**Tur 5/6 bulgulari (2026-10-11 .. 2026-10-14; kod okumasi + native test, PIE YOK).** Tur 5 = `f70e5ad` (kod) + `76ceed9`
+(testler: basarim 96 -> 102, gunluk 81 -> 87, posta 130 -> 144, ad kilidi 68 -> 82; 9 mutasyonun 9'u yakalandi). Tur 6 = bulut
+PR #3'un (`9855256`, Sprint 1 altyapisi) yerel QA/guvenlik denetimi, duzeltmeler `1f4a557`. Satirlar `1f4a557` icindir.
+
+| Etiket | Bulgu (kisa) | Durum ve yer |
+|---|---|---|
+| T5-1 | Baglanti adindaki izinsiz karakterler sessizce kirpiliyordu: `Ömer` -> `mer`, `Ali!` -> `Ali` baskasinin kaydini acardi | **KAPANDI (tur 5).** Kirpma yok: `PreLogin` temizlemenin (bas/son bosluk disinda) degistirdigi adi reddeder (`MMOGameMode.cpp:595-599`, `InitialNameWasAltered` `:397-400`); `ChangeName` ayni durumda `Gezgin######` verir (`:466-468`, `:502`). URL kodlu ad (`%C3%96mer`) de ret (test) |
+| T5-2 | Ayrilmis adlar: motorun misafir adi `Player<Id>` (Id her surecte 256'dan baslar, sonraki misafir oncekinin kaydina duserdi) ve ortak yedek yuva `Default` istenerek alinabiliyordu | **KAPANDI (tur 5).** `MMONameRules::IsReservedName` (kanonik `default`, `player` + yalniz rakam; `MMONameRules.h:103`); `PreLogin` (`MMOGameMode.cpp:600`) ve `ServerSetName` (`MMOCharacter.cpp:1613`) reddeder, `ChangeName` `Gezgin` verir, posta `IsDeliverableName` (`MMOMailStore.cpp:107`) teslim etmez ve ayrilmis adli gonderen gonderemez |
+| T5-3 | Pawn'i olmayan bagli oyuncu (olu/izleyici/henuz possess edilmemis) cevrimici sayilmiyordu: adi `ServerSetName` ile alinabilir, eski yuva dosyalari silinebilirdi | **KAPANDI (tur 5).** `GameState->PlayerArray` de taranir: `ServerSetName` (`MMOCharacter.cpp:1693`), basarim (`MMOAchievementComponent.cpp:92`) ve gunluk (`MMODailyComponent.cpp:88`) eski yuva silme korumasi |
+| S1-1 | `build.ps1 -Clean` `Saved/`'i siliyordu (karakter `.sav`, basarim, gunluk, posta) | **KAPANDI (tur 6).** Yalniz `Binaries/` + `Intermediate/`; DDC ayri `-CleanDdc`; editor/UBT calisirken durur (`build.ps1:167`); `-ProjectPath` dogrulanir. Betik bu denetimde calistirilarak denenmedi |
+| S1-2 | `UDatabaseMigrator` sahte basari: `ExecuteSQL`, `RecordMigration`, `IsDatabaseInitialized`, `ValidateSchema` hicbir sey yapmadan `true` | **KAPANDI (tur 6).** Hepsi `false` + `LastError = "not implemented: no database backend"` (`DatabaseMigrator.cpp:195-203` vb.); `*_rollback.sql` ileri yonde elenir. Sinifi kimse cagirmiyor; silmek/tutmak = karar S15 |
+| S1-3 | `FPacketValidator::ValidateRPCFrequency` (TODO) ve `ValidatePacketIntegrity` her zaman `true` (calisan anti-cheat sanilabilirdi) | **KAPANDI (tur 6).** Ikisi de `false` + `LastError` (`PacketValidator.cpp:286-292`, `:111`'den). Sonuc: `ValidateRPC` (`:58`) cagrilirsa her RPC'yi reddeder; kimse cagirmiyor |
+| S1-4 | `V1__initial_schema.sql`: `update_warehouse_updated_at` tetikleyicisi olmayan `character_warehouse.updated_at`'e yaziyordu; altin/adet/fiyat negatif olabiliyordu | **KAPANDI (tur 6, metin olarak).** `updated_at` sutunu + `CHECK (>= 0)` (`gold`, `count`, `gold_attached`, `price`, `quantity`). **psql ile uygulanmadi** |
+| S1-5 | `MyProjectServer.Target.cs` Shipping'de `UE_LOG`'u derleme disi birakirdi (takas denetimi `LogMMOTradeAudit`, `[MMOMETRIC]`, anti-cheat loglari kaybolurdu) | **KAPANDI (tur 6, metin olarak).** `bUseLoggingInShipping = true` + `BuildEnvironment = Unique`; konsol Shipping'de kapali kalir. Server hedefi **derlenmedi** (kaynak motor gerekir) |
+| S1-6 | Posta iadesi odenemezse (sahip/envanter gitti, yeniden yukleme, ad/yuva degisimi, kilit) altin sessizce kayboluyordu | **GOZLEMLENEBILIR (tur 6).** Mantik ayni (altin kopyalanmaz, kaybolur); `[MMOMETRIC] ev=gold_lost src=posta-iade` + `LogMMOMail` uyarisi (`MMOMailComponent.cpp:294-303`) |
+| S1-7 | Takas altini hep-ya-hic degil: `9855256` (icindeki Codex O69 posta iade isi) `ApplyGoldInternal`'a "sahip/bilesen yok ediliyorsa yok say, 0 don" kosulu ekledi (`MMOInventoryComponent.cpp:410`); takasin dort altin cagrisi donus degerine bakmaz (`MMOTradeComponent.cpp:880-883`) | **ACIK.** Bir cagri 0 donerse altin yaratilir ya da yok olur. Onay kapisi (`:548-549`) aktorleri hemen once kontrol eder, aradaki yolda senkron callback yok: pratik pencere dar [Muhtemel], tetiklenebildigi gosterilmedi. `MMOTradeComponent.*` Codex'in dosyasi: karar/devir `DECISIONS_NEEDED.md` "Takas altini hep-ya-hic degil"; PIE maddesi `PLAYTEST_CHECKLIST.md` (A-1) |
+| S1-8 | PL1-PL3 plan riskleri (`SIX_MAP_PLAN.md`) | **ACIK.** Tur 6 denetim raporunda geciyor; icerikleri hicbir belgede ya da commit mesajinda yazili degil, bu belge denetcisi dogrulayamadi. Raporun sahibi bu satiri doldurmali |
+| S1-9 | `Scripts/k6_load_test.js` var olmayan HTTP uclarina (`/api/auth/login`, `/api/character/move` ...) istek atiyor | **ACIK (bilerek).** Calistirilamaz; A3'te giris servisi yuk testi olarak yeniden yazilacak (`SIX_MAP_PLAN.md` §1.5) |
 
 **Onerilen kisa vadeli cozum (2026-10-11'de uygulandi; F4 haric, yukaridaki "Durum" satirlari):**
 - Uzak istemci (`!IsLocallyControlled()`) icin `ServerSetName` yalniz **hic kaydedilmemis yeni karaktere** izin versin:
@@ -267,6 +292,7 @@ ikinci kez verilmemeli. `43e87ca` kodunda (1) ve (3) **basarisiz olmasi beklenir
 yesil beklenir ama hala kosulmadi. Native test icin kanca: `AMMOCharacter::SetRemoteNameRulesForTest` (test-muhendisi).
 Guncel (2026-10-11): bu kancayla native `Scripts/TestNameLock.ps1` (58 kontrol, (1) ve (2)'nin tek surec benzetimi) GECTI;
 iki istemcili NetSmokeTest varyanti ve (3) gercek ag uzerinde hala kosulmadi.
+Guncel (2026-10-14): ad kilidi testi tur 5 ile 82 kontrol (`76ceed9`), `1f4a557` uzerinde GECTI; iki istemcili varyant hala kosulmadi.
 
 ---
 

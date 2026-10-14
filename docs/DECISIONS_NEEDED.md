@@ -209,7 +209,8 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
 ## Yeni karar adayi (2026-10-11: guvenlik denetimi; denetim aninda kod degistirilmedi, sonra (a) uygulandi)
 
 - **Ad degistirme kisiti (uzak istemci):** DURUM: secenek (a) GECICI ONLEM OLARAK UYGULANDI (2026-10-11, commit `afba349`, tur 3
-  `2bb2023` ve tur 4 `d031b90` ile sikilastirildi; native test `Scripts/TestNameLock.ps1` 58 kontrol GECTI (`7932979`), PIE/gercek
+  `2bb2023` ve tur 4 `d031b90` ile sikilastirildi; native test `Scripts/TestNameLock.ps1` 58 kontrol GECTI (`7932979`); guncel: tur 5
+  (`f70e5ad`, `76ceed9`) sonrasi 82 kontrol GECTI (2026-10-14, `RunAllChecks` icinde), PIE/gercek
   uzak istemci YOK; `SECURITY_AUDIT.md` K-1 yeni yuz "Durum" satirlari). Kullanici karari hala ACIK: kayitli karakter icin ad
   degistirme oyun ozelligi olarak gerekli mi? Ayrica yeni karar: basarim dosyasi olmayan Lv>1 karakterde seviye/gorev/altin basarimlari
   odulsuz acik sayiliyor (`ACHIEVEMENTS.md`); sistem oncesi karakterlerin geriye donuk odul almamasi kabul mu?
@@ -244,7 +245,7 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
   ad cakismasi kontrolleri kanonik anahtarla: bosluk -> `_`, ASCII kucuk harf). Neden: `FChar::IsAlnum` Turkce harfleri
   geciriyor, `ESearchCase::IgnoreCase` yalniz ASCII'de harf duyarsiz, NTFS ise Unicode'da da harf duyarsiz: buyuk ve kucuk
   O-umlautlu iki ad farkli sayilip AYNI `MMOSave_*.sav` dosyasina yaziliyordu (ayni kayda ikinci oturum). Bedeli: Turkce harfli ad
-  secilemez (baglanti adindan harf atilir, `MMOSetName` reddeder); ASCII disi eski kayit/posta kutusu icin migrasyon YOK (o adlar
+  secilemez (~~baglanti adindan harf atilir~~ tur 5'ten beri `PreLogin` reddeder / `ChangeName` `Gezgin######` verir, `MMOSetName` reddeder); ASCII disi eski kayit/posta kutusu icin migrasyon YOK (o adlar
   erisilemez kalir; eski Turkce harfli klan adlari yuklemede korunur, yenisi kurulamaz). Karar: Turkce harfli ad gerekli mi?
   "Evet" ise sonra ICU tabanli kanonik anahtar (tam Unicode case-fold + normalizasyon, dosya adi = anahtarin guvenli kodlamasi)
   ve eski kayitlar icin tek seferlik tasima.
@@ -255,8 +256,49 @@ Kod okunarak bulundu, PIE'de görülmedi. Satırlar `6d5e1d0` içindir.
   karisikligi riski var. Secenekler: (a) bugunku gibi kirp + bildir; (b) `PreLogin`'de ASCII disi harf iceren adi
   "Adda Turkce harf kullanilamaz" diye reddet (oyuncu dogru adla yeniden baglanir); (c) kirp ama kalan adin kaydi varsa
   rastgele `Gezgin######` ver. Oneri [Muhtemel]: (b), en az sasirtan.
-- **Uzak ad degistirme kilidinin kapsami:** kilit "kaydi olan karakter adini degistiremez" (`MMOCharacter.cpp:1648-1663`) ve
+  - **DURUM: UYGULANDI (tur 5, `f70e5ad`; testler `76ceed9`, ad kilidi 82 kontrol; PIE'da denenmedi).** Yukaridaki "bugun" paragrafi
+    tur 5 oncesi davranistir. Simdi izinsiz karakterli ad **kirpilmaz**: `PreLogin` temizlemenin (bas/son bosluk disinda) degistirdigi
+    `?Name=`'i "Gecersiz ad: Turkce harf kullanilamaz ..." ile reddeder (`MMOGameMode.cpp:595-599`, `InitialNameWasAltered` `:397-400`),
+    `ChangeName` ayni durumda `Gezgin######` verir (`:466-468`, `:502`), "izinsiz karakterler atildi" bildirimi kalkti. Ek olarak
+    ayrilmis adlar (`MMONameRules::IsReservedName`: kanonik `default`, `player`+yalniz rakam) `PreLogin`/`ServerSetName`'de reddedilir,
+    `ChangeName`'de `Gezgin` alir, posta alamaz/gonderemez. Yani (b) + ayrilmis adlar icin (c) secildi; karar yalniz "Turkce harfli ad
+    gerekli mi" olarak acik kaldi (ustteki madde).
+- **Uzak ad degistirme kilidinin kapsami:** kilit "kaydi olan karakter adini degistiremez" (`MMOCharacter.cpp:1655-1670`; satirlar `1f4a557`, eskiden 1648-1663) ve
   yukaridaki "Ad degistirme kisiti" kararina bagli. Tur 4 ile kilitten sonraki denemeler soguma boyunca kilit metnini gorur
-  (`bNameLockRejected`, `:1637-1640`). Acik soru ayni: kayitli karakter icin ad degistirme ozelligi istenirse kalici yol
+  (`bNameLockRejected`, `:1644-1647`; eskiden 1637-1640). Acik soru ayni: kayitli karakter icin ad degistirme ozelligi istenirse kalici yol
   B-full (`ACCOUNT_IDENTITY_DESIGN.md` §4.7) ve ICU anahtari birlikte tasarlanmali; istenmiyorsa "Ad degistirme kisiti"
   maddesinin (b) secenegi (uzak istemcide ad degistirmeyi tamamen kapat) daha basit.
+
+## Yeni karar adaylari (2026-10-14: Sprint 1 altyapisi, yerel QA/guvenlik tur 6)
+
+Kaynak: bulut PR #3 (`9855256`) yerelde denetlendi, duzeltmeler `1f4a557`'de. Durum ayrintisi `SIX_MAP_PLAN.md` §1.5. PIE'da denenmedi.
+
+- **S15: `UDatabaseMigrator` / `FPacketValidator` silinsin mi, tutulsun mu? (ACIK, kullanici karari)** DURUM [Kesin, grep]: ikisini de
+  `Source` icinde **kimse cagirmiyor**. Tur 6'da sahte basari kaldirildi: migrator'in tum DB islemleri `false` +
+  `LastError = "not implemented: no database backend"` (`DatabaseMigrator.cpp:195-203` `ExecuteSQL`), `*_rollback.sql` ileri yonde elenir;
+  validator'da `ValidatePacketIntegrity` ve `ValidateRPCFrequency` (`PacketValidator.cpp:286-292`) `false` doner, yani `ValidateRPC`
+  (`:58`) cagrilirsa her RPC'yi reddeder. Editor derlemesi 0 hata. Secenekler: (a) sil (bakimi yok, yaniltici "anti-cheat" adi kalkar);
+  (b) "kullanilmiyor" diye tut (bugunku hal; dosya basinda yorum var). Oneri [Muhtemel]: migration'lar oyun disinda psql/Flyway ile
+  (`SIX_MAP_PLAN.md` A2), RPC oran siniri bugunku `_Validate` + bilesen ici bekleme deseniyle; yani iki sinifin da yeri yok, (a).
+  Karar A2 basina kadar verilebilir; vermemenin bedeli yalniz kafa karisikligi.
+- **Takas altini hep-ya-hic degil (ACIK; karar + Codex devri) [Kesin, kod okumasi; tetiklenebilirligi PIE'da denenmedi]:**
+  `9855256` (Sprint 1 commit'i; bu degisiklik mesajda yazmayan Codex O69 posta iade muhasebesi isinden gelir, gorev kaydi
+  `docs/tasks/MAIL_REFUND_ACCOUNTING_2026-10-11.md`) `AddGoldInternal`'i `ApplyGoldInternal`'a cevirdi ve yeni bir kosul ekledi: sahip aktor yok ediliyorsa ya da
+  bilesen yok ediliyorsa altin degisikligi **sessizce yok sayilir**, 0 doner (`MMOInventoryComponent.cpp:407-413`, kosul `:410`).
+  Takas tamamlama dort altin cagrisini arka arkaya yapar ve donus degerine bakmaz (`MMOTradeComponent.cpp:880-883`; esya cantalari
+  hemen once `:875-878`'de atanir). Onay ve baslangic kapilari (`:548-549` `CurrentApproval`, `:577-578` `StartTradeServer`) iki aktorun
+  yok edilmedigini kontrol eder; `TryExecuteTrade`'in tek cagiricisi (`:566`) hemen oncesinde `CurrentApproval(true)`'yu yeniden cagirir.
+  Ama `TryExecuteTrade` (`:788`) icinde ve aktarim satirlarinda bu kontrol tekrarlanmaz, envanter bileseninin kendi `IsBeingDestroyed`'i
+  hic kontrol edilmez. Dort cagridan biri 0 donerse (or. bir tarafin envanteri/aktoru yok ediliyor) A'nin altini B'ye gecer, B'ninki A'ya
+  gecmez ya da tersi: **altin yaratilabilir veya yok olabilir**, kalem sessizdir. Bugunku yolda araya senkron callback girmiyor
+  (`bNotify=false`), yani pratik pencere dar [Muhtemel]; tetiklenebildigi gosterilmedi. Asil risk, ileride araya bir callback girerse
+  sessiz yarim takas.
+  Secenekler: (a) takas, dort cagridan once iki envanterin de `ApplyGoldInternal` kosulunu gecebilecegini dogrulasin, gecmezse takasi
+  iptal etsin; (b) `AppliedDelta` donuslerini toplayip tutarsizlikta geri alsin; (c) takas yolu icin "yok ediliyor" kosulunu atlayan
+  ayri bir dahili cagri. `MMOTradeComponent.*` Codex'in dosyasi (`CheckPrPaths.py` uyarisi): duzeltme Codex'e devredilmeli ya da
+  Codex'le sira alinmali. Dogrulama maddesi: `PLAYTEST_CHECKLIST.md` "Takas onayi aninda cikis (A-1)". Gereken log: sunucuda
+  `event=trade_complete` satirindaki `balance_a`/`balance_b` + `[MMOMETRIC] ev=gold src=` satirlari; iki oyuncunun toplam altini
+  takas oncesi ve sonrasi esit olmali.
+- **`Scripts/k6_load_test.js` (ACIK, karar gerekmez, not):** HTTP `/api/auth/login`, `/api/character/move`, `/api/combat/attack` ...
+  uclarina istek atar; bu uclar yok, oyun trafigi UE'nin UDP ag surucusunden gecer. Bugun calistirilamaz. A3'te (Steam bileti +
+  giris servisi) yalniz giris servisi yuk testi olarak **yeniden yazilacak**; oyun ici yuk testi coklu headless istemciyle (NetSmoke deseni).

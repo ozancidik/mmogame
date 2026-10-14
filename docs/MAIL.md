@@ -1,10 +1,12 @@
 # Posta (2026-10-11)
 
-Durum: **kodda, derlendi ve headless test edildi (`Scripts/TestMail.ps1` 130 kontrol, `7932979`; mutasyonla sinandi); oyun icinde (PIE) denenmedi.** Basarim ve gunluk gorevlerle ayni kalip,
+Durum: **kodda, derlendi ve headless test edildi (`Scripts/TestMail.ps1` 144 kontrol, `76ceed9`; 2026-10-14'te `1f4a557` uzerinde GECTI; mutasyonla sinandi); oyun icinde (PIE) denenmedi.** Basarim ve gunluk gorevlerle ayni kalip,
 Codex'in dosyalarindan bagimsiz yeni dosyalarla eklendi. 2026-10-11 QA/guvenlik duzeltmeleri (K1, O2, O5, D1, D3; tur 3 `2bb2023`: `.bak` yedekli yazim,
 bozuk kutuda false + iade, tekrar denemesiz kurtarma + 60 sn geri cekilme; tur 4 `d031b90`: tekrar denemesiz yazim `Move`'u, ilk-posta `.bad` politikasi,
-`BoxFull`/`StoreError` sogumasi, ASCII ad kurali) asagida; native test kontrolleri 41 -> 89 -> 104 -> 130 ile bunlari kapsar. Codex'in ayri okuma hatasi testi
-`Scripts/TestMailReadFailure.ps1` (O68, 24 kontrol) `RunAllChecks.ps1` adimi degil.
+`BoxFull`/`StoreError` sogumasi, ASCII ad kurali; tur 5 `f70e5ad`: ayrilmis adlar; Codex O69 (`9855256` icinde) + tur 6 `1f4a557`: iade muhasebesi) asagida;
+native test kontrolleri 41 -> 89 -> 104 -> 130 -> 144 ile bunlari kapsar (144 = 130 + 11 tur 5 + 3 iade hesabi (O69, `9855256`), `76ceed9` mesaji). Codex'in ayri okuma hatasi testi
+`Scripts/TestMailReadFailure.ps1` (O68, 24 kontrol) ve iade testi `Scripts/TestMailRefund.ps1` (`MMOMailRefundSelfTest`, 176 kontrol; ana checkout'u reddeder,
+kayitli izole git worktree ister, UE/UBT calisirken erteler, cikis 3) `RunAllChecks.ps1` adimi degil.
 
 ## Ne yapar
 
@@ -24,7 +26,7 @@ bozuk kutuda false + iade, tekrar denemesiz kurtarma + 60 sn geri cekilme; tur 4
 |---|---|
 | `Public/Mail/MMOMailStore.h`, `Private/Mail/MMOMailStore.cpp` | disk deposu, ad temizleme, dogrulamali JSON, `TakeAll`, `Replace`, `.bak`/`.tmp`/`.bad` durum makinesi ve kurtarma |
 | `Public/Components/MMOMailComponent.h`, `Private/Components/MMOMailComponent.cpp` | gonderim kurallari, toplama, `ParseSendArgs`, `/posta` komutlari |
-| `Private/Tests/MMOMailSelfTest.cpp`, `Scripts/TestMail.ps1` | native test (130 kontrol: ayristirma tablosu, K1 kayit sirasi, kilit/ad degisimi, B3, C1, O2 tavan, .tmp kurtarma, iade callback'leri, ASCII ad/yol, `.bak` alinamazsa yazim yok, Move + dogrudan yazim basarisizsa kutu bayt-bayt ayni ve < 1 sn, `.bak` > `.tmp` kurtarma sirasi, bozuk ana + `.bak`, ilk-posta `.tmp` politikasi, 60 sn geri cekilme, bozuk/okunamayan alici kutusu, `BoxFull`/`StoreError` sogumasi, fee_clamp); calistirici `Error moving file` satiri 0 bekler |
+| `Private/Tests/MMOMailSelfTest.cpp`, `Scripts/TestMail.ps1` | native test (144 kontrol: ayrilmis ad alici/gonderen (tur 5), hediye/harcama callback'li iade hesabi (O69), ayristirma tablosu, K1 kayit sirasi, kilit/ad degisimi, B3, C1, O2 tavan, .tmp kurtarma, iade callback'leri, ASCII ad/yol, `.bak` alinamazsa yazim yok, Move + dogrudan yazim basarisizsa kutu bayt-bayt ayni ve < 1 sn, `.bak` > `.tmp` kurtarma sirasi, bozuk ana + `.bak`, ilk-posta `.tmp` politikasi, 60 sn geri cekilme, bozuk/okunamayan alici kutusu, `BoxFull`/`StoreError` sogumasi, fee_clamp); calistirici `Error moving file` satiri 0 bekler |
 
 Baglanti: `MMOCharacter.h/.cpp` (alt nesne, `IsTravelSaveCommitted()` erisimcisi), `MMOPlayerController.cpp` (`/posta` sohbet komutu, `/yardim`).
 
@@ -40,6 +42,23 @@ Baglanti: `MMOCharacter.h/.cpp` (alt nesne, `IsTravelSaveCommitted()` erisimcisi
   `Deducted`'a eklenir (`MMOMailComponent.cpp:252-294`); iade = `Deducted`. Altin callback'i (Blueprint `OnGoldChanged` vb.) araya altin eklese ya da
   harcasa da iade fazladan altin uretmez. Tam ucret+ek dusulemediyse ya da bakiye net o kadar dusmediyse posta gonderilmez, dusulen kadar iade
   edilir (`:295-301`). Native test: `refund_spend_callback_*`, `refund_gift_callback_*`, `fee_clamp_refund_no_creation`.
+  (Satirlar tur 3 icindir; guncel yerler asagidaki madde.)
+- **Iade muhasebesi (guncel: Codex O69, `docs/tasks/MAIL_REFUND_ACCOUNTING_2026-10-11.md`, Sprint 1 commit'i `9855256` icinde geldi;
+  + tur 6 `1f4a557`; PIE'da denenmedi):** her dusum
+  `UMMOInventoryComponent::AddGoldFromWithAppliedDelta` ile yapilir; bu, `ApplyGoldInternal`'in gercekten uyguladigi (tavana/sifira
+  kirpilmis) `AppliedDelta`'yi dondurur (`MMOInventoryComponent.cpp:402-449`). `Deducted` yalniz **bu denemenin** uygulanan dusumlerini
+  toplar (`MMOMailComponent.cpp:310-319`); araya giren altin callback'inin harcamasi iade edilmez, verdigi hediye de geri alinmaz
+  (**hediye korunur**). Tam ucret + ek dusulmediyse (`Deducted != Charge`) posta gonderilmez ve dusulen kadar iade edilir (`:325-331`);
+  yani posta yalniz **tam odendiginde** gonderilir. Ornek (posta testi, beklenti `9855256`'da degisti; `MMOMailSelfTest.cpp:632-642`):
+  10000 altin, 300 ek + 16 ucret, callback +1000 hediye; son bakiye 10684 ve bir 300-altinlik posta (eskiden posta reddedilir, bakiye
+  <= 11000 beklenirdi). Callback bakiyeyi ucretten azina indirirse (1000, 500 ek, callback -495) posta kayittan once reddedilir, son bakiye tam 505.
+  Iade, uygunluk kontrolunden (`GetEligibleInventory`, `:263-278`: sahip/envanter/posta bileseni ayni ve yasiyor, `LoadSerial` ve
+  yuva ayni, kilit/ad degisimi yok) gecmezse **altin kaybolur, kopyalanmaz**; tur 6'dan beri bu sessiz degil:
+  `[MMOMETRIC] ev=gold_lost who=<ad> src=posta-iade amount=N` + `LogMMOMail` uyarisi (`:294-303`). Olcumde `gold_lost` satiri
+  gorulurse incelenmeli. Iade yolunun ayri native testi `TestMailRefund.ps1` (176) yalniz izole worktree'de kosar.
+- **Ayrilmis adlar (tur 5, `f70e5ad`):** `FMMOMailStore::IsDeliverableName` (`MMOMailStore.cpp:104-107`) `MMONameRules::IsReservedName`
+  (kanonik `default`, `player` + yalniz rakam) adlari reddeder: bu adlara posta gonderilemez (`MMOMailComponent.cpp:200`), bu adli
+  gonderen gonderemez (`:191`) ve toplayamaz (`:368`). `PlayerOne`, `Player` + harf, `Gezgin2` teslim edilir.
 - **Toplama (QA O2):** kutu yuklenir; eki altin tavanini (`UMMOInventoryComponent::MaxGold`) asacak posta **kutuda kalir** (oyuncuya bir kez uyari);
   kalanlarla kutu once diske yazilir (`Replace`), sonra altin verilir, sonra karakter kaydedilir. Bolge gecisi onaylanmissa toplama atlanir
   (posta yeni bolgede alinir). Dongu ortasinda sahip duserse teslim edilmeyenler kutuya geri yazilir (kutu bu arada dolduysa loglanip kaybolur).
@@ -50,9 +69,9 @@ Baglanti: `MMOCharacter.h/.cpp` (alt nesne, `IsTravelSaveCommitted()` erisimcisi
   karakterde ya da host'ta olusur. B2 korumasi tek basina catallamayi kapatmiyordu (yeni adla yeniden girince ad ve yuva eslesir); kapatan F1 kuralidir.
 - **Ad tarama (B3):** "alici yok" ve "altin yetersiz" ayni genel mesaji verir, altin kontrolu varlik kontrolunden once yapilir ve basarisiz
   alici denemesi de 5 sn cooldown baslatir. Tur 4 (Y-NEW-5): alici VAR iken olusan `StoreError` (kutu okunamadi/bozuk) ve `BoxFull` retleri de
-  cooldown'a yazilir (`MMOMailComponent.cpp:233-246`); aksi halde bu cevaplar damgasiz kalip cevrimdisi ad varligi sinirsiz hizda sorgulanabilirdi.
+  cooldown'a yazilir (`MMOMailComponent.cpp:241-254`, `1f4a557`); aksi halde bu cevaplar damgasiz kalip cevrimdisi ad varligi sinirsiz hizda sorgulanabilirdi.
 - **Hedef adi (C1):** temizleme adi sessizce degistiremez (`Al!i` -> `Ali` reddedilir; yalniz bosluk = `_`). Onay mesaji gercek kutu adini yazar.
-- **Disk yazimi (A4, tur 3/4 guncel; `WriteBox`, `MMOMailStore.cpp:246-331`):** degismez kural: `false` donerse kutu yazimdan onceki haliyle
+- **Disk yazimi (A4, tur 3/4 guncel; `WriteBox`, `MMOMailStore.cpp:252-337`, `1f4a557`):** degismez kural: `false` donerse kutu yazimdan onceki haliyle
   kalir (ya da sonraki `Load`'da o hale doner), `true` = yeni icerik diskte. Sira:
   1. Ana dosya varsa `.bak` kopyasi alinir; alinamazsa **hic yazilmaz** (`false`, cagiran iade eder).
   2. Icerik `.tmp`'ye yazilir. Olmazsa `.tmp` ve `.bak` silinir, `false`. Ilk postada (ana dosya yok) silinemeyen `.tmp` `.tmp.bad`'e ayrilir;
@@ -62,7 +81,7 @@ Baglanti: `MMOCharacter.h/.cpp` (alt nesne, `IsTravelSaveCommitted()` erisimcisi
   5. Ikisi de olmazsa: kutu varken `.bak` ana yola geri konur (konamazsa `.bak` durur, sonraki `Load` onu kurtarir), `.tmp` silinir, `false`.
      Ilk postada ana dosya **kosulsuz silinmez**, `.bad`'e ayrilir (QA DUSUK-3); `.tmp` silinir/`.tmp.bad` olur; geriye teslim edilebilir dosya
      kalmazsa `false`, kalirsa yazim basarili sayilir.
-- **Bozuk kutu (tur 3 guncel; `Load`, `:175-237`):** bozuk ana dosya `.bad`'e ayrilir ve bu `Load` **false** doner (bos kutu sayilip ustune yazilmaz);
+- **Bozuk kutu (tur 3 guncel; `Load`, `:181-243`):** bozuk ana dosya `.bad`'e ayrilir ve bu `Load` **false** doner (bos kutu sayilip ustune yazilmaz);
   yanindaki eski `.tmp` `.tmp.bad` olur (olmazsa silinir); `.bak` varsa (basarisiz yazimin gecerli eski kutusu) geri konup okunur ve `true` doner.
   Okunamayan (kilitli) ana dosya da `false` doner. `SendMail` alici kutusunu `Load` ile okur: `false`ta hicbir altin dusulmez (`StoreError`).
   Basarili okumada kalmis eski `.bak` silinir (ileride eski kutuyu diriltmesin).
