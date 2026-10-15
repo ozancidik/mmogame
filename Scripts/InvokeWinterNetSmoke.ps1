@@ -1,7 +1,9 @@
 # S00.02 Winter adapter. Wrapper alone owns the common Git lock; child owns UE handles.
 # Exit 0 = smoke evidence accepted; 1 = rejected/failed; 2 = watchdog; 3 = NOT_RUN.
 [CmdletBinding()]
-param([string]$BuildReceipt, [switch]$PreflightOnly)
+param([string]$BuildReceipt, [switch]$PreflightOnly,
+    [ValidateSet('Summer_scene','Winter_scene')][string]$Map = 'Winter_scene',
+    [ValidateSet('Listen','EditorDedicated')][string]$ServerMode = 'Listen')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -90,8 +92,8 @@ function Get-WinterSavedInventory([string]$Root) {
         }
     }
 }
-function Assert-WinterAssets([string]$Root) {
-    foreach ($relative in @('Content/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene.umap',
+function Assert-WinterAssets([string]$Root, [string]$Map = 'Winter_scene') {
+    foreach ($relative in @("Content/HandPaintedEnvironment/Maps/$Map/$Map.umap",
         'Content/ThirdPerson/Blueprints/BP_ThirdPersonGameMode.uasset',
         'Content/ThirdPerson/Blueprints/BP_ThirdPersonCharacter.uasset',
         'Content/ThirdPerson/Blueprints/BP_ThirdPersonPlayerController.uasset')) {
@@ -153,12 +155,12 @@ function Save-WinterJson([string]$Path, $Value) {
     $null = Assert-WinterPath $Path
     [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 12), (New-Object Text.UTF8Encoding($false)))
 }
-function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof) {
+function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen') {
     # Same PowerShell process: no outer shell watchdog, nested lock, or orphanable PID tree.
     $global:LASTEXITCODE = $null
     $output = New-Object 'System.Collections.Generic.List[string]'
     try {
-        & $Child -Map Winter_scene -UserDir $UserDir -LogDirectory $Logs | ForEach-Object { $output.Add([string]$_) }
+        & $Child -Map $Map -ServerMode $ServerMode -UserDir $UserDir -LogDirectory $Logs | ForEach-Object { $output.Add([string]$_) }
         $nativeExit = $LASTEXITCODE
     } finally {
         $path = Assert-WinterPath (Join-Path $Proof 'child-output.log')
@@ -166,10 +168,10 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
     }
     return $nativeExit
 }
-function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir) {
+function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen') {
     $manifest = Get-Content -LiteralPath (Join-Path $Logs 'processes.json') -Raw | ConvertFrom-Json
     $serverLog = Join-Path $Logs 'server.log'; $clientLog = Join-Path $Logs 'client.log'
-    if ($manifest.schema -ne 1 -or $manifest.map -cne 'Winter_scene' -or $manifest.userDir -ine $UserDir -or
+    if ($manifest.schema -ne 1 -or $manifest.map -cne $Map -or $manifest.serverMode -cne $ServerMode -or $manifest.userDir -ine $UserDir -or
         $manifest.exitCode -ne 0 -or -not $manifest.observed -or -not $manifest.cleanupOk -or $manifest.timedOut -or
         $manifest.serverObservedSeconds -lt 30 -or $manifest.clientObservedSeconds -lt 45 -or $manifest.watchdogSeconds -ne 95 -or
         -not $manifest.readinessReady -or -not $manifest.readinessPort -or -not $manifest.readinessMap -or $manifest.startupFailure -or
@@ -187,16 +189,41 @@ function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir) {
         throw 'Owned process manifest rejected.'
     }
     $server = Get-Content -LiteralPath $serverLog -Raw; $client = Get-Content -LiteralPath $clientLog -Raw
+    $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
+    $sa = @($manifest.serverArguments); $ca = @($manifest.clientArguments)
+    $expectedUrl = if ($ServerMode -eq 'EditorDedicated') { $mapPath } else { "${mapPath}?listen" }
+    $expectedFlag = if ($ServerMode -eq 'EditorDedicated') { '-server' } else { '-game' }
+    $expectedRoute = if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' }
+    $project = Join-Path (Split-Path -Parent (Split-Path -Parent $UserDir)) 'MyProject.uproject'
+    if ($sa.Count -lt 3 -or $ca.Count -lt 3 -or $sa[1] -cne $expectedUrl -or $sa[2] -cne $expectedFlag -or
+        $manifest.route -cne $expectedRoute -or $manifest.netModeEvidence -cne 'NOT_PROVEN' -or
+        $manifest.executable -cne 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' -or
+        $sa[0] -cne "`"$project`"" -or $ca[0] -cne $sa[0] -or "-port=$($manifest.port)" -notin $sa -or
+        "-UserDir=`"$UserDir`"" -notin $sa -or "-UserDir=`"$UserDir`"" -notin $ca -or
+        "-ABSLOG=`"$serverLog`"" -notin $sa -or "-ABSLOG=`"$clientLog`"" -notin $ca -or
+        @($sa | Where-Object { $_ -in @('-server','-game') }).Count -ne 1 -or
+        $ca[1] -cne "127.0.0.1:$($manifest.port)" -or $ca[2] -cne '-game' -or '-server' -in $ca) { throw 'Raw launch arguments/mode mismatch.' }
+    if ($ServerMode -eq 'EditorDedicated') {
+        $cmd = [string]$manifest.serverCommandLine
+        if (-not $manifest.serverCommandLineVerified -or -not $server.Contains('LogInit: Command Line: ' + $cmd) -or
+            $cmd -notmatch '(?:^|\s)-server(?:\s|$)' -or $cmd -match '(?:^|\s)-game(?:\s|$)|\?listen' -or
+            $cmd -notmatch ('(?:^|\s)' + [regex]::Escape($mapPath) + '(?:\s|$)') -or
+            $cmd -notmatch ("(?:^|\s)-port=$($manifest.port)(?:\s|$)")) { throw 'EDITOR_SERVER native command evidence rejected.' }
+    }
     if ($server -notmatch ("\bLogNet:[^\r\n]*\blistening on port $($manifest.port)\b") -or
-        $server -notmatch ('\bLogWorld: Bringing World ' + [regex]::Escape('/Game/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene.Winter_scene') + ' up for play(?:\s|$)') -or
+        $server -notmatch ('\bLogWorld: Bringing World ' + [regex]::Escape("$mapPath.$Map") + ' up for play(?:\s|$)') -or
         $server -notmatch 'Join succeeded' -or $client -notmatch 'Welcomed by server' -or
         ($server + $client) -match 'Error:|Fatal error|Ensure condition|Access violation') { throw 'Child connection logs rejected.' }
 }
-function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Execute) {
-    $result = [ordered]@{ status = 'NOT_RUN'; runnerExit = 1; map = 'Winter_scene'; proof = $null;
+function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Execute,
+    [ValidateSet('Summer_scene','Winter_scene')][string]$Map = 'Winter_scene',
+    [ValidateSet('Listen','EditorDedicated')][string]$ServerMode = 'Listen') {
+    $result = [ordered]@{ status = 'NOT_RUN'; runnerExit = 1; map = $Map; serverMode = $ServerMode;
+        route = $(if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' });
+        acceptanceScope = 'DEVELOPMENT_COMMAND_AND_CONNECTION_ONLY'; netModeEvidence = 'NOT_PROVEN'; proof = $null;
         gate = 'worktree'; reason = $null; childExit = $null; serverLog = $null; clientLog = $null; processManifest = $null;
         childStarted = $false; savedPreserved = $null; provenance = $null; userDir = $null;
-        requestedChildArguments = @('-Map', 'Winter_scene'); watchdog = 'NOT_RUN' }
+        requestedChildArguments = @('-Map', $Map, '-ServerMode', $ServerMode); watchdog = 'NOT_RUN' }
     $lock = $null
     $before = $null
     $worktree = $null
@@ -227,7 +254,7 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
         $before = @(Get-WinterSavedInventory $worktree.root | Sort-Object path)
         Save-WinterJson (Join-Path $proof 'saved-before.json') $before
         $result.gate = 'assets'
-        Assert-WinterAssets $worktree.root
+        Assert-WinterAssets $worktree.root $Map
         $result.gate = 'provenance'
         $result.provenance = Assert-WinterProvenance $worktree $ReceiptPath
         $result.gate = 'child-isolation'
@@ -238,7 +265,7 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
         $parameters = @($ast.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
         Save-WinterJson (Join-Path $proof 'child-contract.json') ([ordered]@{ path = $child;
             sha256 = (Get-FileHash -LiteralPath $child -Algorithm SHA256).Hash; parameters = $parameters })
-        foreach ($required in @('UserDir', 'LogDirectory', 'WatchdogSeconds')) {
+        foreach ($required in @('UserDir', 'LogDirectory', 'WatchdogSeconds', 'ServerMode')) {
             if ($required -notin $parameters) { throw "Child isolation parameter missing: $required" }
         }
         if (-not $Execute) { $result.runnerExit = 3; throw 'NOT_RUN: preflight only; no child invoked.' }
@@ -258,12 +285,12 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
         $result.childStarted = $true
         $result.status = 'FAILED'
         $result.watchdog = '95s observation deadline + at most 10s owned cleanup waits'
-        $result.childExit = Invoke-WinterChild $child $result.userDir $logs $proof
+        $result.childExit = Invoke-WinterChild $child $result.userDir $logs $proof $Map $ServerMode
         if ($null -eq $result.childExit -or $result.childExit -ne 0) {
             if ($result.childExit -eq 2) { $result.runnerExit = 2 }
             throw "Child failed: exit=$($result.childExit)"
         }
-        Assert-WinterChildEvidence $logs $result.userDir
+        Assert-WinterChildEvidence $logs $result.userDir $Map $ServerMode
         $result.status = 'PASSED'
         $result.runnerExit = 0
     } catch {
@@ -298,7 +325,7 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
     return [pscustomobject]$result
 }
 if ($MyInvocation.InvocationName -ne '.') {
-    $report = Invoke-WinterPreflight (Split-Path -Parent $PSScriptRoot) $BuildReceipt -Execute:(-not $PreflightOnly)
+    $report = Invoke-WinterPreflight (Split-Path -Parent $PSScriptRoot) $BuildReceipt -Execute:(-not $PreflightOnly) -Map $Map -ServerMode $ServerMode
     Write-Output (ConvertTo-Json -InputObject $report -Depth 12)
     exit $report.runnerExit
 }

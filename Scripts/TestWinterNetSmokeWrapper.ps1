@@ -97,7 +97,8 @@ Reject { Assert-WinterAssets $linked } 'Required asset missing' 'missing Winter 
 $assetPaths = @('Content/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene.umap',
     'Content/ThirdPerson/Blueprints/BP_ThirdPersonGameMode.uasset',
     'Content/ThirdPerson/Blueprints/BP_ThirdPersonCharacter.uasset',
-    'Content/ThirdPerson/Blueprints/BP_ThirdPersonPlayerController.uasset')
+    'Content/ThirdPerson/Blueprints/BP_ThirdPersonPlayerController.uasset',
+    'Content/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene.umap')
 foreach ($relative in $assetPaths) {
     $path = Join-Path $linked $relative
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
@@ -159,7 +160,7 @@ $report = Invoke-WinterPreflight $linked $receiptPath
 Check ($report.status -ceq 'NOT_RUN' -and $report.runnerExit -eq 3 -and $report.gate -ceq 'child-isolation') 'valid prep reaches explicit NOT_RUN isolation gate'
 Check (-not $report.childStarted -and $null -eq $report.childExit -and $null -eq $report.serverLog -and $null -eq $report.clientLog) 'no false child result or invented log paths'
 Check ($report.savedPreserved -eq $true) 'pre/post Saved preservation recorded'
-Check (($report.requestedChildArguments -join ' ') -ceq '-Map Winter_scene') 'child timeout defaults never overridden'
+Check (($report.requestedChildArguments -join ' ') -ceq '-Map Winter_scene -ServerMode Listen') 'legacy Winter/Listen defaults; child timeout defaults never overridden'
 Check (Test-Path -LiteralPath (Join-Path $report.proof 'saved-after.json')) 'post-inventory retained'
 Check (Test-Path -LiteralPath (Join-Path $report.proof 'child-contract.json')) 'child contract retained'
 $second = Invoke-WinterPreflight $linked $receiptPath
@@ -182,9 +183,11 @@ function Get-CimInstance { param($ClassName, $ErrorAction) return @() }
 $refused = Invoke-WinterPreflight $main $receiptPath
 Check ($refused.runnerExit -eq 1 -and $null -eq $refused.proof -and $refused.gate -ceq 'worktree') 'main entry refuses before evidence writes'
 $contractChild = Join-Path $scratch 'fake contract child.ps1'
-Write-FixtureText $contractChild 'param($Map,$UserDir,$LogDirectory) Write-Output "$Map|$UserDir|$LogDirectory"; exit 2'
+Write-FixtureText $contractChild 'param($Map,$UserDir,$LogDirectory,$ServerMode) Write-Output "$Map|$UserDir|$LogDirectory|$ServerMode"; exit 2'
 $code = Invoke-WinterChild $contractChild 'fixture user dir' 'fixture logs' $scratch
 Check ($code -eq 2 -and [IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('Winter_scene|fixture user dir|fixture logs')) 'real invocation helper retains exact args/output and child exit'
+$code = Invoke-WinterChild $contractChild 'fixture' 'logs' $scratch 'Summer_scene' 'EditorDedicated'
+Check ($code -eq 2 -and [IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('Summer_scene|fixture|logs|EditorDedicated')) 'helper propagates selected map/mode without launch overrides'
 Write-FixtureText $contractChild 'param($Map,$UserDir,$LogDirectory) Write-Output "partial output"; throw "Injected fake child exception"'
 Reject { Invoke-WinterChild $contractChild 'fixture' 'fixture' $scratch } 'Injected fake child' 'real invocation helper propagates child exception'
 Check ([IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('partial output')) 'partial child output survives exception'
@@ -194,7 +197,7 @@ $script:childInvocations = 0
 $script:runtimeMode = 'healthy'
 $script:lockHeldDuringChild = $false
 $script:protectedWriteBlocked = $false
-function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof) {
+function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen') {
     $script:childInvocations++
     try {
         $contender = Open-WinterLock $worktree.common
@@ -212,9 +215,19 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
     if ($script:runtimeMode -eq 'outside_saved') { Write-FixtureText (Join-Path $linked ('Saved/rogue_' + [guid]::NewGuid().ToString('N'))) 'forbidden' }
     if ($script:runtimeMode -eq 'source_changed') { Write-FixtureText (Join-Path $linked 'Source/MyProject/fixture.cpp') ('// changed ' + [guid]::NewGuid().ToString('N')) }
     $server = Join-Path $Logs 'server.log'; $client = Join-Path $Logs 'client.log'
-    Write-FixtureText $server "LogNet: listening on port 17779`nLogWorld: Bringing World /Game/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene.Winter_scene up for play`nJoin succeeded"
+    $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
+    $project = Join-Path (Split-Path -Parent (Split-Path -Parent $UserDir)) 'MyProject.uproject'
+    $modeArgs = if ($ServerMode -eq 'EditorDedicated') { @($mapPath, '-server') } else { @("${mapPath}?listen", '-game') }
+    $serverArgs = @("`"$project`"") + $modeArgs + @('-port=17779', "-ABSLOG=`"$server`"", "-UserDir=`"$UserDir`"")
+    $clientArgs = @("`"$project`"", '127.0.0.1:17779', '-game', "-ABSLOG=`"$client`"", "-UserDir=`"$UserDir`"")
+    $cmd = ($serverArgs | Select-Object -Skip 1) -join ' '
+    Write-FixtureText $server "LogInit: Command Line: $cmd`nLogNet: listening on port 17779`nLogWorld: Bringing World $mapPath.$Map up for play`nJoin succeeded"
     Write-FixtureText $client 'Welcomed by server'
-    $fake = [ordered]@{ schema = 1; map = 'Winter_scene'; port = 17779; userDir = $UserDir;
+    $fake = [ordered]@{ schema = 1; map = $Map; port = 17779; userDir = $UserDir;
+        serverMode = $ServerMode; route = $(if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' });
+        executable = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe';
+        serverArguments = $serverArgs; clientArguments = $clientArgs; serverCommandLine = $cmd;
+        serverCommandLineVerified = ($ServerMode -eq 'EditorDedicated'); netModeEvidence = 'NOT_PROVEN';
         serverLog = $server; clientLog = $client; watchdogSeconds = 95; timedOut = $false;
         observed = $true; serverObservedSeconds = 30; clientObservedSeconds = 45; cleanupOk = $true; exitCode = 0;
         readinessReady = $true; readinessMap = $true; readinessPort = $true; readinessElapsedSeconds = 30;
@@ -234,17 +247,29 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
         'reset_clock_budget' { $fake.readinessElapsedSeconds = 35; $fake.clientBudgetRemainingSeconds = 65 }
         'trace_port' { Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace('LogNet: listening on port 17779', 'LogTrace: listening on port 17779')) }
         'map_prefix' { Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace('Winter_scene.Winter_scene', 'Winter_scene.Winter_scene_extra')) }
+        'dedicated_mode_mismatch' { $fake.serverMode = 'Listen' }
+        'dedicated_raw_fallback' { $fake.serverArguments[1] += '?listen'; $fake.serverArguments[2] = '-game' }
+        'dedicated_native_fallback' {
+            $fake.serverCommandLine = $cmd.Replace(' -server ', '?listen -game ')
+            Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace($cmd, $fake.serverCommandLine))
+        }
+        'dedicated_client_server' { $fake.clientArguments[2] = '-server' }
+        'dedicated_unproven_cmd' { $fake.serverCommandLineVerified = $false }
     }
     Save-WinterJson (Join-Path $Logs 'processes.json') $fake
     return $fake.exitCode
 }
 foreach ($mode in @('healthy', 'protected_write', 'watchdog', 'missing_manifest', 'short_observation',
     'wrong_pid', 'cleanup_failed', 'wrong_port', 'outside_saved', 'source_changed',
-    'late_ready', 'too_late_ready', 'missing_ready', 'short_budget', 'reset_clock_budget', 'trace_port', 'map_prefix')) {
+    'late_ready', 'too_late_ready', 'missing_ready', 'short_budget', 'reset_clock_budget', 'trace_port', 'map_prefix',
+    'listen_summer', 'dedicated_winter', 'dedicated_summer', 'dedicated_mode_mismatch', 'dedicated_raw_fallback',
+    'dedicated_native_fallback', 'dedicated_client_server', 'dedicated_unproven_cmd')) {
     Write-FixtureReceipt
     $script:runtimeMode = $mode
-    $runtime = Invoke-WinterPreflight $linked $receiptPath -Execute
-    $expected = if ($mode -in @('healthy', 'protected_write', 'late_ready')) { 0 } elseif ($mode -eq 'watchdog') { 2 } else { 1 }
+    $requestedMap = if ($mode.EndsWith('_summer')) { 'Summer_scene' } else { 'Winter_scene' }
+    $requestedMode = if ($mode.StartsWith('dedicated_')) { 'EditorDedicated' } else { 'Listen' }
+    $runtime = Invoke-WinterPreflight $linked $receiptPath -Execute -Map $requestedMap -ServerMode $requestedMode
+    $expected = if ($mode -in @('healthy', 'protected_write', 'late_ready', 'listen_summer', 'dedicated_winter', 'dedicated_summer')) { 0 } elseif ($mode -eq 'watchdog') { 2 } else { 1 }
     Check ($runtime.runnerExit -eq $expected -and $runtime.childStarted) "fake child $mode expected exit=$expected"
     Check ($runtime.status -ceq $(if ($expected -eq 0) { 'PASSED' } else { 'FAILED' })) "$mode status matches full orchestration"
     Check ($runtime.serverLog -and $runtime.clientLog -and $runtime.processManifest) "$mode both log paths/manifest retained even on failure"
@@ -252,6 +277,8 @@ foreach ($mode in @('healthy', 'protected_write', 'watchdog', 'missing_manifest'
     $handle.Dispose()
     Check $true "$mode releases common handle after owned child"
 }
+Reject { Invoke-WinterPreflight $linked $receiptPath -Execute -ServerMode 'Dedicated' } 'ServerMode' 'invalid mode rejected before child'
+Reject { Invoke-WinterPreflight $linked $receiptPath -Execute -Map '../Winter_scene' } 'Map' 'invalid map rejected before child'
 Check $script:lockHeldDuringChild 'wrapper holds the one common lock through child invocation'
 Check $script:protectedWriteBlocked 'read-only Saved handle blocks overwrite attempt'
 Check ([IO.File]::ReadAllText((Join-Path $linked 'Saved/fixture.sav')) -ceq 'owner fixture save') 'protected save contents preserved'

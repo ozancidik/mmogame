@@ -884,6 +884,8 @@ Notlar: adım 1-4 bugünkü motorla yapılır ve kaynak motora bağlı değildir
 yalnız okuyan ajanlar (tasarım, metin, denetim) çalışır. Adım 9 tamamen kullanıcı işidir ve her an yapılabilir; A5 bunu bekler.
 Codex aynı ağaçta çalışıyorsa her adımdan önce `git status` bakılır, Codex'in dosyalarına dokunulmaz.
 
+**Yerel güncelleme — 2026-10-15:** adım 2'nin eksik Winter bağlantı kanıtı izole `4e0f0c5` modülüyle S00.04'te elde edildi: port 17490, join/welcome 1/1, hata 0/0, tam süreç gözlemi ve kayıt koruma kontrolü geçti ([kanıt](tasks/S00_04_STARTUP_READINESS_2026-10-15.md)). Adım 4 için S01.02'de kurulu `UnrealEditor-Cmd.exe` ile Summer raw map + `-server` **bir kez** denendi: 45,110 sn hazırlık bütçesinde harita/port hazır olmadığı için exit 1; istemci başlatılmadı, kayıtlar korundu. Bu koşu destek yok sonucunu veya `NM_DedicatedServer` kabulünü kanıtlamaz ([kanıt ve kapsam](tasks/S01_02_EDITOR_DEDICATED_ROUTE_2026-10-15.md)). Adım 3 PIE ve kaynak motorla gerçek Server hedefi hâlâ açık. Güncel yürütme sırası [sprint panosunda](SIX_MAP_SPRINT_BOARD.md); eski tarihli sonuçlar yeni koşu sayılmaz.
+
 ---
 
 ## 12. Steam yayını (revizyon 2, 2026-10-13)

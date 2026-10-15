@@ -14,7 +14,9 @@ param(
     [string]$UserDir,
     [string]$LogDirectory,
     [ValidateRange(0, 4000)]
-    [int]$WatchdogSeconds = 0
+    [int]$WatchdogSeconds = 0,
+    [ValidateSet('Listen', 'EditorDedicated')]
+    [string]$ServerMode = 'Listen'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +27,7 @@ $stamp = (Get-Date -Format yyyyMMdd_HHmmss_fff) + '_' + [guid]::NewGuid().ToStri
 $slog = Join-Path $env:TEMP "mmo_net_server_$stamp.log"
 $clog = Join-Path $env:TEMP "mmo_net_client_$stamp.log"
 $mapPath = "/Game/HandPaintedEnvironment/Maps/$Map/$Map"
+$route = if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' }
 
 function Assert-NetSmokePath([string]$Path) {
     if ($Path -notmatch '^[A-Za-z]:[\\/]' -or $Path.Substring(2) -match '[:"\r\n]') { throw 'Absolute local unquoted path required.' }
@@ -67,6 +70,8 @@ $manifestPath = if ($isolated) { Join-Path $LogDirectory 'processes.json' } else
 $deadline = if ($WatchdogSeconds) { $WatchdogSeconds } else { $ServerSeconds + $ClientSeconds + 20 }
 $clock = [Diagnostics.Stopwatch]::StartNew()
 $state = [ordered]@{ schema = 1; map = $Map; port = $null; userDir = $UserDir;
+    serverMode = $ServerMode; route = $route; executable = $exe; serverArguments = @(); clientArguments = @();
+    serverCommandLine = $null; serverCommandLineVerified = $false; netModeEvidence = 'NOT_PROVEN';
     serverLog = $slog; clientLog = $clog; watchdogSeconds = $deadline; timedOut = $false;
     observed = $false; serverObservedSeconds = 0; clientObservedSeconds = 0; cleanupOk = $true; exitCode = 1;
     readinessReady = $false; readinessPort = $false; readinessMap = $false; readinessElapsedSeconds = $null;
@@ -82,6 +87,7 @@ function Assert-NetSmokeDeadline {
 }
 Write-Output "Loglar: $slog ; $clog"
 Write-Output "Process manifest: $manifestPath"
+Write-Output "Route: $route development command/connection proof; NM_DedicatedServer NOT_PROVEN; no MyProjectServer/package/alpha acceptance."
 Save-NetSmokeManifest
 
 # Sabit 7777 yerine bos rastgele port: 2026-10-09'da 7777 baska bir sureçte (esanli test kosusu) doluydu, sunucu 7778'e
@@ -142,6 +148,18 @@ function Wait-NetSmokeReadiness($Server) {
         $state.readinessElapsedSeconds = $clock.Elapsed.TotalSeconds
         $state.clientBudgetRemainingSeconds = $deadline - $state.readinessElapsedSeconds
         if ($state.readinessPort -and $state.readinessMap) {
+            if ($ServerMode -eq 'EditorDedicated') {
+                $lines = @(Select-String -LiteralPath $slog -Pattern '\bLogInit: Command Line: ([^\r\n]*)$')
+                if ($lines.Count -eq 1) { $state.serverCommandLine = $lines[0].Matches[0].Groups[1].Value }
+                $cmd = [string]$state.serverCommandLine
+                if ($lines.Count -ne 1 -or $cmd -notmatch '(?:^|\s)-server(?:\s|$)' -or
+                    $cmd -match '(?:^|\s)-game(?:\s|$)|\?listen' -or
+                    $cmd -notmatch ('(?:^|\s)' + [regex]::Escape($mapPath) + '(?:\s|$)') -or
+                    $cmd -notmatch ("(?:^|\s)-port=$selectedPort(?:\s|$)")) {
+                    throw 'EDITOR_SERVER command-line evidence missing or inconsistent; listen fallback rejected.'
+                }
+                $state.serverCommandLineVerified = $true
+            }
             Assert-NetSmokeClientBudget
             $state.readinessReady = $true
             Save-NetSmokeManifest
@@ -161,8 +179,12 @@ $observed = $false
 $cleanupOk = $true
 try {
     $userArguments = if ($isolated) { @("-UserDir=`"$UserDir`"") } else { @() }
+    $modeArguments = if ($ServerMode -eq 'EditorDedicated') { @($mapPath, '-server') } else { @("${mapPath}?listen", '-game') }
+    $state.serverArguments = @("`"$project`"") + $modeArguments + @('-NullRHI', '-nosound', '-unattended', '-nosplash', '-stdout', "-ABSLOG=`"$slog`"", "-port=$selectedPort") + $userArguments
+    $state.clientArguments = @("`"$project`"", "127.0.0.1:$selectedPort", '-game', '-NullRHI', '-nosound', '-unattended', '-nosplash', '-stdout', "-ABSLOG=`"$clog`"") + $userArguments
+    Save-NetSmokeManifest # Raw arrays below are the arrays passed to the owned native launches.
     Assert-NetSmokeDeadline
-    $srv = Start-Process -FilePath $exe -ArgumentList (@("`"$project`"", "${mapPath}?listen", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=`"$slog`"", "-port=$selectedPort") + $userArguments) -PassThru -WindowStyle Hidden
+    $srv = Start-Process -FilePath $exe -ArgumentList $state.serverArguments -PassThru -WindowStyle Hidden
     $null = $srv.Handle # Retain native handle; ownership never reconstructed from a PID/name lookup.
     $state.processes[0].pid = $srv.Id
     Save-NetSmokeManifest
@@ -170,7 +192,7 @@ try {
     Wait-NetSmokeReadiness $srv
     Assert-NetSmokeAlive $srv $null
     Assert-NetSmokeClientBudget # Include readiness manifest I/O in the same reserved budget.
-    $cli = Start-Process -FilePath $exe -ArgumentList (@("`"$project`"", "127.0.0.1:$selectedPort", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=`"$clog`"") + $userArguments) -PassThru -WindowStyle Hidden
+    $cli = Start-Process -FilePath $exe -ArgumentList $state.clientArguments -PassThru -WindowStyle Hidden
     $null = $cli.Handle
     $state.processes[1].pid = $cli.Id
     Save-NetSmokeManifest

@@ -14,6 +14,7 @@ $env:TEMP = Join-Path (Split-Path -Parent $CaseRoot) 'space temp'
 $null = New-Item -ItemType Directory -Path $env:TEMP -Force
 $env:TEMP = [IO.Path]::GetFullPath($env:TEMP) # Normalize Windows 8.3 TEMP aliases before comparing canonical child paths.
 $global:NetMockCase = $CaseName -replace '^isolated_', ''
+if ($global:NetMockCase.StartsWith('dedicated_')) { $global:NetMockCase = $global:NetMockCase.Substring(10) }
 $global:NetMockRoot = $CaseRoot
 $global:NetMockProcesses = @{}
 $global:NetMockClientAttempted = $false
@@ -52,8 +53,9 @@ function taskkill {
 function Start-Process {
     [CmdletBinding()]
     param($FilePath, $ArgumentList, [switch]$PassThru, $WindowStyle)
-    $role = if (@($ArgumentList | Where-Object { $_ -like '*?listen' }).Count) { 'server' } else { 'client' }
+    $role = if (@($ArgumentList | Where-Object { $_ -like '*?listen' }).Count -or '-server' -in $ArgumentList) { 'server' } else { 'client' }
     Write-MockEvidence "$role-args.txt" ($ArgumentList -join [Environment]::NewLine)
+    Write-MockEvidence "$role-exe.txt" $FilePath
     Write-MockEvidence 'launches.txt' $role
     if ($role -eq 'server' -and $global:NetMockCase -eq 'server_launch_fail') {
         throw 'Injected server launch failure'
@@ -83,7 +85,7 @@ function Start-Process {
     } else {
         'LogNet: Welcomed by server (Level: /Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene)'
     }
-    if ($global:NetMockCase -eq 'healthy_winter' -or $CaseName.StartsWith('isolated_')) { $text = $text.Replace('Summer_scene', 'Winter_scene') }
+    if ($global:NetMockCase -eq 'healthy_winter' -or ($CaseName.StartsWith('isolated_') -and -not $CaseName.EndsWith('_summer'))) { $text = $text.Replace('Summer_scene', 'Winter_scene') }
     if ($role -eq 'server') {
         switch ($global:NetMockCase) {
             'empty_server' { $text = '' }
@@ -113,6 +115,12 @@ function Start-Process {
             'empty_client' { $text = '' }
             'missing_welcome' { $text = 'LogNet: Client connecting' }
         }
+    }
+    if ($role -eq 'server' -and $CaseName.StartsWith('isolated_dedicated_') -and $global:NetMockCase -ne 'missing_cmd') {
+        $nativeCmd = ($ArgumentList | Select-Object -Skip 1) -join ' '
+        if ($global:NetMockCase -eq 'fallback') { $nativeCmd = $nativeCmd.Replace(' -server ', '?listen -game ') }
+        if ($global:NetMockCase -eq 'wrong_cmd_map') { $nativeCmd = $nativeCmd.Replace('Winter_scene', 'Summer_scene') }
+        $text += "`nLogInit: Command Line: $nativeCmd"
     }
     foreach ($kind in @('error', 'fatal', 'ensure', 'access')) {
         if ($global:NetMockCase -eq "${role}_$kind") {
@@ -217,6 +225,8 @@ if ((Get-Command -Name $Runner).Parameters.ContainsKey('WatchdogSeconds')) { $ar
 if ($CaseName.StartsWith('isolated_')) {
     $Runner = $IsolatedRunner
     $argsForRunner.Map = 'Winter_scene'
+    if ($CaseName.EndsWith('_summer')) { $argsForRunner.Map = 'Summer_scene' }
+    if ($CaseName.StartsWith('isolated_dedicated_')) { $argsForRunner.ServerMode = 'EditorDedicated' }
     $argsForRunner.UserDir = Join-Path $IsolatedRoot ('Saved/WinterNet_' + [guid]::NewGuid().ToString('N'))
     $argsForRunner.LogDirectory = Join-Path $env:TEMP ($CaseName + '_' + [guid]::NewGuid().ToString('N') + '/child logs')
     switch ($global:NetMockCase) {
@@ -252,6 +262,7 @@ switch ($CaseName) {
     'bad_port_zero' { $argsForRunner.Port = 0 }
     'bad_port_negative' { $argsForRunner.Port = -1 }
     'bad_port_high' { $argsForRunner.Port = 65536 }
+    'bad_server_mode' { $argsForRunner.ServerMode = 'Dedicated' }
 }
 & $Runner @argsForRunner
 exit $LASTEXITCODE
@@ -297,6 +308,11 @@ if ((Get-Command -Name $Runner).Parameters.ContainsKey('UserDir')) {
         'isolated_readiness_only_port', 'isolated_readiness_wrong_port', 'isolated_readiness_port_prefix',
         'isolated_readiness_map_prefix', 'isolated_readiness_trace', 'isolated_readiness_early_exit',
         'isolated_readiness_budget', 'isolated_readiness_boundary')
+    if ((Get-Command -Name $Runner).Parameters.ContainsKey('ServerMode')) {
+        $cases += @('bad_server_mode', 'isolated_listen_summer', 'isolated_dedicated_winter', 'isolated_dedicated_summer',
+            'isolated_dedicated_fallback', 'isolated_dedicated_missing_cmd', 'isolated_dedicated_wrong_cmd_map',
+            'isolated_dedicated_missing_join', 'isolated_dedicated_client_kill_fail')
+    }
 }
 $checks = 0
 $failures = 0
@@ -320,7 +336,8 @@ foreach ($case in $cases) {
     } finally { $ErrorActionPreference = $previousPreference }
     $output | Out-File -LiteralPath (Join-Path $caseRoot 'output.txt')
     [IO.File]::WriteAllText((Join-Path $caseRoot 'exit.txt'), [string]$code)
-    $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter', 'isolated_healthy', 'isolated_readiness_late')
+    $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter', 'isolated_healthy', 'isolated_readiness_late',
+        'isolated_listen_summer', 'isolated_dedicated_winter', 'isolated_dedicated_summer')
     $expectedCode = if ($shouldPass) { 0 } elseif ($case -like 'isolated_timeout_*') { 2 } else { 1 }
     Check ($code -eq $expectedCode) "$case exit=$code"
     Check (-not (Test-Path -LiteralPath (Join-Path $caseRoot 'foreign-cleanup.txt'))) "$case only owned process cleanup"
@@ -354,7 +371,7 @@ foreach ($case in $cases) {
         if ($created) {
             $exitedNaturally = Test-Path -LiteralPath (Join-Path $caseRoot "$role-natural-exit.txt")
             Check ($kills.Count -eq $(if ($exitedNaturally) { 0 } else { 1 })) "$case $role owned cleanup / exited process not killed"
-            if ($case -eq "${role}_kill_fail" -or $case -eq "isolated_${role}_kill_fail") {
+            if ($case -eq "${role}_kill_fail" -or $case -eq "isolated_${role}_kill_fail" -or $case -eq "isolated_dedicated_${role}_kill_fail") {
                 # A thrown Kill may skip this object's wait; the other object must still be cleaned up.
                 Check ($waits.Count -le 1) "$case $role cleanup not retried indefinitely"
             } else {
@@ -401,7 +418,7 @@ foreach ($case in $cases) {
         Check ($cleanupOrder.Count -ge 2 -and $cleanupOrder[0] -like 'client:*' -and $cleanupOrder[-1] -like 'server:*') "$case both processes cleaned client then server despite first cleanup failure"
     }
     if ($shouldPass) {
-        $map = if ($case -in @('healthy_winter', 'isolated_healthy', 'isolated_readiness_late')) { 'Winter_scene' } else { 'Summer_scene' }
+        $map = if ($case -in @('healthy_winter', 'isolated_healthy', 'isolated_readiness_late', 'isolated_dedicated_winter')) { 'Winter_scene' } else { 'Summer_scene' }
         $metrics = "Harita: $map  Port: 17779  Baglanti(server)=1  Welcomed(istemci)=1  Hata(server)=0  Hata(istemci)=0"
         Check (($output -join "`n").Contains($metrics)) "$case historical metric output retained"
         Check (($output -join "`n") -match 'Loglar: .+ ; .+') "$case both log paths reported"
@@ -421,7 +438,7 @@ foreach ($case in $cases) {
             foreach ($row in @($manifest.processes)) {
                 $created = Test-Path -LiteralPath (Join-Path $caseRoot ($row.role + '-created.txt'))
                 Check (($null -ne $row.pid) -eq $created) "$case $($row.role) PID only for created handle"
-                if ($created -and $case -ne 'isolated_client_kill_fail') { Check $row.stopped "$case $($row.role) stopped by owner" }
+                if ($created -and $case -notin @('isolated_client_kill_fail', 'isolated_dedicated_client_kill_fail')) { Check $row.stopped "$case $($row.role) stopped by owner" }
             }
             if ($case -like 'isolated_timeout_*') {
                 Check ($manifest.timedOut -and -not $manifest.observed) "$case deadline cannot produce successful observation"
@@ -441,6 +458,22 @@ foreach ($case in $cases) {
                         else { 'readiness-timeout' }
                     Check ($manifest.startupFailure -ceq $reason -and ($output -join "`n") -match '\[NET_SMOKE_STARTUP\] FAIL') "$case distinct startup failure reason=$reason"
                 }
+            }
+            $requestedMode = if ($case.StartsWith('isolated_dedicated_')) { 'EditorDedicated' } else { 'Listen' }
+            Check ($manifest.serverMode -ceq $requestedMode -and $manifest.netModeEvidence -ceq 'NOT_PROVEN') "$case mode intent recorded without fabricated net mode"
+            $serverArgv = @(EvidenceLines $caseRoot 'server-args.txt')
+            $rawMap = "/Game/HandPaintedEnvironment/Maps/$($manifest.map)/$($manifest.map)"
+            Check (($manifest.serverArguments -join "`n") -ceq ($serverArgv -join "`n")) "$case manifest records exact server argv"
+            if ($requestedMode -eq 'EditorDedicated') {
+                Check ($serverArgv[1] -ceq $rawMap -and $serverArgv[2] -ceq '-server' -and '-game' -notin $serverArgv -and
+                    @($serverArgv | Where-Object { $_ -like '*?listen' }).Count -eq 0) "$case raw map/server flag only"
+                if ($case -in @('isolated_dedicated_fallback', 'isolated_dedicated_missing_cmd', 'isolated_dedicated_wrong_cmd_map')) {
+                    Check (-not $manifest.serverCommandLineVerified -and 'client' -notin $launches) "$case fallback/native mode evidence refused before client"
+                } else { Check $manifest.serverCommandLineVerified "$case native command-line evidence confirmed (not runtime NM)" }
+            } else { Check ($serverArgv[1] -ceq "${rawMap}?listen" -and $serverArgv[2] -ceq '-game' -and '-server' -notin $serverArgv) "$case legacy Listen retained" }
+            if ('client' -in $launches) {
+                $clientArgv = @(EvidenceLines $caseRoot 'client-args.txt')
+                Check (($manifest.clientArguments -join "`n") -ceq ($clientArgv -join "`n") -and $clientArgv[2] -ceq '-game' -and '-server' -notin $clientArgv) "$case unchanged exact game client argv"
             }
         }
         foreach ($role in @('server', 'client')) {
