@@ -69,6 +69,8 @@ $clock = [Diagnostics.Stopwatch]::StartNew()
 $state = [ordered]@{ schema = 1; map = $Map; port = $null; userDir = $UserDir;
     serverLog = $slog; clientLog = $clog; watchdogSeconds = $deadline; timedOut = $false;
     observed = $false; serverObservedSeconds = 0; clientObservedSeconds = 0; cleanupOk = $true; exitCode = 1;
+    readinessReady = $false; readinessPort = $false; readinessMap = $false; readinessElapsedSeconds = $null;
+    clientBudgetRemainingSeconds = $null; startupOverheadSeconds = 5; startupFailure = $null;
     processes = @([ordered]@{ role = 'server'; pid = $null; log = $slog; stopped = $false; cleanupError = $null },
         [ordered]@{ role = 'client'; pid = $null; log = $clog; stopped = $false; cleanupError = $null }) }
 function Save-NetSmokeManifest {
@@ -104,7 +106,10 @@ Save-NetSmokeManifest
 
 function Assert-NetSmokeAlive($Server, $Client) {
     Assert-NetSmokeDeadline
-    if ($Server.HasExited) { throw "Sunucu gozlem tamamlanmadan kapandi (exit=$($Server.ExitCode))." }
+    if ($Server.HasExited) {
+        if (-not $state.readinessReady) { $state.startupFailure = 'server-exited-before-ready' }
+        throw "Sunucu gozlem tamamlanmadan kapandi (exit=$($Server.ExitCode))."
+    }
     if ($null -ne $Client -and $Client.HasExited) { throw "Istemci gozlem tamamlanmadan kapandi (exit=$($Client.ExitCode))." }
 }
 function Wait-NetSmokeAlive([int]$Seconds, $Server, $Client) {
@@ -115,6 +120,39 @@ function Wait-NetSmokeAlive([int]$Seconds, $Server, $Client) {
     }
     Assert-NetSmokeAlive $Server $Client
     return $timer.Elapsed.TotalSeconds
+}
+function Assert-NetSmokeClientBudget {
+    $state.clientBudgetRemainingSeconds = $deadline - $clock.Elapsed.TotalSeconds
+    if ($state.clientBudgetRemainingSeconds -lt ($ClientSeconds + $state.startupOverheadSeconds)) {
+        $state.startupFailure = 'insufficient-client-budget'
+        throw 'Startup readiness: full client window plus overhead no longer fits the total deadline.'
+    }
+}
+function Wait-NetSmokeReadiness($Server) {
+    # Use the original total clock; do not grant a fresh startup or client deadline.
+    $portPattern = '\bLogNet:[^\r\n]*\blistening on port ' + $selectedPort + '\b'
+    $worldPattern = '\bLogWorld: Bringing World ' + [regex]::Escape("$mapPath.$Map") + ' up for play(?:\s|$)'
+    while ($true) {
+        Assert-NetSmokeAlive $Server $null
+        if (Test-Path -LiteralPath $slog) {
+            $state.readinessPort = Select-String -LiteralPath $slog -Pattern $portPattern -Quiet
+            $state.readinessMap = Select-String -LiteralPath $slog -Pattern $worldPattern -Quiet
+        }
+        Assert-NetSmokeAlive $Server $null # A server exiting during log reads is still a failure.
+        $state.readinessElapsedSeconds = $clock.Elapsed.TotalSeconds
+        $state.clientBudgetRemainingSeconds = $deadline - $state.readinessElapsedSeconds
+        if ($state.readinessPort -and $state.readinessMap) {
+            Assert-NetSmokeClientBudget
+            $state.readinessReady = $true
+            Save-NetSmokeManifest
+            return
+        }
+        if ($state.clientBudgetRemainingSeconds -le ($ClientSeconds + $state.startupOverheadSeconds)) {
+            $state.startupFailure = 'readiness-timeout'
+            throw "Startup readiness: exact requested raw map and gameplay port $selectedPort were not both ready within the reserved client budget."
+        }
+        Start-Sleep -Milliseconds 250
+    }
 }
 
 $srv = $null
@@ -129,12 +167,9 @@ try {
     $state.processes[0].pid = $srv.Id
     Save-NetSmokeManifest
     $state.serverObservedSeconds = Wait-NetSmokeAlive $ServerSeconds $srv $null
-    # Sahip olunan sunucunun taze logu secilen portu dogrulamadan istemci baslatilmaz.
-    $listening = (Test-Path -LiteralPath $slog) -and (Select-String -LiteralPath $slog -Pattern "listening on port $selectedPort\b" -Quiet)
-    if (-not $listening) { throw "Sunucu port $selectedPort dinlemiyor (port dolu ya da sunucu acilmadi)." }
-    $ready = Select-String -LiteralPath $slog -SimpleMatch "LogWorld: Bringing World $mapPath.$Map up for play" -Quiet
-    if (-not $ready) { throw 'Sunucu istenen haritayi yuklemedi.' }
+    Wait-NetSmokeReadiness $srv
     Assert-NetSmokeAlive $srv $null
+    Assert-NetSmokeClientBudget # Include readiness manifest I/O in the same reserved budget.
     $cli = Start-Process -FilePath $exe -ArgumentList (@("`"$project`"", "127.0.0.1:$selectedPort", "-game", "-NullRHI", "-nosound", "-unattended", "-nosplash", "-stdout", "-ABSLOG=`"$clog`"") + $userArguments) -PassThru -WindowStyle Hidden
     $null = $cli.Handle
     $state.processes[1].pid = $cli.Id
@@ -142,6 +177,7 @@ try {
     $state.clientObservedSeconds = Wait-NetSmokeAlive $ClientSeconds $srv $cli
     $observed = $true
 } catch {
+    if ($state.startupFailure) { Write-Output "[NET_SMOKE_STARTUP] FAIL reason=$($state.startupFailure) elapsed=$($state.readinessElapsedSeconds) port=$($state.readinessPort) map=$($state.readinessMap) remaining=$($state.clientBudgetRemainingSeconds)" }
     Write-Output "KALDI: $($_.Exception.Message)"
 } finally {
     # Bir cleanup hatasi diger sahip olunan surecin temizlenmesini engellemez.

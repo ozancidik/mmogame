@@ -18,7 +18,7 @@ Bu pano uygulamadan önce paylaşılan yürütme sırasıdır. Bu dosyanın haz�
 
 | ID / teslim | Eski plan | Bağımlılık | Ana sahip / bağımsız kabul | Kapanış kapısı | Durum |
 |---|---|---|---|---|---|
-| **S00 Taban** | Aşama 0, §11 adım 1–3 | Yok | devops + qa-automation; kullanıcı PIE, orchestrator kabul | Winter NetSmoke harita/port/join/welcome/hata kanıtı; iki oyunculu Summer↔Winter, NPC/görev/parti/HUD, yeniden giriş ve takasta kopma. Önceki build/headless kanıtı adayla eşleştirilir. | **AKTİF:** S00.04 başlangıç teşhisi; S00.02 gerçek koşu KALDI, PIE açık |
+| **S00 Taban** | Aşama 0, §11 adım 1–3 | Yok | devops + qa-automation; kullanıcı PIE, orchestrator kabul | Winter NetSmoke harita/port/join/welcome/hata kanıtı; iki oyunculu Summer↔Winter, NPC/görev/parti/HUD, yeniden giriş ve takasta kopma. Önceki build/headless kanıtı adayla eşleştirilir. | **AKTİF:** oyun içi/PIE kabulü açık; **S00.04 Winter ağ GEÇTİ** |
 | **S01 Dedicated** | **A1** | S00 tam kabul; betik/kurulum hazırlığı şimdi | devops + ue5-developer; QA, performance | Gerçek Server ve Editor build; Summer/Winter dedicated bağlantısı; iki portta iki süreç; CPU/RAM ve uzak bildirimler. Kaynak motor dış önkoşul. | HAZIRLIK: **S01.01 TAMAM**; Server/kapasite açık |
 | **S02 Yerleşim tablosu** | Aşama 1 | S00; S01 bitişi gerekmez | ue5-developer + npc-ai; QA | Summer 18/Winter 17 cep, NPC 5/4; koordinat/bant/MaxMobs eşdeğer; veri, smoke ve PIE eşdeğerliği. | PLAN |
 | **S03 Kalıcı ırk** | Aşama 2 | S02; ara depo/eski kayıt kararları | ue5-developer + game-designer; QA/network | Tek seçim, replikasyon, eski kayıt ve yeniden giriş/geçişte veri korunması. Ork seçimi S10'a kadar sunucuda reddedilir. | PLAN |
@@ -62,6 +62,14 @@ S00'dan sonra **S01 ∥ S02 → S03 → S04**; S01 ve S04, S05'te birleşir. S11
 **Sıradaki sınırlı görev S00.04:** aynı başlangıç logunun bağımsız teşhisi; gerçek neden görülmeden süre artırma veya kör tekrar yok. Franklin'e salt okunur teşhis atandı. S00'ın PIE ve sonraki sprint bağımlılıkları açık kalır. Ana checkout'taki peer takas/ırk düzenlemeleri bu pakete dahil değildir.
 
 **S00.04 teşhis sonucu:** Franklin ham koşuyu bağımsız doğruladı: port çakışması/çökme kanıtı yok, 30 sn kontrolünde gameplay readiness henüz görülmemiş. Önerilen sonraki uygulama: toplam 95 sn sınırını artırmadan, 45 sn istemci gözlemini koruyarak tam harita + gameplay portu için readiness polling; geç readiness/hiç hazır olmama/erken çıkış fixture'ları. Bu uygulama ve yeni gerçek koşu henüz yapılmadı; soğuk cache yalnız olası açıklamadır.
+
+**S00.04 uygulama atandı (2026-10-15):** mevcut Erdos (`01a13fde-a22c-7582-8c44-ade7659aadfc`) aynı izole worktree'de dört S00 betiğine ve yeni `docs/tasks/S00_04_STARTUP_READINESS_2026-10-15.md` kaydına yazabilir. Önceki görev notu, S01 dosyaları, derleme girdileri ve main kapsam dışıdır. Franklin (`01a13fe0-dc73-77b3-a84c-3352cc3a5d65`) frozen diff için bağımsız salt okunur QA/ağ kabulünü üstlenir. Her iki ajan da önceki tamamlanmış sonuçları alınarak yeniden kullanıldı; yeni/çift görev açılmadı. Bu dispatch gerçek UE/build/runtime yetkisi vermez. Tek 95 sn saat, en az 30 sn sunucu ve tam 45 sn istemci gözlemi korunacak; istemci başlamadan kalan bütçe ve iki readiness işareti doğrulanacak. Sonuçlar henüz bekleniyor.
+
+**S00.04 frozen aday alındı:** Erdos dört betik ve yeni görev notunu dondurdu. Koordinatör dört script hash'ini, child 1.132 kontrol/77 vaka ve PS5.1/PS7 wrapper 135'er kontrol loglarını ve üç exit 0 kaydını okudu; başarısız kontrol yok. Güncel read-only provenance helper 141 girdi/DLL eşleşmesini doğruladı; rebuild yapılmadı. Franklin'in son diff kabulü bekleniyor. Bu aday henüz main'e alınmadı ve yeni gerçek Winter koşusu yapılmadı.
+
+**S00.04 GEÇTİ (2026-10-15):** frozen aday Franklin'in bağımsız QA/ağ diff kabulünü aldı. Koordinatör tek runtime sahibi olarak aynı taze izole modülle bir kez çalıştırdı: **exit 0**, Winter raw world + port **17490**, join **1** / welcome **1**, hata **0/0**. Sunucu gözlemi **30,136 sn**, readiness **30,808 sn**, istemci gözlemi **45,163 sn**; toplam 95 sn sınırı ve 5 sn pay korundu. İki sahip olunan süreç temizlendi; mevcut Saved ve 141 derleme girdisi/DLL korundu, ortak kilit bırakıldı. Betikler hash eşitliğiyle main'e alındı. Kanıt ve sınırlar: `docs/tasks/S00_04_STARTUP_READINESS_2026-10-15.md`. Önceki başarısız koşu kaydı korunur; bu başarı soğuk cache nedenini kanıtlamaz.
+
+**Sonraki kapı:** S00'ın Summer↔Winter iki oyunculu gameplay/PIE kabulü hâlâ açık. S02/S03 gameplay entegrasyonu bu kapıyı atlamaz. Bağımsız S01 kaynak motor/dedicated hazırlığı sürdürülebilir; gerçek Server build ve kapasite kabulü henüz yoktur.
 
 | Rol | Bu programdaki görevi |
 |---|---|

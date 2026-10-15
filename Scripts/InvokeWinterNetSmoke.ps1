@@ -172,6 +172,10 @@ function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir) {
     if ($manifest.schema -ne 1 -or $manifest.map -cne 'Winter_scene' -or $manifest.userDir -ine $UserDir -or
         $manifest.exitCode -ne 0 -or -not $manifest.observed -or -not $manifest.cleanupOk -or $manifest.timedOut -or
         $manifest.serverObservedSeconds -lt 30 -or $manifest.clientObservedSeconds -lt 45 -or $manifest.watchdogSeconds -ne 95 -or
+        -not $manifest.readinessReady -or -not $manifest.readinessPort -or -not $manifest.readinessMap -or $manifest.startupFailure -or
+        $null -eq $manifest.readinessElapsedSeconds -or $manifest.readinessElapsedSeconds -lt 30 -or
+        $manifest.startupOverheadSeconds -ne 5 -or $manifest.readinessElapsedSeconds -gt 45 -or
+        $manifest.clientBudgetRemainingSeconds -lt 50 -or $manifest.clientBudgetRemainingSeconds -gt (95 - $manifest.readinessElapsedSeconds) -or
         $manifest.serverLog -ine $serverLog -or $manifest.clientLog -ine $clientLog -or $manifest.port -lt 1 -or $manifest.port -gt 65535) {
         throw 'Child observation/cleanup/log manifest rejected.'
     }
@@ -183,8 +187,8 @@ function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir) {
         throw 'Owned process manifest rejected.'
     }
     $server = Get-Content -LiteralPath $serverLog -Raw; $client = Get-Content -LiteralPath $clientLog -Raw
-    if ($server -notmatch "listening on port $($manifest.port)\b" -or
-        -not $server.Contains('LogWorld: Bringing World /Game/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene.Winter_scene up for play') -or
+    if ($server -notmatch ("\bLogNet:[^\r\n]*\blistening on port $($manifest.port)\b") -or
+        $server -notmatch ('\bLogWorld: Bringing World ' + [regex]::Escape('/Game/HandPaintedEnvironment/Maps/Winter_scene/Winter_scene.Winter_scene') + ' up for play(?:\s|$)') -or
         $server -notmatch 'Join succeeded' -or $client -notmatch 'Welcomed by server' -or
         ($server + $client) -match 'Error:|Fatal error|Ensure condition|Access violation') { throw 'Child connection logs rejected.' }
 }

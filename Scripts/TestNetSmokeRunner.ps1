@@ -93,6 +93,21 @@ function Start-Process {
             'wrong_map' { $text = if ($CaseName.StartsWith('isolated_')) { $text.Replace('Winter_scene', 'Summer_scene') } else { $text.Replace('Summer_scene', 'Winter_scene') } }
             'missing_readiness' { $text = "LogNet: GameNetDriver listening on port 17779`nLogNet: Join succeeded: MockPlayer" }
         }
+        if ($global:NetMockCase -like 'readiness_*') {
+            $global:NetMockReadyText = $text
+            $global:NetMockServerLog = $logPath
+            $global:NetMockStartupClock = [Diagnostics.Stopwatch]::StartNew()
+            switch ($global:NetMockCase) {
+                'readiness_only_map' { $text = ($text -split "`n" | Where-Object { $_ -notmatch 'LogNet: GameNetDriver' }) -join "`n" }
+                'readiness_only_port' { $text = ($text -split "`n" | Where-Object { $_ -notmatch 'LogWorld:' }) -join "`n" }
+                'readiness_wrong_port' { $text = $text.Replace('17779', '17780') }
+                'readiness_port_prefix' { $text = $text.Replace('17779', '177790') }
+                'readiness_map_prefix' { $text = $text.Replace('Winter_scene.Winter_scene', 'Winter_scene.Winter_scene_extra') }
+                'readiness_trace' { $text = $text.Replace('LogNet: GameNetDriver listening on port 17779', 'LogTrace: Store listening on port 1985') }
+                'readiness_budget' { }
+                default { $text = '' }
+            }
+        }
     } else {
         switch ($global:NetMockCase) {
             'empty_client' { $text = '' }
@@ -176,12 +191,29 @@ function Start-Sleep {
     if ($Milliseconds -gt 0) {
         Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds ([math]::Min([int]$Milliseconds, 250))
     }
+    if ($phase -eq 'server' -and $global:NetMockCase -in @('readiness_late', 'readiness_boundary') -and
+        $global:NetMockStartupClock.Elapsed.TotalSeconds -ge 2) {
+        [IO.File]::WriteAllText($global:NetMockServerLog, $global:NetMockReadyText)
+        Write-MockEvidence 'ready-published.txt' 'both markers after 2s; minimum server observation 1s'
+    }
+    if ($phase -eq 'server' -and $global:NetMockCase -eq 'readiness_early_exit' -and
+        $global:NetMockStartupClock.Elapsed.TotalSeconds -ge 1.25) {
+        $global:NetMockProcesses.server.HasExited = $true
+        $global:NetMockProcesses.server.ExitCode = 0
+        Write-MockEvidence 'server-natural-exit.txt' '0'
+    }
+    if ($phase -eq 'client' -and $global:NetMockCase -eq 'timeout_client') {
+        # Inject a stalled total clock without a long fixture sleep or production timing seam.
+        $clock | Add-Member -MemberType ScriptProperty -Name Elapsed -Value { [TimeSpan]::FromSeconds(4001) } -Force
+        Write-MockEvidence 'watchdog-injected.txt' 'total clock stall after client launch'
+    }
 }
 $argsForRunner = @{ Map = 'Summer_scene'; ClientSeconds = 1; Port = 17779 }
 # Do not let the newly added parameter prevent the old runner's false positives from being reproduced.
 $hasServerSeconds = (Get-Command -Name $Runner).Parameters.ContainsKey('ServerSeconds')
 Write-MockEvidence 'runner-capabilities.txt' "ServerSeconds=$hasServerSeconds"
 if ($hasServerSeconds) { $argsForRunner.ServerSeconds = 1 }
+if ((Get-Command -Name $Runner).Parameters.ContainsKey('WatchdogSeconds')) { $argsForRunner.WatchdogSeconds = 8 }
 if ($CaseName.StartsWith('isolated_')) {
     $Runner = $IsolatedRunner
     $argsForRunner.Map = 'Winter_scene'
@@ -189,7 +221,10 @@ if ($CaseName.StartsWith('isolated_')) {
     $argsForRunner.LogDirectory = Join-Path $env:TEMP ($CaseName + '_' + [guid]::NewGuid().ToString('N') + '/child logs')
     switch ($global:NetMockCase) {
         'timeout_server' { $argsForRunner.ServerSeconds = 2; $argsForRunner.WatchdogSeconds = 1 }
-        'timeout_client' { $argsForRunner.ClientSeconds = 3; $argsForRunner.WatchdogSeconds = 2 }
+        'timeout_client' { $argsForRunner.WatchdogSeconds = 8 }
+        'readiness_late' { $argsForRunner.WatchdogSeconds = 9 }
+        'readiness_budget' { $argsForRunner.WatchdogSeconds = 7 }
+        'readiness_trace' { $argsForRunner.Port = 1985 }
         'reused_user' { $null = [IO.Directory]::CreateDirectory($argsForRunner.UserDir) }
         'reused_log' { $null = [IO.Directory]::CreateDirectory($argsForRunner.LogDirectory) }
         'foreign_user' { $argsForRunner.UserDir = Join-Path $env:TEMP ('WinterNet_' + [guid]::NewGuid().ToString('N')) }
@@ -258,6 +293,10 @@ if ((Get-Command -Name $Runner).Parameters.ContainsKey('UserDir')) {
         'isolated_client_after_join_zero', 'isolated_wrong_port', 'isolated_wrong_map', 'isolated_client_kill_fail',
         'isolated_reused_user', 'isolated_reused_log', 'isolated_foreign_user', 'isolated_foreign_log',
         'isolated_unpaired', 'isolated_reparse_log', 'isolated_udp_unknown')
+    $cases += @('isolated_readiness_late', 'isolated_readiness_never', 'isolated_readiness_only_map',
+        'isolated_readiness_only_port', 'isolated_readiness_wrong_port', 'isolated_readiness_port_prefix',
+        'isolated_readiness_map_prefix', 'isolated_readiness_trace', 'isolated_readiness_early_exit',
+        'isolated_readiness_budget', 'isolated_readiness_boundary')
 }
 $checks = 0
 $failures = 0
@@ -281,7 +320,7 @@ foreach ($case in $cases) {
     } finally { $ErrorActionPreference = $previousPreference }
     $output | Out-File -LiteralPath (Join-Path $caseRoot 'output.txt')
     [IO.File]::WriteAllText((Join-Path $caseRoot 'exit.txt'), [string]$code)
-    $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter', 'isolated_healthy')
+    $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter', 'isolated_healthy', 'isolated_readiness_late')
     $expectedCode = if ($shouldPass) { 0 } elseif ($case -like 'isolated_timeout_*') { 2 } else { 1 }
     Check ($code -eq $expectedCode) "$case exit=$code"
     Check (-not (Test-Path -LiteralPath (Join-Path $caseRoot 'foreign-cleanup.txt'))) "$case only owned process cleanup"
@@ -362,7 +401,7 @@ foreach ($case in $cases) {
         Check ($cleanupOrder.Count -ge 2 -and $cleanupOrder[0] -like 'client:*' -and $cleanupOrder[-1] -like 'server:*') "$case both processes cleaned client then server despite first cleanup failure"
     }
     if ($shouldPass) {
-        $map = if ($case -in @('healthy_winter', 'isolated_healthy')) { 'Winter_scene' } else { 'Summer_scene' }
+        $map = if ($case -in @('healthy_winter', 'isolated_healthy', 'isolated_readiness_late')) { 'Winter_scene' } else { 'Summer_scene' }
         $metrics = "Harita: $map  Port: 17779  Baglanti(server)=1  Welcomed(istemci)=1  Hata(server)=0  Hata(istemci)=0"
         Check (($output -join "`n").Contains($metrics)) "$case historical metric output retained"
         Check (($output -join "`n") -match 'Loglar: .+ ; .+') "$case both log paths reported"
@@ -386,6 +425,22 @@ foreach ($case in $cases) {
             }
             if ($case -like 'isolated_timeout_*') {
                 Check ($manifest.timedOut -and -not $manifest.observed) "$case deadline cannot produce successful observation"
+            }
+            if ($case -like 'isolated_readiness_*') {
+                Check ($manifest.serverObservedSeconds -ge 1) "$case minimum server observation retained"
+                Check ($manifest.startupOverheadSeconds -eq 5) "$case defined overhead retained"
+                if ($case -eq 'isolated_readiness_late') {
+                    Check ($manifest.readinessReady -and $manifest.readinessMap -and $manifest.readinessPort -and
+                        $manifest.readinessElapsedSeconds -ge 2 -and $manifest.clientObservedSeconds -ge 1) "$case late readiness keeps full client window"
+                    Check ($manifest.clientBudgetRemainingSeconds -ge 6 -and $manifest.watchdogSeconds -eq 9) "$case uses original total clock and reserved budget"
+                    Check (Test-Path -LiteralPath (Join-Path $caseRoot 'ready-published.txt')) "$case startup markers appeared during polling"
+                } else {
+                    Check (@($launches | Where-Object { $_ -eq 'client' }).Count -eq 0 -and -not $manifest.observed) "$case no client on failed readiness/budget"
+                    $reason = if ($case -eq 'isolated_readiness_early_exit') { 'server-exited-before-ready' }
+                        elseif ($case -in @('isolated_readiness_budget', 'isolated_readiness_boundary')) { 'insufficient-client-budget' }
+                        else { 'readiness-timeout' }
+                    Check ($manifest.startupFailure -ceq $reason -and ($output -join "`n") -match '\[NET_SMOKE_STARTUP\] FAIL') "$case distinct startup failure reason=$reason"
+                }
             }
         }
         foreach ($role in @('server', 'client')) {

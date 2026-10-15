@@ -217,6 +217,8 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
     $fake = [ordered]@{ schema = 1; map = 'Winter_scene'; port = 17779; userDir = $UserDir;
         serverLog = $server; clientLog = $client; watchdogSeconds = 95; timedOut = $false;
         observed = $true; serverObservedSeconds = 30; clientObservedSeconds = 45; cleanupOk = $true; exitCode = 0;
+        readinessReady = $true; readinessMap = $true; readinessPort = $true; readinessElapsedSeconds = 30;
+        clientBudgetRemainingSeconds = 65; startupOverheadSeconds = 5; startupFailure = $null;
         processes = @([ordered]@{role = 'server'; pid = 800001; log = $server; stopped = $true; cleanupError = $null},
             [ordered]@{role = 'client'; pid = 800002; log = $client; stopped = $true; cleanupError = $null}) }
     switch ($script:runtimeMode) {
@@ -225,16 +227,24 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
         'wrong_pid' { $fake.processes[1].pid = $fake.processes[0].pid }
         'cleanup_failed' { $fake.cleanupOk = $false; $fake.processes[0].stopped = $false }
         'wrong_port' { Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace('17779', '17780')) }
+        'late_ready' { $fake.readinessElapsedSeconds = 35; $fake.clientBudgetRemainingSeconds = 60 }
+        'too_late_ready' { $fake.readinessElapsedSeconds = 46; $fake.clientBudgetRemainingSeconds = 49 }
+        'missing_ready' { $fake.readinessMap = $false; $fake.readinessReady = $false }
+        'short_budget' { $fake.clientBudgetRemainingSeconds = 49 }
+        'reset_clock_budget' { $fake.readinessElapsedSeconds = 35; $fake.clientBudgetRemainingSeconds = 65 }
+        'trace_port' { Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace('LogNet: listening on port 17779', 'LogTrace: listening on port 17779')) }
+        'map_prefix' { Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace('Winter_scene.Winter_scene', 'Winter_scene.Winter_scene_extra')) }
     }
     Save-WinterJson (Join-Path $Logs 'processes.json') $fake
     return $fake.exitCode
 }
 foreach ($mode in @('healthy', 'protected_write', 'watchdog', 'missing_manifest', 'short_observation',
-    'wrong_pid', 'cleanup_failed', 'wrong_port', 'outside_saved', 'source_changed')) {
+    'wrong_pid', 'cleanup_failed', 'wrong_port', 'outside_saved', 'source_changed',
+    'late_ready', 'too_late_ready', 'missing_ready', 'short_budget', 'reset_clock_budget', 'trace_port', 'map_prefix')) {
     Write-FixtureReceipt
     $script:runtimeMode = $mode
     $runtime = Invoke-WinterPreflight $linked $receiptPath -Execute
-    $expected = if ($mode -in @('healthy', 'protected_write')) { 0 } elseif ($mode -eq 'watchdog') { 2 } else { 1 }
+    $expected = if ($mode -in @('healthy', 'protected_write', 'late_ready')) { 0 } elseif ($mode -eq 'watchdog') { 2 } else { 1 }
     Check ($runtime.runnerExit -eq $expected -and $runtime.childStarted) "fake child $mode expected exit=$expected"
     Check ($runtime.status -ceq $(if ($expected -eq 0) { 'PASSED' } else { 'FAILED' })) "$mode status matches full orchestration"
     Check ($runtime.serverLog -and $runtime.clientLog -and $runtime.processManifest) "$mode both log paths/manifest retained even on failure"
