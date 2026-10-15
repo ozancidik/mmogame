@@ -18,7 +18,7 @@ Bu pano uygulamadan önce paylaşılan yürütme sırasıdır. Bu dosyanın haz�
 
 | ID / teslim | Eski plan | Bağımlılık | Ana sahip / bağımsız kabul | Kapanış kapısı | Durum |
 |---|---|---|---|---|---|
-| **S00 Taban** | Aşama 0, §11 adım 1–3 | Yok | devops + qa-automation; kullanıcı PIE, orchestrator kabul | Winter NetSmoke harita/port/join/welcome/hata kanıtı; iki oyunculu Summer↔Winter, NPC/görev/parti/HUD, yeniden giriş ve takasta kopma. Önceki build/headless kanıtı adayla eşleştirilir. | **AKTİF:** S00.02; gerçek ağ/PIE açık |
+| **S00 Taban** | Aşama 0, §11 adım 1–3 | Yok | devops + qa-automation; kullanıcı PIE, orchestrator kabul | Winter NetSmoke harita/port/join/welcome/hata kanıtı; iki oyunculu Summer↔Winter, NPC/görev/parti/HUD, yeniden giriş ve takasta kopma. Önceki build/headless kanıtı adayla eşleştirilir. | **AKTİF:** S00.04 başlangıç teşhisi; S00.02 gerçek koşu KALDI, PIE açık |
 | **S01 Dedicated** | **A1** | S00 tam kabul; betik/kurulum hazırlığı şimdi | devops + ue5-developer; QA, performance | Gerçek Server ve Editor build; Summer/Winter dedicated bağlantısı; iki portta iki süreç; CPU/RAM ve uzak bildirimler. Kaynak motor dış önkoşul. | HAZIRLIK: **S01.01 TAMAM**; Server/kapasite açık |
 | **S02 Yerleşim tablosu** | Aşama 1 | S00; S01 bitişi gerekmez | ue5-developer + npc-ai; QA | Summer 18/Winter 17 cep, NPC 5/4; koordinat/bant/MaxMobs eşdeğer; veri, smoke ve PIE eşdeğerliği. | PLAN |
 | **S03 Kalıcı ırk** | Aşama 2 | S02; ara depo/eski kayıt kararları | ue5-developer + game-designer; QA/network | Tek seçim, replikasyon, eski kayıt ve yeniden giriş/geçişte veri korunması. Ork seçimi S10'a kadar sunucuda reddedilir. | PLAN |
@@ -54,6 +54,14 @@ S00'dan sonra **S01 ∥ S02 → S03 → S04**; S01 ve S04, S05'te birleşir. S11
 **S00.03 TAMAM (2026-10-15):** Wegener tek UE build sahibi olarak aynı izole worktree'de `MyProjectEditor Win64 Development` hedefini bir kez derledi: exit 0, gerçek UBT `Result: Succeeded`, 76,47 saniye. 141 derleme girdisi ve HEAD `4e0f0c5` değişmedi; taze DLL SHA256 `4845E04198C1CB419514B50FD0E9060822E68A6866D0AC348D13B19A847068E1`. Koordinatör girdi kümesini/hash'leri, DLL/zaman aralığını, ham log hash'ini, compile/link satırlarını ve bırakılan ortak kilidi bağımsız doğruladı. Kanıt: `docs/tasks/S00_03_ISOLATED_MODULE_2026-10-15.md`. Ana checkout'un yeni ırk kodu bu build'e dahil değildir. Gerçek Winter ağı ve PIE hâlâ açık; sonraki koşul S00.02'nin frozen bağımsız kabulüdür.
 
 ## On iki rolün yönlendirmesi
+
+**S00.02 betik teslimi kabul edildi (2026-10-15):** Erdos'un frozen dört betiği Franklin'in bağımsız QA/ağ incelemesinden geçti; koordinatör hash'leri ve ham test loglarını doğruladı. Child mock suite 878 kontrol/66 vaka, wrapper PS5.1 ve PS7'de 107'şer kontrol: başarısız kontrol yok. Beş dosyalık paket ana checkout'a hash eşitliğiyle alındı; ardından yalnız bu görev notuna gerçek sonuç eklendi.
+
+**S00.02 gerçek Winter koşusu KALDI:** koordinatör ortak kilit altında taze izole modülle bir kez çalıştırdı. Sunucu 30,135 sn canlı kaldı; port 17916/Winter readiness kanıtı oluşmadığı için istemci başlatılmadı. Exit 1, cleanup başarılı, watchdog dolmadı, log hata kalıbı 0; join/welcome kanıtı yok. Mevcut izole Saved korundu, 141 girdi/DLL değişmedi, kilit bırakıldı. Kanıt: `docs/tasks/S00_01_WINTER_NETWORK_2026-10-15.md`; ham loglar `TEMP/mmo_winter_net_d5d03dce0be9490a91a0f97d43188bd2`. Bu sonuç ağ kabulü değildir.
+
+**Sıradaki sınırlı görev S00.04:** aynı başlangıç logunun bağımsız teşhisi; gerçek neden görülmeden süre artırma veya kör tekrar yok. Franklin'e salt okunur teşhis atandı. S00'ın PIE ve sonraki sprint bağımlılıkları açık kalır. Ana checkout'taki peer takas/ırk düzenlemeleri bu pakete dahil değildir.
+
+**S00.04 teşhis sonucu:** Franklin ham koşuyu bağımsız doğruladı: port çakışması/çökme kanıtı yok, 30 sn kontrolünde gameplay readiness henüz görülmemiş. Önerilen sonraki uygulama: toplam 95 sn sınırını artırmadan, 45 sn istemci gözlemini koruyarak tam harita + gameplay portu için readiness polling; geç readiness/hiç hazır olmama/erken çıkış fixture'ları. Bu uygulama ve yeni gerçek koşu henüz yapılmadı; soğuk cache yalnız olası açıklamadır.
 
 | Rol | Bu programdaki görevi |
 |---|---|

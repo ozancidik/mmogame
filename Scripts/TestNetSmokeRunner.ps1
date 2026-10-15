@@ -7,12 +7,13 @@ $scratch = Join-Path $env:TEMP ('mmo_net_regression_' + [guid]::NewGuid().ToStri
 $null = New-Item -ItemType Directory -Path $scratch
 $child = Join-Path $scratch 'mock.ps1'
 $childSource = @'
-param([string]$Runner, [string]$CaseName, [string]$CaseRoot)
+param([string]$Runner, [string]$CaseName, [string]$CaseRoot, [string]$IsolatedRunner, [string]$IsolatedRoot)
 $ErrorActionPreference = 'Stop'
 # All cases share a TEMP containing spaces, so filename uniqueness cannot come from directories.
 $env:TEMP = Join-Path (Split-Path -Parent $CaseRoot) 'space temp'
 $null = New-Item -ItemType Directory -Path $env:TEMP -Force
-$global:NetMockCase = $CaseName
+$env:TEMP = [IO.Path]::GetFullPath($env:TEMP) # Normalize Windows 8.3 TEMP aliases before comparing canonical child paths.
+$global:NetMockCase = $CaseName -replace '^isolated_', ''
 $global:NetMockRoot = $CaseRoot
 $global:NetMockProcesses = @{}
 $global:NetMockClientAttempted = $false
@@ -25,6 +26,7 @@ function Get-NetUDPEndpoint {
     [CmdletBinding()]
     param()
     Write-MockEvidence 'udp.txt' 'mock endpoint query'
+    if ($global:NetMockCase -eq 'udp_unknown') { throw 'Injected UDP inventory failure' }
     # This unrelated process must never be killed, even when its port blocks the run.
     [pscustomobject]@{ LocalPort = 17780; OwningProcess = 999998 }
     if ($global:NetMockCase -eq 'occupied') {
@@ -66,6 +68,11 @@ function Start-Process {
     }
     $logPath = $Matches[1]
     Write-MockEvidence "$role-logpath.txt" $logPath
+    if ($CaseName.StartsWith('isolated_')) {
+        $published = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $logPath) 'processes.json') -Raw | ConvertFrom-Json
+        if (-not $published.serverLog -or -not $published.clientLog) { throw 'Both log paths must be published before native launch.' }
+        Write-MockEvidence 'prelaunch-manifest.txt' $role
+    }
     if (-not [IO.Path]::IsPathRooted($logPath) -or
         -not $logPath.StartsWith($env:TEMP + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
         throw 'Mock log path must be absolute and inside the case TEMP.'
@@ -76,14 +83,14 @@ function Start-Process {
     } else {
         'LogNet: Welcomed by server (Level: /Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene)'
     }
-    if ($global:NetMockCase -eq 'healthy_winter') { $text = $text.Replace('Summer_scene', 'Winter_scene') }
+    if ($global:NetMockCase -eq 'healthy_winter' -or $CaseName.StartsWith('isolated_')) { $text = $text.Replace('Summer_scene', 'Winter_scene') }
     if ($role -eq 'server') {
         switch ($global:NetMockCase) {
             'empty_server' { $text = '' }
             'wrong_port' { $text = $text.Replace('17779', '17780') }
             'port_prefix' { $text = $text.Replace('17779', '177790') }
             'missing_join' { $text = $text.Replace("`nLogNet: Join succeeded: MockPlayer", '') }
-            'wrong_map' { $text = $text.Replace('Summer_scene', 'Winter_scene') }
+            'wrong_map' { $text = if ($CaseName.StartsWith('isolated_')) { $text.Replace('Winter_scene', 'Summer_scene') } else { $text.Replace('Summer_scene', 'Winter_scene') } }
             'missing_readiness' { $text = "LogNet: GameNetDriver listening on port 17779`nLogNet: Join succeeded: MockPlayer" }
         }
     } else {
@@ -109,6 +116,8 @@ function Start-Process {
         Write-MockEvidence "$role-locked.txt" 'exclusive fixture lock'
     }
     $p = [pscustomobject]@{
+        Id = $(if ($role -eq 'server') { 900001 } else { 900002 })
+        Handle = [IntPtr]::Zero
         HasExited = $false
         ExitCode = 0
         Role = $role
@@ -173,6 +182,27 @@ $argsForRunner = @{ Map = 'Summer_scene'; ClientSeconds = 1; Port = 17779 }
 $hasServerSeconds = (Get-Command -Name $Runner).Parameters.ContainsKey('ServerSeconds')
 Write-MockEvidence 'runner-capabilities.txt' "ServerSeconds=$hasServerSeconds"
 if ($hasServerSeconds) { $argsForRunner.ServerSeconds = 1 }
+if ($CaseName.StartsWith('isolated_')) {
+    $Runner = $IsolatedRunner
+    $argsForRunner.Map = 'Winter_scene'
+    $argsForRunner.UserDir = Join-Path $IsolatedRoot ('Saved/WinterNet_' + [guid]::NewGuid().ToString('N'))
+    $argsForRunner.LogDirectory = Join-Path $env:TEMP ($CaseName + '_' + [guid]::NewGuid().ToString('N') + '/child logs')
+    switch ($global:NetMockCase) {
+        'timeout_server' { $argsForRunner.ServerSeconds = 2; $argsForRunner.WatchdogSeconds = 1 }
+        'timeout_client' { $argsForRunner.ClientSeconds = 3; $argsForRunner.WatchdogSeconds = 2 }
+        'reused_user' { $null = [IO.Directory]::CreateDirectory($argsForRunner.UserDir) }
+        'reused_log' { $null = [IO.Directory]::CreateDirectory($argsForRunner.LogDirectory) }
+        'foreign_user' { $argsForRunner.UserDir = Join-Path $env:TEMP ('WinterNet_' + [guid]::NewGuid().ToString('N')) }
+        'foreign_log' { $argsForRunner.LogDirectory = Join-Path $IsolatedRoot 'Saved/forbidden_logs' }
+        'unpaired' { $argsForRunner.Remove('LogDirectory') }
+        'reparse_log' {
+            $link = Join-Path $CaseRoot 'junction'
+            $null = New-Item -ItemType Junction -Path $link -Target $env:TEMP
+            $argsForRunner.LogDirectory = Join-Path $link 'foreign_log'
+        }
+    }
+    Write-MockEvidence 'requested-userdir.txt' $argsForRunner.UserDir
+}
 switch ($CaseName) {
     'healthy_winter' { $argsForRunner.Map = 'Winter_scene' }
     'bad_map' { $argsForRunner.Map = 'Missing_scene' }
@@ -204,6 +234,31 @@ $cases = @('healthy', 'healthy_again', 'healthy_winter',
     'server_wait_throw', 'client_wait_throw', 'occupied',
     'bad_map', 'bad_map_path', 'bad_map_empty', 'bad_server_zero', 'bad_server_negative', 'bad_server_high',
     'bad_client_zero', 'bad_client_negative', 'bad_client_high', 'bad_port_zero', 'bad_port_negative', 'bad_port_high')
+$isolatedRoot = ''; $isolatedRunner = ''
+if ((Get-Command -Name $Runner).Parameters.ContainsKey('UserDir')) {
+    # Separate temporary fixture registration; never edit project Git metadata or copy game assets/DLLs.
+    $fixtureMain = Join-Path $scratch 'fixture-main'
+    $isolatedRoot = Join-Path $scratch 'isolated worktree'
+    $null = [IO.Directory]::CreateDirectory($fixtureMain)
+    function Fixture-Git([string]$Root, [string[]]$GitArgs) {
+        $null = & git -C $Root @GitArgs
+        if ($LASTEXITCODE) { throw 'Fixture Git command failed.' }
+    }
+    Fixture-Git $fixtureMain @('init', '-q')
+    Fixture-Git $fixtureMain @('config', 'user.name', 'Smoke fixture')
+    Fixture-Git $fixtureMain @('config', 'user.email', 'fixture@example.invalid')
+    [IO.File]::WriteAllText((Join-Path $fixtureMain 'MyProject.uproject'), '{}')
+    Fixture-Git $fixtureMain @('add', '--', 'MyProject.uproject')
+    Fixture-Git $fixtureMain @('commit', '-qm', 'temporary fixture only')
+    Fixture-Git $fixtureMain @('worktree', 'add', '--detach', '-q', $isolatedRoot, 'HEAD')
+    $null = [IO.Directory]::CreateDirectory((Join-Path $isolatedRoot 'Scripts'))
+    $isolatedRunner = Join-Path $isolatedRoot 'Scripts/NetSmokeTest.ps1'
+    [IO.File]::WriteAllText($isolatedRunner, [IO.File]::ReadAllText($Runner), (New-Object Text.UTF8Encoding($false)))
+    $cases += @('isolated_healthy', 'isolated_timeout_server', 'isolated_timeout_client',
+        'isolated_client_after_join_zero', 'isolated_wrong_port', 'isolated_wrong_map', 'isolated_client_kill_fail',
+        'isolated_reused_user', 'isolated_reused_log', 'isolated_foreign_user', 'isolated_foreign_log',
+        'isolated_unpaired', 'isolated_reparse_log', 'isolated_udp_unknown')
+}
 $checks = 0
 $failures = 0
 function Check([bool]$Condition, [string]$Label) {
@@ -221,16 +276,19 @@ foreach ($case in $cases) {
     try {
         # Expected parameter/exception failures write stderr under Windows PowerShell 5.
         $ErrorActionPreference = 'Continue'
-        $output = & powershell -NoProfile -File $child -Runner $Runner -CaseName $case -CaseRoot $caseRoot 2>&1
+        $output = & powershell -NoProfile -File $child -Runner $Runner -CaseName $case -CaseRoot $caseRoot -IsolatedRunner $isolatedRunner -IsolatedRoot $isolatedRoot 2>&1
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $previousPreference }
     $output | Out-File -LiteralPath (Join-Path $caseRoot 'output.txt')
     [IO.File]::WriteAllText((Join-Path $caseRoot 'exit.txt'), [string]$code)
-    $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter')
-    Check ($code -eq $(if ($shouldPass) { 0 } else { 1 })) "$case exit=$code"
+    $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter', 'isolated_healthy')
+    $expectedCode = if ($shouldPass) { 0 } elseif ($case -like 'isolated_timeout_*') { 2 } else { 1 }
+    Check ($code -eq $expectedCode) "$case exit=$code"
     Check (-not (Test-Path -LiteralPath (Join-Path $caseRoot 'foreign-cleanup.txt'))) "$case only owned process cleanup"
     $launches = @(EvidenceLines $caseRoot 'launches.txt')
-    $rejectBeforeLaunch = $case -eq 'occupied' -or $case -like 'bad_*'
+    $rejectBeforeLaunch = $case -eq 'occupied' -or $case -like 'bad_*' -or
+        $case -in @('isolated_reused_user', 'isolated_reused_log', 'isolated_foreign_user', 'isolated_foreign_log',
+            'isolated_unpaired', 'isolated_reparse_log', 'isolated_udp_unknown')
     if ($rejectBeforeLaunch) {
         Check ($launches.Count -eq 0) "$case rejected before process launch"
     } else {
@@ -257,7 +315,7 @@ foreach ($case in $cases) {
         if ($created) {
             $exitedNaturally = Test-Path -LiteralPath (Join-Path $caseRoot "$role-natural-exit.txt")
             Check ($kills.Count -eq $(if ($exitedNaturally) { 0 } else { 1 })) "$case $role owned cleanup / exited process not killed"
-            if ($case -eq "${role}_kill_fail") {
+            if ($case -eq "${role}_kill_fail" -or $case -eq "isolated_${role}_kill_fail") {
                 # A thrown Kill may skip this object's wait; the other object must still be cleaned up.
                 Check ($waits.Count -le 1) "$case $role cleanup not retried indefinitely"
             } else {
@@ -304,7 +362,7 @@ foreach ($case in $cases) {
         Check ($cleanupOrder.Count -ge 2 -and $cleanupOrder[0] -like 'client:*' -and $cleanupOrder[-1] -like 'server:*') "$case both processes cleaned client then server despite first cleanup failure"
     }
     if ($shouldPass) {
-        $map = if ($case -eq 'healthy_winter') { 'Winter_scene' } else { 'Summer_scene' }
+        $map = if ($case -in @('healthy_winter', 'isolated_healthy')) { 'Winter_scene' } else { 'Summer_scene' }
         $metrics = "Harita: $map  Port: 17779  Baglanti(server)=1  Welcomed(istemci)=1  Hata(server)=0  Hata(istemci)=0"
         Check (($output -join "`n").Contains($metrics)) "$case historical metric output retained"
         Check (($output -join "`n") -match 'Loglar: .+ ; .+') "$case both log paths reported"
@@ -312,7 +370,31 @@ foreach ($case in $cases) {
         $clientLog = @(EvidenceLines $caseRoot 'client-logpath.txt')
         Check ($serverLog.Count -eq 1 -and $clientLog.Count -eq 1 -and $serverLog[0] -ne $clientLog[0]) "$case separate server/client logs"
     }
-    Write-Output "Case: $case exit=$code expected=$(if ($shouldPass) { 0 } else { 1 })"
+    if ($case.StartsWith('isolated_') -and -not $rejectBeforeLaunch) {
+        $manifestLines = @($output | ForEach-Object { [string]$_ } | Where-Object { $_.StartsWith('Process manifest: ') })
+        Check ($manifestLines.Count -eq 1) "$case publishes manifest before native launch"
+        Check (@(EvidenceLines $caseRoot 'prelaunch-manifest.txt').Count -eq $launches.Count) "$case manifest exists before each created process"
+        if ($manifestLines.Count -eq 1) {
+            $manifestFile = $manifestLines[0].Substring('Process manifest: '.Length)
+            $manifest = Get-Content -LiteralPath $manifestFile -Raw | ConvertFrom-Json
+            Check ($manifest.exitCode -eq $expectedCode) "$case manifest matches native script exit"
+            Check ($manifest.serverLog -and $manifest.clientLog -and $manifest.serverLog -ne $manifest.clientLog) "$case both log paths retained on failure"
+            foreach ($row in @($manifest.processes)) {
+                $created = Test-Path -LiteralPath (Join-Path $caseRoot ($row.role + '-created.txt'))
+                Check (($null -ne $row.pid) -eq $created) "$case $($row.role) PID only for created handle"
+                if ($created -and $case -ne 'isolated_client_kill_fail') { Check $row.stopped "$case $($row.role) stopped by owner" }
+            }
+            if ($case -like 'isolated_timeout_*') {
+                Check ($manifest.timedOut -and -not $manifest.observed) "$case deadline cannot produce successful observation"
+            }
+        }
+        foreach ($role in @('server', 'client')) {
+            if ($role -notin $launches) { continue }
+            $nativeArgs = @(EvidenceLines $caseRoot "$role-args.txt")
+            Check (@($nativeArgs | Where-Object { $_ -match '^-UserDir=".+isolated worktree.+WinterNet_[0-9a-f]{32}"$' }).Count -eq 1) "$case $role isolated UserDir quoted"
+        }
+    }
+    Write-Output "Case: $case exit=$code expected=$expectedCode"
 }
 foreach ($role in @('server', 'client')) {
     $first = @(EvidenceLines (Join-Path $scratch 'healthy') "$role-logpath.txt")
