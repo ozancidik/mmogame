@@ -18,8 +18,8 @@ Bu pano uygulamadan önce paylaşılan yürütme sırasıdır. Bu dosyanın haz�
 
 | ID / teslim | Eski plan | Bağımlılık | Ana sahip / bağımsız kabul | Kapanış kapısı | Durum |
 |---|---|---|---|---|---|
-| **S00 Taban** | Aşama 0, §11 adım 1–3 | Yok | devops + qa-automation; kullanıcı PIE, orchestrator kabul | Winter NetSmoke harita/port/join/welcome/hata kanıtı; iki oyunculu Summer↔Winter, NPC/görev/parti/HUD, yeniden giriş ve takasta kopma. Önceki build/headless kanıtı adayla eşleştirilir. | **AKTİF HEDEF:** S00.01; PIE açık |
-| **S01 Dedicated** | **A1** | S00 tam kabul; betik/kurulum hazırlığı şimdi | devops + ue5-developer; QA, performance | Gerçek Server ve Editor build; Summer/Winter dedicated bağlantısı; iki portta iki süreç; CPU/RAM ve uzak bildirimler. Kaynak motor dış önkoşul. | HAZIRLIK: S01.01 |
+| **S00 Taban** | Aşama 0, §11 adım 1–3 | Yok | devops + qa-automation; kullanıcı PIE, orchestrator kabul | Winter NetSmoke harita/port/join/welcome/hata kanıtı; iki oyunculu Summer↔Winter, NPC/görev/parti/HUD, yeniden giriş ve takasta kopma. Önceki build/headless kanıtı adayla eşleştirilir. | **AKTİF:** S00.02; gerçek ağ/PIE açık |
+| **S01 Dedicated** | **A1** | S00 tam kabul; betik/kurulum hazırlığı şimdi | devops + ue5-developer; QA, performance | Gerçek Server ve Editor build; Summer/Winter dedicated bağlantısı; iki portta iki süreç; CPU/RAM ve uzak bildirimler. Kaynak motor dış önkoşul. | HAZIRLIK: **S01.01 TAMAM**; Server/kapasite açık |
 | **S02 Yerleşim tablosu** | Aşama 1 | S00; S01 bitişi gerekmez | ue5-developer + npc-ai; QA | Summer 18/Winter 17 cep, NPC 5/4; koordinat/bant/MaxMobs eşdeğer; veri, smoke ve PIE eşdeğerliği. | PLAN |
 | **S03 Kalıcı ırk** | Aşama 2 | S02; ara depo/eski kayıt kararları | ue5-developer + game-designer; QA/network | Tek seçim, replikasyon, eski kayıt ve yeniden giriş/geçişte veri korunması. Ork seçimi S10'a kadar sunucuda reddedilir. | PLAN |
 | **S04 DB ve servis** | **A2** | S03; servis dili/posta biçimi kararları; S01 bitişi gerekmez | backend + ue5-developer; QA/security | Asenkron JSONB/revision; eski yazı ret; `.sav` + yan veri idempotent içe aktarma; DB kapalıyken durum ilerlemez; DB modu ve bayraksız yol doğrulanır. | PLAN; sözleşme hazırlığı bağımsız |
@@ -35,7 +35,7 @@ Bu pano uygulamadan önce paylaşılan yürütme sırasıdır. Bu dosyanın haz�
 
 S00'dan sonra **S01 ∥ S02 → S03 → S04**; S01 ve S04, S05'te birleşir. S11/S12, S10'dan sonra ayrık kapsamlarla paralel ilerleyebilir; UE build/runtime yine sırayladır. Kaynak motor, PIE veya Steamworks beklenirken bağımsız betik, şema/API sözleşmesi, metin ve kurulum hazırlığı sürer; bekleyen kapı geçilmiş sayılmaz ve bağımlı gameplay entegrasyonu açılmaz.
 
-## Bir sonraki kesin görev: S00.01 — Winter ağ kanıtı
+## S00.01 → S00.02 — Winter ağ kanıtı
 
 - **Sahip:** devops uygulama; qa-automation bağımsız runner/kanıt incelemesi; network bağlantı kabulü; orchestrator entegrasyon. İzole worktree'nin base SHA'sı ve kullanılan DLL/asset kaynağı görev kaydında sabitlenir; dirty main sessizce kopyalanmaz.
 - **Yazma allowlist'i:** yeni `Scripts/InvokeWinterNetSmoke.ps1` ve yalnız bu görevin `docs/tasks/` manifest/kanıt kaydı. Mevcut `Scripts/NetSmokeTest.ps1` ilk görevde salt okunur çağrılır; ek değişiklik gerekirse koordinatör ayrı sahiplik atar. Takasın üç staged dosyası, ajan tanımları ve ana checkout oyuncu verisi kapsam dışıdır.
@@ -44,6 +44,12 @@ S00'dan sonra **S01 ∥ S02 → S03 → S04**; S01 ve S04, S05'te birleşir. S11
 - **Kabul:** runner bounded süre içinde exit sonucu verir; kendi sunucusu `Winter_scene` ve seçilen portu yüklemiştir; aynı koşuda server join ≥1, client welcome ≥1, iki logda hata 0 ve gözlem boyunca süreçler canlıdır. Komut/aday SHA/DLL kimliği/log yolları/exit ve çalışmayan kontroller kaydedilir. Port/envanter/erken process çıkışı/zaman aşımı hataları PASS üretemez. Ana Saved ve yabancı süreçler korunur. Bu kanıt PIE/HUD/gameplay RPC veya temiz native shutdown kabulü değildir.
 
 **Paralel hazır iş S01.01:** devops, ayrı worktree'de `Scripts/build.ps1` ve motor yolu/hedef seçimi sözleşmesini inceler ve sınırları belirli betik hazırlığını yapar; Server target taşıma/C++ yazarlığı ue5-developer'a ayrılır. Kaynak motor yolu, olmayan Client hedefi, Saved koruması ve ortak kilit davranışı somut kabul listesine bağlanır. Motor indirme/build/kurulum yapılmış sayılmaz. S00.01 wrapper dosyasına yazmaz.
+
+**Güncel teslim (2026-10-15):** S01.01'in iki betiği frozen hash ile bağımsız kabul aldı; koordinatör PS5.1 ve PowerShell 7'de 100/100 kontrolü, ana checkout'ta PS5.1 100/100 kontrolü doğruladı. Gerçek Clean/UE build yapılmadı. Kanıt ve kapsam: `docs/tasks/S01_01_BUILD_PREPARATION_2026-10-15.md`.
+
+**S00.01 ön hazırlık:** Erdos, izole worktree'de 57 fixture/AST kontrolünü iki PowerShell sürümünde geçirdiğini bildirdi. Bu paket henüz ana checkout'a alınmadı; gerçek Winter ağı **NOT_RUN**. Çalıştırıcının child-isolation kapısı kapalıdır, bu S00 kabulü değildir.
+
+**S00.02 atandı:** Erdos aynı izole worktree'de mevcut `Scripts/NetSmokeTest.ps1` ve `Scripts/TestNetSmokeRunner.ps1` ile kendi wrapper/test/görev notuna yazabilir. S01'in frozen iki dosyası kapsam dışıdır. İzole UserDir, açık log ve süreç manifesti, yalnız sahip olunan süreçlerin temizliği ve sınırlı watchdog eklenecek; legacy varsayılanlar korunacak. Bu dispatch yalnız betik/mock test içindir; gerçek UE koşusu taze modül ve bağımsız inceleme kapısından sonra tek runtime sahibine verilir.
 
 ## On iki rolün yönlendirmesi
 
@@ -71,6 +77,8 @@ Bu tablo dispatch kanıtı değildir. Koordinatör ilgili gerçek uzmanları ba�
 - Mevcut `myproject-otonom-geli-tirme` heartbeat'i yeni scheduler açılmadan **ACTIVE** yapıldı ve bu sohbetin kimliğine (`01a138cc-1bfe-76e0-bb67-797f3f97d180`) bağlandı. Kontrol aralığı 5 dakika. Yerel çalışma için bilgisayar ve uygulama açık olmalıdır.
 - **S01.01 atandı:** Wegener (`01a13fdd-f402-70e1-89fb-88abf0c4adef`), runtime `default`, DevOps uygulama uzmanı. Worktree: `C:/Users/OZAN CIDIK/.codex/worktrees/six-map-sprint0/MyProject`, base `4e0f0c5`. Yalnız `Scripts/build.ps1` ve `Scripts/TestBuildScript.ps1`; olmayan Client hedefi, gerçek All hedef listesi, ortak kilit ve süreç ön kontrolü. Gerçek UE build/Clean yetkisi bu alt göreve verilmedi.
 - **S00.01 atandı:** Erdos (`01a13fde-a22c-7582-8c44-ade7659aadfc`), runtime `default`, QA/DevOps runner uzmanı. Aynı worktree'de açıkça ayrık dosyalar: `Scripts/InvokeWinterNetSmoke.ps1`, `Scripts/TestWinterNetSmokeWrapper.ps1`, `docs/tasks/S00_01_WINTER_NETWORK_2026-10-15.md`. Önce güvenli wrapper ve oyun başlatmayan testler; gerçek Winter koşusu modül/asset/provenance ve tek UE sahibi kapısını bekler.
+- **Bağımsız inceleme atandı:** Franklin (`01a13fe0-dc73-77b3-a84c-3352cc3a5d65`), runtime `default`, QA/network-security incelemecisi; yazma/build/runtime kapsamı yok. S01 betiği ve S00 ön kontrolünde somut hedef/kilit/süreç/veri koruma hatalarını inceler. Yazarın son sürümü ve sonuçları alınmadan entegrasyon yapılmaz.
+- **Koordinatör teslimi:** plan, H2/H3 kararı ve ilk pano `79bd0a0` commit'inde. O70 üç staged takas dosyası index'te korundu; yabancı ırk değişiklikleri commit'e alınmadı. S01.01 kod değişikliği ve S00.01 ön kontrolü izole worktree'de gözlendi; bu başlangıç kaydı sırasında sonuçları henüz kabul edilmedi, gerçek Winter ağı/UE build/PIE yapılmadı.
 - Bu kayıt dispatch bilgisidir; kodun tamamlandığı, testlerin geçtiği veya Winter ağ kabulünün kapandığı anlamına gelmez. Üç önceki uzman devam çağrısı yürütme sınırı hatası verdi; bunlardan yeni inceleme/test sonucu üretilmiş sayılmaz. Yeni worker sonuçları koordinatör tarafından alınacak, diff ve bağımsız kabul sonrası durum güncellenecek.
 - Ana checkout'ta bu göreve ait olmayan yeni `MMORace*`, Character/HUD/controller ve `RunSystemTests` düzenlemeleri gözlendi. Sahipliği teyit edilmeden bunlara yazılmaz, stage/commit yapılmaz veya bu programın tamamlanan S03 işi sayılmaz. İzole worker'lar bu düzenlemeleri kopyalamaz; başka bir aracın UE süreçleri kapatılmaz.
 

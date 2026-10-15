@@ -2,14 +2,16 @@
 .SYNOPSIS
     Build script for MyProject Unreal Engine 5.7 project
 .DESCRIPTION
-    Builds Editor, Server, and Client targets with proper configuration
+    Builds defined Editor, Game, Server, and Client targets with proper configuration
 .NOTES
     Requires: Visual Studio 2022 with Game Development workload, UE 5.7 installed
 
     -Clean    deletes ONLY <project>\Binaries and <project>\Intermediate.
     -CleanDdc deletes <project>\DerivedDataCache (explicit, separate flag; combine with -Clean for all three).
     Saved\ is NEVER deleted (character .sav files, Saved\MMOAchievements, MMODaily, MMOMail, LLM budget counter).
-    Before deleting anything the script stops with an error if Unreal Editor or UnrealBuildTool is running.
+    Build and clean share the common Git agent-build.lock and refuse active UE/build processes.
+    Undefined targets fail before prerequisites, lock creation, cleaning, or building.
+    Exit: 0 success, 1 failure, 3 deferred (shared build resources busy).
 
     Project lookup: -ProjectPath if given, else MyProject.uproject next to this script's parent folder
     (Scripts\..), else -DefaultProjectPath (the owner's desktop checkout).
@@ -17,7 +19,7 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [ValidateSet('Editor', 'Server', 'Client', 'All')]
+    [ValidateSet('Editor', 'Game', 'Server', 'Client', 'All')]
     [string]$Target = 'Editor',
 
     [Parameter(Mandatory=$false)]
@@ -84,7 +86,53 @@ function Resolve-ProjectFile {
     return $full
 }
 
-$ProjectPath = Resolve-ProjectFile
+function Resolve-BuildTargets {
+    param([string]$ProjectFile, [string]$RequestedTarget)
+    $source = Join-Path (Split-Path -Parent $ProjectFile) 'Source'
+    $defined = @()
+    if (Test-Path -LiteralPath $source -PathType Container) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $source -Filter '*.Target.cs' -File -Recurse | Sort-Object FullName)) {
+            # Read literal TargetRules assignments, including targets in module subfolders.
+            # Ignore commented examples; never infer a type from a filename suffix.
+            $text = Get-Content -LiteralPath $file.FullName -Raw
+            $text = [regex]::Replace($text, '(?s)/\*.*?\*/|(?m)//[^\r\n]*', '')
+            $types = @([regex]::Matches($text, '\bType\s*=\s*TargetType\.(Editor|Game|Server|Client)\s*;'))
+            if ($types.Count -ne 1) { throw "Expected one literal TargetType assignment: $($file.FullName)" }
+            $name = $file.Name.Substring(0, $file.Name.Length - '.Target.cs'.Length)
+            if ($name -notmatch '^[A-Za-z_][A-Za-z0-9_]*$' -or $name -in @($defined | ForEach-Object { $_.Name })) {
+                throw "Invalid or duplicate build target name: $name"
+            }
+            $defined += [pscustomobject]@{ Name = $name; Type = $types[0].Groups[1].Value }
+        }
+    }
+    $selected = @(foreach ($type in @('Editor', 'Game', 'Server', 'Client')) {
+        if ($RequestedTarget -eq 'All' -or $RequestedTarget -eq $type) {
+            $defined | Where-Object { $_.Type -eq $type }
+        }
+    })
+    if (-not $selected.Count) { throw "Target '$RequestedTarget' has no target definition under $source" }
+    return $selected
+}
+
+function Enter-BuildLock {
+    param([string]$ProjectFile)
+    $root = Split-Path -Parent $ProjectFile
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $commonOutput = @(& git -C $root rev-parse --path-format=absolute --git-common-dir 2>&1)
+        $gitExit = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $previousPreference }
+    if ($gitExit -ne 0 -or $commonOutput.Count -ne 1) { throw 'Cannot resolve shared Git directory.' }
+    $common = [IO.Path]::GetFullPath([string]$commonOutput[0])
+    # The open handle is the lock. Retain the file, even after releasing the handle.
+    try {
+        return [IO.File]::Open((Join-Path $common 'agent-build.lock'),
+            [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch [IO.IOException] {
+        throw 'DEFER: common agent-build.lock is unavailable; no build or clean started.'
+    }
+}
 
 function Write-Log {
     param([string]$Message, [string]$Level = 'INFO')
@@ -163,12 +211,17 @@ function Invoke-Build {
 }
 
 function Assert-NoUnrealRunning {
-    # A running editor / build holds files in Binaries/Intermediate/DDC; deleting under it leaves a half state.
-    $names = @('UnrealEditor', 'UnrealEditor-Cmd', 'UnrealBuildTool', 'LiveCodingConsole')
-    $running = @(Get-Process -ErrorAction Stop | Where-Object { $names -contains $_.ProcessName })
+    # Fail closed if process inventory cannot be read, including dotnet-hosted UBT/UAT.
+    $processes = @(Get-CimInstance -ClassName Win32_Process -ErrorAction Stop)
+    $running = @($processes | Where-Object {
+        $_.Name -match '^(UnrealEditor.*|LiveCoding.*|UnrealBuildTool.*|AutomationTool.*|MSBuild|UAT|MyProject(?:Server|Client)?(?:-.*)?)\.exe$' -or
+        ($_.Name -eq 'dotnet.exe' -and
+            ([string]::IsNullOrWhiteSpace($_.CommandLine) -or
+             $_.CommandLine -match 'UnrealBuildTool|AutomationTool|RunUAT|Epic Games[\\/]UE_'))
+    })
     if ($running.Count -gt 0) {
-        $list = ($running | ForEach-Object { "$($_.ProcessName) (pid $($_.Id))" }) -join ', '
-        throw "Clean aborted: close these first: $list"
+        $list = ($running | ForEach-Object { "$($_.Name) (pid $($_.ProcessId))" }) -join ', '
+        throw "DEFER: UE/build process active; leave it untouched: $list"
     }
 }
 
@@ -189,8 +242,31 @@ function Clean-Build {
 
     Write-Log "Cleaning build artifacts in $root ($($names -join ', '))..."
     foreach ($name in $names) {
-        $dir = Join-Path $root $name
+        $dir = [IO.Path]::GetFullPath((Join-Path $root $name))
+        $expectedParent = [IO.Path]::GetFullPath($root).TrimEnd('\', '/')
+        if ([IO.Path]::GetDirectoryName($dir) -ne $expectedParent -or
+            $name -notin @('Binaries', 'Intermediate', 'DerivedDataCache')) {
+            throw "Refusing clean outside allowed project artifacts: $dir"
+        }
         if (Test-Path -LiteralPath $dir -PathType Container) {
+            # Reject linked paths before any recursive removal, including linked ancestors.
+            $cursor = $dir
+            while ($cursor) {
+                if (((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                    throw "Refusing clean through reparse point: $cursor"
+                }
+                $cursor = [IO.Path]::GetDirectoryName($cursor)
+            }
+            $pending = New-Object 'System.Collections.Generic.Queue[string]'
+            $pending.Enqueue($dir)
+            while ($pending.Count) {
+                foreach ($entry in @(Get-ChildItem -LiteralPath $pending.Dequeue() -Force)) {
+                    if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                        throw "Refusing clean containing reparse point: $($entry.FullName)"
+                    }
+                    if ($entry.PSIsContainer) { $pending.Enqueue($entry.FullName) }
+                }
+            }
             Write-Log "Removing $dir"
             Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction Stop
         }
@@ -198,45 +274,39 @@ function Clean-Build {
     Write-Log "Clean completed"
 }
 
-# Main execution
-Write-Log "=== MyProject Build Script ==="
-Write-Log "Target: $Target | Configuration: $Configuration"
-
-if (-not (Test-Prerequisites)) {
-    exit 1
+function Invoke-ProjectBuild {
+    $ProjectPath = Resolve-ProjectFile
+    # Validate before prerequisites or any persistent mutation, including lock creation.
+    $targets = @(Resolve-BuildTargets -ProjectFile $ProjectPath -RequestedTarget $Target)
+    Write-Log "=== MyProject Build Script ==="
+    Write-Log "Target: $Target | Configuration: $Configuration"
+    $lock = Enter-BuildLock -ProjectFile $ProjectPath
+    try {
+        Assert-NoUnrealRunning
+        if (-not (Test-Prerequisites)) { return $false }
+        if ($Clean -or $CleanDdc) {
+            Clean-Build -IncludeBuild ([bool]$Clean) -IncludeDdc ([bool]$CleanDdc)
+        }
+        foreach ($t in $targets) {
+            Assert-NoUnrealRunning
+            if (-not (Invoke-Build -TargetName $t.Name -Config $Configuration -TargetType $t.Type)) {
+                Write-Log "$($t.Type) build failed, stopping" 'ERROR'
+                return $false
+            }
+        }
+        Write-Log "=== ALL BUILDS SUCCEEDED ===" 'SUCCESS'
+        return $true
+    } finally { $lock.Dispose() }
 }
 
-if ($Clean -or $CleanDdc) {
-    Clean-Build -IncludeBuild ([bool]$Clean) -IncludeDdc ([bool]$CleanDdc)
-}
-
-$success = $true
-$targets = @()
-
-switch ($Target) {
-    'Editor' { $targets += @{ Name = 'MyProjectEditor'; Type = 'Editor' } }
-    'Server' { $targets += @{ Name = 'MyProjectServer'; Type = 'Server' } }
-    'Client' { $targets += @{ Name = 'MyProjectClient'; Type = 'Client' } }
-    'All' {
-        $targets += @{ Name = 'MyProjectEditor'; Type = 'Editor' }
-        $targets += @{ Name = 'MyProjectServer'; Type = 'Server' }
-        $targets += @{ Name = 'MyProjectClient'; Type = 'Client' }
+# Dot-sourcing exposes helpers for isolated tests without starting a build or clean.
+if ($MyInvocation.InvocationName -ne '.') {
+    try {
+        if (Invoke-ProjectBuild) { exit 0 }
+        exit 1
+    } catch {
+        Write-Log $_.Exception.Message 'ERROR'
+        if ($_.Exception.Message -like 'DEFER:*') { exit 3 }
+        exit 1
     }
-}
-
-foreach ($t in $targets) {
-    $result = Invoke-Build -TargetName $t.Name -Config $Configuration -TargetType $t.Type
-    if (-not $result) {
-        $success = $false
-        Write-Log "$($t.Type) build failed, stopping" 'ERROR'
-        break
-    }
-}
-
-if ($success) {
-    Write-Log "=== ALL BUILDS SUCCEEDED ===" 'SUCCESS'
-    exit 0
-} else {
-    Write-Log "=== BUILD FAILED ===" 'ERROR'
-    exit 1
 }
