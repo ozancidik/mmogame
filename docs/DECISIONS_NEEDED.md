@@ -302,3 +302,9 @@ Kaynak: bulut PR #3 (`9855256`) yerelde denetlendi, duzeltmeler `1f4a557`'de. Du
 - **`Scripts/k6_load_test.js` (ACIK, karar gerekmez, not):** HTTP `/api/auth/login`, `/api/character/move`, `/api/combat/attack` ...
   uclarina istek atar; bu uclar yok, oyun trafigi UE'nin UDP ag surucusunden gecer. Bugun calistirilamaz. A3'te (Steam bileti +
   giris servisi) yalniz giris servisi yuk testi olarak **yeniden yazilacak**; oyun ici yuk testi coklu headless istemciyle (NetSmoke deseni).
+
+## Kullanıcı kararı (2026-10-15: H2/H3 krallık erişimi)
+
+- **KESİNLEŞTİ:** H2 İnsan krallığı ve H3 Ork krallığı, doğru ırk için **Lv25+**; girişte veya kalışta üst seviye sınırı yok. Lv59/Lv80'de zorunlu çıkış yok; H4/H5'in Lv59+ açılması krallığa erişimi kaldırmaz. Gelecekte genel seviye tavanı yükselse de H2/H3 uygunluk kuralı değişmez.
+- **Kapsam:** yalnız harita uygunluk kararı; mevcut içerik bantları, mob seviyeleri, genel seviye tavanı ve H4/H5 Lv59+ eşiği değişmedi. `SIX_MAP_PLAN.md` gereksinim tablosu, §2.6, §5 ve Aşama 3/6 kabulü güncellendi; kod uygulanmadı, oyun testi yapılmadı.
+- **Kabul:** iki krallıkta doğru ırk için Lv24 ret, Lv25/59/80 kabul; mevcut genel tavanı değiştirmeyen gelecekteki Lv>80 uygunluk fikstürü de kabul. Yanlış ırk tüm bu seviyelerde ret; seviye artışı oyuncuyu krallıktan çıkarmaz, H4/H5 açıldıktan sonra kalış/yeniden giriş korunur.

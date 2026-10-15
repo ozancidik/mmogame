@@ -9,11 +9,13 @@
 | # | Karar | Önceki öneri (2026-10-12) | Sonuç (bu plana etkisi) |
 |---|---|---|---|
 | **S1** | **B: iki ırk aynı anda farklı haritalarda olabilir.** "Oturum ırkı" kuralı **reddedildi** | Oturum ırkı kuralı (tek listen server, herkes birlikte taşınır) | Her harita ayrı bir dedicated sunucu süreci olur. Karakterler paylaşılan PostgreSQL deposunda durur. Geçiş oyuncu başına yapılır (istemci başka sunucuya bağlanır). Bu iş kaynak motor, hesap/kimlik (K-1) ve DB katmanı ister. **Alfa ~12-16 haftadan ~6-10 aya uzar** [Tahmin] (§9.4; revizyon 2 Steam aşamasıyla **~6,5-11 ay**) |
-| **K1** | PvP haritasına (H6) giriş **Lv55** | Lv35 | H6 krallık haritasının (Lv25-59) son bölümündeki ve üst bölgedeki oyuncuları buluşturur. PvE bandı Lv55-72'ye kayar (§6 K2) |
+| **K1** | PvP haritasına (H6) giriş **Lv55** | Lv35 | H6 krallık haritasının içerik bandının (Lv25-58) son bölümündeki ve üst bölgedeki oyuncuları buluşturur. PvE bandı Lv55-72'ye kayar (§6 K2) |
 | **K4** | PvP'de ölünce **XP kaybı var** | Yok | Oyuncu öldürünce kayıp, mob cezasından küçük olur: `ExperienceToNextLevel`'ın **%3'ü** `[PLACEHOLDER]` (mob: %10, `MMOStatsComponent.h:197`). Seviye düşmez (bugünkü formül zaten `Min(Experience, ...)`). `ApplyDeathPenalty` öldürenin türüne göre ayrılır (§6 K4) |
 | **K5** | Ölünce **eşya da altın da düşmez** | "Hiçbir şey" | Önceki öneriyle aynı. Kod işi yok. Yalnız bir test: PvP ölümünde çanta, kuşanılan eşya ve altın değişmez |
 | **S5** | **Pazar alfada şart**, ertelenemez | Erteleme seçeneği vardı | Aşama 8 (pazar) alfa kapısının parçası. "Aşama 7 sonrası pazarsız alfa" seçeneği kaldırıldı. Pazar artık PostgreSQL üzerinde çalışır (§3.3) |
 | — | Çalışma **yerelde** (kullanıcının makinesi) | Bulut / yerel / editör üçlüsü | §9'da her aşama "Yerel ajan" (Claude/Codex: kod, derleme, headless test) ve "Kullanıcı" (motor kurulumu, editör, PIE, DB kurulumu) diye ayrılır. Derleme yapan ajan aynı anda tek olur (CLAUDE.md) |
+
+**Kullanıcı kararı (2026-10-15, S8 — H2/H3):** İnsan ve Ork krallıklarına kendi ırkından **Lv25+** oyuncu girer ve kalabilir; haritaya girişte veya kalışta üst seviye sınırı yoktur. Lv59/Lv80 olunca zorunlu çıkış olmaz. H4/H5'in Lv59+ açılması H2/H3 erişimini kaldırmaz. Gelecekte genel seviye tavanı yükselse de H2/H3 uygunluk kuralı değişmez. İçerik bantları, mob seviyeleri ve mevcut genel seviye tavanı değişmedi.
 
 **Steam yayını kararları (kullanıcı, 2026-10-13, "işle" dendi).** Aşağıdakiler **önerilen karar** olarak kaydedildi ve plan bunlara göre yazıldı.
 Kullanıcı aksini söylemedikçe kabul edilmiş sayılır. Gerekçeler §8'de, Steam ayrıntısı §12'de, kaynaklar §13'te.
@@ -39,13 +41,13 @@ A1-A4 ve yeni sıra), §10, yeni §11 (yerelde ilk adımlar).
 | # | Harita | Kim girer | Seviye | İçerik |
 |---|---|---|---|---|
 | H1 | Ortak merkez (KO Moradon / Rise Dorion) | İnsan + Ork | 1-25 | Kasma, görev, **pazar kurma**, eşya alış-satışı |
-| H2 | İnsan krallığı (KO El Morad / Rise Lunaskar) | Yalnız İnsan | 25-59 | Kasma, görev |
-| H3 | Ork krallığı (KO Luferson / Rise Protean) | Yalnız Ork | 25-59 | Kasma, görev |
+| H2 | İnsan krallığı (KO El Morad / Rise Lunaskar) | Yalnız İnsan | **25+** | Kasma, görev |
+| H3 | Ork krallığı (KO Luferson / Rise Protean) | Yalnız Ork | **25+** | Kasma, görev |
 | H4 | İnsan üst bölge (KO Eslant / Rise Haddar-Hagard) | Yalnız İnsan | 59-80 | Kasma, görev |
 | H5 | Ork üst bölge | Yalnız Ork | 59-80 | Kasma, görev |
 | H6 | Ortak PvP | İnsan + Ork | **55+** (K1) | PvP + PvE |
 
-Her haritada NPC ve mob zorunlu.
+Her haritada NPC ve mob zorunlu. H2/H3 için 25+ giriş ve kalış kuralıdır; üst sınır yoktur. H4/H5'in giriş eşiği Lv59+ olarak kalır; tablodaki 59-80 bu haritaların mevcut içerik bandıdır.
 
 Etiketler: **[Kesin]** = koddan/dosyadan okundu (dosya:satır) · **[Muhtemel]** = koddan çıkarım, oyunda doğrulanmadı · **[Tahmin]** = öngörü ·
 **[Doğrulanmadı]** = derlenip/çalıştırılıp görülmedi. `[PLACEHOLDER]` sayılar ölçümden önce değişir.
@@ -55,7 +57,7 @@ Etiketler: **[Kesin]** = koddan/dosyadan okundu (dosya:satır) · **[Muhtemel]**
 ## 0. Oyuncu deneyimi ve neden şimdi
 
 Oyuncu karakterini yaratırken İnsan ya da Ork seçer. İlk 25 seviyeyi iki ırkın paylaştığı merkez kasabada geçirir: kasar, görev yapar,
-pazar kurar, ticaret yapar. Lv25'te kendi ırkının krallığına geçer, Lv59'da ırkının üst bölgesine çıkar. Karşı ırkla yalnız
+pazar kurar, ticaret yapar. Lv25'te kendi ırkının krallığına girebilir, Lv59'da ırkının üst bölgesi de açılır; krallıkta kalabilir veya oraya dönebilir. Karşı ırkla yalnız
 merkezde (barış) ve Lv55'ten sonra PvP haritasında (savaş) karşılaşır. İki krallık **aynı anda yaşar**: bir İnsan Ravenmoor'da kasarken
 bir Ork kendi yurdunda kasar (S1 = B). Bu, Knight Online'ın iki ulus döngüsüdür ve oyunun kimliğini taşır.
 Neden şimdi: kapalı alfanın kapsamı bu. Irk, kayıt, geçiş, PvP ve sosyal sistemlerin hepsine dokunuyor. Alfa öncesinde
@@ -229,7 +231,7 @@ Lv42-57 ceplerinin (A-konumları, hub'a 3.000-6.000 u) yanından geçebilir. Win
 
 ### 2.3 Mevcut içeriğin yeni yapıya eşlenmesi
 
-| Bant | Bugün nerede | Yeni yer | Mob (normal+elit) | Görev |
+| İçerik bandı | Bugün nerede | Yeni yer | Mob (normal+elit) | Görev |
 |---|---|---|---:|---:|
 | Lv1-24 | Summer | H1 (ortak) | 19 + 6 | 37 |
 | Lv25-41 (Obsidyen, Alacakaranlık) | Summer | H2 **ve** H3 | 7 + 2 | ~20 |
@@ -238,6 +240,8 @@ Lv42-57 ceplerinin (A-konumları, hub'a 3.000-6.000 u) yanından geçebilir. Win
 | Lv59-65 (Yarık) | Summer | H4 **ve** H5 | 3 + 1 | ~7 |
 | Lv66-80 (Kül, Uçurum) | Winter | H4 **ve** H5 | 7 + 2 | ~18 |
 | Lv55-72 karma (H6 PvE) | — | H6 (mevcut arketiplerin kopya cepleri) | 5 + 1 | 0 (alfa) |
+
+Bu bantlar içerik dağılımıdır, H2/H3'e giriş veya kalış için üst seviye sınırı değildir; içerik ve mob seviyeleri değişmez.
 
 Görev sayıları `~` ile verildi: görev kapı seviyesine göre sayıldı (`CONTENT_MAP.md`). Lv25-58 toplamı 35, Lv59-80 toplamı 25 [Kesin].
 
@@ -296,7 +300,7 @@ Kapılar **oyuncu başınadır** (S1 = B): her oyuncu kendi geçişini ister, ya
 
 | Kenar | Kapı (kaynak sunucuda, istekte bulunan oyuncu için) | Etiket |
 |---|---|---|
-| H1 → H2/H3 | Oyuncunun ırkı = hedefin ırkı. Lv ≥ 25 `[PLACEHOLDER]` | Öneri |
+| H1 → H2/H3 | Oyuncunun ırkı = hedefin ırkı. **Lv ≥ 25; üst sınır yok** (yeniden giriş dahil) | **Karar (2026-10-15)** |
 | H2 → H4, H3 → H5 | Aynı ırk + Lv ≥ 59 `[PLACEHOLDER]` | Öneri |
 | Herhangi → H6 | Lv ≥ **55** (K1). Irk serbest | **Karar** |
 | Herhangi → H1 | Kapı yok | Öneri |
@@ -304,6 +308,7 @@ Kapılar **oyuncu başınadır** (S1 = B): her oyuncu kendi geçişini ister, ya
 | Ortak ön koşullar | Canlı, savaş dışında, takas/tezgâh açık değil, ırk seçilmiş (`None` ise yalnız H1) | Öneri |
 
 Irk kapısında alternatif yok, çünkü karşı ırk haritasına girmek gereksinimi çiğner. Seviye kapısı zorlayıcıdır (S8).
+H2/H3 uygunluğu yalnız doğru ırk + Lv ≥ 25 ile belirlenir; içerik bandının sonu veya genel seviye tavanı haritaya özgü bir üst sınır olarak kullanılmaz. Lv59/Lv80 ve gelecekte geçerli daha yüksek seviyelerde giriş/kalış sürer; zorunlu çıkış yoktur. H4/H5'in Lv59+ açılması bu hakkı kaldırmaz.
 Hedef sunucu, biletteki hedef bölgeyi ve kapıyı **yeniden** denetler (kaynak sunucuya körü körüne güvenilmez; §4.3).
 Irk haritasındaki **varış**: tek PlayerStart. H6'da varış ırk etiketli iki PlayerStart'tan seçilir.
 **Geçiş yolu nasıl tetiklenir:** alfada HUD hedef listesi ya da `MMOTravel <Bolge>` (hub NPC'si veya kapı aktörü alfa sonrası, §7).
@@ -431,7 +436,8 @@ commit'lenmemiş dosyalarına dokunmaz.
 | Cep kalitesi | `MMOProbeSurface X Y 225` (elit 150) | ok ≥ 60/64 |
 | Takılma ve ilk doldurma | `SoakTest.ps1 -Seconds 90` + `SpawnAudit.py` | Takılma ≤ 1, her cep ilk doldurmada ≥ 4/6 |
 | Cep aralığı | `PocketSpacing.py` (bölge bazlı) | Hata yok |
-| Veri | `ValidateData.py` yeni kurallar: (1) her bölgede ≥1 normal spawner ve zorunlu NPC'ler; (2) cep bandı bölge bandında; (3) her `KillSpecificMob` hedefi görevin seviyesinde **her iki ırkın** erişebildiği bir bölgede doğuyor; (4) Lv1-80 her seviye her ırk için bir bölgede; (5) ırk haritası çiftleri (H2/H3, H4/H5) aynı arketip kümesini üretiyor (ayna eşitliği); (6) H6 bandı giriş seviyesinin (55) altına inmiyor | Hata yok + her kural için negatif test |
+| Veri | `ValidateData.py` yeni kurallar: (1) her bölgede ≥1 normal spawner ve zorunlu NPC'ler; (2) cep bandı bölgenin içerik bandında (H2/H3 giriş/kalış üst sınırı değildir); (3) her `KillSpecificMob` hedefi görevin seviyesinde **her iki ırkın** erişebildiği bir bölgede doğuyor; (4) Lv1-80 her seviye her ırk için bir bölgede; (5) ırk haritası çiftleri (H2/H3, H4/H5) aynı arketip kümesini üretiyor (ayna eşitliği); (6) H6 bandı giriş seviyesinin (55) altına inmiyor | Hata yok + her kural için negatif test |
+| H2/H3 seviye kapısı | `MMOTestZoneTable` uygunluk fikstürü + iki istemcili oyun içi kabul (Aşama 3/6) | Her iki krallıkta doğru ırk: Lv24 ret; Lv25, Lv59 ve Lv80 kabul. Mevcut genel tavanı değiştirmeden, gelecekte geçerli Lv>80 uygunluk fikstürü de kabul; H2/H3 kuralı değiştirilmez. Yanlış ırk bu seviyelerin tümünde reddedilir. Lv59/Lv80'e yükselen oyuncu zorla çıkarılmaz; H4/H5 açıldıktan sonra krallıkta kalır ve yeniden girebilir. Gelecekteki daha yüksek seviyede kalış da üst sınır nedeniyle engellenmez. |
 | Irk native testi | Yeni `Scripts/TestRace.ps1` (`TestAchievements.ps1` deseni) | Seçim bir kez; ikinci seçim reddedilir; `None` iken H1 dışı geçiş reddedilir; karşı ırk haritasına geçiş reddedilir; yan dosya `.tmp`/`.bad` (ara yol); karşı ırka posta, parti ve fısıltı reddedilir; H6'da karşı ırka hasar var, aynı ırka yok |
 | Ölüm cezası | `TestRace` PvP senaryosu + mevcut `MMOReentrantDeathSelfTest` gerilemesi | Oyuncu öldürünce kayıp = %3 `[PLACEHOLDER]` × `ExperienceToNextLevel`, mob öldürünce %10; ikisinde de seviye düşmez; çanta/kuşanılan/altın değişmez (K5) |
 | DB mağazası | Yeni `Scripts/TestDbStore.ps1` (yerel PostgreSQL'e karşı) | JSON gidiş-dönüş eşitliği (mevcut `TestCharacterSaveJson` fikstürü), eski `revision` ile yazım reddi, DB kapalıyken kayıt başarısız ve oyuncu durumu ilerlemiyor, `.sav` içe aktarma bir kez |
@@ -493,7 +499,7 @@ Kalan riskler:
 | S5b | Pazar yalnız çevrimiçi tezgâh mı, offline satış/açık artırma da mı? | Öneri: alfa = çevrimiçi tezgâh (KO). Offline satış alfa sonrası (satıcıya altın teslimi posta tablosu üzerinden yapılabilir) |
 | S6 | İçerik P1 (aynı mob/görev) mi, P2 (iki metin sürümü) mi? | Öneri: P1, ardından P2 metin işi. P3 değmez |
 | S7 | Ork oyuncunun Ork mob kesmesi | Öneri: "dönek ork" fraksiyonu (yalnız metin) |
-| S8 | Seviye kapısı zorlayıcı mı? | Öneri: zorlayıcı, oyuncu başına. `[PLACEHOLDER]` 25/59, H6 55 (karar) |
+| S8 | Seviye kapısı zorlayıcı mı? | **KARAR (2026-10-15, H2/H3): doğru ırk + Lv25+, giriş/kalış üst sınırı ve Lv59/Lv80'de zorunlu çıkış yok.** Genel seviye tavanı artışı bu kuralı değiştirmez. H4/H5 Lv59+ eşiği korunur; H6 Lv55 (karar). İçerik bantları ayrı, değişmedi. |
 | S9 | H6 kararları K1-K10 (§6) | K1, K4, K5 karar verildi. K2 revize öneri (Lv55-72), diğerleri öneri |
 | S10 | Eski karakterler (ırksız) ilk girişte seçer | Öneri: kabul |
 | S11 | 4 yeni `.umap` (~9-18 MB her biri, LFS yok) → repo ~50-70 MB büyür | Kullanıcı kararı: LFS ya da doğrudan |
@@ -696,8 +702,8 @@ A4 icin A1 + A2 + A5 + A3 sart.
 - **Kapsam:** `MMOTravel <Bolge>`, HUD hedef listesi (her oyuncunun kendi menüsü, yönetici gerekmez), §2.6 kapıları, sunucu dizininden hedef. Yeni self-test `MMOTestZoneTable`.
   Summer = H1 rolü, Winter = geçici İnsan krallığı rolü. İçerik ve cep değişmez.
 - **Bağımlılık:** A4.
-- **Kabul:** (1) her istemci kendi menüsünü görüyor; (2) Lv<25 oyuncu Winter'a gidemiyor, aynı anda Lv25+ oyuncu gidebiliyor (birbirini etkilemiyor); (3) ırk seçmemiş oyuncu reddediliyor;
-  (4) kaynak sunucu atlatılıp sahte biletle hedefe bağlanılınca hedef reddediyor; (5) eski kayıtla giriş korunuyor.
+- **Kabul:** (1) her istemci kendi menüsünü görüyor; (2) doğru ırkta Lv24 oyuncu Winter'a gidemiyor; Lv25, Lv59 ve Lv80 oyuncuları gidebiliyor (birbirini etkilemiyor); üst seviye nedeniyle zorunlu çıkış yok, §5 H2/H3 seviye kapısı fikstürü geçiyor; (3) ırk seçmemiş oyuncu reddediliyor;
+  (4) kaynak sunucu atlatılıp sahte biletle hedefe bağlanılınca hedef reddediyor; (5) eski kayıtla giriş korunuyor; (6) yanlış ırk her seviyede reddediliyor.
   **Not:** Winter içeriği hâlâ Lv42-80. Lv25-41 oyuncusu Summer'daki 25-40 ceplerinde kalır, oyun uçtan uca oynanabilir.
 - **Süre:** 0,5-1 hafta [Tahmin] (taşıma A4'te yazıldı, burada yalnız kural ve menü).
 - **Kararlar:** S8.
@@ -716,7 +722,7 @@ A4 icin A1 + A2 + A5 + A3 sart.
 - **Süre:** 1-1,5 hafta [Tahmin].
 - **Kararlar:** S2, S11, harita görünen adları.
 
-#### Aşama 5. İnsan yolu tamam: Winter = Ravenmoor (Lv25-58), Summer = merkez (Lv1-24)
+#### Aşama 5. İnsan yolu tamam: Winter = Ravenmoor (giriş Lv25+, içerik Lv25-58), Summer = merkez (Lv1-24)
 - **Amaç:** İnsan için 3 haritada Lv1-80 uçtan uca, kopya içerik yok.
 - **Kapsam:** Winter yerleşimi §2.2 H2. Summer'dan 7 cep çıkar (11 kalır). Winter'dan 66-80 çıkar. Winter için rota açıklığı ölçümü.
 - **Yerel ajan:** tablo değişiklikleri, probe (8 yeni bant-konum ataması), Soak iki harita, `ContentMap.py --write`, `DocCounts`, rota ölçüm betiği. **Kullanıcı:** oyun içi test.
@@ -739,7 +745,7 @@ A4 icin A1 + A2 + A5 + A3 sart.
 - **Kabul:** headless: H3 16, H5 13 cep, probe/soak ölçütleri, ayna kuralı yeşil, beş sunucu aynı anda açık.
   Oyun içi: (1) bir pencere İnsan, bir pencere Ork; Summer'da ikisi de doğuyor; (2) **İnsan Ravenmoor'da, Ork OrcLand'de aynı anda** kasıyor (S1 = B kanıtı);
   (3) karşı ırka parti daveti, posta ve fısıltı reddediliyor; (4) Ork Ravenmoor'a gidemiyor; (5) Ork zinciri Summer→OrcLand→OrcHigh→Summer, kayıt korunuyor;
-  (6) Summer'da karşı ırkla takas S4 kararına uygun.
+  (6) Summer'da karşı ırkla takas S4 kararına uygun; (7) §5 H2/H3 seviye kapısı kabulü iki ırk için de geçiyor: Lv24 ret, Lv25/59/80 ve gelecekteki daha yüksek seviye fikstürü kabul, yanlış ırk ret, krallıkta kalış/yeniden giriş korunuyor.
 - **Süre:** 2,5-4 hafta [Tahmin] (sunucular arası sosyal kurallar dahil).
 - **Kararlar:** S4, S7, S14, Ork yurdu adı.
 
@@ -794,7 +800,7 @@ A4 icin A1 + A2 + A5 + A3 sart.
 | S19 Steamworks hesabı + Steam Direct ücreti, `CheckAppOwnership` açık mı | A5 |
 | Hesap (SteamID) başına karakter sayısı | A3 |
 | S14 sunucular arası fısıltı | A4 |
-| S8 seviye kapısı | Aşama 3 |
+| S8 seviye kapısı (H2/H3 Lv25+, üst sınır yok: 2026-10-15 kararı) | Aşama 3 |
 | S2 kopya + giydirme, S11 LFS, harita adları | Aşama 4 |
 | §2.2 bant eşlemesi, S6 içerik P1 | Aşama 5 |
 | S4 karşı ırkla ticaret, S7 dönek ork, Ork yurdu adı | Aşama 6 |
