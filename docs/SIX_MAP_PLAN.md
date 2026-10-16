@@ -326,7 +326,7 @@ Irk haritasındaki **varış**: tek PlayerStart. H6'da varış ırk etiketli iki
 | I3 | Seçim | İlk girişte, sınıf seçimi gibi HUD paneli (`ClassChoiceRegions` deseni). Irk yoksa seçilene kadar H1 dışına geçiş yok | `ServerChooseRace(EMMORace)`: yalnız `Race == None` iken, `_Validate` ile değer aralığı. Kalıcı yazım başarılı olunca uygulanır. **Değiştirilemez** (alfa) |
 | I4 | Görünürlük | `AMMOCharacter` üzerinde (ya da `UMMORaceComponent`'te) `ReplicatedUsing=OnRep_Race`. Ad etiketi rengi ve hedef imleci için | `DOREPLIFETIME`, `StaticLint` kuralları |
 | I5 | Kimlik bağı | Irk karakter anahtarına bağlı. K-1 açığı ırkı da etkiler. **S1 = B ile K-1 alfadan önce kapanmak zorunda** (A5 + A3): bilet olmadan harita sunucusu kimin bağlandığını bilemez | S12: karakter → `accounts` (SteamID). `ACCOUNT_IDENTITY_DESIGN.md` B-min'in parola kısmı Steam sürümünde kullanılmaz; sahiplik/bilet/kilit fikri kalır |
-| I6 | Eski karakterler | Irksız kayıt → ilk girişte seçim paneli (H1'e konur) | Göç kodu yok, yalnız `None` durumu |
+| I6 | Eski karakterler | **KARAR (2026-10-16):** ırksız kayıt → ilk girişte bir kez İnsan seçim paneli; sessiz otomatik İnsan ataması yok. Önceki H1'e yerleştirme önerisi ayrıca değerlendirilir; bu cevap otomatik Winter→H1 taşıma yetkisi değildir | Göç kodu yok, yalnız `None` durumu; S03.01 depo adımı harita değiştirmez |
 
 **Yan dosya riski (yalnız ara yolda) [Muhtemel]:** ırk dosyası kaybolur ya da bozulursa karakter `None` olur ve yeniden seçebilir.
 Önlem: `.bad` durumunda seçimi kilitle ("ırk kaydı okunamadı, yöneticiye bildir"). A2'den sonra risk kalkar (ırk karakter satırında, tek işlemde yazılır).
@@ -493,7 +493,7 @@ Kalan riskler:
 |---|---|---|
 | S1 | Oturum ırkı kuralı mı, harita başına sunucu mu? | **KARAR (2026-10-13): harita başına sunucu (B).** Oturum ırkı kuralı reddedildi. Sonuç: A1-A4 aşamaları, alfa ~6-10 ay [Tahmin]; revizyon 2 (Steam, A5): ~6,5-11 ay |
 | S2 | Kopya + giydirme (Winter 4 haritada, Summer 2'de) kabul mü? | Öneri: kabul, sonra harita harita özgün araziye geçilir |
-| S3 | Irk nerede saklanır? | **Revize:** hedef DB sütunu (`character_saves.race`). DB'den önceki ara yol: yan dosya + `.bad` durumunda kilit. `MMOSaveGame.h`'e dokunulmaz. Onay gerekir: ara yol kabul mü, yoksa ırk işi A2'ye kadar beklesin mi (o zaman Aşama 2 A2'den sonraya kayar, toplam süre değişmez, yalnız sıra) |
+| S3 | Irk nerede saklanır? | **KARAR (kullanıcı, 2026-10-16): geçici JSON yan dosyası kullan, DB hazır olunca taşı.** Hedef DB sütunu `character_saves.race`; ara yol `Saved/MMORace/<SlotKey>.json`, bozuk kayıt/`.bad` durumunda seçim kilidi. `MMOSaveGame.h`'e dokunulmaz. Ara yol onayı artık açık soru değildir; DB'ye taşıma ve veri bütünlüğü ayrıca doğrulanır. |
 | S4 | H1'de karşı ırkla takas ve pazar serbest mi? | Öneri: serbest (ortak pazar = merkez haritanın anlamı). Parti/klan/posta yine aynı ırk |
 | S5 | Pazar alfada şart mı? | **KARAR (2026-10-13): şart.** Aşama 8 alfa kapısında |
 | S5b | Pazar yalnız çevrimiçi tezgâh mı, offline satış/açık artırma da mı? | Öneri: alfa = çevrimiçi tezgâh (KO). Offline satış alfa sonrası (satıcıya altın teslimi posta tablosu üzerinden yapılabilir) |
@@ -501,7 +501,7 @@ Kalan riskler:
 | S7 | Ork oyuncunun Ork mob kesmesi | Öneri: "dönek ork" fraksiyonu (yalnız metin) |
 | S8 | Seviye kapısı zorlayıcı mı? | **KARAR (2026-10-15, H2/H3): doğru ırk + Lv25+, giriş/kalış üst sınırı ve Lv59/Lv80'de zorunlu çıkış yok.** Genel seviye tavanı artışı bu kuralı değiştirmez. H4/H5 Lv59+ eşiği korunur; H6 Lv55 (karar). İçerik bantları ayrı, değişmedi. |
 | S9 | H6 kararları K1-K10 (§6) | K1, K4, K5 karar verildi. K2 revize öneri (Lv55-72), diğerleri öneri |
-| S10 | Eski karakterler (ırksız) ilk girişte seçer | Öneri: kabul |
+| S10 | Eski karakterler (ırksız) ilk girişte seçer | **KARAR (kullanıcı, 2026-10-16): evet, ilk girişte bir kez seçim göster.** Şimdilik İnsan seçilir; Ork seçimi Ork/sosyal S10 sprintine kadar sunucuda kapalıdır. Bu S10 karar kimliği ile S10 sprint kimliği farklıdır. Eski seviye/altın/envanter/görev verileri korunur. |
 | S11 | 4 yeni `.umap` (~9-18 MB her biri, LFS yok) → repo ~50-70 MB büyür | Kullanıcı kararı: LFS ya da doğrudan |
 | **S12** | **Arka uç ve kimlik: PostgreSQL mi PlayFab mı; parola mı Steam mi?** | **ÖNERİLEN KARAR (2026-10-13, kullanıcı "işle" dedi): PostgreSQL + kimlik = SteamID.** Parola/e-posta/sıfırlama yazılmaz (Steam sürümü). `accounts (provider, external_id)` tekil; `provider='steam'`, ileride başka mağaza yeni satır türüyle. K-1, karakter SteamID hesabına bağlanınca kapanır. Eski belgeler (`ACCOUNT_BACKEND_COMPARISON.md` §5 PlayFab önerir, `ACCOUNT_IDENTITY_DESIGN.md` parola tasarlar) bununla çelişir; `belge-denetcisi` "Steam sürümünde geçersiz" notu düşmeli |
 | **S13** | **Oyun sunucusu DB'ye nasıl erişir?** (a) küçük arka uç servisi (HTTP+JSON; giriş servisiyle aynı süreç), (b) libpq'yu UE sunucu modülüne bağlamak | **ÖNERİLEN KARAR (2026-10-13): (a) kesinleşti.** Yeni ve belirleyici gerekçe: Steam bilet doğrulaması (`AuthenticateUserTicket`, `CheckAppOwnership`) Web API **Publisher Key** ister; bu anahtar gizlidir, 6 harita sunucusuna dağıtılmaz, istemciye girmez, tek servis tutar. Önceki gerekçeler de geçerli (pazar/kilit devri SQL işlemi tek yerde, DB parolası dağılmaz, `Build.cs`'teki `HTTP`/`Json` yeterli). **Açık kalan:** servis dili (varsayılan Python [Tahmin]; kullanıcı kararı, A2'den önce) |
@@ -625,6 +625,9 @@ A4 icin A1 + A2 + A5 + A3 sart.
 **S02.00 bağımsız hazırlık — 2026-10-16:** [Mevcut yerleşim tabanı](tasks/S02_00_LAYOUT_BASELINE_2026-10-16.md), izole `4e0f0c5` kaynağından 35 cep (Summer 18, Winter 17) ve 9 NPC'nin (5/4) bütün ayarlarını belgeler; NPC/AI uzmanı hazırladı, bağımsız QA her satırı kabul etti. Koordinatlar tek biçimli değildir: Summer'ın ilk 10 cebi PlayerStart'a göreli, kalan 8 Summer ve 17 Winter cebi mutlak konumdadır; varsayılan/nav ve deferred-spawn farkları da korunacaktır. Bu not statik hazırlık kanıtıdır; C++/araç taşıması, build, smoke veya PIE sonucu değildir. Önceki genel PIE uygulama blokajı kaldırıldı: **S02.01 uygulaması** ayrı `six-map-layout` adayında gerçek UE/NPC uzmanına atandı; bağımsız QA ve yeni adayın build/test kanıtı gerekir. `six-map-sprint0` PIE adayı korunur; kaynak motor S01'in ayrı önkoşuludur. [Güncel yürütme ve dosya sahipliği](SIX_MAP_SPRINT_BOARD.md) bağlayıcıdır; S00/S02 PIE kabulü açık kalır.
 
 #### Aşama 2. Irk: veri modeli + seçim (iki mevcut haritada)
+
+**2026-10-16 kullanıcı kararları işlendi:** S3 geçici JSON ara deposu ve S10 eski karakterde ilk girişte bir defalık İnsan seçimi onaylandı; bu iki karar tekrar sorulmaz. S02'nin kabul edilmiş izole teknik tabanı `57205a3` üzerinde önce **S03.01 tür + depo + izole native test**, ardından bileşen/replikasyon ve HUD/RPC entegrasyonu uygulanır. Depo adımı Character/MMOSaveGame/harita/oyuncu verisi entegrasyonu yapmaz. Eksik, bozuk, okunamayan ve kilitli kayıt durumları ayrılır; bozuk dosya sessizce `None`/yeniden seçim sayılmaz. Gerçek backend/QA-güvenlik uzmanları kod/test deltasını inceler; yeni C++ derlemesi ve native test kanıtı eski S02 modülünden devralınmaz. S00/S02/S03 PIE ve main peer sahiplik entegrasyonu ayrı açık kapılardır; bu adım onları geçti saymaz.
+
 - **Amaç:** her karakterin değişmez bir ırkı olsun, kalıcı ve replike. Henüz harita veya kural etkisi yok.
 - **Kapsam:** `EMMORace`, `UMMORaceComponent`, `IMMORaceStore` + yan dosya uygulaması (§3.1 I2), `ServerChooseRace`, HUD seçim paneli.
   Ork **seçilebilir değil** (panelde "yakında"; sunucu `Orc` isteğini reddeder). Irk ad etiketinde görünür. `Scripts/TestRace.ps1` (çekirdek senaryolar).
@@ -633,7 +636,7 @@ A4 icin A1 + A2 + A5 + A3 sart.
 - **Kabul (PIE):** (1) yeni karakterde panel çıkıyor, İnsan seçiliyor; (2) öbür pencerede ırk etiketi görünüyor; (3) yeniden bağlanınca ırk aynı, panel yok;
   (4) **eski kayıt** (ırksız) yükleniyor, panel bir kez çıkıyor, seviye/altın/envanter korunuyor; (5) Summer↔Winter geçişinden sonra ırk aynı.
 - **Süre:** 1-1,5 hafta [Tahmin].
-- **Kararlar (önce):** S3 (ara yan dosya kabul mü), S10, ırkın değiştirilemezliği.
+- **Kararlar:** S3 geçici JSON ara yolu ve S10 eski karakterde ilk giriş seçimi **2026-10-16 kullanıcı cevabıyla onaylandı**; bu iki karar uygulamayı artık bekletmez. Kalıcı seçim alfa boyunca değiştirilemez (§3.1 I3). Otomatik Winter→H1 taşıma bu cevaplarla kararlaştırılmadı ve depo adımının dışındadır.
 
 #### Aşama A2. PostgreSQL karakter deposu (YENİ; Sprint 1 şemasının üstüne)
 - **Amaç:** karakter, ırk, başarım, günlük ve posta verisinin tek paylaşılan DB'de, yerel dosya yoluyla **aynı davranışla** durması. Hâlâ tek sunucu.
@@ -799,7 +802,7 @@ A4 icin A1 + A2 + A5 + A3 sart.
 | Karar | En geç bu aşamadan önce |
 |---|---|
 | S17 alfa sunucu yeri (önerilen karar verildi; A1 ölçümüyle teyit) | A1 sonu |
-| S3 ırk ara yolu, S10 eski karakterler, ırk değiştirilemez | Aşama 2 |
+| S3 ırk ara yolu ve S10 eski karakterler **2026-10-16 onaylandı**; ırk değiştirilemez | Aşama 2 |
 | Servis dili (S13 kalan kısmı), S15 Sprint 1 artıkları, S16 posta biçimi | A2 |
 | S19 Steamworks hesabı + Steam Direct ücreti, `CheckAppOwnership` açık mı | A5 |
 | Hesap (SteamID) başına karakter sayısı | A3 |
@@ -878,7 +881,7 @@ Steamworks tarafındaki onay/bekleme süreleri **[Doğrulanmadı]** ve bu aralı
 | 3 | Aşama 0 PIE: `PLAYTEST_RUNBOOK.md` akışı, iki pencere, Summer↔Winter | **Kullanıcı** | Aşama 0 kabul listesi 1-7 geçti/kaldı yazıldı. **Bekliyor (kullanıcı):** 2026-10-14 itibarıyla yapılmadı; ek madde: takas onayı anında çıkış (`PLAYTEST_CHECKLIST.md`, A-1) |
 | 4 | Ara yol ölçümü: kurulu motorda `UnrealEditor.exe "<uproject>" Summer_scene -server -log` ile dedicated açılıyor ve bir `-game` istemci bağlanabiliyor mu | Yerel ajan (komut + log okuma), kullanıcının makinesinde | Evet/hayır + log satırı belgeye yazıldı (§1.4 "ara yol" etiketi güncellenir) |
 | 5 | Kaynak motor kurulumu: Epic hesabı ↔ GitHub bağlantısı, UE 5.7 kaynağı, `Setup.bat`, `GenerateProjectFiles.bat`, motor derlemesi | **Kullanıcı** (uzun sürer; bu sırada 6-7 yürüyebilir) | Kaynak motorla boş bir proje ya da bu proje editörde açılıyor; disk/süre not edildi |
-| 6 | Önerilen kararların (S12, S13, S17, S18) `DECISIONS_NEEDED.md`'ye işlenmesi; açık kararlar: servis dili (S13 kalan), S15 (Sprint 1 artıkları), S3 (ırk ara yolu), S19 (Steamworks ücreti zamanı). Eski belgelere (`ACCOUNT_BACKEND_COMPARISON.md`, `ACCOUNT_IDENTITY_DESIGN.md`) "Steam sürümünde parola yok" notu | **Kullanıcı** (karar), `belge-denetcisi` (yazım) | Karar satırları yazıldı; çelişen iki belgede not var |
+| 6 | Önerilen kararların (S12, S13, S17, S18) `DECISIONS_NEEDED.md`'ye işlenmesi; açık kararlar: servis dili (S13 kalan), S15 (Sprint 1 artıkları), S19 (Steamworks ücreti zamanı). **S3 ırk ara yolu ve S10 eski karakter ilk seçim kararı 2026-10-16'da cevaplandı.** Eski belgelere (`ACCOUNT_BACKEND_COMPARISON.md`, `ACCOUNT_IDENTITY_DESIGN.md`) "Steam sürümünde parola yok" notu | **Kullanıcı** (karar), `belge-denetcisi` (yazım) | Karar satırları yazıldı; çelişen iki belgede not var |
 | 7 | Yerel PostgreSQL kurulumu + `V1__initial_schema.sql`'i psql ile boş bir veritabanına uygulama (oyun kodu yok) | Kullanıcı kurar; yerel ajan uygular ve `\dt` çıktısını okur | Tablolar oluştu; şema farkları (§1.5) `V2` taslağı için listelendi (`accounts (provider, external_id)` dahil) |
 | 8 | A1 başlangıcı (5 bittikten sonra): `MyProjectServer.Target.cs`'i `Source/` köküne taşı, motor yolunu tek noktaya al, ~~`build.ps1 -Clean`'i düzelt~~ (tur 6'da yapıldı, `1f4a557`), `MyProjectServer` derle | Yerel ajan (`mmo-developer`), sonra `qa-kontrolcu` | Server derlemesi sonucu (0 hata ya da hata listesi) belgeye yazıldı; `RunAllChecks` kaynak motorla yeşil |
 | 9 | Steamworks hazırlığı (derlemesiz, 5-8 ile paralel): partner hesabı, Steam Direct ücreti ve App ID (S19), Web API Publisher Key'in nerede saklanacağı (servis makinesi, depo dışı); Playtest ücret/onay şartları ve `CheckAppOwnership`'in Playtest App ID'siyle davranışı panelden okunur | **Kullanıcı** | App ID var ya da S19 "sonra" kararı yazıldı; §12.1'deki **[Doğrulanmadı]** satırları panel bilgisiyle güncellendi |
