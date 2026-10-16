@@ -622,6 +622,8 @@ A4 icin A1 + A2 + A5 + A3 sart.
   PIE: Aşama 0 listesinin 1-5. maddeleri aynen geçer.
 - **Süre:** 1 hafta [Tahmin].
 
+**S02.00 bağımsız hazırlık — 2026-10-16:** [Mevcut yerleşim tabanı](tasks/S02_00_LAYOUT_BASELINE_2026-10-16.md), izole `4e0f0c5` kaynağından 35 cep (Summer 18, Winter 17) ve 9 NPC'nin (5/4) bütün ayarlarını belgeler; NPC/AI uzmanı hazırladı, bağımsız QA her satırı kabul etti. Koordinatlar tek biçimli değildir: Summer'ın ilk 10 cebi PlayerStart'a göreli, kalan 8 Summer ve 17 Winter cebi mutlak konumdadır; varsayılan/nav ve deferred-spawn farkları da korunacaktır. Bu yalnız statik hazırlıktır; C++/araç taşıması, build, smoke veya PIE yapılmadı. Aşama 1 uygulaması S00 PIE kabulünü bekler; kaynak motor S01'in ayrı önkoşuludur.
+
 #### Aşama 2. Irk: veri modeli + seçim (iki mevcut haritada)
 - **Amaç:** her karakterin değişmez bir ırkı olsun, kalıcı ve replike. Henüz harita veya kural etkisi yok.
 - **Kapsam:** `EMMORace`, `UMMORaceComponent`, `IMMORaceStore` + yan dosya uygulaması (§3.1 I2), `ServerChooseRace`, HUD seçim paneli.
