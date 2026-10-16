@@ -16,10 +16,14 @@ param(
     [ValidateRange(0, 4000)]
     [int]$WatchdogSeconds = 0,
     [ValidateSet('Listen', 'EditorDedicated')]
-    [string]$ServerMode = 'Listen'
+    [string]$ServerMode = 'Listen',
+    [switch]$ShaderStartupDiagnostics
 )
 
 $ErrorActionPreference = 'Stop'
+if ($ShaderStartupDiagnostics -and $ServerMode -ne 'EditorDedicated') {
+    throw 'ShaderStartupDiagnostics requires EditorDedicated; no process launched.'
+}
 $exe = "C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $project = Join-Path (Split-Path -Parent $PSScriptRoot) "MyProject.uproject"
 # Her kosuya ayri kimlik: ayni TEMP/saniyede paralel smoke loglari birbirini ezmesin.
@@ -70,7 +74,8 @@ $manifestPath = if ($isolated) { Join-Path $LogDirectory 'processes.json' } else
 $deadline = if ($WatchdogSeconds) { $WatchdogSeconds } else { $ServerSeconds + $ClientSeconds + 20 }
 $clock = [Diagnostics.Stopwatch]::StartNew()
 $state = [ordered]@{ schema = 1; map = $Map; port = $null; userDir = $UserDir;
-    serverMode = $ServerMode; route = $route; executable = $exe; serverArguments = @(); clientArguments = @();
+    serverMode = $ServerMode; shaderStartupDiagnostics = [bool]$ShaderStartupDiagnostics;
+    route = $route; executable = $exe; serverArguments = @(); clientArguments = @();
     serverCommandLine = $null; serverCommandLineVerified = $false; netModeEvidence = 'NOT_PROVEN';
     serverLog = $slog; clientLog = $clog; watchdogSeconds = $deadline; timedOut = $false;
     observed = $false; serverObservedSeconds = 0; clientObservedSeconds = 0; cleanupOk = $true; exitCode = 1;
@@ -143,6 +148,11 @@ function Wait-NetSmokeReadiness($Server) {
         if (Test-Path -LiteralPath $slog) {
             $state.readinessPort = Select-String -LiteralPath $slog -Pattern $portPattern -Quiet
             $state.readinessMap = Select-String -LiteralPath $slog -Pattern $worldPattern -Quiet
+            if ($ShaderStartupDiagnostics) {
+                # Retain native startup argv even if readiness never arrives; verification still requires readiness below.
+                $startupLines = @(Select-String -LiteralPath $slog -Pattern '\bLogInit: Command Line: ([^\r\n]*)$')
+                if ($startupLines.Count -eq 1) { $state.serverCommandLine = $startupLines[0].Matches[0].Groups[1].Value }
+            }
         }
         Assert-NetSmokeAlive $Server $null # A server exiting during log reads is still a failure.
         $state.readinessElapsedSeconds = $clock.Elapsed.TotalSeconds
@@ -157,6 +167,12 @@ function Wait-NetSmokeReadiness($Server) {
                     $cmd -notmatch ('(?:^|\s)' + [regex]::Escape($mapPath) + '(?:\s|$)') -or
                     $cmd -notmatch ("(?:^|\s)-port=$selectedPort(?:\s|$)")) {
                     throw 'EDITOR_SERVER command-line evidence missing or inconsistent; listen fallback rejected.'
+                }
+                $logCmdCount = [regex]::Matches($cmd, '(?i)(?:^|\s)-LogCmds(?:=|(?=\s|$))').Count
+                if (($ShaderStartupDiagnostics -and ($logCmdCount -ne 1 -or
+                        $cmd -cnotmatch '(?:^|\s)-LogCmds="LogShaders Log"(?:\s|$)')) -or
+                    (-not $ShaderStartupDiagnostics -and $logCmdCount -ne 0)) {
+                    throw 'Shader startup diagnostic native command-line mismatch.'
                 }
                 $state.serverCommandLineVerified = $true
             }
@@ -180,7 +196,8 @@ $cleanupOk = $true
 try {
     $userArguments = if ($isolated) { @("-UserDir=`"$UserDir`"") } else { @() }
     $modeArguments = if ($ServerMode -eq 'EditorDedicated') { @($mapPath, '-server') } else { @("${mapPath}?listen", '-game') }
-    $state.serverArguments = @("`"$project`"") + $modeArguments + @('-NullRHI', '-nosound', '-unattended', '-nosplash', '-stdout', "-ABSLOG=`"$slog`"", "-port=$selectedPort") + $userArguments
+    $diagnosticArguments = if ($ShaderStartupDiagnostics) { @('-LogCmds="LogShaders Log"') } else { @() }
+    $state.serverArguments = @("`"$project`"") + $modeArguments + @('-NullRHI', '-nosound', '-unattended', '-nosplash', '-stdout', "-ABSLOG=`"$slog`"", "-port=$selectedPort") + $userArguments + $diagnosticArguments
     $state.clientArguments = @("`"$project`"", "127.0.0.1:$selectedPort", '-game', '-NullRHI', '-nosound', '-unattended', '-nosplash', '-stdout', "-ABSLOG=`"$clog`"") + $userArguments
     Save-NetSmokeManifest # Raw arrays below are the arrays passed to the owned native launches.
     Assert-NetSmokeDeadline

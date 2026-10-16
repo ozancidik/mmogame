@@ -161,6 +161,7 @@ Check ($report.status -ceq 'NOT_RUN' -and $report.runnerExit -eq 3 -and $report.
 Check (-not $report.childStarted -and $null -eq $report.childExit -and $null -eq $report.serverLog -and $null -eq $report.clientLog) 'no false child result or invented log paths'
 Check ($report.savedPreserved -eq $true) 'pre/post Saved preservation recorded'
 Check (($report.requestedChildArguments -join ' ') -ceq '-Map Winter_scene -ServerMode Listen') 'legacy Winter/Listen defaults; child timeout defaults never overridden'
+Check ($report.shaderStartupDiagnostics -is [bool] -and -not $report.shaderStartupDiagnostics) 'wrapper diagnostic defaults false'
 Check (Test-Path -LiteralPath (Join-Path $report.proof 'saved-after.json')) 'post-inventory retained'
 Check (Test-Path -LiteralPath (Join-Path $report.proof 'child-contract.json')) 'child contract retained'
 $second = Invoke-WinterPreflight $linked $receiptPath
@@ -183,11 +184,14 @@ function Get-CimInstance { param($ClassName, $ErrorAction) return @() }
 $refused = Invoke-WinterPreflight $main $receiptPath
 Check ($refused.runnerExit -eq 1 -and $null -eq $refused.proof -and $refused.gate -ceq 'worktree') 'main entry refuses before evidence writes'
 $contractChild = Join-Path $scratch 'fake contract child.ps1'
-Write-FixtureText $contractChild 'param($Map,$UserDir,$LogDirectory,$ServerMode) Write-Output "$Map|$UserDir|$LogDirectory|$ServerMode"; exit 2'
+Write-FixtureText $contractChild 'param($Map,$UserDir,$LogDirectory,$ServerMode,[switch]$ShaderStartupDiagnostics) Write-Output "$Map|$UserDir|$LogDirectory|$ServerMode|$ShaderStartupDiagnostics"; exit 2'
 $code = Invoke-WinterChild $contractChild 'fixture user dir' 'fixture logs' $scratch
 Check ($code -eq 2 -and [IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('Winter_scene|fixture user dir|fixture logs')) 'real invocation helper retains exact args/output and child exit'
 $code = Invoke-WinterChild $contractChild 'fixture' 'logs' $scratch 'Summer_scene' 'EditorDedicated'
 Check ($code -eq 2 -and [IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('Summer_scene|fixture|logs|EditorDedicated')) 'helper propagates selected map/mode without launch overrides'
+$code = Invoke-WinterChild $contractChild 'fixture' 'logs' $scratch 'Summer_scene' 'EditorDedicated' -ShaderStartupDiagnostics
+Check ($code -eq 2 -and [IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('Summer_scene|fixture|logs|EditorDedicated|True')) 'real helper passes fixed diagnostic switch'
+Reject { Invoke-WinterChild $contractChild 'fixture' 'logs' $scratch -ShaderStartupDiagnostics } 'requires EditorDedicated' 'real helper rejects diagnostic Listen before child'
 Write-FixtureText $contractChild 'param($Map,$UserDir,$LogDirectory) Write-Output "partial output"; throw "Injected fake child exception"'
 Reject { Invoke-WinterChild $contractChild 'fixture' 'fixture' $scratch } 'Injected fake child' 'real invocation helper propagates child exception'
 Check ([IO.File]::ReadAllText((Join-Path $scratch 'child-output.log')).Contains('partial output')) 'partial child output survives exception'
@@ -197,7 +201,7 @@ $script:childInvocations = 0
 $script:runtimeMode = 'healthy'
 $script:lockHeldDuringChild = $false
 $script:protectedWriteBlocked = $false
-function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen') {
+function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen', [switch]$ShaderStartupDiagnostics) {
     $script:childInvocations++
     try {
         $contender = Open-WinterLock $worktree.common
@@ -219,12 +223,14 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
     $project = Join-Path (Split-Path -Parent (Split-Path -Parent $UserDir)) 'MyProject.uproject'
     $modeArgs = if ($ServerMode -eq 'EditorDedicated') { @($mapPath, '-server') } else { @("${mapPath}?listen", '-game') }
     $serverArgs = @("`"$project`"") + $modeArgs + @('-port=17779', "-ABSLOG=`"$server`"", "-UserDir=`"$UserDir`"")
+    if ($ShaderStartupDiagnostics) { $serverArgs += '-LogCmds="LogShaders Log"' }
     $clientArgs = @("`"$project`"", '127.0.0.1:17779', '-game', "-ABSLOG=`"$client`"", "-UserDir=`"$UserDir`"")
     $cmd = ($serverArgs | Select-Object -Skip 1) -join ' '
     Write-FixtureText $server "LogInit: Command Line: $cmd`nLogNet: listening on port 17779`nLogWorld: Bringing World $mapPath.$Map up for play`nJoin succeeded"
     Write-FixtureText $client 'Welcomed by server'
     $fake = [ordered]@{ schema = 1; map = $Map; port = 17779; userDir = $UserDir;
-        serverMode = $ServerMode; route = $(if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' });
+        serverMode = $ServerMode; shaderStartupDiagnostics = [bool]$ShaderStartupDiagnostics;
+        route = $(if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' });
         executable = 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe';
         serverArguments = $serverArgs; clientArguments = $clientArgs; serverCommandLine = $cmd;
         serverCommandLineVerified = ($ServerMode -eq 'EditorDedicated'); netModeEvidence = 'NOT_PROVEN';
@@ -255,6 +261,28 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
         }
         'dedicated_client_server' { $fake.clientArguments[2] = '-server' }
         'dedicated_unproven_cmd' { $fake.serverCommandLineVerified = $false }
+        'dedicated_diag_manifest_false' { $fake.shaderStartupDiagnostics = $false }
+        'dedicated_diag_manifest_string' { $fake.shaderStartupDiagnostics = 'true' }
+        'dedicated_diag_raw_missing' { $fake.serverArguments = @($serverArgs | Where-Object { $_ -notlike '-LogCmds*' }) }
+        'dedicated_diag_raw_wrong' { $fake.serverArguments = @($serverArgs | ForEach-Object { $_.Replace('LogShaders Log', 'LogShaders Error') }) }
+        'dedicated_diag_raw_duplicate' { $fake.serverArguments += '-LogCmds="LogShaders Log"' }
+        'dedicated_diag_client_leak' { $fake.clientArguments += '-LogCmds="LogShaders Log"' }
+        'dedicated_diag_native_missing' {
+            $fake.serverCommandLine = $cmd.Replace(' -LogCmds="LogShaders Log"', '')
+            Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace($cmd, $fake.serverCommandLine))
+        }
+        'dedicated_diag_native_wrong' {
+            $fake.serverCommandLine = $cmd.Replace('LogShaders Log', 'LogShaders Error')
+            Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace($cmd, $fake.serverCommandLine))
+        }
+        'dedicated_diag_native_duplicate' {
+            $fake.serverCommandLine = $cmd + ' -LogCmds="LogShaders Log"'
+            Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace($cmd, $fake.serverCommandLine))
+        }
+        'dedicated_diag_native_log_mismatch' { Write-FixtureText $server ([IO.File]::ReadAllText($server).Replace(' -LogCmds="LogShaders Log"', '')) }
+        'dedicated_unrequested_diag' { $fake.serverArguments += '-LogCmds="LogShaders Log"' }
+        'dedicated_diag_watchdog' { $fake.timedOut = $true; $fake.observed = $false; $fake.exitCode = 2 }
+        'dedicated_diag_cleanup_failed' { $fake.cleanupOk = $false; $fake.processes[0].stopped = $false }
     }
     Save-WinterJson (Join-Path $Logs 'processes.json') $fake
     return $fake.exitCode
@@ -263,20 +291,39 @@ foreach ($mode in @('healthy', 'protected_write', 'watchdog', 'missing_manifest'
     'wrong_pid', 'cleanup_failed', 'wrong_port', 'outside_saved', 'source_changed',
     'late_ready', 'too_late_ready', 'missing_ready', 'short_budget', 'reset_clock_budget', 'trace_port', 'map_prefix',
     'listen_summer', 'dedicated_winter', 'dedicated_summer', 'dedicated_mode_mismatch', 'dedicated_raw_fallback',
-    'dedicated_native_fallback', 'dedicated_client_server', 'dedicated_unproven_cmd')) {
+    'dedicated_native_fallback', 'dedicated_client_server', 'dedicated_unproven_cmd',
+    'dedicated_diag_summer', 'dedicated_diag_manifest_false', 'dedicated_diag_manifest_string',
+    'dedicated_diag_raw_missing', 'dedicated_diag_raw_wrong', 'dedicated_diag_raw_duplicate', 'dedicated_diag_client_leak',
+    'dedicated_diag_native_missing', 'dedicated_diag_native_wrong', 'dedicated_diag_native_duplicate',
+    'dedicated_diag_native_log_mismatch', 'dedicated_unrequested_diag', 'dedicated_diag_watchdog', 'dedicated_diag_cleanup_failed')) {
     Write-FixtureReceipt
     $script:runtimeMode = $mode
     $requestedMap = if ($mode.EndsWith('_summer')) { 'Summer_scene' } else { 'Winter_scene' }
     $requestedMode = if ($mode.StartsWith('dedicated_')) { 'EditorDedicated' } else { 'Listen' }
-    $runtime = Invoke-WinterPreflight $linked $receiptPath -Execute -Map $requestedMap -ServerMode $requestedMode
-    $expected = if ($mode -in @('healthy', 'protected_write', 'late_ready', 'listen_summer', 'dedicated_winter', 'dedicated_summer')) { 0 } elseif ($mode -eq 'watchdog') { 2 } else { 1 }
+    $diagnostic = $mode.StartsWith('dedicated_diag_')
+    $runtime = Invoke-WinterPreflight $linked $receiptPath -Execute -Map $requestedMap -ServerMode $requestedMode -ShaderStartupDiagnostics:$diagnostic
+    $expected = if ($mode -in @('healthy', 'protected_write', 'late_ready', 'listen_summer', 'dedicated_winter', 'dedicated_summer', 'dedicated_diag_summer')) { 0 } elseif ($mode -in @('watchdog', 'dedicated_diag_watchdog')) { 2 } else { 1 }
     Check ($runtime.runnerExit -eq $expected -and $runtime.childStarted) "fake child $mode expected exit=$expected"
     Check ($runtime.status -ceq $(if ($expected -eq 0) { 'PASSED' } else { 'FAILED' })) "$mode status matches full orchestration"
     Check ($runtime.serverLog -and $runtime.clientLog -and $runtime.processManifest) "$mode both log paths/manifest retained even on failure"
+    if ($mode.StartsWith('dedicated_')) {
+        Check ($runtime.shaderStartupDiagnostics -is [bool] -and $runtime.shaderStartupDiagnostics -eq $diagnostic -and
+            (('-ShaderStartupDiagnostics' -in $runtime.requestedChildArguments) -eq $diagnostic)) "$mode wrapper evidence records exact requested diagnostic intent"
+    }
+    if ($mode -like 'dedicated_diag_manifest_*') { Check ($runtime.reason -match 'manifest rejected') "$mode rejected for manifest intent/type mismatch" }
+    if ($mode -like 'dedicated_diag_raw_*' -or $mode -in @('dedicated_diag_client_leak', 'dedicated_unrequested_diag')) {
+        Check ($runtime.reason -match 'diagnostic raw arguments mismatch') "$mode rejected for raw diagnostic mismatch"
+    }
+    if ($mode -like 'dedicated_diag_native_*') { Check ($runtime.reason -match 'native command') "$mode rejected for actual native diagnostic mismatch" }
     $handle = Open-WinterLock $worktree.common
     $handle.Dispose()
     Check $true "$mode releases common handle after owned child"
 }
+$callsBefore = $script:childInvocations
+$invalidDiagnostic = Invoke-WinterPreflight $linked $receiptPath -Execute -ShaderStartupDiagnostics
+Check ($invalidDiagnostic.runnerExit -eq 1 -and $invalidDiagnostic.gate -ceq 'options' -and
+    -not $invalidDiagnostic.childStarted -and $null -eq $invalidDiagnostic.proof -and
+    $script:childInvocations -eq $callsBefore -and $invalidDiagnostic.reason -match 'requires EditorDedicated') 'Listen diagnostics refused before proof/lock/child'
 Reject { Invoke-WinterPreflight $linked $receiptPath -Execute -ServerMode 'Dedicated' } 'ServerMode' 'invalid mode rejected before child'
 Reject { Invoke-WinterPreflight $linked $receiptPath -Execute -Map '../Winter_scene' } 'Map' 'invalid map rejected before child'
 Check $script:lockHeldDuringChild 'wrapper holds the one common lock through child invocation'
@@ -304,7 +351,7 @@ if ($ActualBuildReceipt) {
     Check ((Get-FileHash -LiteralPath $ActualBuildReceipt -Algorithm SHA256).Hash -ceq $receiptBeforeHash) 'actual receipt unchanged by helper'
     Write-Output "Actual provenance helper only: inputs=$($actualEvidence.inputs.Count) DLL=$($actualEvidence.dllSha256); UE=NOT_RUN"
 }
-Write-Output "Winter wrapper SCRIPT tests: checks=$checks failures=$($failures.Count); network=NOT_RUN (57 prep checks + mocked adapter checks)"
+Write-Output "Winter wrapper SCRIPT tests: checks=$checks failures=$($failures.Count); selection=FULL (wrapper fixtures only); network=NOT_RUN"
 Write-Output "Evidence: $scratch"
 if ($failures.Count) { exit 1 }
 exit 0

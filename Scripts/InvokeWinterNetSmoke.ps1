@@ -3,7 +3,8 @@
 [CmdletBinding()]
 param([string]$BuildReceipt, [switch]$PreflightOnly,
     [ValidateSet('Summer_scene','Winter_scene')][string]$Map = 'Winter_scene',
-    [ValidateSet('Listen','EditorDedicated')][string]$ServerMode = 'Listen')
+    [ValidateSet('Listen','EditorDedicated')][string]$ServerMode = 'Listen',
+    [switch]$ShaderStartupDiagnostics)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -155,12 +156,15 @@ function Save-WinterJson([string]$Path, $Value) {
     $null = Assert-WinterPath $Path
     [IO.File]::WriteAllText($Path, (ConvertTo-Json -InputObject $Value -Depth 12), (New-Object Text.UTF8Encoding($false)))
 }
-function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen') {
+function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [string]$Proof, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen', [switch]$ShaderStartupDiagnostics) {
+    if ($ShaderStartupDiagnostics -and $ServerMode -ne 'EditorDedicated') { throw 'ShaderStartupDiagnostics requires EditorDedicated; no child invoked.' }
     # Same PowerShell process: no outer shell watchdog, nested lock, or orphanable PID tree.
     $global:LASTEXITCODE = $null
     $output = New-Object 'System.Collections.Generic.List[string]'
     try {
-        & $Child -Map $Map -ServerMode $ServerMode -UserDir $UserDir -LogDirectory $Logs | ForEach-Object { $output.Add([string]$_) }
+        $diagnosticOption = @{}
+        if ($ShaderStartupDiagnostics) { $diagnosticOption.ShaderStartupDiagnostics = $true }
+        & $Child -Map $Map -ServerMode $ServerMode -UserDir $UserDir -LogDirectory $Logs @diagnosticOption | ForEach-Object { $output.Add([string]$_) }
         $nativeExit = $LASTEXITCODE
     } finally {
         $path = Assert-WinterPath (Join-Path $Proof 'child-output.log')
@@ -168,10 +172,12 @@ function Invoke-WinterChild([string]$Child, [string]$UserDir, [string]$Logs, [st
     }
     return $nativeExit
 }
-function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen') {
+function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir, [string]$Map = 'Winter_scene', [string]$ServerMode = 'Listen', [switch]$ShaderStartupDiagnostics) {
+    if ($ShaderStartupDiagnostics -and $ServerMode -ne 'EditorDedicated') { throw 'ShaderStartupDiagnostics requires EditorDedicated.' }
     $manifest = Get-Content -LiteralPath (Join-Path $Logs 'processes.json') -Raw | ConvertFrom-Json
     $serverLog = Join-Path $Logs 'server.log'; $clientLog = Join-Path $Logs 'client.log'
     if ($manifest.schema -ne 1 -or $manifest.map -cne $Map -or $manifest.serverMode -cne $ServerMode -or $manifest.userDir -ine $UserDir -or
+        $manifest.shaderStartupDiagnostics -isnot [bool] -or $manifest.shaderStartupDiagnostics -ne [bool]$ShaderStartupDiagnostics -or
         $manifest.exitCode -ne 0 -or -not $manifest.observed -or -not $manifest.cleanupOk -or $manifest.timedOut -or
         $manifest.serverObservedSeconds -lt 30 -or $manifest.clientObservedSeconds -lt 45 -or $manifest.watchdogSeconds -ne 95 -or
         -not $manifest.readinessReady -or -not $manifest.readinessPort -or -not $manifest.readinessMap -or $manifest.startupFailure -or
@@ -203,12 +209,20 @@ function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir, [string]$Ma
         "-ABSLOG=`"$serverLog`"" -notin $sa -or "-ABSLOG=`"$clientLog`"" -notin $ca -or
         @($sa | Where-Object { $_ -in @('-server','-game') }).Count -ne 1 -or
         $ca[1] -cne "127.0.0.1:$($manifest.port)" -or $ca[2] -cne '-game' -or '-server' -in $ca) { throw 'Raw launch arguments/mode mismatch.' }
+    $serverLogCmds = @($sa | Where-Object { $_ -like '-LogCmds*' })
+    if (@($ca | Where-Object { $_ -like '-LogCmds*' }).Count -ne 0 -or
+        ($ShaderStartupDiagnostics -and ($serverLogCmds.Count -ne 1 -or $serverLogCmds[0] -cne '-LogCmds="LogShaders Log"')) -or
+        (-not $ShaderStartupDiagnostics -and $serverLogCmds.Count -ne 0)) { throw 'Shader startup diagnostic raw arguments mismatch.' }
     if ($ServerMode -eq 'EditorDedicated') {
         $cmd = [string]$manifest.serverCommandLine
         if (-not $manifest.serverCommandLineVerified -or -not $server.Contains('LogInit: Command Line: ' + $cmd) -or
             $cmd -notmatch '(?:^|\s)-server(?:\s|$)' -or $cmd -match '(?:^|\s)-game(?:\s|$)|\?listen' -or
             $cmd -notmatch ('(?:^|\s)' + [regex]::Escape($mapPath) + '(?:\s|$)') -or
             $cmd -notmatch ("(?:^|\s)-port=$($manifest.port)(?:\s|$)")) { throw 'EDITOR_SERVER native command evidence rejected.' }
+        $logCmdCount = [regex]::Matches($cmd, '(?i)(?:^|\s)-LogCmds(?:=|(?=\s|$))').Count
+        if (($ShaderStartupDiagnostics -and ($logCmdCount -ne 1 -or
+                $cmd -cnotmatch '(?:^|\s)-LogCmds="LogShaders Log"(?:\s|$)')) -or
+            (-not $ShaderStartupDiagnostics -and $logCmdCount -ne 0)) { throw 'Shader startup diagnostic native command evidence rejected.' }
     }
     if ($server -notmatch ("\bLogNet:[^\r\n]*\blistening on port $($manifest.port)\b") -or
         $server -notmatch ('\bLogWorld: Bringing World ' + [regex]::Escape("$mapPath.$Map") + ' up for play(?:\s|$)') -or
@@ -217,19 +231,25 @@ function Assert-WinterChildEvidence([string]$Logs, [string]$UserDir, [string]$Ma
 }
 function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Execute,
     [ValidateSet('Summer_scene','Winter_scene')][string]$Map = 'Winter_scene',
-    [ValidateSet('Listen','EditorDedicated')][string]$ServerMode = 'Listen') {
+    [ValidateSet('Listen','EditorDedicated')][string]$ServerMode = 'Listen', [switch]$ShaderStartupDiagnostics) {
     $result = [ordered]@{ status = 'NOT_RUN'; runnerExit = 1; map = $Map; serverMode = $ServerMode;
+        shaderStartupDiagnostics = [bool]$ShaderStartupDiagnostics;
         route = $(if ($ServerMode -eq 'EditorDedicated') { 'EDITOR_SERVER' } else { 'EDITOR_LISTEN' });
         acceptanceScope = 'DEVELOPMENT_COMMAND_AND_CONNECTION_ONLY'; netModeEvidence = 'NOT_PROVEN'; proof = $null;
         gate = 'worktree'; reason = $null; childExit = $null; serverLog = $null; clientLog = $null; processManifest = $null;
         childStarted = $false; savedPreserved = $null; provenance = $null; userDir = $null;
         requestedChildArguments = @('-Map', $Map, '-ServerMode', $ServerMode); watchdog = 'NOT_RUN' }
+    if ($ShaderStartupDiagnostics) { $result.requestedChildArguments += '-ShaderStartupDiagnostics' }
     $lock = $null
     $before = $null
     $worktree = $null
     $savedHandles = New-Object 'System.Collections.Generic.List[System.IO.FileStream]'
     $childHash = $null
     try {
+        if ($ShaderStartupDiagnostics -and $ServerMode -ne 'EditorDedicated') {
+            $result.gate = 'options'
+            throw 'ShaderStartupDiagnostics requires EditorDedicated; no child invoked.'
+        }
         $worktree = Get-WinterWorktree $Root
         $temp = Assert-WinterPath $env:TEMP
         foreach ($registered in $worktree.registeredRoots) {
@@ -268,6 +288,7 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
         foreach ($required in @('UserDir', 'LogDirectory', 'WatchdogSeconds', 'ServerMode')) {
             if ($required -notin $parameters) { throw "Child isolation parameter missing: $required" }
         }
+        if ($ShaderStartupDiagnostics -and 'ShaderStartupDiagnostics' -notin $parameters) { throw 'Child diagnostic parameter missing: ShaderStartupDiagnostics' }
         if (-not $Execute) { $result.runnerExit = 3; throw 'NOT_RUN: preflight only; no child invoked.' }
         $result.gate = 'protected-saved'
         foreach ($row in $before) {
@@ -285,12 +306,12 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
         $result.childStarted = $true
         $result.status = 'FAILED'
         $result.watchdog = '95s observation deadline + at most 10s owned cleanup waits'
-        $result.childExit = Invoke-WinterChild $child $result.userDir $logs $proof $Map $ServerMode
+        $result.childExit = Invoke-WinterChild $child $result.userDir $logs $proof $Map $ServerMode -ShaderStartupDiagnostics:$ShaderStartupDiagnostics
         if ($null -eq $result.childExit -or $result.childExit -ne 0) {
             if ($result.childExit -eq 2) { $result.runnerExit = 2 }
             throw "Child failed: exit=$($result.childExit)"
         }
-        Assert-WinterChildEvidence $logs $result.userDir $Map $ServerMode
+        Assert-WinterChildEvidence $logs $result.userDir $Map $ServerMode -ShaderStartupDiagnostics:$ShaderStartupDiagnostics
         $result.status = 'PASSED'
         $result.runnerExit = 0
     } catch {
@@ -325,7 +346,7 @@ function Invoke-WinterPreflight([string]$Root, [string]$ReceiptPath, [switch]$Ex
     return [pscustomobject]$result
 }
 if ($MyInvocation.InvocationName -ne '.') {
-    $report = Invoke-WinterPreflight (Split-Path -Parent $PSScriptRoot) $BuildReceipt -Execute:(-not $PreflightOnly) -Map $Map -ServerMode $ServerMode
+    $report = Invoke-WinterPreflight (Split-Path -Parent $PSScriptRoot) $BuildReceipt -Execute:(-not $PreflightOnly) -Map $Map -ServerMode $ServerMode -ShaderStartupDiagnostics:$ShaderStartupDiagnostics
     Write-Output (ConvertTo-Json -InputObject $report -Depth 12)
     exit $report.runnerExit
 }

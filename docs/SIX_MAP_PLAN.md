@@ -886,6 +886,8 @@ Codex aynı ağaçta çalışıyorsa her adımdan önce `git status` bakılır, 
 
 **Yerel güncelleme — 2026-10-15:** adım 2'nin eksik Winter bağlantı kanıtı izole `4e0f0c5` modülüyle S00.04'te elde edildi: port 17490, join/welcome 1/1, hata 0/0, tam süreç gözlemi ve kayıt koruma kontrolü geçti ([kanıt](tasks/S00_04_STARTUP_READINESS_2026-10-15.md)). Adım 4 için S01.02'de kurulu `UnrealEditor-Cmd.exe` ile Summer raw map + `-server` **bir kez** denendi: 45,110 sn hazırlık bütçesinde harita/port hazır olmadığı için exit 1; istemci başlatılmadı, kayıtlar korundu. Bu koşu destek yok sonucunu veya `NM_DedicatedServer` kabulünü kanıtlamaz ([kanıt ve kapsam](tasks/S01_02_EDITOR_DEDICATED_ROUTE_2026-10-15.md)). Adım 3 PIE ve kaynak motorla gerçek Server hedefi hâlâ açık. Güncel yürütme sırası [sprint panosunda](SIX_MAP_SPRINT_BOARD.md); eski tarihli sonuçlar yeni koşu sayılmaz.
 
+**Yerel güncelleme — 2026-10-16:** adım 4'ün Summer geliştirme ara yolu S01.04'te **geçti**: kurulu editör `-server` komutu ve sabit shader-log seçeneğiyle tek korumalı koşu, port 17342, join/welcome 1/1, hata 0/0, exit 0. Shader başlatma begin/end kayıtları 5,939 sn arayla gözlendi; önceki başarısızlığın nedeni bulunmuş sayılmaz. Özgün 95 sn sınırı, süreç gözlemi ve kayıt koruması doğrulandı; bağımsız QA kanıtı kabul etti ([S01.04](tasks/S01_04_SHADER_STARTUP_LOG_2026-10-15.md)). Winter'ın editör-server modu, canlı `NM_DedicatedServer`, paketli `MyProjectServer`/kaynak motor, kapasite ve PIE hâlâ açık; geliştirme bağlantı kanıtı bu kapıların yerine geçmez.
+
 ---
 
 ## 12. Steam yayını (revizyon 2, 2026-10-13)

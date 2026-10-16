@@ -1,7 +1,9 @@
 # Runner regression: mocked processes, UDP endpoints and fresh logs only; never launches Unreal.
 # -Runner also accepts the historical runner (without ServerSeconds) to reproduce false positives.
-param([string]$Runner = (Join-Path $PSScriptRoot 'NetSmokeTest.ps1'))
+param([string]$Runner = (Join-Path $PSScriptRoot 'NetSmokeTest.ps1'), [string[]]$Case)
 $ErrorActionPreference = 'Stop'
+if ($PSBoundParameters.ContainsKey('Case') -and (@($Case).Count -eq 0 -or
+    @($Case | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count)) { throw 'Case selection must not be empty.' }
 $Runner = (Resolve-Path -LiteralPath $Runner).Path
 $scratch = Join-Path $env:TEMP ('mmo_net_regression_' + [guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Path $scratch
@@ -15,6 +17,7 @@ $null = New-Item -ItemType Directory -Path $env:TEMP -Force
 $env:TEMP = [IO.Path]::GetFullPath($env:TEMP) # Normalize Windows 8.3 TEMP aliases before comparing canonical child paths.
 $global:NetMockCase = $CaseName -replace '^isolated_', ''
 if ($global:NetMockCase.StartsWith('dedicated_')) { $global:NetMockCase = $global:NetMockCase.Substring(10) }
+if ($global:NetMockCase.StartsWith('diag_')) { $global:NetMockCase = $global:NetMockCase.Substring(5) }
 $global:NetMockRoot = $CaseRoot
 $global:NetMockProcesses = @{}
 $global:NetMockClientAttempted = $false
@@ -120,6 +123,9 @@ function Start-Process {
         $nativeCmd = ($ArgumentList | Select-Object -Skip 1) -join ' '
         if ($global:NetMockCase -eq 'fallback') { $nativeCmd = $nativeCmd.Replace(' -server ', '?listen -game ') }
         if ($global:NetMockCase -eq 'wrong_cmd_map') { $nativeCmd = $nativeCmd.Replace('Winter_scene', 'Summer_scene') }
+        if ($global:NetMockCase -eq 'missing_logcmd') { $nativeCmd = $nativeCmd.Replace(' -LogCmds="LogShaders Log"', '') }
+        if ($global:NetMockCase -eq 'wrong_logcmd') { $nativeCmd = $nativeCmd.Replace('-LogCmds="LogShaders Log"', '-LogCmds="LogShaders Error"') }
+        if ($global:NetMockCase -eq 'duplicate_logcmd') { $nativeCmd += ' -LogCmds="LogShaders Log"' }
         $text += "`nLogInit: Command Line: $nativeCmd"
     }
     foreach ($kind in @('error', 'fatal', 'ensure', 'access')) {
@@ -227,6 +233,7 @@ if ($CaseName.StartsWith('isolated_')) {
     $argsForRunner.Map = 'Winter_scene'
     if ($CaseName.EndsWith('_summer')) { $argsForRunner.Map = 'Summer_scene' }
     if ($CaseName.StartsWith('isolated_dedicated_')) { $argsForRunner.ServerMode = 'EditorDedicated' }
+    if ($CaseName.StartsWith('isolated_dedicated_diag_')) { $argsForRunner.ShaderStartupDiagnostics = $true }
     $argsForRunner.UserDir = Join-Path $IsolatedRoot ('Saved/WinterNet_' + [guid]::NewGuid().ToString('N'))
     $argsForRunner.LogDirectory = Join-Path $env:TEMP ($CaseName + '_' + [guid]::NewGuid().ToString('N') + '/child logs')
     switch ($global:NetMockCase) {
@@ -263,6 +270,7 @@ switch ($CaseName) {
     'bad_port_negative' { $argsForRunner.Port = -1 }
     'bad_port_high' { $argsForRunner.Port = 65536 }
     'bad_server_mode' { $argsForRunner.ServerMode = 'Dedicated' }
+    'bad_diag_listen' { $argsForRunner.ShaderStartupDiagnostics = $true }
 }
 & $Runner @argsForRunner
 exit $LASTEXITCODE
@@ -312,7 +320,23 @@ if ((Get-Command -Name $Runner).Parameters.ContainsKey('UserDir')) {
         $cases += @('bad_server_mode', 'isolated_listen_summer', 'isolated_dedicated_winter', 'isolated_dedicated_summer',
             'isolated_dedicated_fallback', 'isolated_dedicated_missing_cmd', 'isolated_dedicated_wrong_cmd_map',
             'isolated_dedicated_missing_join', 'isolated_dedicated_client_kill_fail')
+        if ((Get-Command -Name $Runner).Parameters.ContainsKey('ShaderStartupDiagnostics')) {
+            $cases += @('bad_diag_listen', 'isolated_dedicated_diag_summer',
+                'isolated_dedicated_diag_missing_logcmd', 'isolated_dedicated_diag_wrong_logcmd',
+                'isolated_dedicated_diag_duplicate_logcmd', 'isolated_dedicated_diag_server_sleep_fail',
+                'isolated_dedicated_diag_readiness_never')
+        }
     }
+}
+$availableCases = $cases.Count
+$selection = 'FULL'
+if ($PSBoundParameters.ContainsKey('Case')) {
+    foreach ($selected in $Case) {
+        if ($selected -cnotin $cases) { throw "Unknown case selection: $selected" }
+    }
+    if (@($Case | Select-Object -Unique).Count -ne $Case.Count) { throw 'Duplicate case selection refused.' }
+    $cases = @($Case)
+    $selection = 'FILTERED'
 }
 $checks = 0
 $failures = 0
@@ -337,7 +361,7 @@ foreach ($case in $cases) {
     $output | Out-File -LiteralPath (Join-Path $caseRoot 'output.txt')
     [IO.File]::WriteAllText((Join-Path $caseRoot 'exit.txt'), [string]$code)
     $shouldPass = $case -in @('healthy', 'healthy_again', 'healthy_winter', 'isolated_healthy', 'isolated_readiness_late',
-        'isolated_listen_summer', 'isolated_dedicated_winter', 'isolated_dedicated_summer')
+        'isolated_listen_summer', 'isolated_dedicated_winter', 'isolated_dedicated_summer', 'isolated_dedicated_diag_summer')
     $expectedCode = if ($shouldPass) { 0 } elseif ($case -like 'isolated_timeout_*') { 2 } else { 1 }
     Check ($code -eq $expectedCode) "$case exit=$code"
     Check (-not (Test-Path -LiteralPath (Join-Path $caseRoot 'foreign-cleanup.txt'))) "$case only owned process cleanup"
@@ -347,6 +371,7 @@ foreach ($case in $cases) {
             'isolated_unpaired', 'isolated_reparse_log', 'isolated_udp_unknown')
     if ($rejectBeforeLaunch) {
         Check ($launches.Count -eq 0) "$case rejected before process launch"
+        if ($case -eq 'bad_diag_listen') { Check (($output -join "`n") -match 'requires EditorDedicated') "$case explicit diagnostic mode rejection" }
     } else {
         Check (@($launches | Where-Object { $_ -eq 'server' }).Count -eq 1) "$case one server launch"
     }
@@ -418,7 +443,7 @@ foreach ($case in $cases) {
         Check ($cleanupOrder.Count -ge 2 -and $cleanupOrder[0] -like 'client:*' -and $cleanupOrder[-1] -like 'server:*') "$case both processes cleaned client then server despite first cleanup failure"
     }
     if ($shouldPass) {
-        $map = if ($case -in @('healthy_winter', 'isolated_healthy', 'isolated_readiness_late', 'isolated_dedicated_winter')) { 'Winter_scene' } else { 'Summer_scene' }
+        $map = if ($case -eq 'healthy_winter' -or ($case.StartsWith('isolated_') -and -not $case.EndsWith('_summer'))) { 'Winter_scene' } else { 'Summer_scene' }
         $metrics = "Harita: $map  Port: 17779  Baglanti(server)=1  Welcomed(istemci)=1  Hata(server)=0  Hata(istemci)=0"
         Check (($output -join "`n").Contains($metrics)) "$case historical metric output retained"
         Check (($output -join "`n") -match 'Loglar: .+ ; .+') "$case both log paths reported"
@@ -464,17 +489,29 @@ foreach ($case in $cases) {
             $serverArgv = @(EvidenceLines $caseRoot 'server-args.txt')
             $rawMap = "/Game/HandPaintedEnvironment/Maps/$($manifest.map)/$($manifest.map)"
             Check (($manifest.serverArguments -join "`n") -ceq ($serverArgv -join "`n")) "$case manifest records exact server argv"
+            $diagnostic = $case.StartsWith('isolated_dedicated_diag_')
+            Check ($manifest.shaderStartupDiagnostics -is [bool] -and $manifest.shaderStartupDiagnostics -eq $diagnostic) "$case diagnostic intent recorded as boolean"
+            $logCmds = @($serverArgv | Where-Object { $_ -like '-LogCmds*' })
+            Check ($logCmds.Count -eq $(if ($diagnostic) { 1 } else { 0 })) "$case diagnostic opt-in count; default absent"
+            if ($diagnostic) { Check ($logCmds[0] -ceq '-LogCmds="LogShaders Log"') "$case one fixed quoted server diagnostic token" }
             if ($requestedMode -eq 'EditorDedicated') {
                 Check ($serverArgv[1] -ceq $rawMap -and $serverArgv[2] -ceq '-server' -and '-game' -notin $serverArgv -and
                     @($serverArgv | Where-Object { $_ -like '*?listen' }).Count -eq 0) "$case raw map/server flag only"
-                if ($case -in @('isolated_dedicated_fallback', 'isolated_dedicated_missing_cmd', 'isolated_dedicated_wrong_cmd_map')) {
+                if ($case -in @('isolated_dedicated_fallback', 'isolated_dedicated_missing_cmd', 'isolated_dedicated_wrong_cmd_map',
+                    'isolated_dedicated_diag_missing_logcmd', 'isolated_dedicated_diag_wrong_logcmd', 'isolated_dedicated_diag_duplicate_logcmd',
+                    'isolated_dedicated_diag_server_sleep_fail', 'isolated_dedicated_diag_readiness_never')) {
                     Check (-not $manifest.serverCommandLineVerified -and 'client' -notin $launches) "$case fallback/native mode evidence refused before client"
                 } else { Check $manifest.serverCommandLineVerified "$case native command-line evidence confirmed (not runtime NM)" }
+                if ($case -eq 'isolated_dedicated_diag_readiness_never') {
+                    Check ($manifest.serverCommandLine -cmatch '(?:^|\s)-LogCmds="LogShaders Log"(?:\s|$)' -and
+                        $manifest.startupFailure -ceq 'readiness-timeout' -and $manifest.cleanupOk) "$case actual native diagnostic argv retained without readiness proof; owned cleanup succeeds"
+                }
             } else { Check ($serverArgv[1] -ceq "${rawMap}?listen" -and $serverArgv[2] -ceq '-game' -and '-server' -notin $serverArgv) "$case legacy Listen retained" }
             if ('client' -in $launches) {
                 $clientArgv = @(EvidenceLines $caseRoot 'client-args.txt')
                 Check (($manifest.clientArguments -join "`n") -ceq ($clientArgv -join "`n") -and $clientArgv[2] -ceq '-game' -and '-server' -notin $clientArgv) "$case unchanged exact game client argv"
             }
+            Check (@($manifest.clientArguments | Where-Object { $_ -like '-LogCmds*' }).Count -eq 0) "$case no diagnostic in planned client argv"
         }
         foreach ($role in @('server', 'client')) {
             if ($role -notin $launches) { continue }
@@ -484,12 +521,13 @@ foreach ($case in $cases) {
     }
     Write-Output "Case: $case exit=$code expected=$expectedCode"
 }
-foreach ($role in @('server', 'client')) {
+if ('healthy' -in $cases -and 'healthy_again' -in $cases) { foreach ($role in @('server', 'client')) {
     $first = @(EvidenceLines (Join-Path $scratch 'healthy') "$role-logpath.txt")
     $next = @(EvidenceLines (Join-Path $scratch 'healthy_again') "$role-logpath.txt")
     Check ($first.Count -eq 1 -and $next.Count -eq 1 -and $first[0] -ne $next[0]) "$role repeated runs use fresh unique logs in the same TEMP"
 }
-Write-Output "NetSmokeTest runner: checks=$checks failures=$failures cases=$($cases.Count) (mocked; no Unreal/network/build)"
+}
+Write-Output "NetSmokeTest runner: checks=$checks failures=$failures cases=$($cases.Count) selection=$selection available=$availableCases (mocked; no Unreal/network/build)"
 Write-Output "Runner: $Runner"
 Write-Output "Evidence: $scratch"
 if ($failures -gt 0) { exit 1 }
