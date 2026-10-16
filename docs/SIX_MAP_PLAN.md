@@ -888,6 +888,8 @@ Codex aynı ağaçta çalışıyorsa her adımdan önce `git status` bakılır, 
 
 **Yerel güncelleme — 2026-10-16:** adım 4'ün Summer geliştirme ara yolu S01.04'te **geçti**: kurulu editör `-server` komutu ve sabit shader-log seçeneğiyle tek korumalı koşu, port 17342, join/welcome 1/1, hata 0/0, exit 0. Shader başlatma begin/end kayıtları 5,939 sn arayla gözlendi; önceki başarısızlığın nedeni bulunmuş sayılmaz. Özgün 95 sn sınırı, süreç gözlemi ve kayıt koruması doğrulandı; bağımsız QA kanıtı kabul etti ([S01.04](tasks/S01_04_SHADER_STARTUP_LOG_2026-10-15.md)). Winter'ın editör-server modu, canlı `NM_DedicatedServer`, paketli `MyProjectServer`/kaynak motor, kapasite ve PIE hâlâ açık; geliştirme bağlantı kanıtı bu kapıların yerine geçmez.
 
+**S01.05 güncellemesi — 2026-10-16:** Winter geliştirme editör-server bağlantısı da tek korumalı koşuda **geçti**; tanı bayrağı kapalı, port 17288, join/welcome 1/1, hata 0/0, exit 0. Sunucu/istemci gözlemi 30,234/45,238 sn; 95 sn gözlem saati ve sınırlı cleanup korundu (wrapper toplam duvar süresi 99,527 sn). Mevcut 104 Saved kaydı ve 141 derleme girdisi/DLL korundu; rebuild yapılmadı. Koordinatör kanıtı doğruladı, bağımsız QA aynı ham kanıtı kabul etti ([S01.05](tasks/S01_05_WINTER_EDITOR_SERVER_2026-10-16.md)). Bu iki ayrı koşu, eşzamanlı iki harita veya canlı `NM_DedicatedServer`/paketli Server/kapasite/PIE kabulü değildir. Kaynak motor yolu henüz teyit edilmedi; kayıtlı UE 5.7.1 motorunda `InstalledBuild.txt` vardır. Güncel kanıt ve sonraki kapı [sprint panosundadır](SIX_MAP_SPRINT_BOARD.md).
+
 ---
 
 ## 12. Steam yayını (revizyon 2, 2026-10-13)
