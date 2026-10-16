@@ -617,12 +617,12 @@ A4 icin A1 + A2 + A5 + A3 sart.
 - **Kapsam:** yeni `World/MMOZoneLayout.{h,cpp}` (`MakeZone`/`MakePocket`/`MakeNpc`; bölge satırında `ZoneId`, `MapName`, `Race`, `MinLevel`, `bPvPZone`, `ServerPort` alanları
   şimdiden), `SpawnMobArea` tek çağrıya iner. Yalnız Summer ve Winter satırları. `ValidateData.py`/`PocketSpacing.py` yeni kalıbı okur; negatif testleri güncellenir.
 - **Yerel ajan:** C++ taşıma, derleme, Smoke iki harita, eşdeğerlik diff'i, Python betikleri. **Kullanıcı:** PIE.
-- **Bağımlılık:** Aşama 0 (A1 ile sıra yalnız tek-derleyici kuralından).
+- **Bağımlılık:** Aşama 0 kaynak/derleme tabanı (A1 ile sıra yalnız tek-derleyici kuralından). 2026-10-16 kullanıcı akış düzeltmesiyle S00 PIE, izole uygulama/derleme/test başlangıcını engellemez; davranış eşdeğerliğinin nihai kabulü için açık kalır. Teknik/karar bağımlılıkları ve gerçek Server için kaynak motor önkoşulu korunur.
 - **Kabul:** headless: `[MMOLAYOUT]` Summer **18**, Winter **17** satır. Koordinat, bant ve MaxMobs refaktör öncesiyle bire bir. NPC 5/4. `RunAllChecks` yeşil.
   PIE: Aşama 0 listesinin 1-5. maddeleri aynen geçer.
 - **Süre:** 1 hafta [Tahmin].
 
-**S02.00 bağımsız hazırlık — 2026-10-16:** [Mevcut yerleşim tabanı](tasks/S02_00_LAYOUT_BASELINE_2026-10-16.md), izole `4e0f0c5` kaynağından 35 cep (Summer 18, Winter 17) ve 9 NPC'nin (5/4) bütün ayarlarını belgeler; NPC/AI uzmanı hazırladı, bağımsız QA her satırı kabul etti. Koordinatlar tek biçimli değildir: Summer'ın ilk 10 cebi PlayerStart'a göreli, kalan 8 Summer ve 17 Winter cebi mutlak konumdadır; varsayılan/nav ve deferred-spawn farkları da korunacaktır. Bu yalnız statik hazırlıktır; C++/araç taşıması, build, smoke veya PIE yapılmadı. Aşama 1 uygulaması S00 PIE kabulünü bekler; kaynak motor S01'in ayrı önkoşuludur.
+**S02.00 bağımsız hazırlık — 2026-10-16:** [Mevcut yerleşim tabanı](tasks/S02_00_LAYOUT_BASELINE_2026-10-16.md), izole `4e0f0c5` kaynağından 35 cep (Summer 18, Winter 17) ve 9 NPC'nin (5/4) bütün ayarlarını belgeler; NPC/AI uzmanı hazırladı, bağımsız QA her satırı kabul etti. Koordinatlar tek biçimli değildir: Summer'ın ilk 10 cebi PlayerStart'a göreli, kalan 8 Summer ve 17 Winter cebi mutlak konumdadır; varsayılan/nav ve deferred-spawn farkları da korunacaktır. Bu not statik hazırlık kanıtıdır; C++/araç taşıması, build, smoke veya PIE sonucu değildir. Önceki genel PIE uygulama blokajı kaldırıldı: **S02.01 uygulaması** ayrı `six-map-layout` adayında gerçek UE/NPC uzmanına atandı; bağımsız QA ve yeni adayın build/test kanıtı gerekir. `six-map-sprint0` PIE adayı korunur; kaynak motor S01'in ayrı önkoşuludur. [Güncel yürütme ve dosya sahipliği](SIX_MAP_SPRINT_BOARD.md) bağlayıcıdır; S00/S02 PIE kabulü açık kalır.
 
 #### Aşama 2. Irk: veri modeli + seçim (iki mevcut haritada)
 - **Amaç:** her karakterin değişmez bir ırkı olsun, kalıcı ve replike. Henüz harita veya kural etkisi yok.
