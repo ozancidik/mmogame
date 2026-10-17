@@ -308,3 +308,26 @@ Kaynak: bulut PR #3 (`9855256`) yerelde denetlendi, duzeltmeler `1f4a557`'de. Du
 - **KESİNLEŞTİ:** H2 İnsan krallığı ve H3 Ork krallığı, doğru ırk için **Lv25+**; girişte veya kalışta üst seviye sınırı yok. Lv59/Lv80'de zorunlu çıkış yok; H4/H5'in Lv59+ açılması krallığa erişimi kaldırmaz. Gelecekte genel seviye tavanı yükselse de H2/H3 uygunluk kuralı değişmez.
 - **Kapsam:** yalnız harita uygunluk kararı; mevcut içerik bantları, mob seviyeleri, genel seviye tavanı ve H4/H5 Lv59+ eşiği değişmedi. `SIX_MAP_PLAN.md` gereksinim tablosu, §2.6, §5 ve Aşama 3/6 kabulü güncellendi; kod uygulanmadı, oyun testi yapılmadı.
 - **Kabul:** iki krallıkta doğru ırk için Lv24 ret, Lv25/59/80 kabul; mevcut genel tavanı değiştirmeyen gelecekteki Lv>80 uygunluk fikstürü de kabul. Yanlış ırk tüm bu seviyelerde ret; seviye artışı oyuncuyu krallıktan çıkarmaz, H4/H5 açıldıktan sonra kalış/yeniden giriş korunur.
+
+## Yeni karar adaylari (2026-10-17: Ekipman birlestirme A1-A4)
+
+Kaynak: `docs/DESIGN_FUSION.md` §10, §11. D1 kurallari master'da (`d7bb1b1`..`d7c75ed`, `TestFusion.ps1` 180 kontrol, izole worktree'de
+GECTI); hicbir komut/RPC/HUD bunu cagirmiyor, **PIE'da denenmedi**. Kod asagidaki onerilerle yazildi; karar degisirse yalniz
+`MMOFusion.cpp`/`.h` sabitleri ve test degisir. Ucret sayilari `[PLACEHOLDER]`, D0 ekonomi modeli (`EconomyModel.py` bolum d) yapilmadi.
+
+| # | Soru | Oneri | Kodda bugun [Kesin] | Etiket |
+|---|---|---|---|---|
+| A1 | Efsanevi birlestirmeyle uretilebilsin mi? | **Hayir**, yalniz ganimet | `MaxOutputRarity = Epic` (`MMOFusion.h:51`); 3 Destansi/Efsanevi -> `RarityCapped` | [Muhtemel] |
+| A2 | Artili (+N) esya birlestirilebilsin mi? | **Hayir** (ilk dilim): +N'ye harcanan altin kaybolmasin, +N aklanmasin | `Plus != 0` -> `PlusNotZero` (`MMOFusion.cpp:153-161`) | [Muhtemel] |
+| A3 | Ucret neye bagli? | **Satici alis fiyati** x nadirlik carpani (tek formul; `GetBuyPrice` seviyeyle buyur) | `FusionFeeMult = {0.5, 1.0, 2.0}` (`MMOFusion.cpp:19`); Lv1 Kisa Kilic 86/171/342, Lv25 Obsidyen 794/1.587/3.174 | [Tahmin], carpanlar D0 + `ev=fusion` olcumu ister |
+| A4 | Satici yerine ayri "Demirci" NPC'si? | **Sonra**; NPC yerlesimi S02 dosyalarinda (`MMOZoneLayout`, `MMOGameMode.cpp`) | Herhangi bir saticiya 800 u yakinlik (`IsOwnerNearVendor`) | [Muhtemel] |
+
+Ek acik nokta (kucuk, tasarim): `FindFromSlot` takastaki esdegerleri atlamiyor (en kucuk kimlikli kopya takastaysa ucuncu serbest kopya
+olsa bile `TradeLocked`); oneri: atla. Gereken olcum (A3): `[MMOMETRIC] ev=fusion` sayisi ve `ev=gold src=birlestirme` toplami / bant saatlik gelir.
+
+## Not (2026-10-17): proje ajanlari modeli
+
+`f9b71c2`: `.claude/agents/` altindaki 9 Turkce proje ajaninin (`oyun-tasarimcisi`, `mmo-developer`, `test-muhendisi`, `qa-kontrolcu`,
+`ag-guvenlik-denetcisi`, `belge-denetcisi`, `ekonomi-tasarimcisi`, `seviye-tasarimcisi`, `metin-yazari`) `model:` alani `opus` -> `sonnet`
+(limit tuketimini azaltmak icin). Diger 12 Ingilizce ajan (`backend`, `devops`, `ue5-developer` ...) `model: inherit` kaldi. Karar gerekmez;
+geri almak tek satirlik degisiklik. Bilinen etkisi olculmedi (kalite/hiz karsilastirmasi yok).

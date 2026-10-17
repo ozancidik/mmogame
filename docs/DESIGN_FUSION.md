@@ -1,7 +1,14 @@
 # Ekipman birleştirme (nadirlik füzyonu) — tasarım
 
-**Tarih:** 2026-10-17 · **Taban:** `29a44b1` (master) · **Durum:** TASARIM, kod yok, derleme yok.
+**Tarih:** 2026-10-17 · **Taban:** `29a44b1` (master) · ~~Durum: TASARIM, kod yok, derleme yok.~~ (ilk yazım, `26deb59`)
 **Yazan:** `oyun-tasarimcisi`. Sayıların hepsi `[PLACEHOLDER]`; `ekonomi-tasarimcisi` modeli (Dilim D0) bitmeden kesinleşmez.
+
+> **Güncel durum (2026-10-17, `f9b71c2` üzerinde, belge denetçisi):** **D1 TAMAM (180 kontrol)**, master'da: `d7bb1b1` (kurallar + 129 kontrol),
+> `df4c3c6` (135), `1a8ec3f` (QA/güvenlik düzeltmeleri, 162), `d7c75ed` (180). Kanıt: `%TEMP%\mmo_fusion_fusion_1aba1ee2….log` (2026-10-17 10:44)
+> `[MMO_FUSION_TEST] PASS checks=180`, 180 `CASE PASS`, 0 `FAIL`; koşu **izole worktree** `C:\Users\OZAN CIDIK\.claude\worktrees\fusion-d1`'de
+> (ana kopya, sahibi belirsiz izlenmeyen `MMOZoneLayout*`/`MMORace*` dosyaları yüzünden derlenmiyor; `d7bb1b1` mesajı: `MMOZoneLayout.h` UHT hatası).
+> **Oyun içi yüzeyi yok:** hiçbir komut, RPC veya HUD `FMMOFusion`'u çağırmıyor; `TestFusion.ps1` `RunSystemTests.ps1`/`RunAllChecks.ps1` adımı değil (D2).
+> **PIE'de denenmedi.** D0 (ekonomi modeli) yapılmadı: `FeeMult` ve `MaxOutputRarity` hâlâ PLACEHOLDER. Açık/ertelenen maddeler §11.
 
 ## 1. Oyuncu deneyimi ve neden şimdi
 
@@ -64,9 +71,9 @@ Malzeme/tarif sistemi, şanslı birleştirme, +N taşıma, Efsanevi üretimi, to
 
 - `UMMOInventoryComponent`: tek veri sahibi. Birleştirme yeni alan eklemez; `EquipmentBag`, `Gold`, `NextInstanceId`, `AddEquipmentInstanceInternal(.., bNotify=false)`, `ApplyGoldInternal(.., bNotify=false)`, `IsOwnerNearVendor`, `FindBagIndexByInstanceId` kullanılır.
 - `FMMOItemDatabase`: yalnız okunur (`Find`, `GetBuyPrice`, `GetRarityName`). **`MMOItemDatabase.cpp`'ye dokunulmaz** (`lv31-40-content` dalı orada).
-- Takas: teklif edilen eşya birleştirilirse takas yürütmede eşyanın hâlâ çantada olduğunu yeniden doğrular (`MMOTradeComponent.cpp:38-58`) ve başarısız olur; ikileme yok. Birleştirme takası ayrıca kilitlemez (ilk dilimde).
+- Takas: teklif edilen eşya birleştirilirse takas yürütmede eşyanın hâlâ çantada olduğunu yeniden doğrular (`MMOTradeComponent.cpp:38-58`) ve başarısız olur; ikileme yok. ~~Birleştirme takası ayrıca kilitlemez (ilk dilimde).~~ **Güncel (`1a8ec3f`):** aktif takas teklifindeki girdi `TradeLocked` ile reddedilir (`MMOFusion.cpp:22-31` `FusionIsInTradeOffer`, yalnız `UMMOTradeComponent` public alanları okunur; Trade dosyaları değişmedi).
 - Satıcı sat/al, yükseltme: aynı satıcı yakınlık kuralı; birbirini etkilemez.
-- Sohbet komutları `AMMOPlayerController::ServerSay` içinde sunucuda ayrıştırılır (`MMOPlayerController.cpp:1380-1700`, 0.7 sn throttle, `SeenCommandPawn` kontrolü). D2 bu kalıba bir dal ekler.
+- Sohbet komutları `AMMOPlayerController::ServerSendChat_Implementation` içinde sunucuda ayrıştırılır (`f9b71c2`'de `MMOPlayerController.cpp:1372`; 200 karakter sınırı + 0.7 sn throttle `:1384-1390` (her denemeyi sayar), kontrol/biçim karakteri temizliği `:1392-1403`, `/yardim` `:1409`, `/posta` `:1647`; `SeenCommandPawn` kontrolü). D2 bu kalıba bir dal ekler (§11.1). (İlk yazımdaki "`ServerSay`, `:1380-1700`" adı yanlıştı.)
 
 ## 4. Dosya haritası
 
@@ -83,9 +90,9 @@ Malzeme/tarif sistemi, şanslı birleştirme, +N taşıma, Efsanevi üretimi, to
 
 | Dosya | Tam değişiklik | Dilim | Durum |
 |---|---|---|---|
-| `Source/MyProject/Public/Components/MMOInventoryComponent.h` | Satır 214'ün (`friend class UMMOTradeComponent;`) altına **tek satır**: `friend struct FMMOFusion; // Silent fusion settlement before any observer.` | D1 | Temiz, hiçbir dalda değişmiyor |
-| `Source/MyProject/Private/Player/MMOPlayerController.cpp` | `/posta` dalından (satır ~1647) önce `/birlestir` dalı (~12 satır) + satır 1411 `/yardim` metnine `/birlestir (canta no)` | D2 | **Kirli: bekle** (§9) |
-| `Scripts/RunSystemTests.ps1` | Diziye `@{ Name = 'Birlestirme (TestFusion)'; Script = 'TestFusion.ps1' }` | D2 | **Kirli: bekle** |
+| `Source/MyProject/Public/Components/MMOInventoryComponent.h` | Satır 214'ün (`friend class UMMOTradeComponent;`) altına **tek satır**: `friend struct FMMOFusion; // Silent fusion settlement before any observer.` | D1 | **Yapıldı** (`d7bb1b1`, satır 215) |
+| `Source/MyProject/Private/Player/MMOPlayerController.cpp` | `/posta` dalından (satır ~1647) önce `/birlestir` dalı + `/yardim` metnine (`:1411`, `ClientReceiveChat` satırı) `/birlestir (canta no)`; gereksinimler §11.1 | D2 | **Kirli (2026-10-17: +4 satır, sahibi başkası): bekle** (§9) |
+| `Scripts/RunSystemTests.ps1` | Diziye `@{ Name = 'Birlestirme (TestFusion)'; Script = 'TestFusion.ps1' }` | D2 | **Kirli (2026-10-17: başkası `TestRace.ps1` satırı ekledi): bekle** |
 | `Scripts/RunAllChecks.ps1`, `docs/PLAYTEST_CHECKLIST.md` | Yalnız ekleme | D2 | Sıcak, son adımda |
 | `Scripts/EconomyModel.py` | Yeni bölüm (d) Birleştirme | D0 | Temiz |
 | `Source/MyProject/Public/Components/MMOInventoryComponent.h` + yeni `.cpp` | `UFUNCTION(Server, Reliable) void ServerFuseEquipment(int32 A, int32 B, int32 C);` + `double LastFusionServerTime`. `_Implementation` `MMOFusion.cpp`'de tanımlanır (StaticLint "hiçbir cpp'de" diye arar, `StaticLint.py:315`) | D4 | HUD sahipleri bitince |
@@ -94,6 +101,12 @@ Malzeme/tarif sistemi, şanslı birleştirme, +N taşıma, Efsanevi üretimi, to
 **Dokunulmayanlar:** `MMOSaveGame.h`, `MMOCharacterSaveJson.*`, `MMOCharacter.*`, `MMOGameMode.cpp`, `MMOItemDatabase.cpp`, `MMOTradeComponent.*`, `MMOPartyComponent.*`, `MMOInventoryComponent.cpp`, `Config/`, `Content/`.
 
 ### 4.3 API taslağı (D1, ASCII)
+
+> **Güncel (`1a8ec3f`):** gerçek API `Public/Items/MMOFusion.h`'dedir ve taslaktan şu kadar farklıdır: enum'un sonuna `NotPlayer`, `Locked`,
+> `TradeLocked` eklendi (mevcut değerler kaymaz); `Check` ve `FindFromSlot` önce ortak `private static GateResult` kapısından geçer
+> (yetki → oyuncu kontrollü `AMMOCharacter` → `IsInitialLoadComplete` / `!IsTravelSaveCommitted` → satıcı yakınlığı, eşya kontrollerinden önce);
+> `FindFromSlot`'ta seçilen slotun eşyası **her zaman ilk girdi**, kalan ikisi en küçük `InstanceId`'li eşdeğerler (aşağıdaki taslak yorumu
+> "en küçük id'ler önce" eskidi; açık semantik soruları §11.4).
 
 ```cpp
 // Public/Items/MMOFusion.h
@@ -137,7 +150,7 @@ struct MYPROJECT_API FMMOFusion
 
 - **Kim değiştirir:** yalnız sunucu (`Execute` ilk satırda `Inv.GetOwner()->HasAuthority()` + `!IsBeingDestroyed()`; değilse `NotAuthority`, mutasyon yok). İstemci yalnız `InstanceId` üçlüsü ya da çanta numarası yollar; ücret, nadirlik ve çıktı **her zaman sunucuda yeniden hesaplanır**, istemciden gelen hiçbir sayı kullanılmaz.
 - **Replikasyon:** yeni replike alan yok. `EquipmentBag` (`ReplicatedUsing=OnRep_Items`) ve `Gold` (`OnRep_Gold`) mevcut; HUD envanteri kendiliğinden yenilenir.
-- **RPC:** D1'de yok. D2 sohbet komutu zaten sunucuda çalışan `ServerSay`'den gelir (yeni RPC gerekmez). D4'te `ServerFuseEquipment(A,B,C)` (Reliable) + 0.5 sn `[PLACEHOLDER]` bekleme, yükseltmedeki `LastUpgradeServerTime` deseni (`MMOInventoryComponent.h:259`).
+- **RPC:** D1'de yok. D2 sohbet komutu zaten sunucuda çalışan `ServerSendChat_Implementation`'dan gelir (yeni RPC gerekmez). D4'te (ayrıntı §11.2) `ServerFuseEquipment(A,B,C)` (Reliable) + 0.5 sn `[PLACEHOLDER]` bekleme, yükseltmedeki `LastUpgradeServerTime` deseni (`MMOInventoryComponent.h:259`).
 - **Bayat görünüm (NETWORK_AUDIT Y4):** D2 iki adımlıdır: `/birlestir 4` yalnız önizleme yazar ("Kisa Kilic Siradan x3 -> Nadir, ucret 86. Onay: /birlestir onay 17 22 31"), mutasyon `/birlestir onay <id> <id> <id>` ile olur. Onay açık `InstanceId` taşır; arada çanta değişirse `Check` reddeder. Sunucuda bekleyen durum tutulmaz.
 - **Kimlik:** işlem yalnız komutu veren pawn'ın kendi envanterinde. Oyuncu adı/slot ile hiçbir şey açılmaz; `MMONameRules` bu sistemi etkilemez. Bilinen K-1 açığı (isim = kimlik) satıştaki gibi aynen geçerli, yeni yüzey açılmaz. Metrikte `who` = `MMOMetrics::WhoName`.
 - **Kalıcılık:** **yeni dosya, yeni alan, yan JSON yok.** Sonuç normal karakter kaydına (`FillSaveData`) girer; `Rarity` zaten `SaveGame` alanı ve JSON'da doğrulanıyor (`MMOCharacterSaveJson.cpp:153-154`). Çökme penceresi: son kayıttan önceki duruma dönülür (üç girdi + altın geri, çıktı yok): tutarlı, ikileme yok (tek kare, tek anlık görüntü). Başarım/günlüğün "önce kaydet sonra ödül" kuralı burada gereksiz: yeni değer yaratılmıyor, yalnız mevcut değer dönüştürülüyor. S04 DB'ye geçişte şema etkisi sıfır.
@@ -167,10 +180,11 @@ struct MYPROJECT_API FMMOFusion
 | Dilim | İş | Bitti = |
 |---|---|---|
 | **D0** | `ekonomi-tasarimcisi`: `EconomyModel.py` (d) bölümü, `FeeMult` önerisi | `python Scripts/EconomyModel.py` çıktısında bölüm (d) tablosu; CI yeşil |
-| **D1** | `MMOFusion.h/.cpp`, `friend` satırı, `MMOFusionSelfTest.cpp`, `TestFusion.ps1` | Build 0 hata; `StaticLint.py` + `ValidateData.py` 0 hata; `TestFusion.ps1` `PASS checks=N` (N tam, CASE satırı = benzersiz etiket = N); mutasyonların hepsi yakalanır (§7.3) |
-| **D2** | `/birlestir` sohbet dalı, `/yardim`, `RunSystemTests.ps1` + `RunAllChecks.ps1` adımı, `PLAYTEST_CHECKLIST.md` maddeleri, `PlaytestMetrics.py` `ev=fusion` | D1 testleri + yeni sohbet vakaları geçer; `NetSmokeTest.ps1` hata 0; `qa-kontrolcu` + `ag-guvenlik-denetcisi` engelleyici bulgu yok |
-| **D3** | PIE (kullanıcı) | §7.4 listesi GEÇTİ |
-| **D4** | HUD düğmesi + `ServerFuseEquipment` RPC (HUD sahipleri bitince) | RPC vakaları (bekleme, bayat id, uzak istemci) + NetSmoke |
+| **D1** — **TAMAM** (`d7bb1b1`, `df4c3c6`, `1a8ec3f`, `d7c75ed`) | `MMOFusion.h/.cpp`, `friend` satırı, `MMOFusionSelfTest.cpp`, `TestFusion.ps1` | Build 0 hata; `StaticLint.py` + `ValidateData.py` 0 hata; `TestFusion.ps1` `PASS checks=N` (N tam, CASE satırı = benzersiz etiket = N); mutasyonların hepsi yakalanır (§7.3). **Sonuç:** `PASS checks=180` (izole worktree; ana kopyada derleme kırık, §9); mutasyonlar §7.3 |
+| **D2** — bekliyor (kirli dosyalar) | `/birlestir` sohbet dalı, `/yardim`, `RunSystemTests.ps1` + `RunAllChecks.ps1` adımı, `PLAYTEST_CHECKLIST.md` maddeleri, `PlaytestMetrics.py` `ev=fusion` | D1 testleri + yeni sohbet vakaları geçer; `NetSmokeTest.ps1` hata 0; `qa-kontrolcu` + `ag-guvenlik-denetcisi` engelleyici bulgu yok; güvenlik gereksinimleri §11.1 |
+| **D3** — bekliyor (D2'ye bağlı) | PIE (kullanıcı) | §7.4 listesi GEÇTİ (`PLAYTEST_CHECKLIST.md` "Ekipman birleştirme" bölümü) |
+| **D4** — bekliyor (HUD sahipleri) | HUD düğmesi + `ServerFuseEquipment` RPC (HUD sahipleri bitince) | RPC vakaları (bekleme, bayat id, uzak istemci, takastaki eşya, seyahat penceresi) + NetSmoke; gereksinimler §11.2 |
+| **D0** — yapılmadı | (yukarıda) | `FeeMult` hâlâ PLACEHOLDER |
 
 ### 7.2 Native self-test (`MMOTestFusion`, D1)
 
@@ -191,12 +205,22 @@ Koşul: `-game -NullRHI -unattended` tek kullanımlık otorite dünyası (yükse
 
 Kesin kontrol sayısı test yazılınca sabitlenir; koşucu eşiği o sayıya eşit olur (`TestAchievements.ps1` deseni: özet = CASE sayısı = benzersiz etiket sayısı, 90 sn watchdog, `Error:`/`Ensure` satırı 0).
 
+**Güncel (`d7c75ed`): eşik 180** (`Scripts/TestFusion.ps1:46-48`): 5 `NextRarity` + 9 `FeeFor` + 3×16 başarı (C→U, U→R, R→E) + 10 `FindFromSlot`
++ 20×4 ret + 2 mob sahibi + 4×2 sınır + 18 geri çağırım (aynı üçlüyle `OnInventoryChanged` içinden ikinci `Execute` → `NotInBag`, tek ücret;
+başka üçlüyle → iki çıktı, iki ücret; gözlemci `OnGoldChanged`'de altın harcar; gözlemci sahibi yok eder → çökme yok). Test yalnız `NM_Standalone`'da
+koşar (dedicated/listen ret), pawn gerçek `AMMOPlayerController`'a possess edilir. Kayıt gidiş-dönüşü planlandığı gibi diske değil bellek içi
+(`FillSaveData` → Restore pawn `ApplySaveData`, `MMOFusionSelfTest.cpp:248-249`); gerçek disk kaydı/yeniden giriş ve sohbet/RPC yolu test edilmedi (D2/D4 yok).
+
 ### 7.3 Mutasyonla sınanacak korumalar (`test-muhendisi`)
 
 Her biri tek başına geri alınınca `TestFusion.ps1` **FAIL** vermeli (geri yükledikten sonra dosyaya touch, CLAUDE.md notu):
 1. `Gold >= Fee` kontrolü silinir. 2. Aynı nadirlik kontrolü silinir. 3. Tavan kontrolü silinir (`MaxOutputRarity`). 4. Farklı id kontrolü silinir (A==B). 5. `IsOwnerNearVendor` çağrısı silinir. 6. Ücret 0'a sabitlenir. 7. Delegeler mutasyondan önce yayınlanır. 8. `Plus == 0` kontrolü silinir. 9. Çıktıya girdi `InstanceId`'si verilir (yeni id yerine).
 
-### 7.4 Oyun içi (PIE) ilk test listesi (D2 sonrası, `PLAYTEST_CHECKLIST.md`'ye eklenecek)
+**Sonuç (worktree `fusion-d1`, her mutasyon ayrı derleme + `TestFusion.ps1`, kaynak bayt bayt geri alındı; loglar `%TEMP%\mmo_fusion_mut_*`, `mmo_fusion_m01…m15_*`):**
+- `df4c3c6` turu: yukarıdaki 9 + 13 ek mutasyon = **22/22 yakalandı** (ilk turda kaçan `IsOwnerNearVendor(1500)` / `(400)` eşik mutasyonları için 850 u ret, 750 u başarı vakası eklendi).
+- `d7c75ed` turu (`1a8ec3f` korumaları, `m01-m15`): **13 yakalandı** (11'i `FAIL checks=180`, `m06`/`m07` dizi sınırı assert'iyle çöktü = koşucu FAIL), **2 beklendiği gibi yakalanmadı** (`m12`, `m13` `PASS checks=180`): ulaşılamaz ücret iade dalı ve dedicated koruması (test yalnız Standalone koşar). Hangi `mNN`'in hangi koruma olduğu commit mesajından okundu; dosya adında yazmıyor.
+
+### 7.4 Oyun içi (PIE) ilk test listesi (D2 sonrası; 2026-10-17'de `PLAYTEST_CHECKLIST.md` "Ekipman birleştirme" bölümüne eklendi, D2 gelene kadar denenemez)
 
 1. Satıcı yanında 3 Sıradan aynı eşya: `/birlestir <no>` önizleme doğru ücreti yazar, altın değişmez.
 2. `/birlestir onay ...` sonrası çantada 1 Nadir (yeşil isim), altın tam ücret kadar düştü, HUD anında yenilendi.
@@ -225,6 +249,7 @@ Her biri tek başına geri alınınca `TestFusion.ps1` **FAIL** vermeli (geri y�
 - **Derleme:** "tek derleyici" kuralı. Codex S03/S04 aday dalda derliyorsa ortak kilit (`agent-build.lock`) ve UE/UBT süreç kontrolü; editör kapalı. Main'deki kirli Race/HUD dosyaları da derlemeye girer: başkasının kodu derlenmezse ajan **dokunmaz**, raporlar ve bekler (derleme hatası kendi dosyalarında değilse D1 "bitti" sayılmaz ama kod commit edilebilir, durum açık yazılır).
 - **D2/D4:** `MMOPlayerController.cpp`, `RunSystemTests.ps1`, `MMOHUD.*` temizlenene (sahibi commit edene) kadar bekler. Beklerken D0 ve D1 ilerler; bekleme döngüsü yok, durum tabloya yazılır.
 - **Commit:** dosyalar adla (`git -C ... add <yol>`), `git add -A` yok, push yok (post-commit hook).
+- **Durum (2026-10-17, `f9b71c2`):** D1 bu plana göre izole worktree'de derlendi/test edildi ve commit'lendi. Ana kopya hâlâ derlenmiyor: izlenmeyen `Public/World/MMOZoneLayout.h` + `Private/World/MMOZoneLayout.cpp` (`StaticLint.py` ana kopyada 7 HATA, hepsi bu iki dosyada: `ServerChangeZone` RPC'si `bool` dönüyor (UHT hatası), `Replicated` olmayan `bIsActive`/`ZonePlayerCounts` `DOREPLIFETIME`'da, eksik `GameplayStatics.h`); worktree'de (master'la aynı fusion dosyaları, Zone dosyaları yok) `StaticLint.py` temiz, 134 dosya. Derleme hatasını belge denetçisi kendisi derleyerek görmedi; `d7bb1b1` mesajına ve StaticLint'e dayanır. Bu dosyaların sahibi belli değil: Codex'in sprint tahtası da main'deki `MMOZoneLayout` çiftine "sahipsiz, farklı bir taslak" diyor (`SIX_MAP_SPRINT_BOARD.md:49`, `:153`). `MMOPlayerController.cpp`, `RunSystemTests.ps1`, `MMOHUD.*` hâlâ kirli → D2/D4 bekliyor.
 
 ## 10. Açık sorular (kullanıcı kararı)
 
@@ -234,3 +259,37 @@ Her biri tek başına geri alınınca `TestFusion.ps1` **FAIL** vermeli (geri y�
 | A2 | Artılı (+N) eşya birleştirilebilsin mi? (örn. üçü aynı +N ise çıktı +N) | İlk dilimde hayır |
 | A3 | Ücret satıcı alış fiyatına mı bağlı, yoksa seviyeye bağlı ayrı tablo mu? | Alış fiyatı (tek formül, `GetBuyPrice` zaten seviyeyle büyür) |
 | A4 | Satıcı yerine ayrı bir "Demirci" NPC'si? | Sonra; NPC yerleşimi S02'nin dosyalarında |
+
+**Durum (2026-10-17):** dördü de **açık**; D1 kodu önerilen varsayılanlarla yazıldı (A1: `MaxOutputRarity = Epic`, A2: `PlusNotZero`, A3: `GetBuyPrice × FeeMult`, A4: satıcı yakınlığı). Karar bloğu `DECISIONS_NEEDED.md` "Ekipman birleştirme A1-A4".
+
+## 11. D1 sonrası gereksinimler ve açık maddeler (QA + güvenlik denetimi, 2026-10-17)
+
+Kod yok; aşağıdakiler D2/D4 yazılırken uyulacak kurallar. Satır numaraları `f9b71c2`'deki commit'li dosyalardır (çalışma kopyası kirli olabilir).
+
+### 11.1 D2: `/birlestir` sohbet komutu
+
+- **Yer:** yeni dal `AMMOPlayerController::ServerSendChat_Implementation` içinde (`MMOPlayerController.cpp:1372`), uzunluk sınırı + 0.7 sn throttle (`:1384-1390`) ve kontrol/biçim karakteri temizliğinden (`:1392-1403`) **sonra**; yani dal bu ortak kapıların hiçbirini atlamaz. `/posta` dalından (`:1647`) önce; `/yardim` metnine (`:1411`) `/birlestir (canta no)`.
+- **Pawn:** mevcut `SeenCommandPawn == GetPawn()` deseni (`:1449`): `IsValid(SeenCommandPawn) && SeenCommandPawn == GetPawn()` değilse sessizce dön; envanter yalnız bu pawn'ınki. Oyuncu adı/slot ile başka envanter açılmaz.
+- **Katı sayı ayrıştırma:** her belirteç boş değil, **en fazla 10 hane** ve karakter karakter yalnız ASCII `0-9`; `FCString::Atoi("17abc")` gibi önek kabulü **yok**, işaret/boşluk/ondalık yok. Dikkat: motorun `FCString::IsNumeric`'i tek başına **yetmez**: baştaki `-`/`+` işaretini, tek bir `.`'yı ve boş dizgeyi kabul eder (`Engine/Source/Runtime/Core/Public/Misc/CString.h:139-166`); `-5` ve `1.5` bu yüzden ayrıca reddedilmeli. Biçim: tam **1** belirteç (çanta numarası) ya da `onay` + tam **3** belirteç (kimlik). Fazla/eksik belirteç ret. Çanta numarası `[1, 12]` (çanta boyutu) aralığında olmalı; aralık dışı (`0`, `13`, `-5`) **ret**, sessizce sınıra kırpılmaz (kırpma `13`'ü 12. slota çevirip oyuncunun seçmediği eşyayı önizlerdi; `PLAYTEST_CHECKLIST.md` maddesi de ret bekliyor). `FindFromSlot` ayrıca `EquipmentBag.Num()` ile sınar (`MMOFusion.cpp:200`). 10 haneyi aşan ya da `int32`'ye sığmayan kimlik ret (taşma yok).
+- **İki adımlı akış:** `/birlestir <no>` yalnız önizleme (`FindFromSlot`, mutasyon yok) ve açık kimlik üçlüsüyle onay satırı yazar; `/birlestir onay <id> <id> <id>` `FMMOFusion::Execute`'u çağırır. **Sunucuda bekleyen durum tutulmaz**; ücret ve nadirlik istemciden **gelmez** (komutta hiç yer almaz), `Execute` her şeyi yeniden hesaplar.
+- **Sabit hata mesajları:** oyuncuya yalnız `FMMOFusion::ResultText` ya da sabit bir kullanım satırı döner; kullanıcı girdisi mesaja yankılanmaz (biçim/bant istismarı yok).
+- **Debug komutu:** `UFUNCTION(Exec)` bir test komutu eklenirse uzak istemci onu `ServerExec` ile sunucuda çalıştırabilir (motor `PlayerController.cpp:1879-1883`, `ServerExecRPC_Implementation` Shipping dışı tüm yapılarda `ConsoleCommand`); bu yüzden böyle bir komut yalnız komutu verenin **kendi pawn'ında** `Execute` çağırmalı, başka oyuncu/aktör seçememeli; tercihen hiç eklenmemeli (`MMOTestFusion` `FSelfRegisteringExec`'tir, `#if !UE_BUILD_SHIPPING`).
+- **D2 ile gelecek diğerleri:** `RunSystemTests.ps1` + `RunAllChecks.ps1` adımı, `PlaytestMetrics.py` `ev=fusion` sayımı, `PLAYTEST_CHECKLIST.md` "Ekipman birleştirme" bölümü (maddeler orada hazır), sohbet ayrıştırma vakaları (`0`, `13`, `-5`, `17abc`, 11 hane, 2/4 kimlik, başkasının pawn'ı).
+
+### 11.2 D4: HUD düğmesi + RPC
+
+- `UFUNCTION(Server, Reliable) void ServerFuseEquipment(int32 A, int32 B, int32 C)` → doğrudan `FMMOFusion::Execute(*this, A, B, C)`. **Ücret/nadirlik/çıktı parametresi yok.**
+- **Bekleme:** `double LastFusionServerTime`, `GetWorld()->GetTimeSeconds()` (sunucu saati) ile, **`Check`'ten önce**; bekleme içindeki çağrı sessizce düşer (mesaj yok), `LastUpgradeServerTime` deseni (`MMOInventoryComponent.h:259-260`, `.cpp:831-835`, yükseltmede 0.3 sn). Süre `[PLACEHOLDER]` (§5'te 0.5 sn). Zaman damgasının yalnız başarılı denemede mi her denemede mi güncelleneceği açık (yükseltme yalnız kabul edilen denemede günceller `.cpp:844`; sohbet throttle'ı her denemede `:1390`); öneri: her denemede (ret mesajı yağmuru da sınırlanır).
+- **`_Validate`** (eklenirse) yalnız ucuz sınır kontrolü (`A, B, C > 0`); envanter okuması yok (ret = bağlantı kopar, ağır mantık oraya girmez).
+- **Bayat görünüm:** HUD önizlemede gösterdiği kimlik üçlüsünü yollar; sunucu `Execute` içinde `Check`'i yeniden koşar, arada çanta değiştiyse ret.
+- **Test vakaları:** uzak istemci (listen + istemci, `NetSmokeTest` deseni), bekleme içinde ikinci çağrı düşer, bayat kimlik (`NotInBag`), takastaki eşya (`TradeLocked`), seyahat/yükleme penceresi (`Locked`).
+
+### 11.3 Açık / ertelenen bulgular
+
+| # | Madde | Durum |
+|---|---|---|
+| F7 | Oyun (`Source/MyProject.Target.cs`) hedefinde `bUseLoggingInShipping` yok (yalnız `MyProjectServer.Target.cs:20`'de var): Shipping listen-server'da `LogMMOFusion` denetim satırı ve `[MMOMETRIC] ev=fusion` (ve diğer tüm `UE_LOG` metrikleri) kaybolur | Ertelendi; birleştirmeye özgü değil, Target değişikliği ayrı iş (Shipping listen-server senaryosu kararına bağlı) |
+| D-3 / F2 | Ulaşılamaz geri alma dalları: `AddEquipmentInstanceInternal` başarısızlığı (`MMOFusion.cpp:292-300`) ve kısmi ücret kesintisi (`:304-317`); `Check` çanta yerini (3 çıkar, 1 girer) ve `Gold >= Fee`'yi önceden doğruladığı için tetiklenemez, test edilemez (mutasyonu yakalanmadı, beklenen). İade `ApplyGoldInternal(-Applied, "birlestirme-iade")` ile metrik dengeli | Kabul; dal savunma amaçlı kalır |
+| — | **`FindFromSlot` semantiği:** (a) tıklanan slot her zaman ilk girdi; (b) kalan ikisi eşdeğerlerin en küçük kimlikleri, **takastaki eşdeğerler atlanmaz**: en küçük kimlikli kopya takastaysa üçüncü serbest kopya olsa bile sonuç `TradeLocked`; (c) seçilen eşya Destansı/Efsanevi ise eşdeğer yoksa `BadIds`, varsa `RarityCapped`. Takastakileri atlamak mı, bugünkü gibi reddetmek mi? | Açık (D2 önizleme metni buna göre); öneri: takastakileri atla |
+| A1-A4 | §10 | Açık, `DECISIONS_NEEDED.md` |
+| D0 | `FeeMult`, `MaxOutputRarity` PLACEHOLDER | Yapılmadı |

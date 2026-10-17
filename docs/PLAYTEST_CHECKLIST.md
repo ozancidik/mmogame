@@ -5627,3 +5627,31 @@ Ayrinti: [O69 gorev kaydi](tasks/MAIL_REFUND_ACCOUNTING_2026-10-11.md).
   dogrulanir. Neden: `ApplyGoldInternal` sahibi yok ediliyorsa altin degisikligini sessizce yok sayar (`MMOInventoryComponent.cpp:410`),
   takasin dort altin cagrisi donus degerine bakmaz (`MMOTradeComponent.cpp:880-883`); ayrinti `DECISIONS_NEEDED.md`.
   Sunucu logunda `event=trade_complete` satirindaki `balance_a`/`balance_b` degerlerini de not et.
+
+## Ekipman birlestirme (nadirlik fuzyonu) — D2 gelince (2026-10-17; D1 `d7bb1b1`..`d7c75ed`, PIE YOK)
+
+**Bugun oyun icinde denenemez:** D1 (`FMMOFusion` kurallari, `Scripts/TestFusion.ps1` 180 kontrol, izole worktree'de GECTI) hicbir
+komuta, RPC'ye ya da HUD dugmesine bagli degil; `/birlestir` sohbet komutu D2'de gelecek (`MMOPlayerController.cpp` ve
+`RunSystemTests.ps1` baskasinin kirli dosyalari oldugu icin bekliyor). Asagidaki maddeler D2 commit'lendikten sonra calistirilir.
+Tasarim ve guvenlik gereksinimleri: `docs/DESIGN_FUSION.md` §7.4, §11. Ucretler PLACEHOLDER (Kisa Kilic Siradan->Nadir 86 altin).
+
+- [ ] **1. Onizleme:** Satici yaninda cantada 3 Siradan ayni esya (or. Kisa Kilic): `/birlestir <canta no>` dogru ucreti ve bir
+  `/birlestir onay <id> <id> <id>` satiri yazar; altin ve canta **degismez**.
+- [ ] **2. Onay:** Yazilan `/birlestir onay ...` sonrasi cantada 1 Nadir (yesil isim), 3 girdi gitti, altin tam ucret kadar dustu,
+  HUD aninda yenilendi.
+- [ ] **3. Satici uzakta:** Saticidan uzaklas, onizle ve onayla: "Satici yakininda degilsin", hicbir sey degismez.
+- [ ] **4. Altin yetersiz:** Ucretten az altinla onay: "Altin yetersiz", canta ve altin ayni.
+- [ ] **5. Bayat onay:** Onizlemeden sonra girdilerden birini saticiya sat, eski onay satirini gonder: ret ("Esya cantada degil"), hicbir sey degismez.
+- [ ] **6. Kalicilik:** Oturumu kapat-ac: Nadir esya kayitta duruyor, girdiler geri gelmedi, altin dusuk kaldi.
+- [ ] **7. Uzak istemci:** Listen-server'da **uzak istemci** ile 1-2'yi tekrarla: mesajlar uzak istemciye sohbet satiri olarak geliyor, sonuc ayni.
+- [ ] **8. Takastaki esya:** Bir girdiyi takas teklifine koy, birlestirmeyi dene: "Takasa konan esya birlestirilemez" (`TradeLocked`);
+  takasi onayla: takas normal biter, esya ikilenmedi.
+- [ ] **9. Metrik:** Sunucu logunda her basarili birlestirme icin `[MMOMETRIC] ev=fusion` ve `ev=gold src=birlestirme` satirlari **tam bir kez**
+  (+ `LogMMOFusion` `event=item_fuse`).
+- [ ] **10. Gecersiz canta no:** `/birlestir 0`, `/birlestir 13`, `/birlestir -5` (ayrica `/birlestir 17abc`, `/birlestir 1.5`) **reddedilir**;
+  hicbiri bir slota kirpilip onizleme uretmez, altin/canta degismez.
+- [ ] **11. Tiklanan slot dahil:** Cantada 4+ ayni esya varken ortadaki birinin numarasiyla onizle: onay satirindaki 3 kimlikten **biri
+  secilen slotun esyasi** (ilk sirada), digerleri en kucuk kimlikler.
+- [ ] **12. Takasa konmus esyanin onayi:** Onizlemeden SONRA girdilerden birini takasa koy, eski onayi gonder: ret, birlestirme olmaz.
+- [ ] **13. Seyahat/yukleme penceresi:** Bolge gecisi (Summer<->Winter) baslatildiktan hemen sonra ve karakter yuklenirken onay gonder:
+  "Karakter yukleniyor ya da bolge degistiriyor..." (`Locked`), hicbir sey degismez; gecis sonrasi canta/altin tutarli.
