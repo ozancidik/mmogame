@@ -82,9 +82,14 @@ public:
 	/**
 	 * LogHttp'yi Warning'e sabitler: UE HTTP modulu Verbose/VeryVerbose'ta istek basliklarini (apikey/Authorization)
 	 * loga yazabilir. Surec geneli yan etki: LogHttp'nin Log seviyesindeki ozet satirlari baska HTTP kullanicilari icin de
-	 * kapanir. Create'te ve her istek denemesinde cagrilir (konsoldan yeniden acilsa bile bir sonraki istekte kapanir).
+	 * kapanir. NO_LOGGING derlemesinde (Shipping, bUseLoggingInShipping yok) hicbir sey yapmaz. Create'te ve her istek denemesinde cagrilir (konsoldan yeniden acilsa bile bir sonraki istekte kapanir).
 	 */
 	static void EnforceHttpLogLevel();
+	/**
+	 * Authorization: Bearer yalniz JWT bicimli (eski service_role) anahtarla gonderilir; sb_secret_... anahtarinda YALNIZ apikey
+	 * basligi vardir (Bearer ile 401 riski). Her ikisinde de anahtar loga/hataya ham girmez.
+	 */
+	static bool UsesBearerAuth(const FString& SecretKey);
 	/** Komut satirinda LogHttp icin Verbose/VeryVerbose istenmis mi (-LogCmds="LogHttp Verbose" vb.). */
 	static bool CommandLineRequestsVerboseHttp(const FString& CommandLine);
 
@@ -93,7 +98,7 @@ public:
 	void Cancel(uint64 CallId);
 	int32 NumInFlight() const { return Calls.Num(); }
 
-	/** Anahtar ve URL maskelenir: sb_secret_****(uzunluk), [supabase-url], [supabase-host]. */
+	/** Anahtar ve URL maskelenir: [supabase-key] (uzunluk bilgisi YOK), [supabase-url], [supabase-host]. */
 	FString Redact(const FString& Text) const;
 	/** Log icin maskeli ozet. */
 	FString DescribeMasked() const;

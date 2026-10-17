@@ -16,11 +16,10 @@ enum class EMMOSupabaseStoreOutcome : uint8
 	NotFound,           // otoriter yokluk (DB "yok" dedi)
 	AlreadyExists,
 	Invalid,            // ad kurali / veri dogrulamasi
-	RevisionConflict,   // eski revision: yeniden yukle
+	RevisionConflict,   // eski revision: yuva "yeniden yukleme gerekli" olur (LoadEx cozer); o zamana dek SaveEx istek GONDERMEDEN bunu doner
 	OwnershipLost,      // kira/epoch yitirildi (baska sunucu aldi / sure doldu)
 	IdempotencyConflict,
-	Forbidden,
-	NotLeased,          // bu yuva icin LoadEx ile kira alinmadi
+	NotLeased,         // bu yuva icin LoadEx ile kira alinmadi
 	Frozen,             // belirsiz sonuc yuzunden bagimli ilerleme donduruldu (ReconcileEx/LoadEx ile cozulur)
 	Unavailable,        // DB/ag/kimlik yok: islem UYGULANMADI (ya da okuma basarisiz)
 	Unknown,            // BELIRSIZ: yazim uygulanmis olabilir; yuva donar
@@ -40,9 +39,16 @@ public:
 
 	virtual ~IMMOAsyncCharacterStore() = default;
 
-	/** acquire_lease: kira al + veriyi yukle. NotFound = otoriter yokluk. */
+	/**
+	 * acquire_lease: kira al + veriyi yukle. NotFound = otoriter yokluk. DONMUS yuvada once eski epoch'la release_lease
+	 * (ownership_lost/not_found = kira zaten bitmis, devam), sonra acquire (epoch artar: zaman asimina ugramis gec yazim
+	 * eski epoch'la ownership_lost olur), sonra yukleme; basarili yuklemeyle yuva cozulur. Release'e ulasilamazsa Unavailable (yuva donuk kalir).
+	 */
 	virtual void LoadEx(const FString& SlotName, FLoadExComplete&& Completion) = 0;
-	/** create_character: yoksa olusturur (kira ALMAZ; ardindan LoadEx). */
+	/**
+	 * create_character: yoksa olusturur. Basarida (outcome == "committed") SQL olusturana epoch 1 + 120 sn kira verir:
+	 * yuva kiralanmis (epoch/revision) kaydedilir, SaveEx dogrudan calisir (yine de kira SURESI icin RenewLeaseEx gerekir).
+	 */
 	virtual void CreateEx(const FString& SlotName, const FMMOCharacterSaveData& Data, FStatusComplete&& Completion) = 0;
 	/** save_character: kira+epoch+expected_revision ile. Yuva basina tek ucustaki yazim; yenisi kuyruktakini birlestirir. */
 	virtual void SaveEx(const FString& SlotName, const FMMOCharacterSaveData& Data, FStatusComplete&& Completion) = 0;
@@ -57,6 +63,13 @@ public:
 	/** release_lease: cikista kirayi birakir. Ok/OwnershipLost/NotFound yuvayi NotLeased yapar; Unavailable'da kira korunur. */
 	virtual void ReleaseLeaseEx(const FString& SlotName, FStatusComplete&& Completion) = 0;
 	virtual bool IsSlotFrozen(const FString& SlotName) const = 0;
+	/**
+	 * healthcheck: api_version ve contract_version == FMMOSupabaseRestClient::ContractVersion (2) dogrulanir. Ok = uyumlu.
+	 * Invalid = surum uyusmazligi (yanlis sema/surum: yeniden denemek ise yaramaz), Unavailable = ulasilamadi/yanit sozlesmeye uymuyor.
+	 * Dilim 3 NOTU: depo acilisinda (sunucu baslangici, ilk LoadEx'ten ONCE) cagrilmali, Ok degilse depo kullanilmamali.
+	 * Simdi yalniz API + test; hicbir yerden cagrilmaz.
+	 */
+	virtual void HealthcheckEx(FStatusComplete&& Completion) = 0;
 };
 
 /**
@@ -86,6 +99,10 @@ public:
 	virtual void RenewLeaseEx(const FString& SlotName, FStatusComplete&& Completion) override;
 	virtual void ReleaseLeaseEx(const FString& SlotName, FStatusComplete&& Completion) override;
 	virtual bool IsSlotFrozen(const FString& SlotName) const override;
+	virtual void HealthcheckEx(FStatusComplete&& Completion) override;
+
+	/** revision_conflict sonrasi yuva "yeniden yukleme gerekli" mi (LoadEx basarisi temizler). */
+	bool IsReloadRequired(const FString& SlotName) const;
 
 	/** Yuva icin istemcinin bildigi kira/revision (testler ve tani). Kira yoksa false. */
 	bool TryGetSlotInfo(const FString& SlotName, int64& OutEpoch, int64& OutRevision) const;

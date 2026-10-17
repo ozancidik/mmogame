@@ -129,6 +129,8 @@ TSharedPtr<FMMOSupabaseRestClient> FMMOSupabaseRestClient::Create(const TSharedR
 
 void FMMOSupabaseRestClient::EnforceHttpLogLevel()
 {
+	// NO_LOGGING (Shipping, bUseLoggingInShipping yok): LogHttp seviyesi okunamaz/ayarlanamaz ve zaten hicbir satir yazilmaz.
+#if !NO_LOGGING
 	const ELogVerbosity::Type Current = LogHttp.GetVerbosity();
 	if (Current <= ELogVerbosity::Warning)
 	{
@@ -140,6 +142,23 @@ void FMMOSupabaseRestClient::EnforceHttpLogLevel()
 		UE_LOG(LogMMOSupabase, Warning, TEXT("LogHttp %s idi; istek basliklari (apikey) loga dusmesin diye Warning'e sabitlendi"),
 			ToString(Current));
 	}
+#endif
+}
+
+bool FMMOSupabaseRestClient::UsesBearerAuth(const FString& SecretKey)
+{
+	// Eski service_role anahtari JWT'dir (header.payload.signature, "eyJ" ile baslar). Yeni sb_secret_... anahtari JWT DEGILDIR:
+	// Authorization: Bearer ile gonderilirse gateway 401 verir; yalniz apikey basligi kullanilir.
+	if (!SecretKey.StartsWith(TEXT("eyJ"), ESearchCase::CaseSensitive))
+	{
+		return false;
+	}
+	int32 Dots = 0;
+	for (const TCHAR Ch : SecretKey)
+	{
+		Dots += Ch == TEXT('.') ? 1 : 0;
+	}
+	return Dots == 2;
 }
 
 bool FMMOSupabaseRestClient::CommandLineRequestsVerboseHttp(const FString& CommandLine)
@@ -178,7 +197,7 @@ FString FMMOSupabaseRestClient::Redact(const FString& Text) const
 	FString Out = Text;
 	if (!Config.SecretKey.IsEmpty())
 	{
-		Out.ReplaceInline(*Config.SecretKey, *FString::Printf(TEXT("sb_secret_****(%d)"), Config.SecretKey.Len()), ESearchCase::CaseSensitive);
+		Out.ReplaceInline(*Config.SecretKey, TEXT("[supabase-key]"), ESearchCase::CaseSensitive); // uzunluk bilgisi de verilmez
 	}
 	if (!Config.BaseUrl.IsEmpty())
 	{
@@ -196,8 +215,8 @@ FString FMMOSupabaseRestClient::Redact(const FString& Text) const
 
 FString FMMOSupabaseRestClient::DescribeMasked() const
 {
-	return FString::Printf(TEXT("url=[supabase-url] key=sb_secret_****(%d) timeout=%.1fs budget=%.1fs attempts=%d"),
-		Config.SecretKey.Len(), Config.RequestTimeoutSeconds, Config.BudgetSeconds, Config.MaxAttempts);
+	return FString::Printf(TEXT("url=[supabase-url] key=[supabase-key] timeout=%.1fs budget=%.1fs attempts=%d"),
+		Config.RequestTimeoutSeconds, Config.BudgetSeconds, Config.MaxAttempts);
 }
 
 uint64 FMMOSupabaseRestClient::Call(const FString& Function, const TSharedRef<FJsonObject>& Params, const FString& OpId, FCallComplete&& Done)
@@ -261,7 +280,10 @@ void FMMOSupabaseRestClient::StartAttempt(const TSharedRef<FCall>& Call)
 	Request.Body = Call->Body;
 	Request.TimeoutSeconds = Config.RequestTimeoutSeconds;
 	Request.Headers.Add({TEXT("apikey"), Config.SecretKey});
-	Request.Headers.Add({TEXT("Authorization"), TEXT("Bearer ") + Config.SecretKey});
+	if (UsesBearerAuth(Config.SecretKey))
+	{
+		Request.Headers.Add({TEXT("Authorization"), TEXT("Bearer ") + Config.SecretKey});
+	}
 	Request.Headers.Add({TEXT("Content-Type"), TEXT("application/json")});
 	Request.Headers.Add({TEXT("Accept"), TEXT("application/json")});
 	// mmo_api ozel sema: PostgREST profil basliklarini ister.

@@ -17,6 +17,8 @@ namespace
 	constexpr int32 SupabaseMaxNameLen = 32;
 	constexpr int32 SupabaseMaxHolderLen = 96;
 	constexpr int32 SupabaseLeaseTtlSeconds = 120;
+	constexpr int32 SupabaseApiVersion = 2; // vectors.json responses.healthcheck.ok.api_version
+	constexpr int64 SupabaseCreateLeaseEpoch = 1; // SQL create_character: olusturana epoch 1 verir
 
 	/** int64: 2^53'e kadar ondalik-siz JSON SAYISI (sozlesme: bigint JSON sayidir). Metin ve digerleri RED. */
 	bool SupabaseParseInt64(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Name, int64& Out)
@@ -47,13 +49,7 @@ namespace
 		if (Outcome == TEXT("revision_conflict")) return SupabaseOut::RevisionConflict;
 		if (Outcome == TEXT("ownership_lost")) return SupabaseOut::OwnershipLost;
 		if (Outcome == TEXT("idempotency_conflict")) return SupabaseOut::IdempotencyConflict;
-		if (Outcome == TEXT("forbidden")) return SupabaseOut::Forbidden;
-		return SupabaseOut::InternalError;
-	}
-
-	bool SupabaseIsCommitted(const FString& Outcome)
-	{
-		return Outcome == TEXT("committed") || Outcome == TEXT("ok");
+		return SupabaseOut::InternalError; // sozlesmede olmayan/"internal" sonuc
 	}
 
 	bool SupabaseDataToObject(const FMMOCharacterSaveData& Data, TSharedPtr<FJsonObject>& Out)
@@ -90,8 +86,9 @@ namespace
 	/**
 	 * get_op yaniti (vectors.json responses.get_op): found:true + outcome:ok + result nesnesi. Islem turu ve anahtar BEKLENENLE
 	 * ayni olmali (baska bir islemin kaydi uzlasti sayilmaz); result.outcome committed ise revision'i verir.
+	 * OutEpoch verilirse result.lease_epoch (>= 1) de ZORUNLUDUR (create: olusturana verilen kira).
 	 */
-	bool SupabaseParseCommittedOp(const FMMORpcResult& R, const TCHAR* ExpectedKind, const FString& ExpectedKey, int64& OutRevision)
+	bool SupabaseParseCommittedOp(const FMMORpcResult& R, const TCHAR* ExpectedKind, const FString& ExpectedKey, int64& OutRevision, int64* OutEpoch = nullptr)
 	{
 		if (R.Status != EMMORpcStatus::Ok || R.Outcome != TEXT("ok") || !R.Json.IsValid())
 		{
@@ -119,6 +116,10 @@ namespace
 		{
 			return false;
 		}
+		if (OutEpoch && (!SupabaseParseInt64(*Result, TEXT("lease_epoch"), *OutEpoch) || *OutEpoch < 1))
+		{
+			return false;
+		}
 		return SupabaseParseInt64(*Result, TEXT("revision"), OutRevision);
 	}
 
@@ -142,6 +143,9 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		bool bFrozen = false;
 		FString FrozenOpId;
 		FString FrozenKind; // "save" | "create": get_op op_kind beklentisi
+		int64 FrozenEpoch = 0; // donma anindaki istegin epoch'u (LoadEx once bununla release_lease yapar)
+		bool bReloadRequired = false; // revision_conflict: kalici cakisma olmasin diye LoadEx'e kadar yazim yok
+		int64 ConflictRevision = -1;  // conflict yanitinin bildirdigi sunucu revision'i (yalniz tani)
 		bool bInFlight = false;
 		bool bHasPending = false;
 		FMMOCharacterSaveData PendingData;
@@ -182,6 +186,21 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		return P;
 	}
 
+	/** Kira kaydi (create basarisi/uzlasmasi): yuva kiralanmis, donuk/cakisma durumu temiz. */
+	void GrantLease(const FString& Key, int64 Epoch, int64 Revision)
+	{
+		FSlot& S = Slots.FindOrAdd(Key);
+		S.bLeased = true;
+		S.Epoch = Epoch;
+		S.Revision = Revision;
+		S.bFrozen = false;
+		S.FrozenOpId.Reset();
+		S.FrozenKind.Reset();
+		S.FrozenEpoch = 0;
+		S.bReloadRequired = false;
+		S.ConflictRevision = -1;
+	}
+
 	/** Gecerli ad + gecerli holder; aksi halde hicbir istek gonderilmez. */
 	bool Resolve(const FString& SlotName, FString& OutKey, FString& OutDisplay) const
 	{
@@ -197,11 +216,47 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			Completion(SupabaseOut::Invalid, FMMOCharacterSaveData());
 			return;
 		}
-		if (const FSlot* Existing = Slots.Find(Key); Existing && Existing->bInFlight)
+		const FSlot* Existing = Slots.Find(Key);
+		if (Existing && Existing->bInFlight)
 		{
 			Completion(SupabaseOut::Unavailable, FMMOCharacterSaveData()); // ucustaki yazim varken kira yenilenmez
 			return;
 		}
+		if (Existing && Existing->bFrozen && Existing->FrozenEpoch >= 1)
+		{
+			// Donmus yuva: zaman asimina ugramis yazim sunucuya GEC ulasabilir. Once eski epoch'un kirasi birakilir; sonraki
+			// acquire epoch'u artirir, boylece gec gelen eski-epoch'lu yazim ownership_lost olur (hayalet yazim yok).
+			const int64 OldEpoch = Existing->FrozenEpoch;
+			const TSharedRef<FJsonObject> P = NewParams(Key);
+			P->SetStringField(TEXT("p_holder"), Holder);
+			P->SetNumberField(TEXT("p_epoch"), static_cast<double>(OldEpoch));
+			const TWeakPtr<FImpl> Weak = AsShared();
+			Client->Call(TEXT("release_lease"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, OldEpoch, Completion](FMMORpcResult&& R)
+			{
+				const TSharedPtr<FImpl> Self = Weak.Pin();
+				if (!Self)
+				{
+					SupabaseLogOrphan(TEXT("release_lease"), R);
+					return;
+				}
+				const SupabaseOut Released = Self->OnLeaseResult(Key, OldEpoch, R, true);
+				// ownership_lost / not_found: kira zaten bitmis (ya da hic alinmamis), devam. Ulasilamayan release: yuva donuk kalir.
+				if (Released == SupabaseOut::Ok || Released == SupabaseOut::OwnershipLost || Released == SupabaseOut::NotFound)
+				{
+					Self->Acquire(Key, Completion);
+				}
+				else
+				{
+					Completion(SupabaseOut::Unavailable, FMMOCharacterSaveData());
+				}
+			});
+			return;
+		}
+		Acquire(Key, Completion);
+	}
+
+	void Acquire(const FString& Key, const IMMOAsyncCharacterStore::FLoadExComplete& Completion)
+	{
 		const FString LogOp = FMMOSupabaseRestClient::NewOpId(); // yalniz log icin; acquire_lease'e GONDERILMEZ
 		const TSharedRef<FJsonObject> P = NewParams(Key);
 		P->SetStringField(TEXT("p_holder"), Holder);
@@ -261,6 +316,9 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		S.bFrozen = false; // yetkili yeniden yukleme belirsizligi cozer
 		S.FrozenOpId.Reset();
 		S.FrozenKind.Reset();
+		S.FrozenEpoch = 0;
+		S.bReloadRequired = false; // taze veri + taze revision: cakisma temizlendi
+		S.ConflictRevision = -1;
 		Completion(SupabaseOut::Ok, MoveTemp(Data));
 	}
 
@@ -293,7 +351,26 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			}
 			if (R.Status == EMMORpcStatus::Ok)
 			{
-				Completion(SupabaseIsCommitted(R.Outcome) ? SupabaseOut::Ok : SupabaseMapOutcome(R.Outcome));
+				if (R.Outcome != TEXT("committed"))
+				{
+					Completion(SupabaseMapOutcome(R.Outcome)); // yalniz committed basaridir ("ok" degil)
+					return;
+				}
+				// SQL create_character basarisinda olusturana epoch 1 + kira verir: yuva kiralanmis kaydedilir.
+				int64 Revision = 0;
+				int64 Epoch = 0;
+				FString RespKey;
+				if (SupabaseParseInt64(R.Json, TEXT("revision"), Revision) && SupabaseParseInt64(R.Json, TEXT("lease_epoch"), Epoch) && Epoch >= 1
+					&& R.Json->TryGetStringField(TEXT("canonical_key"), RespKey) && RespKey == Key)
+				{
+					Self->GrantLease(Key, Epoch, Revision);
+					Completion(SupabaseOut::Ok);
+				}
+				else
+				{
+					Self->Freeze(Key, OpId, TEXT("create"), SupabaseCreateLeaseEpoch); // committed ama kira/revision okunamadi: belirsiz
+					Completion(SupabaseOut::Unknown);
+				}
 			}
 			else if (R.Status == EMMORpcStatus::Unknown)
 			{
@@ -320,13 +397,15 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 				return;
 			}
 			int64 Revision = 0;
-			if (SupabaseParseCommittedOp(G, TEXT("create"), Key, Revision))
+			int64 Epoch = 0;
+			if (SupabaseParseCommittedOp(G, TEXT("create"), Key, Revision, &Epoch))
 			{
+				Self->GrantLease(Key, Epoch, Revision);
 				Completion(SupabaseOut::Ok);
 			}
 			else
 			{
-				Self->Freeze(Key, OpId, TEXT("create")); // commit edilmedi mi, gec mi gelecek: bilinmiyor
+				Self->Freeze(Key, OpId, TEXT("create"), SupabaseCreateLeaseEpoch); // commit edilmedi mi, gec mi gelecek: bilinmiyor
 				Completion(SupabaseOut::Unknown);
 			}
 		});
@@ -350,6 +429,11 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		if (S->bFrozen)
 		{
 			Completion(SupabaseOut::Frozen); // belirsiz sonuc: kor yeniden yazim yok
+			return;
+		}
+		if (S->bReloadRequired)
+		{
+			Completion(SupabaseOut::RevisionConflict); // eski revision kalici cakisir: istek gonderme, LoadEx bekle
 			return;
 		}
 		if (S->bInFlight)
@@ -411,7 +495,7 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 				}
 				else
 				{
-					Freeze(Key, OpId, TEXT("save")); // "committed" ama revision okunamadi: sonuc belirsiz
+					Freeze(Key, OpId, TEXT("save"), Slots.FindOrAdd(Key).Epoch); // "committed" ama revision okunamadi: sonuc belirsiz
 					FinishSave(Key, Done, SupabaseOut::Unknown);
 				}
 				return;
@@ -420,6 +504,19 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			if (Mapped == SupabaseOut::OwnershipLost)
 			{
 				Slots.FindOrAdd(Key).bLeased = false;
+			}
+			else if (Mapped == SupabaseOut::RevisionConflict)
+			{
+				// Sunucu revision'i yerel olandan ileride (baska yazim). Bildirilen revision BENIMSENMEZ (gormedigimiz veriyi ezerdi):
+				// yuva "yeniden yukleme gerekli" olur; LoadEx taze veri + revision getirip temizler.
+				FSlot& S = Slots.FindOrAdd(Key);
+				S.bReloadRequired = true;
+				if (!SupabaseParseInt64(R.Json, TEXT("revision"), S.ConflictRevision))
+				{
+					S.ConflictRevision = -1;
+				}
+				UE_LOG(LogMMOSupabase, Warning, TEXT("yuva yeniden yukleme gerekli (revision_conflict) yerel=%lld sunucu=%lld"),
+					S.Revision, S.ConflictRevision);
 			}
 			FinishSave(Key, Done, Mapped);
 			return;
@@ -449,18 +546,19 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			}
 			else
 			{
-				Self->Freeze(Key, OpId, TEXT("save"));
+				Self->Freeze(Key, OpId, TEXT("save"), Self->Slots.FindOrAdd(Key).Epoch);
 				Self->FinishSave(Key, Done, SupabaseOut::Unknown);
 			}
 		});
 	}
 
-	void Freeze(const FString& Key, const FString& OpId, const TCHAR* Kind)
+	void Freeze(const FString& Key, const FString& OpId, const TCHAR* Kind, int64 RequestEpoch)
 	{
 		FSlot& S = Slots.FindOrAdd(Key);
 		S.bFrozen = true;
 		S.FrozenOpId = OpId;
 		S.FrozenKind = Kind;
+		S.FrozenEpoch = RequestEpoch;
 		UE_LOG(LogMMOSupabase, Warning, TEXT("yuva donduruldu (belirsiz %s sonucu) op=%s"), Kind, *OpId);
 	}
 
@@ -534,6 +632,38 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		});
 	}
 
+	// ---- HealthcheckEx ----
+	void HealthcheckEx(FStatusComplete Completion)
+	{
+		const TWeakPtr<FImpl> Weak = AsShared();
+		Client->Call(TEXT("healthcheck"), MakeShared<FJsonObject>(), FMMOSupabaseRestClient::NewOpId(), [Weak, Completion](FMMORpcResult&& R)
+		{
+			if (!Weak.Pin().IsValid())
+			{
+				SupabaseLogOrphan(TEXT("healthcheck"), R);
+				return;
+			}
+			int64 ApiVersion = 0;
+			int64 ContractVersion = 0;
+			// Ulasilamadi, outcome != ok ya da surum alanlari JSON sayi degil: kullanilamaz (Unavailable). Surumler okunur ama uyusmazsa: Invalid.
+			if (R.Status != EMMORpcStatus::Ok || R.Outcome != TEXT("ok") || !SupabaseParseInt64(R.Json, TEXT("api_version"), ApiVersion)
+				|| !SupabaseParseInt64(R.Json, TEXT("contract_version"), ContractVersion))
+			{
+				Completion(SupabaseOut::Unavailable);
+			}
+			else if (ApiVersion != SupabaseApiVersion || ContractVersion != FMMOSupabaseRestClient::ContractVersion)
+			{
+				UE_LOG(LogMMOSupabase, Warning, TEXT("Supabase surum uyusmazligi: api=%lld contract=%lld, beklenen api=%d contract=%d"),
+					ApiVersion, ContractVersion, SupabaseApiVersion, FMMOSupabaseRestClient::ContractVersion);
+				Completion(SupabaseOut::Invalid);
+			}
+			else
+			{
+				Completion(SupabaseOut::Ok);
+			}
+		});
+	}
+
 	// ---- ReconcileEx ----
 	void ReconcileEx(const FString& SlotName, FStatusComplete Completion)
 	{
@@ -563,16 +693,23 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 				return;
 			}
 			int64 Revision = 0;
+			int64 Epoch = 0;
+			const bool bCreate = Kind == TEXT("create");
 			FSlot* Slot = Self->Slots.Find(Key);
-			if (Slot && Slot->bFrozen && Slot->FrozenOpId == OpId && SupabaseParseCommittedOp(G, *Kind, Key, Revision))
+			if (Slot && Slot->bFrozen && Slot->FrozenOpId == OpId && SupabaseParseCommittedOp(G, *Kind, Key, Revision, bCreate ? &Epoch : nullptr))
 			{
-				if (Kind == TEXT("save"))
+				if (bCreate)
+				{
+					Self->GrantLease(Key, Epoch, Revision); // create'in verdigi kira
+				}
+				else
 				{
 					Slot->Revision = Revision;
+					Slot->bFrozen = false;
+					Slot->FrozenOpId.Reset();
+					Slot->FrozenKind.Reset();
+					Slot->FrozenEpoch = 0;
 				}
-				Slot->bFrozen = false;
-				Slot->FrozenOpId.Reset();
-				Slot->FrozenKind.Reset();
 				Completion(SupabaseOut::Ok);
 			}
 			else
@@ -780,6 +917,22 @@ void FMMOSupabaseCharacterStore::RenewLeaseEx(const FString& SlotName, FStatusCo
 void FMMOSupabaseCharacterStore::ReleaseLeaseEx(const FString& SlotName, FStatusComplete&& Completion)
 {
 	Impl->ReleaseLeaseEx(SlotName, MoveTemp(Completion));
+}
+
+void FMMOSupabaseCharacterStore::HealthcheckEx(FStatusComplete&& Completion)
+{
+	Impl->HealthcheckEx(MoveTemp(Completion));
+}
+
+bool FMMOSupabaseCharacterStore::IsReloadRequired(const FString& SlotName) const
+{
+	FString Key, Display;
+	if (!SlotToKey(SlotName, Key, Display))
+	{
+		return false;
+	}
+	const FImpl::FSlot* S = Impl->Slots.Find(Key);
+	return S && S->bReloadRequired;
 }
 
 bool FMMOSupabaseCharacterStore::IsSlotFrozen(const FString& SlotName) const

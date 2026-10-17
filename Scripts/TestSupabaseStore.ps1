@@ -47,9 +47,14 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
 # Beklenen sayi MMOSupabaseStoreSelfTest.cpp'deki SupabaseTestExpectedChecks ile ayni olmali.
-$expected = 449
-$consistent = ($closedFail.Count -eq 5) -and ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
-Write-Output "[MMO_SUPABASE_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) closed_fail_logs=$($closedFail.Count) consistent=$consistent"
+$expected = 531
+# Test, vectors.json'ta bilmedigi senaryo bulursa (sonradan eklenmis) adimlarini genel yurutucuyle kosar ve "extra" sayar (FAIL degil);
+# NOTE satiri: unknown_scenarios / extra_checks / skipped_admin. Raporlanan toplam = expected + extra olmali.
+$note = @($lines | Select-String '\[MMO_SUPABASE_NOTE\] unknown_scenarios=\d+ extra_checks=\d+ skipped_admin=\d+')
+$unknownScn = 0; $extra = 0; $skippedAdmin = 0
+if ($note.Count -eq 1 -and $note[0].Line -match 'unknown_scenarios=(\d+) extra_checks=(\d+) skipped_admin=(\d+)') { $unknownScn = [int]$Matches[1]; $extra = [int]$Matches[2]; $skippedAdmin = [int]$Matches[3] }
+$consistent = ($note.Count -eq 1) -and ($closedFail.Count -eq 5) -and ($reported -eq ($expected + $extra)) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
+Write-Output "[MMO_SUPABASE_RUNNER] reported=$reported expected=$expected extra=$extra unknown_scenarios=$unknownScn skipped_admin=$skippedAdmin case_lines=$($cases.Count) unique_labels=$($unique.Count) closed_fail_logs=$($closedFail.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
 if ($nativeExit -eq 0 -and $consistent -and $summaries.Count -eq 1 -and $errors.Count -eq 0) {
     Write-Output "[MMO_SUPABASE_RUNNER] PASS checks=$reported"; exit 0
