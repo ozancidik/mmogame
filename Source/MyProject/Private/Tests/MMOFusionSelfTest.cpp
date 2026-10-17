@@ -2,8 +2,11 @@
 
 #if !UE_BUILD_SHIPPING
 #include "Characters/MMOCharacter.h"
+#include "Characters/MMOMob.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOStatsComponent.h"
+#include "Components/MMOTradeComponent.h"
+#include "Player/MMOPlayerController.h"
 #include "Engine/World.h"
 #include "Items/MMOItemDatabase.h"
 #include "Misc/CommandLine.h"
@@ -16,12 +19,14 @@
 #include "UObject/StrongObjectPtr.h"
 #include "World/MMOVendorNPC.h"
 
-// Ekipman birlestirme native testi (docs/DESIGN_FUSION.md 7.2). Tek kullanimlik headless otorite dunyasi,
-// controller'siz ayni-kare aktorler; diske kayit/yukleme yok (FillSaveData/ApplySaveData bellek ici).
+// Ekipman birlestirme native testi (docs/DESIGN_FUSION.md 7.2). Tek kullanimlik headless otorite dunyasi
+// (yalniz NM_Standalone), ayni-kare aktorler; test pawn'i gercek bir AMMOPlayerController'a possess edilir
+// (oyuncu kapisi), kayit kimligi SetSaveIdentityForTest ile acilir. Diske kayit/yukleme yok
+// (FillSaveData/ApplySaveData bellek ici; unpossess oncesi yukleme bayragi kapatilir, ayrilma kaydi atlanir).
 namespace
 {
-	// 5 saf NextRarity + 9 FeeFor + 3x16 basari + 7 FindFromSlot + 15x4 ret + 3x2 sinir.
-	constexpr int32 FusionTestExpectedChecks = 135;
+	// 5 saf NextRarity + 9 FeeFor + 3x16 basari + 10 FindFromSlot + 20x4 ret + 2 mob + 4x2 sinir.
+	constexpr int32 FusionTestExpectedChecks = 162;
 
 	FMMOEquipmentInstance FusionTestInst(int32 Id, const TCHAR* ItemId, EMMOItemRarity Rarity, int32 Plus = 0)
 	{
@@ -48,7 +53,8 @@ namespace
 	{
 		OutChecks = 0;
 		OutError.Reset();
-		if (!World || !World->IsGameWorld() || World->GetNetMode() == NM_Client
+		// Gercek oyunculu sunucuda (dedicated/listen) kosmaz: test pawn'i ve controller'i dunyaya eklenir (D-5).
+		if (!World || !World->IsGameWorld() || World->GetNetMode() != NM_Standalone || IsRunningDedicatedServer()
 			|| !FParse::Param(FCommandLine::Get(), TEXT("unattended"))
 			|| !FParse::Param(FCommandLine::Get(), TEXT("NullRHI")))
 		{
@@ -67,6 +73,25 @@ namespace
 		if (Restore) { Fixtures.Add(Restore); Restore->SetActorEnableCollision(false); }
 		AMMOVendorNPC* Vendor = World->SpawnActor<AMMOVendorNPC>(AMMOVendorNPC::StaticClass(), Origin + FVector(100, 0, 0), FRotator::ZeroRotator, Params);
 		if (Vendor) { Fixtures.Add(Vendor); Vendor->SetActorEnableCollision(false); }
+		AMMOPlayerController* Controller = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Origin, FRotator::ZeroRotator, Params);
+		if (Controller) Fixtures.Add(Controller);
+		// Mob sahibi (F3): kendi AI controller'i ile, satici yaninda. Ayni kare; tick kapali.
+		const FTransform MobTM(FRotator::ZeroRotator, Origin + FVector(0, -300, 0));
+		AMMOMob* Mob = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), MobTM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (Mob)
+		{
+			Fixtures.Add(Mob);
+			Mob->ArchetypeId = TEXT("Goblin");
+			Mob->SetActorEnableCollision(false);
+			Mob->FinishSpawning(MobTM);
+			Mob->SetActorTickEnabled(false);
+		}
+		// Possess oncesi/sonrasi: yalniz bellek ici kayit kimligi; unpossess'ten once kapatilir (ayrilma kaydi yazilmaz).
+		const auto SetLoaded = [&](bool bLoaded)
+		{
+			if (Pawn) Pawn->SetSaveIdentityForTest(bLoaded, Pawn->GetActiveSaveSlot(), Pawn->GetLoadSerial());
+		};
+		if (Pawn && Controller) { Controller->Possess(Pawn); SetLoaded(true); }
 
 		int32 Failures = 0;
 		const auto Check = [&](const FString& Case, const FString& Label, bool bOK)
@@ -82,10 +107,16 @@ namespace
 
 		const bool bCompleted = [&]()
 		{
-			if (!Pawn || !Restore || !Vendor || !Pawn->GetInventory() || !Restore->GetInventory() || !Pawn->GetStats())
+			if (!Pawn || !Restore || !Vendor || !Controller || !Mob || !Pawn->GetInventory() || !Restore->GetInventory() || !Pawn->GetStats()
+				|| !Pawn->GetTradeComponent() || !Mob->GetInventory())
 			{
 				OutError = TEXT("fixture spawn failed"); return false;
 			}
+			if (!Pawn->IsPlayerControlled() || !Pawn->IsInitialLoadComplete() || Mob->IsPlayerControlled())
+			{
+				OutError = TEXT("fixture possession failed"); return false;
+			}
+			UMMOTradeComponent* Trade = Pawn->GetTradeComponent();
 			UMMOInventoryComponent* Inv = Pawn->GetInventory();
 			const FMMOItemDef* Sword = FMMOItemDatabase::Find(TEXT("ShortSword"));
 			if (!Sword || !FMMOItemDatabase::Find(TEXT("LongSword"))) { OutError = TEXT("fixture items missing"); return false; }
@@ -106,7 +137,17 @@ namespace
 				D.NextInstanceId = 100;
 				Pawn->GetStats()->bIsDead = false;
 				Pawn->SetActorLocation(Origin);
+				SetLoaded(true);
+				Pawn->SetTravelSaveCommitted(false);
+				Trade->bTradeActive = false;
+				Trade->MyOffer.Items.Reset();
 				Inv->ApplySaveData(D);
+			};
+			// Takas teklifi: yalniz public alanlar (MMOTradeComponent degismez); Seed temizler.
+			const auto Offer = [&](int32 Id)
+			{
+				Trade->bTradeActive = true;
+				Trade->MyOffer.Items.Add(FusionTestInst(Id, Short, R::Common));
 			};
 			const auto Run = [&](int32 A, int32 B, int32 C, FFusionTestRun& Out)
 			{
@@ -203,7 +244,7 @@ namespace
 				Check(Case, TEXT("repeat_no_mutation"), Same(Snapshot(), After) && Again.InvCalls == 0 && Again.GoldCalls == 0);
 			}
 
-			// --- FindFromSlot: karisik canta (7) ---
+			// --- FindFromSlot: karisik canta (10) ---
 			{
 				const FString Case = TEXT("find_from_slot");
 				Seed({ FusionTestInst(1, Short, R::Common), FusionTestInst(2, Long, R::Common), FusionTestInst(3, Short, R::Uncommon),
@@ -212,17 +253,28 @@ namespace
 				const FMMOCharacterSaveData Before = Snapshot();
 				const FMMOFusionPreview P = FMMOFusion::FindFromSlot(*Inv, 7);
 				Check(Case, TEXT("result_ok"), P.Result == F::Ok);
-				Check(Case, TEXT("picked_lowest_ids"), P.InstanceIds[0] == 1 && P.InstanceIds[1] == 5 && P.InstanceIds[2] == 6);
+				// Tiklanan slotun esyasi (7) ilk girdi; kalan ikisi esdegerlerin en kucuk kimlikleri (D-1).
+				Check(Case, TEXT("slot_item_first"), P.InstanceIds[0] == 7 && P.InstanceIds[1] == 1 && P.InstanceIds[2] == 5);
+				const FMMOFusionPreview P1 = FMMOFusion::FindFromSlot(*Inv, 1);
+				Check(Case, TEXT("slot_one_then_lowest"), P1.Result == F::Ok && P1.InstanceIds[0] == 1 && P1.InstanceIds[1] == 5 && P1.InstanceIds[2] == 6);
 				Check(Case, TEXT("preview_item_fee"), P.ItemId == FName(Short) && P.From == R::Common && P.To == R::Uncommon
 					&& P.Fee == FMMOFusion::FeeFor(*Sword, R::Common));
 				Check(Case, TEXT("plus_slot_rejected"), FMMOFusion::FindFromSlot(*Inv, 4).Result == F::PlusNotZero);
 				Check(Case, TEXT("bad_slot"), FMMOFusion::FindFromSlot(*Inv, 0).Result == F::BadIds
-					&& FMMOFusion::FindFromSlot(*Inv, 99).Result == F::BadIds);
+					&& FMMOFusion::FindFromSlot(*Inv, 99).Result == F::BadIds && FMMOFusion::FindFromSlot(*Inv, 8).Result == F::BadIds);
+				// F4/D-2: isaretli tasma yok (INT_MIN - 1), uc degerler reddedilir.
+				Check(Case, TEXT("bad_slot_extremes"), FMMOFusion::FindFromSlot(*Inv, MIN_int32).Result == F::BadIds
+					&& FMMOFusion::FindFromSlot(*Inv, MAX_int32).Result == F::BadIds && FMMOFusion::FindFromSlot(*Inv, -1).Result == F::BadIds);
 				Check(Case, TEXT("too_few"), FMMOFusion::FindFromSlot(*Inv, 3).Result == F::BadIds);
+				// D-4: uzaktaki oyuncu once satici mesajini gorur (gecersiz slotta bile).
+				Pawn->SetActorLocation(Origin + FVector(2000, 0, 0));
+				Check(Case, TEXT("far_gate_before_slot"), FMMOFusion::FindFromSlot(*Inv, 0).Result == F::NotNearVendor
+					&& FMMOFusion::FindFromSlot(*Inv, 7).Result == F::NotNearVendor);
+				Pawn->SetActorLocation(Origin);
 				Check(Case, TEXT("no_mutation"), Same(Snapshot(), Before));
 			}
 
-			// --- Ret vakalari (15 x 4): sonuc dogru, anlik goruntu ayni, delege 0 ---
+			// --- Ret vakalari (20 x 4): sonuc dogru, anlik goruntu ayni, delege 0 ---
 			const TArray<FMMOEquipmentInstance> RejectBag = {
 				FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common),
 				FusionTestInst(4, Long, R::Common), FusionTestInst(5, Short, R::Uncommon), FusionTestInst(6, Short, R::Common, 1),
@@ -230,8 +282,15 @@ namespace
 				FusionTestInst(10, Short, R::Legendary), FusionTestInst(11, Short, R::Legendary), FusionTestInst(12, Short, R::Legendary) };
 			struct FFusionRejectCase { const TCHAR* Name; int32 A, B, C; F Expected; int32 Setup; };
 			// Setup: 0 normal, 1 Gold = Fee-1, 2 saticidan 2000 u uzak, 3 olu, 4 bilinmeyen esya cantasi,
-			// 5 saticidan 850 u (800 u esiginin hemen disi; esik genisletilirse yakalanir).
+			// 5 saticidan 850 u (800 u esiginin hemen disi; esik genisletilirse yakalanir),
+			// 6 controller yok (oyuncu kapisi kapali), 7 kayit yuklenmedi, 8 bolge gecisi kaydi onaylandi,
+			// 9 girdi 2 aktif takas teklifinde.
 			const FFusionRejectCase Rejects[] = {
+				{ TEXT("reject_not_player"), 1, 2, 3, F::NotPlayer, 6 },
+				{ TEXT("reject_load_incomplete"), 1, 2, 3, F::Locked, 7 },
+				{ TEXT("reject_travel_committed"), 1, 2, 3, F::Locked, 8 },
+				{ TEXT("reject_trade_offer"), 1, 2, 3, F::TradeLocked, 9 },
+				{ TEXT("reject_far_bad_ids"), 0, 1, 2, F::NotNearVendor, 2 },
 				{ TEXT("reject_bad_ids"), 0, 1, 2, F::BadIds, 0 },
 				{ TEXT("reject_duplicate_id"), 1, 1, 2, F::DuplicateId, 0 },
 				{ TEXT("reject_not_in_bag"), 1, 2, 999, F::NotInBag, 0 },
@@ -263,6 +322,10 @@ namespace
 				if (RC.Setup == 2) Pawn->SetActorLocation(Origin + FVector(2000, 0, 0));
 				if (RC.Setup == 5) Pawn->SetActorLocation(Origin + FVector(950, 0, 0)); // satici x=+100: 850 u
 				if (RC.Setup == 3) Pawn->GetStats()->bIsDead = true;
+				if (RC.Setup == 6) { SetLoaded(false); Controller->UnPossess(); }
+				if (RC.Setup == 7) SetLoaded(false);
+				if (RC.Setup == 8) Pawn->SetTravelSaveCommitted(true);
+				if (RC.Setup == 9) Offer(2);
 				const FMMOCharacterSaveData Before = Snapshot();
 				FFusionTestRun Res;
 				Run(RC.A, RC.B, RC.C, Res);
@@ -272,9 +335,27 @@ namespace
 				Check(Case, TEXT("no_gold_delegate"), Res.GoldCalls == 0);
 				Pawn->GetStats()->bIsDead = false;
 				Pawn->SetActorLocation(Origin);
+				if (RC.Setup == 6) { Controller->Possess(Pawn); SetLoaded(true); }
 			}
 
-			// --- Sinir: Gold == Fee tam (2), canta tam 12 dolu (2), saticiya 750 u (2) ---
+			// --- Mob sahibi (2): satici yaninda, 3 esdeger esya, yeterli altin; yine de reddedilir (F3) ---
+			{
+				const FString Case = TEXT("reject_mob_owner");
+				UMMOInventoryComponent* MobInv = Mob->GetInventory();
+				FMMOCharacterSaveData D;
+				D.Gold = 10000;
+				D.EquipmentBag = { FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common) };
+				D.EquippedItems.SetNum(static_cast<int32>(EMMOEquipSlot::MAX));
+				D.NextInstanceId = 100;
+				MobInv->ApplySaveData(D);
+				FMMOCharacterSaveData MobBefore; MobInv->FillSaveData(MobBefore);
+				int32 NewId = -1;
+				Check(Case, TEXT("result"), FMMOFusion::Execute(*MobInv, 1, 2, 3, &NewId) == F::NotPlayer && NewId == 0);
+				FMMOCharacterSaveData MobAfter; MobInv->FillSaveData(MobAfter);
+				Check(Case, TEXT("no_mutation"), Same(MobAfter, MobBefore));
+			}
+
+			// --- Sinir: Gold == Fee tam (2), canta tam 12 dolu (2), saticiya 750 u (2), takasta baska esya (2) ---
 			{
 				const FString Case = TEXT("boundary_gold_equals_fee");
 				Seed({ FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common) },
@@ -308,8 +389,25 @@ namespace
 				Check(Case, TEXT("gold_exact"), Fee > 0 && Inv->Gold == 10000 - Fee);
 				Pawn->SetActorLocation(Origin);
 			}
+			{
+				// Takas acik ama teklifte baska esya (4): kilit yalniz teklifteki kimligi tutar.
+				const FString Case = TEXT("boundary_trade_other_item");
+				Seed({ FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common),
+					FusionTestInst(4, Short, R::Common) }, 10000);
+				Offer(4);
+				FFusionTestRun Res;
+				Run(1, 2, 3, Res);
+				Check(Case, TEXT("result_ok"), Res.Result == F::Ok);
+				Check(Case, TEXT("offered_item_kept"), Inv->EquipmentBag.ContainsByPredicate([](const FMMOEquipmentInstance& I) { return I.InstanceId == 4; })
+					&& Inv->EquipmentBag.ContainsByPredicate([&](const FMMOEquipmentInstance& I) { return I.InstanceId == Res.NewId && Res.NewId != 0; }));
+				Trade->bTradeActive = false;
+				Trade->MyOffer.Items.Reset();
+			}
 			return true;
 		}();
+		// Ayrilma kaydi yazilmasin: yukleme bayragi kapali, sonra unpossess, sonra yok et.
+		SetLoaded(false);
+		if (IsValid(Controller)) Controller->UnPossess();
 		for (AActor* Fixture : Fixtures) if (IsValid(Fixture)) Fixture->Destroy();
 		if (!bCompleted) return false;
 		if (OutChecks != FusionTestExpectedChecks) { ++Failures; OutError += TEXT(" check_count_mismatch"); }
@@ -332,7 +430,9 @@ namespace
 }
 #endif
 
-// Kapsam notu: bu test tek senkron karede, controller'siz otorite dunyasinda FMMOFusion mantigini
-// dogrular. PIE, ag/replikasyon (uzak istemci), sohbet komutu, HUD ve zamanlayici kaniti DEGILDIR.
+// Kapsam notu: bu test tek senkron karede, NM_Standalone otorite dunyasinda (istemci baglantisiz bir
+// AMMOPlayerController possess eder) FMMOFusion mantigini dogrular. PIE, ag/replikasyon (uzak istemci),
+// gercek kayit yukleme/bolge gecisi akisi (bayraklar test kancasiyla), takasin kendi yurutmesi, sohbet
+// komutu, HUD ve zamanlayici kaniti DEGILDIR.
 // Execute icindeki geri alma dallari (cikti eklenemedi / ucret kismen kesildi) Check'in on kosullari
 // yuzunden bu testten ulasilamaz; yalniz "Gold >= Fee kontrolu silinirse" mutasyonuyla dolayli sinandi.

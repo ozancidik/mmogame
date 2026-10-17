@@ -3,6 +3,7 @@
 #include "Items/MMOFusion.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOStatsComponent.h"
+#include "Components/MMOTradeComponent.h"
 #include "Characters/MMOCharacter.h"
 #include "Items/MMOItemDatabase.h"
 #include "Core/MMOMetrics.h"
@@ -16,6 +17,46 @@ namespace
 	// Ucret carpani, GIRDI nadirligine gore (Common, Uncommon, Rare): Fee = Round(GetBuyPrice x carpan).
 	// Epic/Legendary girdisi birlestirilemez (MaxOutputRarity). PLACEHOLDER: D0 ekonomi modeli kesinlestirir.
 	constexpr float FusionFeeMult[] = { 0.5f, 1.0f, 2.0f };
+
+	// Aktif takas teklifindeki esya birlestirilemez (F6). Yalniz UMMOTradeComponent'in public alanlari okunur.
+	bool FusionIsInTradeOffer(const UMMOInventoryComponent& Inv, int32 InstanceId)
+	{
+		const AMMOCharacter* Char = Cast<AMMOCharacter>(Inv.GetOwner());
+		const UMMOTradeComponent* Trade = Char ? Char->GetTradeComponent() : nullptr;
+		if (!Trade || !Trade->IsTrading())
+		{
+			return false;
+		}
+		return Trade->MyOffer.Items.ContainsByPredicate([InstanceId](const FMMOEquipmentInstance& I) { return I.InstanceId == InstanceId; });
+	}
+}
+
+// Esyadan once gelen kapilar (Check ve FindFromSlot ortak): yetki, oyuncu, kayit kilidi, satici yakinligi.
+EMMOFusionResult FMMOFusion::GateResult(const UMMOInventoryComponent& Inv)
+{
+	const AActor* Owner = Inv.GetOwner();
+	if (!IsValid(Owner) || Owner->IsActorBeingDestroyed() || !Owner->HasAuthority() || Inv.IsBeingDestroyed())
+	{
+		return EMMOFusionResult::NotAuthority;
+	}
+	// Mob/NPC/AI'nin envanteri birlestirilmez (F3).
+	const AMMOCharacter* Char = Cast<AMMOCharacter>(Owner);
+	if (!Char || !Char->IsPlayerControlled())
+	{
+		return EMMOFusionResult::NotPlayer;
+	}
+	// Posta deseni (UMMOMailComponent::IsOwnerLocked): yuklenmemis karakterin degisikligi kaydedilemez,
+	// gecis onayindan sonra da EndPlay kaydi atlanir; ikisinde de mutasyon kalici olmaz (F1).
+	if (!Char->IsInitialLoadComplete() || Char->IsTravelSaveCommitted())
+	{
+		return EMMOFusionResult::Locked;
+	}
+	// Olu karakteri de reddeder (IsOwnerNearVendor). Esya kontrollerinden once (D-4).
+	if (!Inv.IsOwnerNearVendor())
+	{
+		return EMMOFusionResult::NotNearVendor;
+	}
+	return EMMOFusionResult::Ok;
 }
 
 bool FMMOFusion::NextRarity(EMMOItemRarity In, EMMOItemRarity& Out)
@@ -52,18 +93,12 @@ FMMOFusionPreview FMMOFusion::Check(const UMMOInventoryComponent& Inv, int32 A, 
 	P.InstanceIds[1] = B;
 	P.InstanceIds[2] = C;
 
-	const AActor* Owner = Inv.GetOwner();
-	if (!IsValid(Owner) || Owner->IsActorBeingDestroyed() || !Owner->HasAuthority() || Inv.IsBeingDestroyed())
+	P.Result = GateResult(Inv);
+	if (P.Result != EMMOFusionResult::Ok)
 	{
-		P.Result = EMMOFusionResult::NotAuthority;
 		return P;
 	}
-	// Olu karakteri de reddeder (IsOwnerNearVendor).
-	if (!Inv.IsOwnerNearVendor())
-	{
-		P.Result = EMMOFusionResult::NotNearVendor;
-		return P;
-	}
+	P.Result = EMMOFusionResult::BadIds;
 	if (A <= 0 || B <= 0 || C <= 0)
 	{
 		P.Result = EMMOFusionResult::BadIds;
@@ -86,6 +121,14 @@ FMMOFusionPreview FMMOFusion::Check(const UMMOInventoryComponent& Inv, int32 A, 
 			return P;
 		}
 		Inputs[i] = &Inv.EquipmentBag[Index];
+	}
+	for (int32 i = 0; i < InputCount; ++i)
+	{
+		if (FusionIsInTradeOffer(Inv, P.InstanceIds[i]))
+		{
+			P.Result = EMMOFusionResult::TradeLocked;
+			return P;
+		}
 	}
 
 	P.ItemId = Inputs[0]->ItemId;
@@ -146,36 +189,50 @@ FMMOFusionPreview FMMOFusion::Check(const UMMOInventoryComponent& Inv, int32 A, 
 FMMOFusionPreview FMMOFusion::FindFromSlot(const UMMOInventoryComponent& Inv, int32 BagSlot1Based)
 {
 	FMMOFusionPreview P;
-	const int32 SlotIndex = BagSlot1Based - 1;
-	if (!Inv.EquipmentBag.IsValidIndex(SlotIndex))
+	// Uzaktaki/kilitli oyuncu once kapi mesajini gorur, slot hatasini degil (D-4).
+	P.Result = GateResult(Inv);
+	if (P.Result != EMMOFusionResult::Ok)
 	{
-		return P; // BadIds
+		return P;
 	}
-	const FMMOEquipmentInstance& Ref = Inv.EquipmentBag[SlotIndex];
+	P.Result = EMMOFusionResult::BadIds;
+	// Cikarmadan once sinir: BagSlot1Based - 1 INT_MIN'de tasmaz (F4/D-2).
+	if (BagSlot1Based <= 0 || BagSlot1Based > Inv.EquipmentBag.Num())
+	{
+		return P;
+	}
+	const FMMOEquipmentInstance& Ref = Inv.EquipmentBag[BagSlot1Based - 1];
 	P.ItemId = Ref.ItemId;
 	P.From = Ref.Rarity;
 	P.To = Ref.Rarity;
 	P.InstanceIds[0] = Ref.InstanceId;
+	if (Ref.InstanceId <= 0)
+	{
+		return P; // BadIds
+	}
 	if (Ref.Plus != 0)
 	{
 		P.Result = EMMOFusionResult::PlusNotZero;
 		return P;
 	}
 
+	// Secilen slotun esyasi her zaman ilk girdi (oyuncunun tikladigi esya gider, D-1); kalan ikisi esdegerlerin
+	// en kucuk kimlikleri (deterministik secim).
 	TArray<int32> Ids;
 	for (const FMMOEquipmentInstance& Inst : Inv.EquipmentBag)
 	{
-		if (Inst.InstanceId > 0 && Inst.ItemId == Ref.ItemId && Inst.Rarity == Ref.Rarity && Inst.Plus == 0)
+		if (Inst.InstanceId > 0 && Inst.InstanceId != Ref.InstanceId && Inst.ItemId == Ref.ItemId
+			&& Inst.Rarity == Ref.Rarity && Inst.Plus == 0)
 		{
 			Ids.Add(Inst.InstanceId);
 		}
 	}
-	if (Ids.Num() < InputCount)
+	if (Ids.Num() < InputCount - 1)
 	{
 		return P; // BadIds: esdeger 3 esya yok
 	}
-	Ids.Sort(); // En kucuk kimlikler once (deterministik secim).
-	return Check(Inv, Ids[0], Ids[1], Ids[2]);
+	Ids.Sort();
+	return Check(Inv, Ref.InstanceId, Ids[0], Ids[1]);
 }
 
 EMMOFusionResult FMMOFusion::Execute(UMMOInventoryComponent& Inv, int32 A, int32 B, int32 C, int32* OutNewInstanceId)
@@ -189,7 +246,7 @@ EMMOFusionResult FMMOFusion::Execute(UMMOInventoryComponent& Inv, int32 A, int32
 	AActor* Owner = Inv.GetOwner();
 	if (P.Result != EMMOFusionResult::Ok)
 	{
-		if (P.Result != EMMOFusionResult::NotAuthority)
+		if (P.Result != EMMOFusionResult::NotAuthority && P.Result != EMMOFusionResult::NotPlayer)
 		{
 			MMONotify::ToOwner(Owner, ResultText(P.Result), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		}
@@ -248,7 +305,8 @@ EMMOFusionResult FMMOFusion::Execute(UMMOInventoryComponent& Inv, int32 A, int32
 	if (Applied != -P.Fee)
 	{
 		// Olmamali (Gold >= Fee dogrulandi): kismi kesintiyi ve ciktiyi geri al.
-		Inv.Gold = FMath::Clamp(Inv.Gold - Applied, 0, UMMOInventoryComponent::MaxGold);
+		// Iade de ApplyGoldInternal'dan gecer: [MMOMETRIC] ev=gold satirlari dengelenir (F2).
+		Inv.ApplyGoldInternal(-Applied, TEXT("birlestirme-iade"), false);
 		Inv.EquipmentBag.RemoveAt(Inv.EquipmentBag.Num() - 1);
 		Inv.NextInstanceId = OldNextInstanceId;
 		RestoreInputs();
@@ -310,6 +368,9 @@ const TCHAR* FMMOFusion::ResultText(EMMOFusionResult R)
 	case EMMOFusionResult::UnknownItem:    return TEXT("Bilinmeyen esya");
 	case EMMOFusionResult::NotEnoughGold:  return TEXT("Altin yetersiz");
 	case EMMOFusionResult::InternalError:  return TEXT("Birlestirme basarisiz");
+	case EMMOFusionResult::NotPlayer:      return TEXT("Birlestirme yalniz oyuncu karakteri icindir");
+	case EMMOFusionResult::Locked:         return TEXT("Karakter yukleniyor ya da bolge degistiriyor; birlestirme su an yapilamaz");
+	case EMMOFusionResult::TradeLocked:    return TEXT("Takasa konan esya birlestirilemez");
 	}
 	return TEXT("Birlestirme basarisiz");
 }

@@ -26,7 +26,11 @@ enum class EMMOFusionResult : uint8
 	RarityCapped,
 	UnknownItem,
 	NotEnoughGold,
-	InternalError
+	InternalError,
+	// QA/guvenlik turu (D1): sona eklendi, mevcut degerler kaymaz.
+	NotPlayer,   // sahip oyuncu kontrollu AMMOCharacter degil (mob/NPC/AI)
+	Locked,      // kayit yuklenmedi ya da bolge gecisi kaydi onaylandi (degisiklik kalici olmaz)
+	TradeLocked  // girdi esya aktif takas teklifinde
 };
 
 /** Check/FindFromSlot sonucu: sunucunun hesapladigi esya, nadirlik gecisi ve ucret. */
@@ -51,13 +55,19 @@ struct MYPROJECT_API FMMOFusion
 	static int32 FeeFor(const FMMOItemDef& Def, EMMOItemRarity Input);
 
 	// Server read-only check (no mutation). Used by preview and by Execute.
+	// Order: authority, player gate (NotPlayer, Locked), vendor range, then the ids/items.
 	static FMMOFusionPreview Check(const UMMOInventoryComponent& Inv, int32 A, int32 B, int32 C);
 
-	// Picks 3 matching bag items starting from the 1-based bag slot (lowest InstanceIds first).
+	// The item in the 1-based bag slot is always the first input; the other two are the matching
+	// bag items (same ItemId and rarity, Plus 0) with the lowest InstanceIds. Same gates as Check first.
 	static FMMOFusionPreview FindFromSlot(const UMMOInventoryComponent& Inv, int32 BagSlot1Based);
 
 	// Server only. Re-runs Check, then mutates silently, then broadcasts once.
 	static EMMOFusionResult Execute(UMMOInventoryComponent& Inv, int32 A, int32 B, int32 C, int32* OutNewInstanceId = nullptr);
 
 	static const TCHAR* ResultText(EMMOFusionResult R); // Turkish ASCII player message
+
+private:
+	// Gates before any item check (shared by Check and FindFromSlot). Member so the inventory friend applies.
+	static EMMOFusionResult GateResult(const UMMOInventoryComponent& Inv);
 };
