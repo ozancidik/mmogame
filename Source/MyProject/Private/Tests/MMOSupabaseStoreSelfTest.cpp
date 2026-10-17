@@ -38,7 +38,7 @@ namespace
 
 	// vectors.json degisince (senaryo/vektor sayisi) test BILEREK kirilir; yeni sayi gozden gecirilip burada ve
 	// Scripts/TestSupabaseStore.ps1'de birlikte guncellenir.
-	constexpr int32 SupabaseTestExpectedChecks = 531;
+	constexpr int32 SupabaseTestExpectedChecks = 556;
 	const TCHAR* SupabaseTestKey = TEXT("sb_secret_TESTKEYDONOTLEAK0123456789abcdef");
 	// Eski service_role bicimi (JWT) icin SAHTE dize: gercek anahtar degil.
 	const TCHAR* SupabaseTestJwtKey = TEXT("eyJTESTFAKEHEADER.TESTFAKEPAYLOADDONOTLEAK.TESTFAKESIGNATURE0123");
@@ -2181,6 +2181,121 @@ namespace
 			FSupabaseCtx G;
 			G.Tr->Server.Seed(TEXT("ali"), SupabaseFixture(1), 3, 0);
 			Check(TEXT("leaseepoch"), TEXT("normal_has_both_fields"), SupabaseLoad(G, TEXT("MMOSave_Ali"))->O == SupabaseOut::Ok);
+		}
+
+		// ---------------- mutasyon sinamasi aciklari (2026-10-17): `epoch` takma adi, ReconcileCreate dogrulamasi, donmus create, ucustaki yazim, ag hatasi, DescribeMasked ----------------
+		const auto RawRpc = [](FSupabaseCtx& Ctx, const TCHAR* Body)
+		{
+			Ctx.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::RawBody, 0.05, 0, Body));
+		};
+		{
+			// create: committed ama yalniz eski `epoch` (lease_epoch yok) => kira kaydi YOK, belirsiz + donuk.
+			FSupabaseCtx C;
+			int64 Epoch = 0, Rev = 0;
+			RawRpc(C, TEXT("{\"outcome\":\"committed\",\"canonical_key\":\"legacya\",\"revision\":0,\"epoch\":1}"));
+			const TSharedRef<FSupabaseRes> Legacy = SupabaseCreate(C, TEXT("MMOSave_Legacya"), SupabaseFixture(10));
+			Check(TEXT("mutkill"), TEXT("create_legacy_epoch_unknown"), Legacy->O == SupabaseOut::Unknown && C.Store->IsSlotFrozen(TEXT("MMOSave_Legacya")));
+			Check(TEXT("mutkill"), TEXT("create_legacy_epoch_no_lease"), !C.Store->TryGetSlotInfo(TEXT("MMOSave_Legacya"), Epoch, Rev));
+			RawRpc(C, TEXT("{\"outcome\":\"committed\",\"canonical_key\":\"legacyb\",\"revision\":0,\"lease_epoch\":1,\"epoch\":1}"));
+			Check(TEXT("mutkill"), TEXT("create_lease_epoch_ok"), SupabaseCreate(C, TEXT("MMOSave_Legacyb"), SupabaseFixture(10))->O == SupabaseOut::Ok
+				&& C.Store->TryGetSlotInfo(TEXT("MMOSave_Legacyb"), Epoch, Rev) && Epoch == 1);
+		}
+		{
+			// renew/release: yanitta yalniz `epoch` varsa sozlesmeye uymaz => Unavailable, kira bilgisi DEGISMEZ.
+			FSupabaseCtx C;
+			C.Tr->Server.Seed(TEXT("ali"), SupabaseFixture(1), 3, 0);
+			SupabaseLoad(C, TEXT("MMOSave_Ali"));
+			int64 Epoch = 0, Rev = 0;
+			RawRpc(C, TEXT("{\"outcome\":\"ok\",\"epoch\":1}"));
+			Check(TEXT("mutkill"), TEXT("renew_legacy_epoch_unavailable"), SupabaseRenew(C, TEXT("MMOSave_Ali"))->O == SupabaseOut::Unavailable);
+			Check(TEXT("mutkill"), TEXT("renew_legacy_epoch_lease_kept"), C.Store->TryGetSlotInfo(TEXT("MMOSave_Ali"), Epoch, Rev) && Epoch == 1);
+			RawRpc(C, TEXT("{\"outcome\":\"ok\",\"already_released\":false,\"epoch\":1}"));
+			Check(TEXT("mutkill"), TEXT("release_legacy_epoch_unavailable"), SupabaseRelease(C, TEXT("MMOSave_Ali"))->O == SupabaseOut::Unavailable);
+			Check(TEXT("mutkill"), TEXT("release_legacy_epoch_lease_kept"), C.Store->TryGetSlotInfo(TEXT("MMOSave_Ali"), Epoch, Rev) && Epoch == 1);
+			RawRpc(C, TEXT("{\"outcome\":\"ok\",\"lease_epoch\":1,\"epoch\":1}"));
+			Check(TEXT("mutkill"), TEXT("renew_lease_epoch_ok"), SupabaseRenew(C, TEXT("MMOSave_Ali"))->O == SupabaseOut::Ok);
+		}
+		{
+			// create belirsiz -> get_op yaniti elle uretilir: yalniz tam gecerli yanit uzlasi sayilir.
+			const auto HostileGetOp = [](FSupabaseCtx& Ctx, const TCHAR* Slot, const TCHAR* GetOpBody)
+			{
+				for (int32 I = 0; I < 3; ++I) Ctx.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::TimeoutNoCommit, 8.0));
+				Ctx.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::RawBody, 0.05, 0, GetOpBody));
+				return SupabaseCreate(Ctx, Slot, SupabaseFixture(10));
+			};
+			int64 Epoch = 0, Rev = 0;
+			{
+				FSupabaseCtx C;
+				const TSharedRef<FSupabaseRes> Ok = HostileGetOp(C, TEXT("MMOSave_Hopa"),
+					TEXT("{\"outcome\":\"ok\",\"found\":true,\"op_kind\":\"create\",\"canonical_key\":\"hopa\",\"result\":{\"outcome\":\"committed\",\"revision\":0,\"lease_epoch\":1,\"epoch\":1}}"));
+				Check(TEXT("mutkill"), TEXT("getop_control_ok"), Ok->O == SupabaseOut::Ok && !C.Store->IsSlotFrozen(TEXT("MMOSave_Hopa")));
+				Check(TEXT("mutkill"), TEXT("getop_control_lease_epoch1"), C.Store->TryGetSlotInfo(TEXT("MMOSave_Hopa"), Epoch, Rev) && Epoch == 1 && Rev == 0);
+			}
+			{
+				FSupabaseCtx C;
+				const TSharedRef<FSupabaseRes> R = HostileGetOp(C, TEXT("MMOSave_Hopb"),
+					TEXT("{\"outcome\":\"ok\",\"found\":true,\"op_kind\":\"create\",\"canonical_key\":\"hopb\",\"result\":{\"outcome\":\"committed\",\"revision\":0,\"epoch\":1}}"));
+				Check(TEXT("mutkill"), TEXT("getop_legacy_epoch_unknown_frozen"), R->O == SupabaseOut::Unknown && C.Store->IsSlotFrozen(TEXT("MMOSave_Hopb")));
+				Check(TEXT("mutkill"), TEXT("getop_legacy_epoch_no_lease"), !C.Store->TryGetSlotInfo(TEXT("MMOSave_Hopb"), Epoch, Rev));
+			}
+			{
+				FSupabaseCtx C;
+				const TSharedRef<FSupabaseRes> R = HostileGetOp(C, TEXT("MMOSave_Hopc"),
+					TEXT("{\"outcome\":\"ok\",\"found\":true,\"op_kind\":\"create\",\"canonical_key\":\"otherkey\",\"result\":{\"outcome\":\"committed\",\"revision\":0,\"lease_epoch\":1,\"epoch\":1}}"));
+				Check(TEXT("mutkill"), TEXT("getop_wrong_key_unknown_frozen"), R->O == SupabaseOut::Unknown && C.Store->IsSlotFrozen(TEXT("MMOSave_Hopc")));
+				Check(TEXT("mutkill"), TEXT("getop_wrong_key_no_lease"), !C.Store->TryGetSlotInfo(TEXT("MMOSave_Hopc"), Epoch, Rev));
+			}
+			{
+				FSupabaseCtx C;
+				const TSharedRef<FSupabaseRes> R = HostileGetOp(C, TEXT("MMOSave_Hopd"),
+					TEXT("{\"outcome\":\"ok\",\"found\":false,\"op_kind\":\"create\",\"canonical_key\":\"hopd\",\"result\":{\"outcome\":\"committed\",\"revision\":0,\"lease_epoch\":1,\"epoch\":1}}"));
+				Check(TEXT("mutkill"), TEXT("getop_found_false_unknown_frozen"), R->O == SupabaseOut::Unknown && C.Store->IsSlotFrozen(TEXT("MMOSave_Hopd")));
+			}
+			{
+				FSupabaseCtx C;
+				const TSharedRef<FSupabaseRes> R = HostileGetOp(C, TEXT("MMOSave_Hope"),
+					TEXT("{\"outcome\":\"ok\",\"op_kind\":\"create\",\"canonical_key\":\"hope\",\"result\":{\"outcome\":\"committed\",\"revision\":0,\"lease_epoch\":1,\"epoch\":1}}"));
+				Check(TEXT("mutkill"), TEXT("getop_found_missing_unknown_frozen"), R->O == SupabaseOut::Unknown && C.Store->IsSlotFrozen(TEXT("MMOSave_Hope")));
+			}
+		}
+		{
+			// Donmus CREATE (yuva hic kiralanmadi, slot epoch'u 0): LoadEx once create'in verdigi epoch 1 ile release gonderir.
+			FSupabaseCtx C;
+			for (int32 I = 0; I < 3; ++I) C.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::TimeoutNoCommit, 8.0));
+			SupabaseCreate(C, TEXT("MMOSave_Frzc"), SupabaseFixture(10)); // get_op normal -> not_found -> Unknown + donuk
+			const TSharedRef<FSupabaseRes> L = SupabaseLoad(C, TEXT("MMOSave_Frzc"));
+			const TSharedPtr<FJsonObject> RelBody = C.Tr->LastBody(TEXT("release_lease"));
+			Check(TEXT("mutkill"), TEXT("frozen_create_release_epoch1"), RelBody.IsValid() && SupabaseNumberOf(RelBody, TEXT("p_epoch")) == 1.0);
+			Check(TEXT("mutkill"), TEXT("frozen_create_load_notfound"), L->O == SupabaseOut::NotFound);
+		}
+		{
+			// Ucustaki yazim varken LoadEx kira yenilemez: Unavailable, istek yok.
+			FSupabaseCtx C;
+			C.Tr->Server.Seed(TEXT("ali"), SupabaseFixture(1), 3, 0);
+			SupabaseLoad(C, TEXT("MMOSave_Ali"));
+			const TSharedRef<FSupabaseRes> Pending = SupabaseSave(C, TEXT("MMOSave_Ali"), SupabaseFixture(2), false);
+			const int32 ReqBefore = C.Tr->Requests.Num();
+			const TSharedRef<FSupabaseRes> L = MakeShared<FSupabaseRes>();
+			C.Store->LoadEx(TEXT("MMOSave_Ali"), [L](SupabaseOut O, FMMOCharacterSaveData&&) { ++L->Calls; L->O = O; });
+			Check(TEXT("mutkill"), TEXT("load_inflight_unavailable"), L->Calls == 1 && L->O == SupabaseOut::Unavailable);
+			Check(TEXT("mutkill"), TEXT("load_inflight_no_request"), C.Tr->Requests.Num() == ReqBefore);
+			C.Tr->Pump();
+			Check(TEXT("mutkill"), TEXT("load_inflight_save_completed"), Pending->O == SupabaseOut::Ok);
+		}
+		{
+			// Ag hatasiyla tukenen yazim BELIRSIZdir (Unavailable/kesin-basarisiz degil): get_op ile sorulur, bulunmazsa Unknown + donuk.
+			FSupabaseCtx C;
+			C.Tr->Server.Seed(TEXT("ali"), SupabaseFixture(1), 3, 0);
+			SupabaseLoad(C, TEXT("MMOSave_Ali"));
+			for (int32 I = 0; I < 3; ++I) C.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::NetworkError));
+			const TSharedRef<FSupabaseRes> S = SupabaseSave(C, TEXT("MMOSave_Ali"), SupabaseFixture(2));
+			Check(TEXT("mutkill"), TEXT("network_exhaust_unknown"), S->O == SupabaseOut::Unknown);
+			Check(TEXT("mutkill"), TEXT("network_exhaust_frozen"), C.Store->IsSlotFrozen(TEXT("MMOSave_Ali")));
+			Check(TEXT("mutkill"), TEXT("network_exhaust_three_attempts"), C.Tr->CountCalls(TEXT("save_character")) == 3 && C.Tr->CountCalls(TEXT("get_op")) == 1);
+		}
+		{
+			FSupabaseCtx C;
+			Check(TEXT("mutkill"), TEXT("describe_exact"), C.Client->DescribeMasked() == TEXT("url=[supabase-url] key=[supabase-key] timeout=8.0s budget=20.0s attempts=3"));
 		}
 
 		// ---------------- renew ----------------

@@ -47,7 +47,7 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
 # Beklenen sayi MMOSupabaseStoreSelfTest.cpp'deki SupabaseTestExpectedChecks ile ayni olmali.
-$expected = 531
+$expected = 556
 # Test, vectors.json'ta bilmedigi senaryo bulursa (sonradan eklenmis) adimlarini genel yurutucuyle kosar ve "extra" sayar (FAIL degil);
 # NOTE satiri: unknown_scenarios / extra_checks / skipped_admin. Raporlanan toplam = expected + extra olmali.
 $note = @($lines | Select-String '\[MMO_SUPABASE_NOTE\] unknown_scenarios=\d+ extra_checks=\d+ skipped_admin=\d+')
