@@ -8,14 +8,17 @@
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
 
+// Sozlesme: supabase/tests/vectors.json (contract_version 2) TEK DOGRULUK KAYNAGI. Parametre kumesi rpc_params ile birebir:
+// p_op_id YALNIZ create_character / save_character / get_op'ta; bigint alanlar (epoch, revision) JSON SAYI.
 namespace
 {
 	using SupabaseOut = EMMOSupabaseStoreOutcome;
 
 	constexpr int32 SupabaseMaxNameLen = 32;
+	constexpr int32 SupabaseMaxHolderLen = 96;
 	constexpr int32 SupabaseLeaseTtlSeconds = 120;
 
-	/** int64: ondalik-siz tam sayi METNI ya da 2^53 alti tam sayi sayisi. Digerleri RED. */
+	/** int64: 2^53'e kadar ondalik-siz JSON SAYISI (sozlesme: bigint JSON sayidir). Metin ve digerleri RED. */
 	bool SupabaseParseInt64(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Name, int64& Out)
 	{
 		if (!Obj.IsValid())
@@ -23,47 +26,17 @@ namespace
 			return false;
 		}
 		const TSharedPtr<FJsonValue>* Value = Obj->Values.Find(Name);
-		if (!Value || !Value->IsValid())
+		if (!Value || !Value->IsValid() || (*Value)->Type != EJson::Number)
 		{
 			return false;
 		}
-		if ((*Value)->Type == EJson::String)
+		const double Number = (*Value)->AsNumber();
+		if (Number < 0.0 || Number > 9007199254740992.0 || Number != FMath::FloorToDouble(Number))
 		{
-			const FString Text = (*Value)->AsString();
-			if (Text.IsEmpty() || Text.Len() > 19)
-			{
-				return false;
-			}
-			for (const TCHAR Ch : Text)
-			{
-				if (Ch < TEXT('0') || Ch > TEXT('9'))
-				{
-					return false;
-				}
-			}
-			if (Text.Len() == 19 && Text > TEXT("9223372036854775807"))
-			{
-				return false;
-			}
-			Out = FCString::Atoi64(*Text);
-			return true;
+			return false;
 		}
-		if ((*Value)->Type == EJson::Number)
-		{
-			const double Number = (*Value)->AsNumber();
-			if (Number < 0.0 || Number > 9007199254740992.0 || Number != FMath::FloorToDouble(Number))
-			{
-				return false;
-			}
-			Out = static_cast<int64>(Number);
-			return true;
-		}
-		return false;
-	}
-
-	FString SupabaseInt64Text(int64 Value)
-	{
-		return FString::Printf(TEXT("%lld"), static_cast<long long>(Value));
+		Out = static_cast<int64>(Number);
+		return true;
 	}
 
 	SupabaseOut SupabaseMapOutcome(const FString& Outcome)
@@ -104,8 +77,21 @@ namespace
 		return Text;
 	}
 
-	/** get_op yaniti: islem KAYITLI ve commit mi; revision'i verir. */
-	bool SupabaseParseCommittedOp(const FMMORpcResult& R, int64& OutRevision)
+	/** vectors.json limits.name_regex ile birebir: 1..32, [A-Za-z0-9 _-], bas ve son karakter bosluk degil. */
+	bool SupabaseIsValidName(const FString& Name)
+	{
+		if (Name.IsEmpty() || Name.Len() > SupabaseMaxNameLen || !MMONameRules::HasOnlyAllowedChars(Name))
+		{
+			return false;
+		}
+		return Name[0] != TEXT(' ') && Name[Name.Len() - 1] != TEXT(' ');
+	}
+
+	/**
+	 * get_op yaniti (vectors.json responses.get_op): found:true + outcome:ok + result nesnesi. Islem turu ve anahtar BEKLENENLE
+	 * ayni olmali (baska bir islemin kaydi uzlasti sayilmaz); result.outcome committed ise revision'i verir.
+	 */
+	bool SupabaseParseCommittedOp(const FMMORpcResult& R, const TCHAR* ExpectedKind, const FString& ExpectedKey, int64& OutRevision)
 	{
 		if (R.Status != EMMORpcStatus::Ok || R.Outcome != TEXT("ok") || !R.Json.IsValid())
 		{
@@ -113,6 +99,13 @@ namespace
 		}
 		bool bFound = false;
 		if (!R.Json->TryGetBoolField(TEXT("found"), bFound) || !bFound)
+		{
+			return false;
+		}
+		FString Kind;
+		FString Key;
+		if (!R.Json->TryGetStringField(TEXT("op_kind"), Kind) || Kind != ExpectedKind
+			|| !R.Json->TryGetStringField(TEXT("canonical_key"), Key) || Key != ExpectedKey)
 		{
 			return false;
 		}
@@ -128,6 +121,13 @@ namespace
 		}
 		return SupabaseParseInt64(*Result, TEXT("revision"), OutRevision);
 	}
+
+	/** Depo silinmis: ham geri cagri GUVENLE cagrilmaz (sahibi gitmis olabilir); sonuc yalniz loglanir (Dilim 4 notu). */
+	void SupabaseLogOrphan(const TCHAR* Function, const FMMORpcResult& R)
+	{
+		UE_LOG(LogMMOSupabase, Warning, TEXT("tamamlanma geri cagrisi atlandi (depo silindi) fn=%s op=%s durum=%d hata=%d http=%d"),
+			Function, *R.OpId, static_cast<int32>(R.Status), static_cast<int32>(R.Error), R.HttpCode);
+	}
 }
 
 struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCharacterStore::FImpl>
@@ -141,6 +141,7 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		int64 Revision = 0;
 		bool bFrozen = false;
 		FString FrozenOpId;
+		FString FrozenKind; // "save" | "create": get_op op_kind beklentisi
 		bool bInFlight = false;
 		bool bHasPending = false;
 		FMMOCharacterSaveData PendingData;
@@ -149,11 +150,16 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 
 	TSharedRef<FMMOSupabaseRestClient> Client;
 	FString Holder;
+	bool bHolderOk = false;
 	TMap<FString, FSlot> Slots;
 
 	FImpl(const TSharedRef<FMMOSupabaseRestClient>& InClient, const FString& InHolder)
-		: Client(InClient), Holder(InHolder)
+		: Client(InClient), Holder(InHolder), bHolderOk(FMMOSupabaseCharacterStore::IsValidHolder(InHolder))
 	{
+		if (!bHolderOk)
+		{
+			UE_LOG(LogMMOSupabase, Warning, TEXT("Supabase deposu: holder kurala uymuyor, hicbir istek gonderilmeyecek"));
+		}
 	}
 
 	static void Deliver(const TArray<FStatusComplete>& Done, SupabaseOut Outcome)
@@ -168,19 +174,25 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		}
 	}
 
-	TSharedRef<FJsonObject> NewParams(const FString& Key, const FString& OpId) const
+	/** Yalniz p_key: p_op_id yalniz create/save/get_op'ta vardir (vectors.json rpc_params), cagiran ekler. */
+	TSharedRef<FJsonObject> NewParams(const FString& Key) const
 	{
 		const TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
 		P->SetStringField(TEXT("p_key"), Key);
-		P->SetStringField(TEXT("p_op_id"), OpId);
 		return P;
+	}
+
+	/** Gecerli ad + gecerli holder; aksi halde hicbir istek gonderilmez. */
+	bool Resolve(const FString& SlotName, FString& OutKey, FString& OutDisplay) const
+	{
+		return bHolderOk && FMMOSupabaseCharacterStore::SlotToKey(SlotName, OutKey, OutDisplay);
 	}
 
 	// ---- LoadEx ----
 	void LoadEx(const FString& SlotName, IMMOAsyncCharacterStore::FLoadExComplete Completion)
 	{
 		FString Key, Display;
-		if (!FMMOSupabaseCharacterStore::SlotToKey(SlotName, Key, Display))
+		if (!Resolve(SlotName, Key, Display))
 		{
 			Completion(SupabaseOut::Invalid, FMMOCharacterSaveData());
 			return;
@@ -190,16 +202,20 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			Completion(SupabaseOut::Unavailable, FMMOCharacterSaveData()); // ucustaki yazim varken kira yenilenmez
 			return;
 		}
-		const FString OpId = FMMOSupabaseRestClient::NewOpId();
-		const TSharedRef<FJsonObject> P = NewParams(Key, OpId);
+		const FString LogOp = FMMOSupabaseRestClient::NewOpId(); // yalniz log icin; acquire_lease'e GONDERILMEZ
+		const TSharedRef<FJsonObject> P = NewParams(Key);
 		P->SetStringField(TEXT("p_holder"), Holder);
 		P->SetNumberField(TEXT("p_ttl_s"), SupabaseLeaseTtlSeconds);
 		const TWeakPtr<FImpl> Weak = AsShared();
-		Client->Call(TEXT("acquire_lease"), P, OpId, [Weak, Key, Completion](FMMORpcResult&& R)
+		Client->Call(TEXT("acquire_lease"), P, LogOp, [Weak, Key, Completion](FMMORpcResult&& R)
 		{
 			if (const TSharedPtr<FImpl> Self = Weak.Pin())
 			{
 				Self->OnLoaded(Key, R, Completion);
+			}
+			else
+			{
+				SupabaseLogOrphan(TEXT("acquire_lease"), R);
 			}
 		});
 	}
@@ -211,27 +227,26 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			Completion(SupabaseOut::Unavailable, FMMOCharacterSaveData()); // ulasilamadi != "yok"
 			return;
 		}
-		if (!SupabaseIsCommitted(R.Outcome))
+		if (R.Outcome != TEXT("ok"))
 		{
 			Completion(SupabaseMapOutcome(R.Outcome), FMMOCharacterSaveData());
 			return;
 		}
 		int64 Revision = 0;
 		int64 Epoch = 0;
-		if (!SupabaseParseInt64(R.Json, TEXT("revision"), Revision) || !SupabaseParseInt64(R.Json, TEXT("lease_epoch"), Epoch))
+		FString RespKey;
+		// Sozlesme 2: kira donemi alani `lease_epoch` (eski `epoch` takma adi OKUNMAZ).
+		if (!SupabaseParseInt64(R.Json, TEXT("revision"), Revision) || !SupabaseParseInt64(R.Json, TEXT("lease_epoch"), Epoch) || Epoch < 1
+			|| !R.Json->TryGetStringField(TEXT("canonical_key"), RespKey) || RespKey != Key)
 		{
 			Completion(SupabaseOut::Unavailable, FMMOCharacterSaveData());
 			return;
 		}
-		FString DataText;
 		const TSharedPtr<FJsonValue>* DataValue = R.Json->Values.Find(TEXT("data"));
+		FString DataText;
 		if (DataValue && DataValue->IsValid() && (*DataValue)->Type == EJson::Object)
 		{
 			DataText = SupabaseObjectToString((*DataValue)->AsObject().ToSharedRef());
-		}
-		else if (DataValue && DataValue->IsValid() && (*DataValue)->Type == EJson::String)
-		{
-			DataText = (*DataValue)->AsString();
 		}
 		FMMOCharacterSaveData Data;
 		if (DataText.IsEmpty() || !FMMOCharacterSaveJson::FromJson(DataText, Data))
@@ -245,6 +260,7 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		S.Revision = Revision;
 		S.bFrozen = false; // yetkili yeniden yukleme belirsizligi cozer
 		S.FrozenOpId.Reset();
+		S.FrozenKind.Reset();
 		Completion(SupabaseOut::Ok, MoveTemp(Data));
 	}
 
@@ -253,27 +269,65 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 	{
 		FString Key, Display;
 		TSharedPtr<FJsonObject> DataObj;
-		if (!FMMOSupabaseCharacterStore::SlotToKey(SlotName, Key, Display) || !SupabaseDataToObject(Data, DataObj))
+		if (!Resolve(SlotName, Key, Display) || !SupabaseDataToObject(Data, DataObj))
 		{
 			Completion(SupabaseOut::Invalid);
 			return;
 		}
 		const FString OpId = FMMOSupabaseRestClient::NewOpId();
-		const TSharedRef<FJsonObject> P = NewParams(Key, OpId);
+		const TSharedRef<FJsonObject> P = NewParams(Key);
 		P->SetStringField(TEXT("p_display_name"), Display);
 		P->SetStringField(TEXT("p_holder"), Holder);
+		P->SetStringField(TEXT("p_op_id"), OpId);
 		P->SetNumberField(TEXT("p_schema_version"), FMMOCharacterSaveJson::CurrentSchemaVersion);
 		P->SetObjectField(TEXT("p_data"), DataObj);
 		P->SetField(TEXT("p_race"), MakeShared<FJsonValueNull>());
-		Client->Call(TEXT("create_character"), P, OpId, [Completion](FMMORpcResult&& R)
+		const TWeakPtr<FImpl> Weak = AsShared();
+		Client->Call(TEXT("create_character"), P, OpId, [Weak, Key, OpId, Completion](FMMORpcResult&& R)
 		{
+			const TSharedPtr<FImpl> Self = Weak.Pin();
+			if (!Self)
+			{
+				SupabaseLogOrphan(TEXT("create_character"), R);
+				return;
+			}
 			if (R.Status == EMMORpcStatus::Ok)
 			{
 				Completion(SupabaseIsCommitted(R.Outcome) ? SupabaseOut::Ok : SupabaseMapOutcome(R.Outcome));
 			}
+			else if (R.Status == EMMORpcStatus::Unknown)
+			{
+				Self->ReconcileCreate(Key, OpId, Completion); // belirsiz: get_op ile uzlastir
+			}
 			else
 			{
-				Completion(R.Status == EMMORpcStatus::Unknown ? SupabaseOut::Unknown : SupabaseOut::Unavailable);
+				Completion(SupabaseOut::Unavailable);
+			}
+		});
+	}
+
+	void ReconcileCreate(const FString& Key, const FString& OpId, const FStatusComplete& Completion)
+	{
+		const TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
+		P->SetStringField(TEXT("p_op_id"), OpId);
+		const TWeakPtr<FImpl> Weak = AsShared();
+		Client->Call(TEXT("get_op"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, OpId, Completion](FMMORpcResult&& G)
+		{
+			const TSharedPtr<FImpl> Self = Weak.Pin();
+			if (!Self)
+			{
+				SupabaseLogOrphan(TEXT("get_op"), G);
+				return;
+			}
+			int64 Revision = 0;
+			if (SupabaseParseCommittedOp(G, TEXT("create"), Key, Revision))
+			{
+				Completion(SupabaseOut::Ok);
+			}
+			else
+			{
+				Self->Freeze(Key, OpId, TEXT("create")); // commit edilmedi mi, gec mi gelecek: bilinmiyor
+				Completion(SupabaseOut::Unknown);
 			}
 		});
 	}
@@ -282,7 +336,7 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 	void SaveEx(const FString& SlotName, const FMMOCharacterSaveData& Data, FStatusComplete Completion)
 	{
 		FString Key, Display;
-		if (!FMMOSupabaseCharacterStore::SlotToKey(SlotName, Key, Display))
+		if (!Resolve(SlotName, Key, Display))
 		{
 			Completion(SupabaseOut::Invalid);
 			return;
@@ -322,10 +376,11 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 		FSlot& S = Slots.FindOrAdd(Key);
 		S.bInFlight = true;
 		const FString OpId = FMMOSupabaseRestClient::NewOpId();
-		const TSharedRef<FJsonObject> P = NewParams(Key, OpId);
+		const TSharedRef<FJsonObject> P = NewParams(Key);
 		P->SetStringField(TEXT("p_holder"), Holder);
-		P->SetStringField(TEXT("p_epoch"), SupabaseInt64Text(S.Epoch));
-		P->SetStringField(TEXT("p_expected_revision"), SupabaseInt64Text(S.Revision));
+		P->SetNumberField(TEXT("p_epoch"), static_cast<double>(S.Epoch));
+		P->SetNumberField(TEXT("p_expected_revision"), static_cast<double>(S.Revision));
+		P->SetStringField(TEXT("p_op_id"), OpId);
 		P->SetNumberField(TEXT("p_schema_version"), FMMOCharacterSaveJson::CurrentSchemaVersion);
 		P->SetObjectField(TEXT("p_data"), DataObj);
 		const TWeakPtr<FImpl> Weak = AsShared();
@@ -334,6 +389,10 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			if (const TSharedPtr<FImpl> Self = Weak.Pin())
 			{
 				Self->OnSaveResult(Key, OpId, R, Done);
+			}
+			else
+			{
+				SupabaseLogOrphan(TEXT("save_character"), R);
 			}
 		});
 	}
@@ -352,7 +411,7 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 				}
 				else
 				{
-					Freeze(Key, OpId); // "committed" ama revision okunamadi: sonuc belirsiz
+					Freeze(Key, OpId, TEXT("save")); // "committed" ama revision okunamadi: sonuc belirsiz
 					FinishSave(Key, Done, SupabaseOut::Unknown);
 				}
 				return;
@@ -371,37 +430,38 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			return;
 		}
 		// Belirsiz: ayni op_id'yi get_op ile uzlastir.
-		const FString ReconcileOp = FMMOSupabaseRestClient::NewOpId();
 		const TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
 		P->SetStringField(TEXT("p_op_id"), OpId);
 		const TWeakPtr<FImpl> Weak = AsShared();
-		Client->Call(TEXT("get_op"), P, ReconcileOp, [Weak, Key, OpId, Done](FMMORpcResult&& G)
+		Client->Call(TEXT("get_op"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, OpId, Done](FMMORpcResult&& G)
 		{
 			const TSharedPtr<FImpl> Self = Weak.Pin();
 			if (!Self)
 			{
+				SupabaseLogOrphan(TEXT("get_op"), G);
 				return;
 			}
 			int64 Revision = 0;
-			if (SupabaseParseCommittedOp(G, Revision))
+			if (SupabaseParseCommittedOp(G, TEXT("save"), Key, Revision))
 			{
 				Self->Slots.FindOrAdd(Key).Revision = Revision;
 				Self->FinishSave(Key, Done, SupabaseOut::Ok);
 			}
 			else
 			{
-				Self->Freeze(Key, OpId);
+				Self->Freeze(Key, OpId, TEXT("save"));
 				Self->FinishSave(Key, Done, SupabaseOut::Unknown);
 			}
 		});
 	}
 
-	void Freeze(const FString& Key, const FString& OpId)
+	void Freeze(const FString& Key, const FString& OpId, const TCHAR* Kind)
 	{
 		FSlot& S = Slots.FindOrAdd(Key);
 		S.bFrozen = true;
 		S.FrozenOpId = OpId;
-		UE_LOG(LogMMOSupabase, Warning, TEXT("yuva donduruldu (belirsiz yazim sonucu) op=%s"), *OpId);
+		S.FrozenKind = Kind;
+		UE_LOG(LogMMOSupabase, Warning, TEXT("yuva donduruldu (belirsiz %s sonucu) op=%s"), Kind, *OpId);
 	}
 
 	void FinishSave(const FString& Key, const TArray<FStatusComplete>& Done, SupabaseOut Outcome)
@@ -449,9 +509,15 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			Completion(SupabaseOut::Invalid, false);
 			return;
 		}
-		const FString OpId = FMMOSupabaseRestClient::NewOpId();
-		Client->Call(TEXT("character_exists"), NewParams(Key, OpId), OpId, [Completion](FMMORpcResult&& R)
+		const FString LogOp = FMMOSupabaseRestClient::NewOpId();
+		const TWeakPtr<FImpl> Weak = AsShared();
+		Client->Call(TEXT("character_exists"), NewParams(Key), LogOp, [Weak, Completion](FMMORpcResult&& R)
 		{
+			if (!Weak.Pin().IsValid())
+			{
+				SupabaseLogOrphan(TEXT("character_exists"), R);
+				return;
+			}
 			bool bExists = false;
 			if (R.Status != EMMORpcStatus::Ok)
 			{
@@ -484,23 +550,29 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 			return;
 		}
 		const FString OpId = S->FrozenOpId;
+		const FString Kind = S->FrozenKind;
 		const TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
 		P->SetStringField(TEXT("p_op_id"), OpId);
 		const TWeakPtr<FImpl> Weak = AsShared();
-		Client->Call(TEXT("get_op"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, OpId, Completion](FMMORpcResult&& G)
+		Client->Call(TEXT("get_op"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, OpId, Kind, Completion](FMMORpcResult&& G)
 		{
 			const TSharedPtr<FImpl> Self = Weak.Pin();
 			if (!Self)
 			{
+				SupabaseLogOrphan(TEXT("get_op"), G);
 				return;
 			}
 			int64 Revision = 0;
 			FSlot* Slot = Self->Slots.Find(Key);
-			if (Slot && Slot->bFrozen && Slot->FrozenOpId == OpId && SupabaseParseCommittedOp(G, Revision))
+			if (Slot && Slot->bFrozen && Slot->FrozenOpId == OpId && SupabaseParseCommittedOp(G, *Kind, Key, Revision))
 			{
-				Slot->Revision = Revision;
+				if (Kind == TEXT("save"))
+				{
+					Slot->Revision = Revision;
+				}
 				Slot->bFrozen = false;
 				Slot->FrozenOpId.Reset();
+				Slot->FrozenKind.Reset();
 				Completion(SupabaseOut::Ok);
 			}
 			else
@@ -508,6 +580,106 @@ struct FMMOSupabaseCharacterStore::FImpl : public TSharedFromThis<FMMOSupabaseCh
 				Completion(SupabaseOut::Unknown); // bulunamadi/ulasilamadi: DONUK kalir (yetkili yeniden yukleme gerekir)
 			}
 		});
+	}
+
+	// ---- RenewLeaseEx ----
+	void RenewLeaseEx(const FString& SlotName, FStatusComplete Completion)
+	{
+		FString Key, Display;
+		if (!Resolve(SlotName, Key, Display))
+		{
+			Completion(SupabaseOut::Invalid);
+			return;
+		}
+		const FSlot* S = Slots.Find(Key);
+		if (!S || !S->bLeased)
+		{
+			Completion(SupabaseOut::NotLeased);
+			return;
+		}
+		const int64 SentEpoch = S->Epoch;
+		const TSharedRef<FJsonObject> P = NewParams(Key);
+		P->SetStringField(TEXT("p_holder"), Holder);
+		P->SetNumberField(TEXT("p_epoch"), static_cast<double>(SentEpoch));
+		P->SetNumberField(TEXT("p_ttl_s"), SupabaseLeaseTtlSeconds);
+		const TWeakPtr<FImpl> Weak = AsShared();
+		Client->Call(TEXT("renew_lease"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, SentEpoch, Completion](FMMORpcResult&& R)
+		{
+			const TSharedPtr<FImpl> Self = Weak.Pin();
+			if (!Self)
+			{
+				SupabaseLogOrphan(TEXT("renew_lease"), R);
+				return;
+			}
+			Completion(Self->OnLeaseResult(Key, SentEpoch, R, false));
+		});
+	}
+
+	// ---- ReleaseLeaseEx ----
+	void ReleaseLeaseEx(const FString& SlotName, FStatusComplete Completion)
+	{
+		FString Key, Display;
+		if (!Resolve(SlotName, Key, Display))
+		{
+			Completion(SupabaseOut::Invalid);
+			return;
+		}
+		const FSlot* S = Slots.Find(Key);
+		if (!S || !S->bLeased)
+		{
+			Completion(SupabaseOut::NotLeased);
+			return;
+		}
+		if (S->bInFlight)
+		{
+			Completion(SupabaseOut::Unavailable); // ucustaki yazim bitmeden birakilmaz
+			return;
+		}
+		const int64 SentEpoch = S->Epoch;
+		const TSharedRef<FJsonObject> P = NewParams(Key);
+		P->SetStringField(TEXT("p_holder"), Holder);
+		P->SetNumberField(TEXT("p_epoch"), static_cast<double>(SentEpoch));
+		const TWeakPtr<FImpl> Weak = AsShared();
+		Client->Call(TEXT("release_lease"), P, FMMOSupabaseRestClient::NewOpId(), [Weak, Key, SentEpoch, Completion](FMMORpcResult&& R)
+		{
+			const TSharedPtr<FImpl> Self = Weak.Pin();
+			if (!Self)
+			{
+				SupabaseLogOrphan(TEXT("release_lease"), R);
+				return;
+			}
+			Completion(Self->OnLeaseResult(Key, SentEpoch, R, true));
+		});
+	}
+
+	/** renew/release ortak sonuc: kira bilgisi yalniz KESIN sonucla degisir; ulasilamazsa korunur (yeniden denenebilir). */
+	SupabaseOut OnLeaseResult(const FString& Key, int64 SentEpoch, const FMMORpcResult& R, bool bRelease)
+	{
+		if (R.Status != EMMORpcStatus::Ok)
+		{
+			return SupabaseOut::Unavailable;
+		}
+		FSlot* S = Slots.Find(Key);
+		const bool bSameLease = S && S->bLeased && S->Epoch == SentEpoch;
+		if (R.Outcome == TEXT("ok"))
+		{
+			int64 Epoch = 0;
+			if (!SupabaseParseInt64(R.Json, TEXT("lease_epoch"), Epoch) || Epoch != SentEpoch)
+			{
+				return SupabaseOut::Unavailable; // yanit sozlesmeye uymuyor: durum degistirme
+			}
+			if (bRelease && bSameLease)
+			{
+				S->bLeased = false;
+			}
+			return SupabaseOut::Ok;
+		}
+		const SupabaseOut Mapped = SupabaseMapOutcome(R.Outcome);
+		if ((Mapped == SupabaseOut::OwnershipLost || Mapped == SupabaseOut::NotFound) && bSameLease)
+		{
+			S->bLeased = false; // kira yitirildi: yazim yok
+		}
+		return Mapped;
 	}
 };
 
@@ -523,15 +695,31 @@ bool FMMOSupabaseCharacterStore::SlotToKey(const FString& SlotName, FString& Out
 	FString Name = SlotName;
 	if (Name.StartsWith(TEXT("MMOSave_"), ESearchCase::IgnoreCase))
 	{
-		Name.RightChopInline(8);
+		Name.RightChopInline(8); // yalniz bir kez
 	}
-	// Ham ad denetlenir: SlotKey izinsiz karakteri sessizce atip BASKA bir adin anahtarini uretirdi.
-	if (Name.IsEmpty() || Name.Len() > SupabaseMaxNameLen || !MMONameRules::HasOnlyAllowedChars(Name) || MMONameRules::IsReservedName(Name))
+	// Ham ad denetlenir: SlotKey izinsiz karakteri/bosluklari sessizce atip BASKA bir adin anahtarini uretirdi.
+	if (!SupabaseIsValidName(Name) || MMONameRules::IsReservedName(Name))
 	{
 		return false;
 	}
 	OutKey = MMONameRules::CanonicalKey(Name);
 	OutDisplayName = Name;
+	return true;
+}
+
+bool FMMOSupabaseCharacterStore::IsValidHolder(const FString& Holder)
+{
+	if (Holder.IsEmpty() || Holder.Len() > SupabaseMaxHolderLen)
+	{
+		return false;
+	}
+	for (const TCHAR Ch : Holder)
+	{
+		if (!(MMONameRules::IsAsciiAlnum(Ch) || Ch == TEXT('_') || Ch == TEXT('.') || Ch == TEXT(':') || Ch == TEXT('-')))
+		{
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -582,6 +770,16 @@ void FMMOSupabaseCharacterStore::ExistsEx(const FString& SlotName, FExistsComple
 void FMMOSupabaseCharacterStore::ReconcileEx(const FString& SlotName, FStatusComplete&& Completion)
 {
 	Impl->ReconcileEx(SlotName, MoveTemp(Completion));
+}
+
+void FMMOSupabaseCharacterStore::RenewLeaseEx(const FString& SlotName, FStatusComplete&& Completion)
+{
+	Impl->RenewLeaseEx(SlotName, MoveTemp(Completion));
+}
+
+void FMMOSupabaseCharacterStore::ReleaseLeaseEx(const FString& SlotName, FStatusComplete&& Completion)
+{
+	Impl->ReleaseLeaseEx(SlotName, MoveTemp(Completion));
 }
 
 bool FMMOSupabaseCharacterStore::IsSlotFrozen(const FString& SlotName) const

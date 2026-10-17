@@ -47,8 +47,15 @@ public:
 	/** save_character: kira+epoch+expected_revision ile. Yuva basina tek ucustaki yazim; yenisi kuyruktakini birlestirir. */
 	virtual void SaveEx(const FString& SlotName, const FMMOCharacterSaveData& Data, FStatusComplete&& Completion) = 0;
 	virtual void ExistsEx(const FString& SlotName, FExistsComplete&& Completion) = 0;
-	/** Donmus yuvayi get_op ile uzlastirir. Donmamissa Ok. Bulunamazsa Unknown ve yuva DONUK kalir. */
+	/** Donmus yuvayi get_op ile uzlastirir (save VE create). Donmamissa Ok. Bulunamazsa Unknown ve yuva DONUK kalir. */
 	virtual void ReconcileEx(const FString& SlotName, FStatusComplete&& Completion) = 0;
+	/**
+	 * renew_lease: kirayi uzatir (periyodik cagri Dilim 4'tur). OwnershipLost/NotFound yuvayi NotLeased yapar;
+	 * ulasilamazsa Unavailable ve kira bilgisi KORUNUR (sonraki yenileme denenebilir).
+	 */
+	virtual void RenewLeaseEx(const FString& SlotName, FStatusComplete&& Completion) = 0;
+	/** release_lease: cikista kirayi birakir. Ok/OwnershipLost/NotFound yuvayi NotLeased yapar; Unavailable'da kira korunur. */
+	virtual void ReleaseLeaseEx(const FString& SlotName, FStatusComplete&& Completion) = 0;
 	virtual bool IsSlotFrozen(const FString& SlotName) const = 0;
 };
 
@@ -76,13 +83,21 @@ public:
 	virtual void SaveEx(const FString& SlotName, const FMMOCharacterSaveData& Data, FStatusComplete&& Completion) override;
 	virtual void ExistsEx(const FString& SlotName, FExistsComplete&& Completion) override;
 	virtual void ReconcileEx(const FString& SlotName, FStatusComplete&& Completion) override;
+	virtual void RenewLeaseEx(const FString& SlotName, FStatusComplete&& Completion) override;
+	virtual void ReleaseLeaseEx(const FString& SlotName, FStatusComplete&& Completion) override;
 	virtual bool IsSlotFrozen(const FString& SlotName) const override;
 
 	/** Yuva icin istemcinin bildigi kira/revision (testler ve tani). Kira yoksa false. */
 	bool TryGetSlotInfo(const FString& SlotName, int64& OutEpoch, int64& OutRevision) const;
 
-	/** Yuva adi -> kanonik anahtar. ASCII disi/ayrilmis/uzun ad RED (kirpilip baska ada cevrilmez). */
+	/**
+	 * Yuva adi -> kanonik anahtar. "MMOSave_" onegi YALNIZ BIR KEZ soyulur; sonrasi SQL name_regex ile birebir:
+	 * 1..32 karakter, [A-Za-z0-9 _-], bas/son bosluk YOK. ASCII disi/ayrilmis/uzun/bosluklu ad RED (kirpilip baska ada cevrilmez).
+	 */
 	static bool SlotToKey(const FString& SlotName, FString& OutKey, FString& OutDisplayName);
+
+	/** p_holder kurali (vectors.json limits.holder_regex): ^[A-Za-z0-9_.:-]{1,96}$. Gecersiz holder ile hicbir istek gonderilmez. */
+	static bool IsValidHolder(const FString& Holder);
 
 private:
 	struct FImpl;

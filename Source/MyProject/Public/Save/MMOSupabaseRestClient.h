@@ -73,8 +73,20 @@ public:
 	static TSharedPtr<FMMOSupabaseRestClient> Create(const TSharedRef<IMMOHttpTransport>& Transport,
 		const FMMOSupabaseConfig& Config, FString& OutError);
 
+	/** Sozlesme surumu (supabase/tests/vectors.json contract_version, SQL healthcheck.contract_version). */
+	static constexpr int32 ContractVersion = 2;
+
 	/** Yeni op_id (UUID, kucuk harf, tireli). Mantiksal bir yazim icin BIR KEZ uretilir. */
 	static FString NewOpId();
+
+	/**
+	 * LogHttp'yi Warning'e sabitler: UE HTTP modulu Verbose/VeryVerbose'ta istek basliklarini (apikey/Authorization)
+	 * loga yazabilir. Surec geneli yan etki: LogHttp'nin Log seviyesindeki ozet satirlari baska HTTP kullanicilari icin de
+	 * kapanir. Create'te ve her istek denemesinde cagrilir (konsoldan yeniden acilsa bile bir sonraki istekte kapanir).
+	 */
+	static void EnforceHttpLogLevel();
+	/** Komut satirinda LogHttp icin Verbose/VeryVerbose istenmis mi (-LogCmds="LogHttp Verbose" vb.). */
+	static bool CommandLineRequestsVerboseHttp(const FString& CommandLine);
 
 	/** Params govde olur; op_id'yi cagiran Params'a koyar ve burada log icin verir. Done her zaman ASENKRON doner. */
 	uint64 Call(const FString& Function, const TSharedRef<FJsonObject>& Params, const FString& OpId, FCallComplete&& Done);

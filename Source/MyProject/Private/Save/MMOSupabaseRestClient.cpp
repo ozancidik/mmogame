@@ -3,6 +3,8 @@
 #include "Save/MMOSupabaseRestClient.h"
 #include "Async/Async.h"
 #include "HAL/PlatformMisc.h"
+#include "Http.h"
+#include "Misc/CommandLine.h"
 #include "Misc/Guid.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
@@ -115,9 +117,55 @@ TSharedPtr<FMMOSupabaseRestClient> FMMOSupabaseRestClient::Create(const TSharedR
 	{
 		return nullptr;
 	}
+	EnforceHttpLogLevel();
+	if (CommandLineRequestsVerboseHttp(FCommandLine::Get()))
+	{
+		UE_LOG(LogMMOSupabase, Warning, TEXT("Komut satirinda LogHttp Verbose istendi; Supabase istemcisi LogHttp'yi Warning'e sabitler (istek basliklarinda anahtar var)"));
+	}
 	TSharedRef<FMMOSupabaseRestClient> Client = MakeShareable(new FMMOSupabaseRestClient(Transport, Config));
 	UE_LOG(LogMMOSupabase, Log, TEXT("Supabase istemcisi hazir: %s"), *Client->DescribeMasked());
 	return Client;
+}
+
+void FMMOSupabaseRestClient::EnforceHttpLogLevel()
+{
+	const ELogVerbosity::Type Current = LogHttp.GetVerbosity();
+	if (Current <= ELogVerbosity::Warning)
+	{
+		return;
+	}
+	LogHttp.SetVerbosity(ELogVerbosity::Warning);
+	if (Current >= ELogVerbosity::Verbose)
+	{
+		UE_LOG(LogMMOSupabase, Warning, TEXT("LogHttp %s idi; istek basliklari (apikey) loga dusmesin diye Warning'e sabitlendi"),
+			ToString(Current));
+	}
+}
+
+bool FMMOSupabaseRestClient::CommandLineRequestsVerboseHttp(const FString& CommandLine)
+{
+	const FString Lower = CommandLine.ToLower();
+	int32 From = 0;
+	while (true)
+	{
+		const int32 At = Lower.Find(TEXT("loghttp"), ESearchCase::CaseSensitive, ESearchDir::FromStart, From);
+		if (At == INDEX_NONE)
+		{
+			return false;
+		}
+		// Ayni LogCmds/ExecCmds girdisi icinde (virgul/tirnaga kadar) "verbose" (veryverbose dahil) geciyor mu.
+		FString Tail = Lower.Mid(At + 7, 24);
+		int32 Cut = INDEX_NONE;
+		if (Tail.FindChar(TEXT(','), Cut) || Tail.FindChar(TEXT('"'), Cut))
+		{
+			Tail.LeftInline(Cut);
+		}
+		if (Tail.Contains(TEXT("verbose")))
+		{
+			return true;
+		}
+		From = At + 7;
+	}
 }
 
 FString FMMOSupabaseRestClient::NewOpId()
@@ -206,6 +254,7 @@ void FMMOSupabaseRestClient::Cancel(uint64 CallId)
 void FMMOSupabaseRestClient::StartAttempt(const TSharedRef<FCall>& Call)
 {
 	++Call->Attempts;
+	EnforceHttpLogLevel(); // baslik loglamasi konsoldan yeniden acilmis olabilir
 	FMMOHttpRequest Request;
 	Request.Verb = TEXT("POST");
 	Request.Url = BaseUrl + TEXT("/rest/v1/rpc/") + Call->Function;

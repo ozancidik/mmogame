@@ -47,7 +47,7 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
 # Beklenen sayi MMOSupabaseStoreSelfTest.cpp'deki SupabaseTestExpectedChecks ile ayni olmali.
-$expected = 147
+$expected = 449
 $consistent = ($closedFail.Count -eq 5) -and ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_SUPABASE_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) closed_fail_logs=$($closedFail.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
