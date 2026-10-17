@@ -212,6 +212,7 @@ public:
 
 protected:
 	friend class UMMOTradeComponent; // Silent paired settlement before any observer.
+	friend struct FMMOFusion; // Silent fusion settlement before any observer.
 	// Purchase commits delivery and payment before publishing either delegate.
 	int32 AddItemInternal(FName ItemId, int32 Count, bool bNotify);
 	bool AddEquipmentInstanceInternal(FName ItemId, int32 Plus, EMMOItemRarity Rarity, bool bNotify);
