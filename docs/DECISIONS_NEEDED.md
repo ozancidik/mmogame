@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | 1 | Lv1–5 hızlı başlangıç korunsun mu | **UYGULANDI (2026-10-05): B eğrisi `MMOXPTuning.cpp`ta**; ince ayar ölçümle | [Muhtemel] | Evet |
 | 2 | Ölüm cezası | `max(%10 eşik, 2 öldürme XP'si)` | [Muhtemel] | Hayır, `death` olayı gerekli |
-| 3 | Altın sink'i / `Q_Gold*` | `Q_Gold*` altını harcatsın + yükseltme maliyeti seviyeyle ölçeklensin | [Muhtemel] | Kısmen (Q_Gold evet, ölçek hayır) |
+| 3 | Altın sink'i / `Q_Gold*` | (a)+(b) uygulandı; 2026-10-17 sink senaryoları: küçük dilim **P1 = şifacı küp + Lv42+ bağış satırları** (EK ~%25 fazla [Hesap/Tahmin]) + `+N` ölçümü; ayrıntı "Karar 3 sink senaryoları" | [Muhtemel] (model) | Kısmen (+N davranışı ölçülmeden açığın büyüklüğü %5-145 arası belirsiz) |
 | 4 | Kimlik/hesap | İlk playtest için parola + tanıdık oyuncu yeter | [Muhtemel] | Evet |
 | 5 | Lv28–33 beceri boşluğu (asıl boşluk Lv33→45) | **UYGULANDI (`56de087`): Lv31 + Lv39 becerileri kodda**; denge/zehir/mana bulguları `SKILL_PLAN_LV31_45.md` | [Tahmin] | Evet (tasarım); değerler ölçümle |
 | 6 | Hız hedefi (Lv30 kaç saat) | 2–3 saat (B) | [Tahmin] | Evet (hedef); tutup tutmadığı ölçümle |
@@ -101,6 +101,55 @@ Ceza, **öldürme eşdeğeri** olarak (mevcut eğri, gereken XP ÷ ortalama XP/�
 > **Net etki [Hesap]:** (gelir + günlük + başarım − şifacı) / kademe gideri, eski orana göre en fazla ±0,3x oynuyor (orta senaryo 2 sa/gün + 4 ölüm/sa: Lv1–2 0,5→0,5, Lv10–15 3,9→4,1, Lv42–50 31,2→31,2, Lv72–79 40,4→40,5). Yeni kalemler mevcut haliyle ne fazlayı kapatıyor ne kıtlığı açıyor; asıl kaldıraç hâlâ yükseltme hedefi (+N) ve seviyeyle ölçeklenen sink'ler.
 >
 > **Gereken `[MMOMETRIC]`:** `ev=gold src=gunluk`, `src=basarim`, `src=iyilestirme`, `src=posta` / `src=posta-iade` toplamları; oturum süresi/gün; `death`/sa. Posta ücreti ayrı satır değil: gönderimde `src=posta` eki + ücreti birlikte düşer, alıcı eki `src=posta` ile alır; ücret = −Σ(`posta`) − Σ(`posta-iade`) (tüm oyuncular, toplanmamış posta hariç). Ayrı `src=posta_ucret` ve günlük görev XP'si için `ev=xp src=gunluk` olayı yok: ölçüm için mmo-developer eklemeli.
+
+### Karar 3 sink senaryoları (2026-10-17, `[MODEL]`, kod değişmedi, PIE'de denenmedi)
+
+Kaynak: `python -I Scripts/EconomyModel.py --sink-scenarios` (D0 birleştirme dahil; formüller koddan okunur; varsayımlar `SINK_*` **[Tahmin]**). Ayrıntı: `BALANCE_MODEL.md` "Altın sink senaryoları".
+
+**Mevcut sink ve açık [Hesap]** (4 parçalı tek kademe/bant, gelir brüt = ana tablodaki gelir + Q_Gold bağışı):
+
+| Bant | Gelir | Gider +3 (ana tablo) | EV +3 | EV +5 | EV +7 | Gelir/sink ALT / ORTA / ÜST |
+|---|---:|---:|---:|---:|---:|---|
+| 16–24 | 87.057 | 7.728 | 9.079 | 28.918 | 230.662 | 5,8 / 1,3 / 0,3 |
+| 25–32 | 215.456 | 13.400 | 16.149 | 55.298 | 448.253 | 4,1 / 1,8 / 0,4 |
+| 33–41 | 457.885 | 20.176 | 24.686 | 87.931 | 718.652 | 6,5 / 2,6 / 0,5 |
+| 42–50 | 923.161 | 29.600 | 36.671 | 134.745 | 1.108.081 | 22,4 / 4,4 / 0,7 |
+| 51–57 | 1.076.615 | 40.960 | 51.206 | 192.280 | 1.587.885 | 19,3 / 3,9 / 0,6 |
+| 58–65 | 1.718.699 | 51.300 | 64.441 | 244.716 | 2.025.210 | 24,7 / 5,0 / 0,7 |
+| 66–71 | 2.128.032 | 64.592 | 81.497 | 312.650 | 2.592.345 | 24,6 / 5,0 / 0,7 |
+| 72–79 | 3.059.719 | 75.776 | 95.822 | 369.490 | 3.066.539 | 30,1 / 6,2 / 0,9 |
+
+EV = 4 parçanın alışı + beklenen yükseltme ücreti; **her deneme (başarılı/başarısız) ücret öder, yanan parça saticidan yeniden alınır** (`MMOInventoryComponent.cpp:837-874`, şans/yanma `MMOItemDatabase.cpp:151,165`). ALT = EV+3 + şifacı + iksir + bağış; ORTA = EV+5 + ... + birleştirme D; ÜST = EV+7 + ... + birleştirme S (üst sınır; Lv1–15'te ve ÜST'te bütçe yetmez).
+
+- **Asıl bulgu [Hesap]:** açığın büyüklüğü oyuncunun +N hedefine bağlı ve bunu hiçbir veri söylemiyor. Lv16–79'da kodda olan sink gelirin ALT'ta **%5,2**'si, ORTA'da **%22,1**'i; +7'yi kovalamak bandın tüm gelirini yer (Lv72–79: 3,07 M / 3,06 M). Eski "11–40×" sayısı yalnız "+3, hiç başarısızlık yok" tabanıdır; ALT'ta gerçek oran 4,1–30,1×, ORTA'da 1,3–6,2×.
+- İksir (Lv16–24'te gelirin %1,5'i, Lv42+'da <%0,2) ve şifacı (%0,15–0,6) açığı kapatmaz; birleştirme (D %6,9 / S %25,7) kısmen emer.
+- Gelir kötümser: ganimet satışı yok (+%2 ile +%13 eklerdi). Gelir tarafının kendisi (ort. mob altını Lv1 16 → Lv79 10.188, ×640; ekipman fiyatı ×24) açığın kökü; sink'ler polinom, gelir üstel. Mob altınını düzleştirmek (`MMOMobArchetype.cpp`) bir gelir düşürme seçeneğidir, **modellenmedi**.
+
+**Adaylar** (EK altın / bant fazlası = gelir − gider+3, Lv16–79 toplamı; birleştirme D %6,9 ile aynı payda):
+
+| Aday | Etki | Oyuncu deneyimi riski | Kod etkisi | Dosya:satır ve çakışma |
+|---|---:|---|---|---|
+| **A** şifacı/iksir büyüsün: A1 küp `0,09×(Lv−1)³`; A2 `10×ort. mob altını` | A1 %2,5; A2 %8,3 (4 ölüm/sa, yarısı atlatılır; bypass 0 ise ×2) | Düşük-orta: ölüm cezası (karar 2) ile birlikte düşünülmeli; pahalı sifa iksire/ölüp doğmaya kaçırır | A1 tek satır (`(L*L*L*9)/100`, int64). A2 yeni seviye→altın yardımcısı | `MMOHealerNPC.h:36` (temiz; çağıran `MMOPlayerController.cpp:2728` formülden bağımsız, controller şu an commit'siz ama dokunulmaz). `EconomyModel.py` ComputeHealCost regex'i (`load_new_items`) küp için güncellenir. Potion: `MMOItemDatabase.h:37`, `MMOConsumableDatabase.cpp:34` |
+| **B** Q_Gold bağış görevleri seviyeyle ölçeklensin (Lv42+ bantlarına bağış satırı; hedef = bandın 0,5–1 saatlik geliri) | B1 (0,5 sa, katılım %50) %22,3; B2 (1 sa) %45,5; katılım %100'de iki katı, %10'da beşte biri | Orta: isteğe bağlı olduğu için "vergi" hissi yok, ama katılım **[Tahmin]**; ödül (XP pace-nötr + unvan/iksir) cazip olmalı; 1,5 M altın taşımak gerekir (`Gold` int32 sınırı içinde) | Yalnız veri satırı (`HaveGold`, hedef ≥ 5000 zaten bağış, `MMOQuestComponent.cpp:662`); bileşen değişmez | `Quests/MMOQuestTypes.cpp:510-536` (Q_Gold5000..50000 zinciri). **Dosya `lv31-40-content` worktree'sinde commit'siz (+24 satır)**: sıra/çakışma Codex ile ayarlanmalı. Önerilen hedefler (B1): Lv42 310.000, Lv51 440.000, Lv58 710.000, Lv66 1.100.000, Lv72 1.500.000 |
+| **C** yükseltme eğrisi yüksek seviyede dikleşsin (`× (1+(Lv−30)/30)^γ`) | γ=1: hedef +3 %3,2 / +5 %13,3 / +7 %111,8; γ=2: %9,9 / %41,7 / %351,5 | **Yüksek:** +7 kovalayanı cezalandırır (kumar zaten yanma içeriyor); talep esnekliği (oyuncunun +N'den vazgeçmesi) modellenmedi, gerçek etki daha düşük olabilir; +7 oynanamaz hale gelir | Tek formül satırı + 3 sabit assertion | `MMOItemDatabase.cpp:140-146` (+ yorum `MMOItemDatabase.h:21-23`), assertion `MMOInventoryComponent.cpp:216-218` (temiz); test `MMOUpgradeCallbackSelfTest.cpp:89` sembolik. **`MMOItemDatabase.cpp` `lv31-40-content` worktree'sinde commit'siz** (yalnız Lv33 satırları, farklı bölge; yine de aynı dosya). `EconomyModel.upgrade_cost` aynasını güncelle; `sink_report` formül değişirse kendiliğinden hata verir |
+| **D** opsiyonel/kozmetik sink | D1 (Lv20/40/60'ta 3 satın alma, her biri 0,25 sa, katılım %50) %2,4 | Düşük; ama ürün yok | **Kodda hiçbiri yok:** isim değiştirme ücreti, depo/çanta genişletme (`MaxWarehouseSize` 24, `MaxBagSize` 12 sabit), beceri/stat sıfırlama, binek, kozmetik, onarım/dayanıklılık (grep boş). Bölge geçidi ücreti için alan var ama 0 | `MMOInventoryComponent.h:118,192` (`fusion-d1` ve `a3cc3` worktree'lerinde commit'siz); `MMOZoneLayout.h:119` `GoldCost` (Codex, izlenmeyen dosya). Yeni sistem = yeni dosya + `MMOSaveGame.h` yasağı + replikasyon: bu karar kapsamında önerilmez |
+| **E** ilan/pazar vergisi | Modellenmedi | — | Pazar yok (`SIX_MAP_PLAN.md` S5/S12: Aşama 8, PostgreSQL); işlem hacmi olmadan oran hesaplanamaz | Not: pazar açılınca %2–5 işlem vergisi + ilan ücreti, posta ücreti (`%2`) emsal |
+
+**Paketler (Lv16–79, gelir/sink ≤ 1,5 hedefi [Tahmin]; tabanlar: ALT hedef 0/8 bant, ORTA 1/8):**
+
+| Paket | EK sink (toplam fazlanın %'si) | Hedefi tutan bant (ALT / ORTA) |
+|---|---|---|
+| P1 = A1 + B1 | %24,8 | 0/8 / 1/8 (gelir/sink: ALT 2,8–4,3, ORTA 1,1–2,4) |
+| P2 = P1 + C1 | ALT %27,9; ORTA %38,0 | 0/8 / 1/8 |
+| P3 = A2 + B2 + C2 + D1 | ALT %66,2; ORTA %98,0 | 4/8 / 8/8 |
+
+**Karar sahibine seçenekler:**
+- **A: Önce ölç, kod değiştirme.** Gerekçe: ALT ile ÜST arasındaki fark (%5 vs %145) +N davranışından geliyor; yanlış yöne düzeltme riski. Dezavantaj: ilk playtestte altın birikimi ölçümsüz kalır.
+- **B: Küçük dilim şimdi (önerim [Tahmin]).** P1 = A1 + B1: iki bağımsız dosya (`MMOHealerNPC.h` tek satır, `MMOQuestTypes.cpp` ~5 veri satırı), yükseltme eğrisine dokunmaz. Model [Hesap]: Lv16–79 fazlasının ~%25'ini emer (A1 %2,5, B1 %22,3 katılım %50 **[Tahmin]** varsayımıyla; katılım %25'te B1 ≈ %11). ALT'ta gelir/sink 4,1–30,1× → 2,8–4,3×; hedef (≤1,5×) tutmaz, yani P1 açığı kapatmaz, yarıya yaklaştırır. Aynı anda `[MMOMETRIC]` ölçümü toplanır; C yalnız ölçüm "medyan hedef +N ≤ 4, yükseltme sink'i kullanılmıyor" derse açılır. A2 ve D şimdilik yok.
+- **C: Tam paket (P3).** Hedefe ulaşır (ORTA 8/8) ama C2 +7 kovalayanı yok eder, D yeni sistemler ister ve her şey katılım/davranış varsayımıdır.
+- **Gelir düşürme** (mob altınını düzleştirmek) ayrı seçenek, modellenmedi; kaynak sorununu çözer ama ekonomiyi ilk haftada kıtlaştırma riski (Lv1–9 zaten 0,4–1,1×).
+
+**Gereken `[MMOMETRIC]` / veri:** (1) yükseltmede `ev=gold src=yukseltme` zaten var; **eksik:** `to_plus` / sonuç (success/failed/burned) `[MMOMETRIC]` satırı (şu an yalnız `LogMMOInventoryAudit event=item_upgrade`, `MMOInventoryComponent.cpp:877`), mmo-developer eklemeli. (2) Bant başına gold `src` toplamı: `Scripts/PlaytestMetrics.py` oyuncu başına `src` giriş/çıkış veriyor; seviye bandı için `levelup` zamanlarıyla kesmek gerekir (gold olayında `lv` yok). (3) `death`/sa ve `src=iyilestirme` (A için), Q_Gold teslim oranı (B katılımı: `gorev_bagis` src'si var), `src=satis` (ganimet satışı geliri). Karar kuralı **[Tahmin, eşikler keyfi]**: ölçülen medyan sink/gelir (Lv16–79 bantları) ≥ %60 ise yeni sink açılmaz; < %30 ise P1'e geç; arada A + ölçüm.
 
 ## 4. Kimlik/hesap sistemi
 

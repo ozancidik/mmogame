@@ -19,6 +19,12 @@ Birlestirme (nadirlik fuzyonu, 2026-10-17, docs/DESIGN_FUSION.md D0; ciktinin en
   --check-fusion : yalniz tablo denetimi (CI/yerel); bedava terfi, sifir ucret, satis arbitraji, Efsanevi uretimi => cikis 1.
   --fusion-full  : 57 ekipmanin tamami icin adim tablosu. Normal kosu da denetimi yapar ve hata varsa cikis 1 verir.
 
+Altin sink senaryolari (2026-10-17, DECISIONS_NEEDED karar 3; ayri bayrak, normal cikti DEGISMEZ):
+  --sink-scenarios : bant bazinda mevcut sink toplami (yukseltme beklenen maliyeti basarisizlik/yanma dahil, sifaci, iksir, Q_Gold bagisi,
+                     birlestirme), acik, 4 aday (A sifaci, B bagis, C yukseltme egrisi, D opsiyonel) ve paketler. Formuller kaynaktan
+                     parse edilir (GetUpgradeCost/Chances/BurnChances/ComputeHealCost/PotionPrice/GoldDonationMinTarget); varsayimlar
+                     dosyadaki SINK_* sabitleridir [TAHMIN].
+
 Yeni kalemler (2026-10-11; ciktinin sonunda ayri bolum, ustteki eski tablo DEGISMEZ):
   sifaci bedeli (sink, MMOHealerNPC.h::ComputeHealCost), basarim altini (kaynak, tek seferlik, MMOAchievementDatabase.cpp),
   gunluk gorevler (kaynak, gunluk, MMODailyComponent.cpp::BuildBounties), posta ucreti (sink, MMOMailComponent.h::FeeFor).
@@ -102,6 +108,8 @@ def main():
     ap.add_argument("--check-fusion", action="store_true",
                     help="yalniz birlestirme tablo denetimi (arbitraj/bedava terfi/sifir ucret => cikis 1)")
     ap.add_argument("--fusion-full", action="store_true", help="birlestirme: 57 ekipmanin tamami icin adim tablosu")
+    ap.add_argument("--sink-scenarios", action="store_true",
+                    help="yalniz altin sink senaryolari (karar 3): mevcut sink toplami, acik, 4 aday ve paketler (2026-10-17)")
     args = ap.parse_args()
 
     if args.check_fusion:
@@ -130,6 +138,17 @@ def main():
         # Altin bagisi (MMOQuestComponent::GoldDonationMinTarget): buyuk HaveGold gorevleri teslimde altini dusurur (sink).
         donated_here = sum(c for (t, c, g, req) in quest_gold.values() if t == "HaveGold" and c >= GOLD_DONATION_MIN and req == lv)
         income_by_level[lv] = gold_kills + quest_here - donated_here
+
+    if args.sink_scenarios:
+        # Yalniz sink senaryolari (normal cikti degismez). Kademe/bant kurulumu asagidakiyle ayni.
+        s_tiers = {}
+        for it in items:
+            s_tiers.setdefault(it["lv"], []).append(it)
+        s_lvls = sorted(s_tiers)
+        s_bands = [(tl, (s_lvls[i + 1] if i + 1 < len(s_lvls) else 80) - 1,
+                    sum(buy_price(p) + upgrade_cost(args.upgrade_to, p["lv"]) for p in s_tiers[tl]))
+                   for i, tl in enumerate(s_lvls)]
+        sys.exit(1 if sink_report(income_by_level, kills_by_level, s_bands, s_tiers, args.upgrade_to) else 0)
 
     tiers = {}
     for it in items:
@@ -742,6 +761,235 @@ def fusion_report(income_by_level, kills_by_level, bands, tiers, full=False):
     for e in errs:
         print("HATA:", e)
     return bool(errs)
+
+
+# ---------------------------------------------------------------------------
+# Altin sink senaryolari (karar 3, 2026-10-17): python Scripts/EconomyModel.py --sink-scenarios
+# Kodda olan sink'lerin bant bazinda toplami + 4 aday sink'in bant basina emme orani.
+# Formul/sabitler kaynaktan PARSE edilir; asagidaki sabitler yalniz model varsayimidir [TAHMIN], oynanis olcumu DEGIL.
+# ---------------------------------------------------------------------------
+
+SINK_DEATHS = 4.0            # [TAHMIN] olum/sa (mevcut yeni-kalemler bolumunun orta degeri)
+SINK_HEAL_BYPASS = 0.5       # [TAHMIN] sifa gerektiren olumlerin yarisi bedava dogus/iksirle atlatilir (sifaci zorunlu degil)
+SINK_POTIONS_PER_HOUR = 30   # [TAHMIN] Buyuk Can Iksiri/sa
+SINK_FIRST_LV = 16           # bu seviyeden once gelir ~ gider: aday sink'ler yalniz a >= 16 bantlarinda hesaplanir
+SINK_TARGET_RATIO = 1.5      # [TAHMIN] hedef: gelir / tum sink <= 1.5 (gelirin >= %67'si harcanir)
+SINK_KNEE = 30               # aday C: dik egri bu seviyeden sonra baslar
+SINK_UPG_GAMMAS = (1.0, 2.0)  # aday C: maliyet x (1 + (Lv-30)/30)^gamma, Lv > 30
+SINK_HEAL_CUBE = 0.09        # aday A1: taban + 0,09 x (Lv-1)^3 (DECISIONS_NEEDED 2026-10-09 onerisi)
+SINK_HEAL_KILLS = 10         # aday A2: sifa bedeli = 10 x seviyedeki ort. mob altini
+SINK_DONATE = ((0.5, 0.5), (1.0, 0.5))   # aday B: (bantin saatlik gelirinin kati, katilim orani) [TAHMIN]
+SINK_OPTIONAL_GATES = (20, 40, 60)       # aday D: opsiyonel satin alimlarin acildigi seviyeler (tasarim varsayimi)
+SINK_OPTIONAL_HOURS = 0.25               # aday D: her biri bandin 1 saatlik gelirinin bu kati
+SINK_OPTIONAL_PART = 0.5                 # aday D: katilim orani [TAHMIN]
+
+
+def load_sink_rules():
+    r = {}
+    db_h = (PUB / "Items" / "MMOItemDatabase.h").read_text(encoding="utf-8", errors="replace")
+    r["max_plus"] = int(_must(r"MaxPlus\s*=\s*(\d+)", db_h, "MaxPlus").group(1))
+    r["potion"] = int(_must(r"PotionPrice\s*=\s*(\d+)", db_h, "PotionPrice").group(1))
+    cons = (SRC / "Items" / "MMOConsumableDatabase.cpp").read_text(encoding="utf-8", errors="replace")
+    r["gpotion"] = int(_must(r'MakeConsumable\(TEXT\("GreaterHealthPotion"\),\s*TEXT\("[^"]*"\),\s*(\d+)', cons,
+                             "GreaterHealthPotion fiyati").group(1))
+    body = _must(r"GetUpgradeCost\(int32 CurrentPlus, int32 RequiredLevel\)\s*\{(.*?)\n\}", item_src, "GetUpgradeCost").group(1)
+    if not re.search(r"50ll\s*\*\s*\(CurrentPlus \+ 1\)\s*\*\s*\(100ll \+ Lv \* Lv\)\s*/\s*100ll", body):
+        sys.exit("HATA: GetUpgradeCost formulu degisti; EconomyModel.upgrade_cost ve sink_report guncellenmeli.")
+    ch = _must(r"Chances\[MaxPlus\]\s*=\s*\{([^}]*)\}", item_src, "Chances").group(1)
+    bu = _must(r"BurnChances\[MaxPlus\]\s*=\s*\{([^}]*)\}", item_src, "BurnChances").group(1)
+    r["chance"] = [int(x) for x in re.findall(r"\d+", ch)]
+    r["burn"] = [int(x) for x in re.findall(r"\d+", bu)]
+    if len(r["chance"]) != r["max_plus"] or len(r["burn"]) != r["max_plus"]:
+        sys.exit("HATA: yukseltme sans/yanma tablosu MaxPlus ile uyusmuyor.")
+    qc = (PUB / "Components" / "MMOQuestComponent.h").read_text(encoding="utf-8", errors="replace")
+    r["don_min"] = int(_must(r"GoldDonationMinTarget\s*=\s*(\d+)", qc, "GoldDonationMinTarget").group(1))
+    return r
+
+
+def upgrade_ev(r, target, buy, lv, gamma=0.0):
+    """+0'dan hedef +N'ye beklenen altin (parca basina): her deneme (basari/basarisizlik) ucret oder, yanarsa parca
+    saticidan yeniden alinir (buy) ve +0'dan baslanir. gamma > 0: aday C dik egri. V(k) = a_k + m_k x V(0) dogrusal cozulur."""
+    def step(k):
+        base = 50 * (k + 1) * (100 + lv * lv) // 100
+        return base * (1.0 + max(0, lv - SINK_KNEE) / SINK_KNEE) ** gamma if gamma else base
+    a, m = 0.0, 0.0
+    for k in range(target - 1, -1, -1):
+        p, b = r["chance"][k] / 100.0, r["burn"][k] / 100.0
+        den = 1.0 - (1.0 - p) * (1.0 - b)
+        a, m = ((step(k) + p * a + (1.0 - p) * b * buy) / den, (p * m + (1.0 - p) * b) / den)
+    return a / (1.0 - m)
+
+
+def sink_report(income_by_level, kills_by_level, bands, tiers, upg_to):
+    r, c, fr = load_sink_rules(), load_new_items(), load_fusion_rules()
+    quests_at = Counter(q["req"] for q in pm.quests if not q["id"].startswith("Q_Gold"))
+    hours = {lv: (k * KILL_SEC + quests_at.get(lv, 0) * QUEST_SEC) / 3600.0 for lv, k in kills_by_level.items()}
+    levels = sorted(income_by_level)
+    don_at = Counter()
+    for t, cnt, _g, req in quest_gold.values():
+        if t == "HaveGold" and cnt >= r["don_min"]:
+            don_at[req] += cnt
+    bsum = lambda f, a, b: sum(f(lv) for lv in levels if a <= lv <= b)
+    hl = lambda lv: max(0, lv - 1)
+    heal_cur = lambda lv: max(0, c["heal_base"]) + (hl(lv) ** 2 * c["heal_num"]) // c["heal_den"]
+    heal_cube = lambda lv: max(0, c["heal_base"]) + int(SINK_HEAL_CUBE * hl(lv) ** 3)
+    heal_kill = lambda lv: round(SINK_HEAL_KILLS * avg_gold(lv))
+    fus_ok = fr["fee_mult"] is not None and fr["cap"] is not None
+    k_in = fr["inputs"] or 3
+    heal_w = SINK_DEATHS * (1.0 - SINK_HEAL_BYPASS)
+    PH = SINK_POTIONS_PER_HOUR * r["gpotion"]
+
+    rows = []
+    for a, b, cost in bands:
+        inc = bsum(lambda lv: income_by_level[lv], a, b)
+        hrs = bsum(lambda lv: hours[lv], a, b)
+        don = bsum(lambda lv: don_at.get(lv, 0), a, b)
+        parts = tiers[a]
+        buys = sum(buy_price(p) for p in parts)
+        row = dict(a=a, b=b, inc=inc, hrs=hrs, inc_h=inc / hrs if hrs else 0.0, don=don, inc_g=inc + don, c3=cost,
+                   S0=inc - cost, buys=buys, heal=heal_w * bsum(lambda lv: hours[lv] * heal_cur(lv), a, b),
+                   pot=hrs * PH, parts=parts, hours_fn=(lambda lv: hours[lv]))
+        row["ev"] = {n: buys + sum(upgrade_ev(r, n, buy_price(p), p["lv"]) for p in parts) for n in (3, 5, 7)}
+        row["fd"] = row["fs"] = 0.0
+        if fus_ok:
+            row["fd"] = sum(chain_fee(fr, f_buy(fr, p), fr["fee_mult"], fr["cap"]) for p in parts)
+            row["fs"] = sum((k_in ** fr["cap"] - 1) * f_buy(fr, p) + chain_fee(fr, f_buy(fr, p), fr["fee_mult"], fr["cap"]) for p in parts)
+        rows.append(row)
+
+    print("=== Altin sink senaryolari (karar 3, 2026-10-17) [MODEL]; oynanis olcumu YOK ===")
+    print(f"Koddan [Kesin]: yukseltme maliyeti 50 x (+N) x (100 + Lv^2) / 100 HER denemede odenir; basari %{'/'.join(map(str, r['chance']))}, "
+          f"basarisizlikta yanma %{'/'.join(map(str, r['burn']))} (MaxPlus {r['max_plus']}); yanan parca saticidan yeniden alinir. "
+          f"Sifaci {c['heal_base']} + {c['heal_num']}/{c['heal_den']} x (Lv-1)^2; iksir {r['potion']} / Buyuk Can Iksiri {r['gpotion']}; "
+          f"Q_Gold bagisi >= {r['don_min']} altin teslimde dusulur; birlestirme {'okundu' if fus_ok else 'YOK (D/S = 0)'}.")
+    print(f"Varsayim [Tahmin]: {SINK_DEATHS:g} olum/sa x (1 - {SINK_HEAL_BYPASS:g} bypass) sifa; {SINK_POTIONS_PER_HOUR} Buyuk Can Iksiri/sa; "
+          f"oldurme {KILL_SEC:g} sn, gorev {QUEST_SEC:g} sn; her bantta 4 parcalik tek kademe. Gelir = ana tablodaki (Q_Gold bagisi dusulmus); "
+          f"'gelir brut' = gelir + bagis. Ganimet satisi gelirde YOK (asagida duyarlilik).")
+
+    # --- 1. Mevcut sink'ler ------------------------------------------------
+    print("\n(1) Mevcut sink'ler, bant basina. gider+3 = ana tablodaki (kesin +3, basarisizlik yok); EV+N = 4 parcanin alisi + beklenen "
+          "yukseltme ucreti (basarisizlik ve yanma/yeniden alis dahil) hedef +N icin. Birl D/S = bir 4 parcalik setin Destansi'ya cikarilmasi "
+          "(D ganimet girdisi, S saticidan).")
+    print(f"{'aralik':>9} {'gelir':>10} {'gelir/sa':>9} {'gider+3':>8} {'EV+3':>8} {'EV+5':>9} {'EV+7':>10} {'sifaci':>9} {'iksir':>8} {'bagis':>7} {'birlD':>8} {'birlS':>9}")
+    for x in rows:
+        print(f"{x['a']:>4}-{x['b']:<4} {x['inc']:>10.0f} {x['inc_h']:>9.0f} {x['c3']:>8.0f} {x['ev'][3]:>8.0f} {x['ev'][5]:>9.0f} {x['ev'][7]:>10.0f} "
+              f"{x['heal']:>9.0f} {x['pot']:>8.0f} {x['don']:>7.0f} {x['fd']:>8.0f} {x['fs']:>9.0f}")
+
+    def tot(x, n, with_fus):
+        return x["ev"][n] + x["heal"] + x["pot"] + x["don"] + (x["fd"] if with_fus == "D" else x["fs"] if with_fus == "S" else 0.0)
+    scen = (("ALT", 3, None), ("ORTA", 5, "D"), ("UST", 7, "S"))
+    print("\n(1b) Senaryo toplami ve acik: ALT = EV+3 + sifaci + iksir + bagis; ORTA = EV+5 + ... + birl.D; UST = EV+7 + ... + birl.S. "
+          "gelir_brut / sink: >1 altin birikir, <1 kit; hedef <= " + f"{SINK_TARGET_RATIO:g}" + ". kalan = gelir_brut - sink.")
+    print(f"{'aralik':>9} {'ALT g/s':>8} {'ORTA g/s':>9} {'UST g/s':>8} {'kalan ALT':>11} {'kalan ORTA':>11} {'kalan UST':>11}")
+    for x in rows:
+        v = [tot(x, n, f) for _l, n, f in scen]
+        print(f"{x['a']:>4}-{x['b']:<4} {x['inc_g'] / v[0]:>8.1f} {x['inc_g'] / v[1]:>9.1f} {x['inc_g'] / v[2]:>8.1f} "
+              f"{x['inc_g'] - v[0]:>11.0f} {x['inc_g'] - v[1]:>11.0f} {x['inc_g'] - v[2]:>11.0f}")
+    hi = [x for x in rows if x["a"] >= SINK_FIRST_LV]
+    s_inc = sum(x["inc_g"] for x in hi)
+    print(f"Lv{SINK_FIRST_LV}-79 toplam: gelir_brut {s_inc:.0f}; sink ALT {sum(tot(x, 3, None) for x in hi):.0f} "
+          f"(%{sum(tot(x, 3, None) for x in hi) / s_inc * 100:.1f}), ORTA {sum(tot(x, 5, 'D') for x in hi):.0f} "
+          f"(%{sum(tot(x, 5, 'D') for x in hi) / s_inc * 100:.1f}), UST {sum(tot(x, 7, 'S') for x in hi):.0f} "
+          f"(%{sum(tot(x, 7, 'S') for x in hi) / s_inc * 100:.1f}). Hangi senaryonun gercek oldugu oyuncunun +N hedefine bagli: "
+          "[MMOMETRIC] ev=gold src=yukseltme ve item_upgrade (to_plus) olmadan bilinmez. "
+          "Gelir < sink olan bantlarda (g/s < 1; ozellikle Lv<16) oyuncu o +N'e ulasamaz: UST bir ust sinirdir, gercek sink = gelir.")
+
+    # Gelir tarafi duyarlilik: ganimet satisi (modelde yok = kotumser gelir)
+    all_items, _calls = load_all_items()
+
+    def loot_sale(lv):
+        pool = [i for i in all_items if i["lv"] <= lv + fr["pool_slack"]]
+        e = sum(p * f_sell(fr, i, ri) for i in pool for ri, p in enumerate(fr["roll"])) / len(pool)
+        return fr["equip_chance"] * e
+    print("Gelir duyarliligi [Hesap]: ganimet satisi (dusme sansi x ort. satis degeri, havuz Lv <= mob+3, elit ve +N dahil degil) "
+          "ortalama mob altinina eklenir: " + "; ".join(
+              f"{x['a']}-{x['b']}: +%{loot_sale((x['a'] + x['b']) // 2) / avg_gold((x['a'] + x['b']) // 2) * 100:.0f}"
+              for x in hi if avg_gold((x['a'] + x['b']) // 2)) + ". (Gelir daha yuksek ise acik buyur.)")
+
+    # --- 2. Adaylar --------------------------------------------------------
+    cand = {}   # etiket -> {bant a: delta}
+
+    def add(label, fn):
+        cand[label] = {x["a"]: fn(x) for x in hi}
+    add("A1", lambda x: heal_w * bsum(lambda lv: hours[lv] * (heal_cube(lv) - heal_cur(lv)), x["a"], x["b"]))
+    add("A2", lambda x: heal_w * bsum(lambda lv: hours[lv] * (heal_kill(lv) - heal_cur(lv)), x["a"], x["b"]))
+    for i, (xh, q) in enumerate(SINK_DONATE, 1):
+        add(f"B{i}", lambda x, xh=xh, q=q: max(0.0, q * xh * x["inc_h"] - x["don"]))
+
+    def up_delta(n, g):
+        return lambda x: sum(upgrade_ev(r, n, buy_price(p), p["lv"], g) - upgrade_ev(r, n, buy_price(p), p["lv"]) for p in x["parts"])
+    for i, g in enumerate(SINK_UPG_GAMMAS, 1):
+        add(f"C{i}", up_delta(5, g))   # N=5 (ORTA); N=3/7 asagida
+    gate_band = {}
+    for gl in SINK_OPTIONAL_GATES:
+        for x in hi:
+            if x["a"] <= gl <= x["b"]:
+                gate_band[x["a"]] = gate_band.get(x["a"], 0) + 1
+    add("D1", lambda x: SINK_OPTIONAL_PART * SINK_OPTIONAL_HOURS * x["inc_h"] * gate_band.get(x["a"], 0))
+
+    names = {
+        "A1": f"A1 sifaci kup {SINK_HEAL_CUBE:g}",
+        "A2": f"A2 sifaci {SINK_HEAL_KILLS}xmob altini",
+        "B1": f"B1 bagis {SINK_DONATE[0][0]:g}sa x%{SINK_DONATE[0][1] * 100:.0f}",
+        "B2": f"B2 bagis {SINK_DONATE[1][0]:g}sa x%{SINK_DONATE[1][1] * 100:.0f}",
+        "C1": f"C1 yuk. dik g={SINK_UPG_GAMMAS[0]:g} (+5)",
+        "C2": f"C2 yuk. dik g={SINK_UPG_GAMMAS[1]:g} (+5)",
+        "D1": f"D1 opsiyonel {len(SINK_OPTIONAL_GATES)} alim",
+    }
+    print("\n(2) Aday sink'ler: EK altin / bant fazlasi (gelir - gider+3, ana tablodaki). Karsilastirma: birlestirme D %6.9, S %25.7 (kod carpani, ayni payda).")
+    for k, v in names.items():
+        print(f"    {v}")
+    print(f"{'aralik':>9} {'fazla':>10}" + "".join(f" {k:>6}" for k in names))
+    for x in hi:
+        print(f"{x['a']:>4}-{x['b']:<4} {x['S0']:>10.0f}" + "".join(f" {cand[k][x['a']] / x['S0'] * 100:>5.1f}%" for k in names))
+    s0 = sum(x["S0"] for x in hi)
+    print(f"{'toplam':>9} {s0:>10.0f}" + "".join(f" {sum(cand[k].values()) / s0 * 100:>5.1f}%" for k in names)
+          + f"   (Lv{SINK_FIRST_LV}-79, yalniz EK sink)")
+    cn = []
+    for n in (3, 5, 7):
+        for i, g in enumerate(SINK_UPG_GAMMAS, 1):
+            d = sum(up_delta(n, g)(x) for x in hi)
+            cn.append(f"C{i} hedef +{n}: %{d / s0 * 100:.1f}")
+    print("  Aday C hedef +N'ye gore (toplam fazlanin yuzdesi): " + "; ".join(cn) + ".")
+    xh0, q0 = SINK_DONATE[0]
+    print(f"  B1 icin bant basina tek bagis hedefi (= {xh0:g} sa gelir, 2 anlamli basamak; mevcut Q_Gold bagislari bant icinde ise o bant 0 EK): "
+          + ", ".join("Lv%d: %d" % (x["a"], int(float("%.2g" % (xh0 * x["inc_h"])))) for x in hi) + ".")
+    print(f"  Duyarlilik: A'da sifa bypass 0 ise etki x{1 / (1 - SINK_HEAL_BYPASS):g}; olum {DEATHS_PER_HOUR[0]}/{DEATHS_PER_HOUR[-1]} /sa ise x{DEATHS_PER_HOUR[0] / SINK_DEATHS:g}"
+          f" / x{DEATHS_PER_HOUR[-1] / SINK_DEATHS:g}. B ve D katilim oranina dogrusal. C'de oyuncunun +N'den vazgecmesi (talep esnekligi) modellenmedi: etkiyi azaltir.")
+
+    # --- 3. Paketler -------------------------------------------------------
+    packs = (("P1 = A1+B1", ("A1", "B1")), ("P2 = P1+C1", ("A1", "B1", "C1")), ("P3 = A2+B2+C2+D1", ("A2", "B2", "C2", "D1")))
+    print(f"\n(3) Paketler: kalan gelir_brut / (sink + EK). ALT (hedef +3) ve ORTA (hedef +5) tabanlari; hedef <= {SINK_TARGET_RATIO:g}. "
+          "C'nin EKi ilgili +N icin yeniden hesaplanir.")
+    print(f"{'aralik':>9} {'taban ALT':>9} {'taban ORTA':>10}" + "".join(f" {p[0][:2] + ' ALT':>7} {p[0][:2] + ' ORTA':>8}" for p in packs))
+    sums = {}
+    for x in hi:
+        base = {"ALT": tot(x, 3, None), "ORTA": tot(x, 5, "D")}
+        line = f"{x['a']:>4}-{x['b']:<4} {x['inc_g'] / base['ALT']:>9.1f} {x['inc_g'] / base['ORTA']:>10.1f}"
+        for pn, keys in packs:
+            for sc, n in (("ALT", 3), ("ORTA", 5)):
+                d = 0.0
+                for k in keys:
+                    d += up_delta(n, SINK_UPG_GAMMAS[int(k[1]) - 1])(x) if k[0] == "C" else cand[k][x["a"]]
+                sums.setdefault((pn, sc), []).append((x["inc_g"], base[sc] + d, x["S0"], d))
+                line += f" {x['inc_g'] / (base[sc] + d):>7.1f}" if sc == "ALT" else f" {x['inc_g'] / (base[sc] + d):>8.1f}"
+        print(line)
+    print("Paket ozeti (Lv16-79): EK sink / toplam fazla; hedefi tutan bant sayisi (gelir/sink <= " + f"{SINK_TARGET_RATIO:g}" + f", {len(hi)} bant):")
+    for pn, _k in packs:
+        out = []
+        for sc in ("ALT", "ORTA"):
+            v = sums[(pn, sc)]
+            out.append(f"{sc} EK %{sum(t[3] for t in v) / s0 * 100:.1f}, hedef {sum(1 for t in v if t[0] / t[1] <= SINK_TARGET_RATIO)}/{len(hi)}")
+        print(f"  {pn}: " + "; ".join(out))
+    base_hit = {"ALT": sum(1 for x in hi if x['inc_g'] / tot(x, 3, None) <= SINK_TARGET_RATIO),
+                "ORTA": sum(1 for x in hi if x['inc_g'] / tot(x, 5, 'D') <= SINK_TARGET_RATIO)}
+    print(f"  taban (paketsiz): ALT hedef {base_hit['ALT']}/{len(hi)}, ORTA hedef {base_hit['ORTA']}/{len(hi)}")
+
+    print("\n(4) Kodda olmayan / sadece not:")
+    print("  Onarim/dayaniklilik: YOK (Durability/Repair grep bos). Isim degistirme ucreti: YOK (GameMode::ChangeName yalniz ad kurali, altin yok). "
+          f"Depo/canta genisletme: YOK (MaxWarehouseSize 24, MaxBagSize 12 sabit). Beceri/stat sifirlama, binek, kozmetik: YOK. "
+          "Bolge gecidi ucreti: alan var ama 0 (MMOZoneLayout.h GoldCost, Codex dosyasi, commit'siz). Pazar/ilan vergisi: pazar yok (S12 atamasi), model yok; "
+          "vergi ancak pazar olunca anlamlidir (islem hacmi olmadan hesaplanamaz).")
+    return False
 
 
 if __name__ == "__main__":

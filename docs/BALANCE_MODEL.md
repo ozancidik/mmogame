@@ -80,22 +80,50 @@ python3 Scripts/ProgressionModel.py --max 30   # yalnız Lv1-30
 
 Betik: `python3 Scripts/EconomyModel.py [--upgrade-to N]`. Gelir = öldürme (ilerleme modelinden) × pencere ortalama mob altını + görev altın ödülleri; gider = kademenin 4 parçasının alış fiyatı + parça başına +N yükseltme. İksir, şifacı, loot satışı, ölüm, yanma ve parti **yok**; sonuç yön gösterir, ölçüm değildir. **[KOD+MODEL]**
 
+Tablo 2026-10-17'de güncel `EconomyModel.py` çıktısıyla yenilendi (eski satırlar 2026-10-05'ti: gelir/gider 9–224×; yükseltme maliyeti o zaman seviyeden bağımsızdı). Yükseltme maliyeti artık `50×(artı+1)×(100+Lv²)/100`, bağış görevleri gelirden düşülüyor. **[KOD+MODEL]**
+
 | Kademe Lv | Aralık | Gelir | Gider (+3) | Gelir/gider |
 |---:|---|---:|---:|---:|
-| 1 | 1–2 | 829 | 1.716 | 0,5 |
-| 3 | 3–4 | 960 | 2.120 | 0,5 |
-| 5 | 5 | 2.462 | 2.524 | 1,0 |
-| 7 | 7–9 | 4.130 | 3.060 | 1,3 |
-| 10 | 10–15 | 8.008 | 3.648 | 2,2 |
-| 16 | 16–24 | 42.148 | 4.656 | 9,1 |
-| 25 | 25–32 | 143.441 | 5.904 | 24,3 |
-| 33 | 33–41 | 457.479 | 7.112 | 64,3 |
-| 42 | 42–50 | 931.425 | 8.432 | 110,5 |
-| 72 | 72–79 | 3.038.495 | 13.568 | 223,9 |
+| 1 | 1–2 | 829 | 1.724 | 0,5 |
+| 3 | 3–4 | 960 | 2.224 | 0,4 |
+| 5 | 5 | 2.462 | 2.820 | 0,9 |
+| 6 | 6 | 3.267 | 968 | 3,4 |
+| 7 | 7–9 | 4.167 | 3.644 | 1,1 |
+| 10 | 10–15 | 18.806 | 4.848 | 3,9 |
+| 16 | 16–24 | 87.057 | 7.728 | 11,3 |
+| 25 | 25–32 | 215.456 | 13.400 | 16,1 |
+| 33 | 33–41 | 457.885 | 20.176 | 22,7 |
+| 42 | 42–50 | 923.161 | 29.600 | 31,2 |
+| 51 | 51–57 | 1.076.615 | 40.960 | 26,3 |
+| 58 | 58–65 | 1.718.699 | 51.300 | 33,5 |
+| 66 | 66–71 | 2.128.032 | 64.592 | 32,9 |
+| 72 | 72–79 | 3.059.719 | 75.776 | 40,4 |
 
-- [Muhtemel] Lv1–9 altın **kıt** (gelir/gider 0,5–1,3): ilk set ancak görev altınıyla alınır, bu "kıtlık yalnız Lv1–8" hedefiyle uyumlu. Lv16'dan itibaren gelir giderin 9–224 katı: ekipman ve +3 yükseltme altını hiç zorlamıyor, altın birikir. `VERTICAL_SLICE_LV1_30.md`'nin "faucet bol, sink zayıf" bulgusunu doğruluyor.
-- Yükseltme maliyeti `50×(artı+1)`, seviyeden bağımsız; ekipman fiyatı yalnız `12×(atk+def) + 25×seviye + 50` ile büyüyor. Gelir ise mob altınıyla ~×1,2/seviye büyüyor, bu yüzden oran açılıyor.
-- **Karar bekleyen:** yeni altın sink'i (ör. yükseltme/iksir/şifacı maliyetini seviyeyle ölçekle) ya da gelir düşürme. Ölçüm (`[MMOMETRIC]` `gold` olayları) olmadan körlemesine olur. Q_Gold* görevleri birikimi ödüllendirdiği için bu dengesizliği büyütüyor.
+- [Muhtemel] Lv1–5 altın **kıt** (gelir/gider 0,4–0,9), Lv7–9 sınırda (1,1): ilk set ancak görev altınıyla alınır, bu "kıtlık yalnız Lv1–8" hedefiyle uyumlu. Lv16'dan itibaren gelir giderin **11–40 katı** (+3 yükseltmede, başarısızlık/yanma yok): ekipman altını zorlamıyor, altın birikir. `VERTICAL_SLICE_LV1_30.md`'nin "faucet bol, sink zayıf" bulgusunu doğruluyor. Ancak bu "gider" kademe başına tek +3 setidir; gerçek sink oyuncunun +N hedefine bağlıdır: aşağıda "Altın sink senaryoları".
+- Ekipman fiyatı `12×(atk+def) + 25×seviye + 50` ile büyüyor (Lv1 171 → Lv72 4.106, ×24); ortalama mob altını Lv1 16 → Lv79 10.188 (×640) ve bant başına saatlik gelir 3,5 bin (Lv1–2) → 3,0 milyon (Lv72–79) (×860). Polinom sink (kare/küp) bu üstel gelire yetişemez; bu yüzden tek maliyet düzeltmesi açığı kapatmıyor.
+- **Karar bekleyen:** karar 3, bkz. "Altın sink senaryoları" ve `DECISIONS_NEEDED.md` karar 3 (2026-10-17 bloğu).
+
+## Altın sink senaryoları (2026-10-17, **[MODEL]**, oynanışta ölçülmedi)
+
+Betik: `python -I Scripts/EconomyModel.py --sink-scenarios` (normal çıktı ve `--check-fusion` bozulmadı; çıktı bayt bayt aynı). Formüller koddan okunur: `GetUpgradeCost`, yükseltme şansı `90/80/70/55/45/35/25/20`, yanma `0/0/0/15/30/50/70/100`, `ComputeHealCost`, `PotionPrice`, `GoldDonationMinTarget`, birleştirme tabloları. Varsayımlar `SINK_*` sabitleridir **[TAHMIN]** (4 ölüm/sa, yarısı sifa atlatır; 30 Büyük Can İksiri/sa; 4 parçalı tek kademe/bant).
+
+- **Yükseltme gerçek sink'tir ve +N'ye aşırı duyarlıdır [Hesap]:** her deneme ücret öder, yanan parça yeniden alınır. 4 parça, Lv72–79: +3 hedefi 95.822, +5 hedefi 369.490, +7 hedefi 3.066.539 altın (bant geliri 3.059.719). Yani +7 kovalamak bandın tüm gelirini yer, +3 ise %3'ünü. Oyuncuların çoğu hangi +N'de duruyor: **veri yok**.
+- Kodda olan sink toplamı, Lv16–79 (gelir brüt 9,77 M): ALT (+3, şifacı, iksir, bağış) **%5,2**, ORTA (+5, birleştirme D) **%22,1**, ÜST (+7, birleştirme S) %144,9 (üst sınır; bütçe yetmeyince gerçekleşmez). Gelir/sink: ALT 4,1–30,1×, ORTA 1,3–6,2×.
+- İksir (30/sa × 40 altın) gelirin Lv16–24'te %1,5'i, Lv42+'da %0,2'sinden azı; şifacı (kare, yarısı atlatılıyor) %0,15–0,6. İkisi de açığı kapatmaz.
+- Gelir tarafı kötümser: ganimet satışı modelde yok; ortalama mob altınına +%2 (Lv51+) ile +%13 (Lv16–24) eklerdi.
+
+| Aday (EK altın / bant fazlası, Lv16–79 toplamı) | Etki | Not |
+|---|---:|---|
+| A1 şifacı küp `0,09×(Lv−1)³` | %2,5 | 4 ölüm/sa, yarısı atlatılıyor |
+| A2 şifacı `10 × ort. mob altını` | %8,3 | mob tablosuna bağlı yeni yardımcı gerekir |
+| B1 bağış `0,5 sa gelir`, katılım %50 | %22,3 | yalnız veri satırı; katılım **[TAHMIN]** |
+| B2 bağış `1 sa gelir`, katılım %50 | %45,5 | aynı |
+| C1 yükseltme dik eğri `×(1+(Lv−30)/30)^1`, hedef +3 / +5 / +7 | %3,2 / %13,3 / %111,8 | hedefe aşırı duyarlı, talep esnekliği modellenmedi |
+| C2 aynı, üs 2: +3 / +5 / +7 | %9,9 / %41,7 / %351,5 | +7 oynanamaz hale gelir |
+| D1 3 opsiyonel satın alma (Lv20/40/60) | %2,4 | kodda yok |
+| (karşılaştırma) birleştirme D / S | %6,9 / %25,7 | |
+
+Paket sonuçları `--sink-scenarios` çıktısının (3) bölümünde; hedef "gelir ≤ 1,5 × sink" **[TAHMIN]**. Hiçbir küçük paket tek başına ALT tabanında hedefi tutturmuyor (P1 = A1+B1: ALT 0/8, ORTA 1/8 bant, EK %24,8); P3 = A2+B2+C2+D1 ORTA'da 8/8. Öneri ve dosya çakışması: `DECISIONS_NEEDED.md` karar 3.
 
 ## Ekipman birleştirme (nadirlik füzyonu) ekonomisi (2026-10-17, **[MODEL]**, oynanışta ölçülmedi)
 
@@ -109,9 +137,9 @@ Betik: `python Scripts/EconomyModel.py` çıktısının sonundaki "Birleştirme"
 | Bant fazlasını emme, 4 parçalık set, yalnız ücret (D) / satıcı yolu (S) | Lv16–24 %41 / %155, Lv25–32 %22 / %83, Lv42–50 %7,7 / %29, Lv72–79 %3,9 / %15 |
 | Her bantta set yapılsa toplam fazla payı | D %6,9; S %25,7 |
 
-- [Hesap] Birleştirme Lv16+ gelir/gider farkını (yukarıdaki "Altın ekonomisi" tablosunda 9–224×, güncel çıktıda 11–40×) kapatmaz; yüksek seviyede etkisi küçük. Lv1–15 fiilen kapalı. Seviyeyle ölçeklenen yükseltme/şifacı sink'i (karar 3) hâlâ gerekli.
+- [Hesap] Birleştirme Lv16+ gelir/gider farkını (yukarıdaki "Altın ekonomisi" tablosunda 11–40×) kapatmaz; yüksek seviyede etkisi küçük. Lv1–15 fiilen kapalı. Seviyeyle ölçeklenen yükseltme/şifacı sink'i (karar 3) hâlâ gerekli.
 - [Hesap] Ganimetten kendi kademenin 3 aynı parçası seviyelenirken gelmez (belirli eşya 3 adet 494–1.341 öldürme, bant süresi 0,1–1,5 sa); elit ganimeti ve gerçek düşme sıklığı: veri yok.
-- Not: yukarıdaki "Altın ekonomisi" tablosu eski bir koşudan (2026-10-05); güncel `EconomyModel.py` çıktısında gelir/gider Lv16'da 11,3×, Lv72'de 40,4×.
+- Not: "Altın ekonomisi" tablosu 2026-10-17'de güncel çıktıyla yenilendi (Lv16'da 11,3×, Lv72'de 40,4×).
 
 ## Uygulanan ayar (2026-10-04, DERLENMEDI): XP çarpan eğrisi, parti bonusu, Q_Gold
 
