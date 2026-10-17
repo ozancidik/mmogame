@@ -19,8 +19,29 @@ Python denetimlerini kendisi koştu (aşağıda).
 | Belge (bu tur) | `DESIGN_FUSION.md` (durum, dilim tablosu, §7.2/§7.3 sonuçları, §9 durum, yeni §11 D2/D4 gereksinimleri + açık maddeler, `ServerSay` → `ServerSendChat_Implementation` düzeltmesi), `PLAYTEST_CHECKLIST.md` (D2 sonrası 13 madde), `DECISIONS_NEEDED.md` (A1-A4 + ajan modeli notu), `CLAUDE.md` (fusion satırı, ajan modeli, Docs listesi, bayat varsayılan harita satırı, test koşucusu cümlesi), bu özet | bu commit |
 | Denetim | `ContentMap.py --check` "koddan üretilenle aynı"; `DocCounts.py` 59 mob / 97 görev / 57 ekipman / 93 beceri, sapma 0; `PocketSpacing.py` 18 cep, 0 hata, 2 bilinen uyarı (`MMOGameMode.cpp:1038`↔`:1050` 1733 u, `:1039`↔`:1074` 1581 u); `ValidateData.py` temiz (2 bilinen Warrior beceri boşluğu uyarısı); `StaticLint.py` ana kopyada **7 HATA** (hepsi izlenmeyen `MMOZoneLayout.*`), `fusion-d1` worktree'de temiz (134 dosya) | 2026-10-17, belge denetçisi |
 
+## Supabase veritabani baglama (Claude, 17 Ekim; yukaridaki `4e0f0c5..f9b71c2` araligindan SONRA, `71c548f`..`342ab17`)
+
+Mimari C: Supabase yalniz barindirilan PostgreSQL + PostgREST RPC; Auth/Realtime/Storage yok. Ayrinti ve durum tablosu: `docs/DESIGN_SUPABASE.md` (ustteki DURUM blogu).
+
+| Alan | Ne | Kanit |
+|---|---|---|
+| Tasarim | Mimari secenekleri, tehdit modeli, dilimler 0-7, 10 karar | `71c548f` |
+| Dilim 1 SQL | `supabase/migrations/20261017120000_v2_character_store.sql` (823 satir; `mmo` semasi API'ye acik degil, `mmo_api` RPC yalniz `service_role`, kira/`lease_epoch` fencing, `op_id` yazim gunlugu, `purge_write_ops`), `supabase/tests/00..05*.sql` + `run_all.sql`, `vectors.json` (sozlesme 2, 20 senaryo), `supabase/README.md`; iki QA/guvenlik turunda yerinde duzeltildi | `c8d81c1`, `bcde6a2`, `1ae80c7` |
+| Dilim 2 UE | `IMMOHttpTransport`, `FMMOUnrealHttpTransport`, `FMMOSupabaseRestClient`, `FMMOSupabaseCharacterStore` (+ `IMMOAsyncCharacterStore`; senkron yontemler kapali-basarisiz), `MMOSupabaseStoreSelfTest.cpp`, `Scripts/TestSupabaseStore.ps1` | `e0fffdf` (147) -> `43be747` (449) -> `932b565` (531) -> `342ab17` (556 kontrol). `SupabaseTestExpectedChecks = 556` ve `TestSupabaseStore.ps1` `$expected = 556` kodda dogrulandi; mutasyon 62/62 yakalandi (9'u ilk turda kacmisti, test guclendirildi) bu oturumun rapor edilen sonucudur, belge denetcisi tekrar kosmadi |
+| Guvenlik | Iki bagimsiz QA + iki guvenlik turu. Kapandi: `p_op_id` fazlaligi, `lease_epoch`, `get_op` `found`, `SlotToKey` bas/son bosluk, Shipping `NO_LOGGING`, Bearer yalniz JWT, `CreateEx` kirasi, donmus yuva release->acquire, `write_ops` purge `p_batch`, `LogHttp` Warning | ayni commit'ler |
+| Belge (bu tur) | `DESIGN_SUPABASE.md` (DURUM blogu, dilim tablosu durum sutunu, 71c548f taslak SQL'ine sapma uyarilari, `IMMOAsyncCharacterStore` farki, §6/§8/§9 duzeltmeleri), `CLAUDE.md` (Supabase satiri + Docs), `DECISIONS_NEEDED.md` (S1-S10), `PLAYTEST_CHECKLIST.md` (dev projesi ilk kurulum), bu bolum | bu commit |
+
+**Durust sinirlar:** SQL hicbir PostgreSQL'de calistirilmadi (sozdizimi bile ayristiriciyla denenmedi; makinede psql/docker/supabase CLI yok). UE testi sahte sunucuya karsi, o sunucu `vectors.json`'dan turetildi: istemci kontrata uyuyor, kontratin
+gercek SQL'le uyumu kanitli degil. Test izole worktree'de kosuldu (ana kopya baskasinin `MMOZoneLayout*`/`MMORace*` dosyalari yuzunden derlenmiyor), `RunSystemTests.ps1`/`RunAllChecks.ps1`/CI adimi degil. Dilim 3 (`-MMOCharacterStore`, acilista `HealthcheckEx`) ve
+Dilim 4 (cagirani DB'ye gecirme, periyodik `RenewLeaseEx`, cikista `ReleaseLeaseEx`) YAPILMADI: oyundaki hicbir kod depoyu cagirmiyor (`grep`). Yan veri (basarim/gunluk/posta) deposu, yedek/`export_all`, silme (KVKK) RPC'si yok. Gercek Supabase hesabi/baglantisi
+ve PIE yok. Acik: K-1 kimlik (tek paylasilan secret key; DB kimlik cozmez), kira yenilemenin cagrilmamasi, R1 daralir ama kapanmaz, motorun `LogHttp`/WinHttp davranisi dogrulanmadi, Supabase limit/fiyat bilgisi dogrulanmadi.
+
+**Kullanicinin yapacaklari:** Supabase hesabi + `myproject-dev` projesi; anahtari SOHBETE YAPISTIRMADAN yalniz yerel ortam degiskenine (`MMO_SUPABASE_URL`, `MMO_SUPABASE_SECRET_KEY`); Dashboard guvenlik ayarlari (`supabase/README.md` listesi); psql / Supabase CLI kurulumu;
+sonra `PLAYTEST_CHECKLIST.md` "Supabase dev projesi ilk kurulum". **Acik kararlar:** `DECISIONS_NEEDED.md` S1-S10 (mimari A/B/C, oneri C -> halka acik oncesi B; servis dili; Auth kullanma; bolge AB; katman; yedek; DB moduna gecis tek yonlu mu; kimlik sirasi; migration kaynagi; yazma-arkada onbellek reddi), hepsi BEKLIYOR.
+
 ## Kim neye dokundu
 
+- **Claude, Supabase (trailer'lı):** `71c548f` (yalnız `docs/DESIGN_SUPABASE.md`), `c8d81c1`/`bcde6a2`/`1ae80c7` (`supabase/` yeni dosyalar), `e0fffdf`/`43be747`/`932b565`/`342ab17` (`Source/MyProject/{Public,Private}/Save/MMOSupabase*`, `MMOHttpTransport.h`, `MMOUnrealHttpTransport.*`, `Private/Tests/MMOSupabaseStoreSelfTest.cpp`, `Scripts/TestSupabaseStore.ps1`); paylasilan dosyadan yalniz `.gitignore` (`c8d81c1`) degisti, Codex'in kirli dosyalarina dokunulmadi.
 - **Claude (bu oturum, trailer'lı):** `26deb59` (yalnız `docs/DESIGN_FUSION.md`), `d7bb1b1`, `df4c3c6`, `1a8ec3f`, `d7c75ed`
   (`MMOFusion.h/.cpp`, `MMOFusionSelfTest.cpp`, `TestFusion.ps1`, `MMOInventoryComponent.h` +1 satır), `f9b71c2` (`.claude/agents/*.md`, 9 dosya,
   birer satır), bu belge commit'i. `MMOInventoryComponent.cpp`, `MMOTradeComponent.*`, `MMOSaveGame.h`, `Config/`, `Content/` değişmedi.

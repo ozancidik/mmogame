@@ -395,6 +395,35 @@ Kaynak: `python Scripts/EconomyModel.py` "Birlestirme" bolumu; fiyat/zar/ucret k
 - **Gereken `[MMOMETRIC]` verisi:** `ev=fusion` sayisi + `ev=gold src=birlestirme` toplami / bant saatlik geliri (kod hazir); `ev=item_pickup rarity=..` (henuz yok). Karar kurali: oyuncularin cogu Lv16-32'de hic birlestirmiyor ve altin birikiyorsa `{0.25, 0.5, 1}`; Lv66+ hala >100x gelir/gider ise karar 3.
 - **Degisecek dosya:** yalniz olcum sonrasi gerekirse `MMOFusion.cpp::FusionFeeMult` (tek satir, mmo-developer).
 
+## Yeni karar adaylari (2026-10-17: Supabase veritabani baglama; hepsi BEKLIYOR)
+
+Kaynak: `docs/DESIGN_SUPABASE.md` (§8 tam tablo, DURUM blogu). **Durum: kimse onaylamadi.** Kodda gecici varsayim: mimari C, Auth yok. SQL (`supabase/`) ve UE depo katmani
+(`Source/MyProject/Public/Save/MMOSupabase*`) yazildi; **SQL hicbir PostgreSQL'de calistirilmadi, UE tarafi yalniz sahte sunucuya karsi (556 kontrol, izole worktree) test edildi,
+oyundaki hicbir yol depoyu cagirmiyor, gercek Supabase hesabi/baglantisi yok, PIE yok.** Hesap, proje, anahtar ve Dashboard ayarlari **kullanicidadir** (anahtari SOHBETE
+YAPISTIRMA; yalniz yerel ortam degiskeni `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECRET_KEY`). Etiket hepsi [Tahmin]/oneri: Supabase limit/fiyat bilgisi dogrulanmadi.
+
+| # | Soru | Oneri | Not |
+|---|---|---|---|
+| S1 | Mimari A (tablo uclari) / B (kendi ara servisi) / C (RPC, mantik SQL'de) | **C**, halka acik surumden once **B** | C'nin bedeli: harita sunucularinda genis bir secret key; kapali alfada kabul. Reddedilirse B (+3-5 hafta) |
+| S2 | S13 servis dili (Steam bilet dogrulama) | TypeScript (Supabase Edge Function) ya da Python | A5'ten once karar |
+| S3 | Supabase Auth kullanilsin mi | **Hayir** | Steam bileti ile cakisir, cift kimlik tablosu |
+| S4 | Bolge | **AB (Frankfurt)** | KVKK yurt disi aktarimi icin hukuki gorus |
+| S5 | Katman / ucret | alfa **Pro**, dev Free | Duraklatma/yedek kurali dogrulanmadi; harcama siniri acik |
+| S6 | Yedek | Pro gunluk yedek + kendi `export_all` | `export_all` ve silme/KVKK RPC'si YOK (yazilmadi) |
+| S7 | DB moduna gecis tek yonlu mu / DB -> dosya donus araci yazilsin mi | tek yonlu + `export_all` | Dosyaya donuste DB ilerlemesi kaybolur |
+| S8 | Kimlik | K-1 acikken yalniz bilinen oyuncularla; Steam (A5/A3) DB dilim 1-4'ten sonra | DB kimlik cozmez (tek paylasilan secret key, `canonical_key`'i bilen karakteri acar) |
+| S9 | Migration kaynagi | `supabase/migrations/`; `Migrations/V1__initial_schema.sql` "kullanilmiyor, UYGULANMAZ" (S15 ile birlikte) | V1 `public` semasinda RLS'siz: Supabase'e uygulanirsa anon anahtarla acik |
+| S10 | Yazma-arkada (write-behind) onbellek | **Reddet** | "DB kapaliyken ilerleme yok" kurali |
+
+Kapanan guvenlik bulgulari (iki bagimsiz QA + iki guvenlik turu; kod/SQL'de): `p_op_id` fazlaligi, `lease_epoch` adi, `get_op` `found`, `SlotToKey` bas/son bosluk, Shipping `NO_LOGGING` korumasi,
+Bearer yalniz JWT, `CreateEx` kirasi, donmus yuva release->acquire, `write_ops` purge `p_batch`, `LogHttp` Warning.
+**ACIK notlar:** (a) K-1 kimlik; (b) kira yenilemesini hicbir kod cagirmiyor (`RenewLeaseEx` var, periyodik cagri Dilim 4); (c) yan veri (basarim/gunluk/posta) deposu yok;
+(d) R1 daralir, kapanmaz (`get_op` ile uzlastirma; `not_found` kesin "olmayacak" degil); (e) `data_max_octets` 2 MiB SQL'de `jsonb::text` bayti ile olculur, UE karakter sayar:
+tavana yakin kayit UE'de gecip DB'de `invalid/data_too_large` alabilir (`supabase/README.md`); (f) motorun `LogHttp`/WinHttp davranisi (basliklar log'a sizar mi) dogrulanmadi;
+(g) `MMOSupabaseCharacterStore` / `RestClient` / `UnrealHttpTransport` hicbir oyun yoluna bagli degil, `RunSystemTests.ps1`/`RunAllChecks.ps1` adimi degil
+(`Scripts/TestSupabaseStore.ps1` izole worktree'de elle); (h) Dilim 3 (`-MMOCharacterStore`, acilista `HealthcheckEx`) ve Dilim 4 (cagiranlar) yapilmadi,
+Dilim 4 Codex'in kirli `MMOCharacter.*` / `MMOTradeComponent.*` dosyalarina dokunur: onlar commit edilmeden baslanmaz.
+
 ## Not (2026-10-17): proje ajanlari modeli
 
 `f9b71c2`: `.claude/agents/` altindaki 9 Turkce proje ajaninin (`oyun-tasarimcisi`, `mmo-developer`, `test-muhendisi`, `qa-kontrolcu`,

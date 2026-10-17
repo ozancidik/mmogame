@@ -1,7 +1,28 @@
 # Supabase'i veritabanı olarak bağlama tasarımı (kapalı alfa)
 
-**Tarih:** 2026-10-17. **Durum:** YALNIZ TASARIM. Bu belge dışında hiçbir dosya değişmedi; derleme, ağ çağrısı, Supabase hesabı, anahtar, SQL uygulaması yok.
-**Kaynaklar (okundu):** `docs/SIX_MAP_PLAN.md` (§1.4, §1.5, A2/A3/A5, S12, S13, S15), `docs/SIX_MAP_SPRINT_BOARD.md` (S04-S07, S12), `docs/tasks/S04_00_PERSISTENCE_CONTRACT_2026-10-16.md`,
+**Tarih:** 2026-10-17 (tasarım `71c548f`; durum bloğu aynı gün güncellendi).
+
+## DURUM (2026-10-17 sonu; her satır git'te ve dosyada doğrulandı)
+
+**Özet: SQL ve UE depo katmanı YAZILDI ve (UE tarafı) sahte sunucuya karşı test edildi; hiçbir şey gerçek Supabase'e / PostgreSQL'e bağlanmadı, oyunun hiçbir yolu bu depoyu çağırmıyor.**
+
+| Parça | Durum | Kanıt (commit / dosya) | Doğrulama sınırı |
+|---|---|---|---|
+| Tasarım (bu belge) | Tamam | `71c548f` | Supabase limit/fiyat/özellikleri hâlâ [Doğrulanmadı] (§9) |
+| Dilim 1 SQL | **Yazıldı, HİÇBİR PostgreSQL'de ÇALIŞTIRILMADI** (sözdizimi bile ayrıştırıcıyla denenmedi) | `c8d81c1`; düzeltmeler `bcde6a2` (tur 1), `1ae80c7` (tur 2); `supabase/migrations/20261017120000_v2_character_store.sql` (823 satır), `supabase/tests/00..05*.sql`, `run_all.sql`, `vectors.json` (sözleşme sürümü 2, 20 senaryo), `supabase/README.md` | Makinede psql / docker / supabase CLI yok. Yalnız `vectors.json` Python ile ayrıştırıldı. İlk gerçek koşu kullanıcının dev projesinde |
+| Dilim 2 UE | **Yazıldı, sahte ulaşımlı native test geçti, izole worktree'de** | `e0fffdf` -> `43be747` -> `932b565` -> `342ab17`; `MMOHttpTransport.h` (`IMMOHttpTransport`), `MMOUnrealHttpTransport.*`, `MMOSupabaseRestClient.*`, `MMOSupabaseCharacterStore.*` (`FMMOSupabaseCharacterStore`, arayüz `IMMOAsyncCharacterStore`), `Private/Tests/MMOSupabaseStoreSelfTest.cpp`, `Scripts/TestSupabaseStore.ps1` | 556 kontrol (`SupabaseTestExpectedChecks = 556`); sahte sunucu `vectors.json`'dan türetilir (gerçek PostgREST/SQL değil: sahte ile gerçek ayrışabilir); mutasyon sınaması 62 mutasyonun 62'si yakalandı (9'u ilk turda kaçmıştı, test güçlendirildi). Ana kopya başkasının `MMOZoneLayout*` / `MMORace*` dosyaları yüzünden derlenmediği için izole worktree'de koşuldu. `RunSystemTests.ps1` / `RunAllChecks.ps1` adımı DEĞİL. Gerçek `FHttpModule` / WinHttp davranışı (LogHttp çıktısı dahil) doğrulanmadı |
+| Dilim 3 (depo seçimi `-MMOCharacterStore`, açılışta `HealthcheckEx`) | **YAPILMADI** | `grep` ile `Source/` içinde bayrağı okuyan kod yok | -- |
+| Dilim 4 (çağıranları DB'ye geçirme, periyodik `RenewLeaseEx`, çıkışta `ReleaseLeaseEx`) | **YAPILMADI** | `MMOCharacter.cpp` vb. Codex'te kirli | Depoyu oyundaki hiçbir kod çağırmıyor (yalnız test) |
+| Yan veri (başarım / günlük / posta) | Depo YOK | `import_character` yan veriyi almaz | Dilim 5 / 7 |
+| Gerçek Supabase hesabı / bağlantısı | **YOK** | -- | Hesap, proje, anahtar kullanıcıda; PIE yok |
+
+**Güvenlik turları:** iki bağımsız QA + iki güvenlik turu yapıldı. KAPANDI: `p_op_id` fazlalığı, `lease_epoch` adı, `get_op` `found`, `SlotToKey` baş/son boşluk, Shipping `NO_LOGGING` koruması, Bearer yalnız JWT anahtarı, `CreateEx` kirası, donmuş yuva `release -> acquire`, `write_ops` purge `p_batch`, `LogHttp` Warning. **AÇIK:** K-1 kimlik (tek paylaşılan secret key, DB kimlik çözmez), kira yenilemenin çağrılmaması (Dilim 4), yan veri deposu yok, SQL çalıştırılmadı, R1 daralır ama kapanmaz, yedek/silme (KVKK) RPC'si yok, motorun `LogHttp` / WinHttp davranışı doğrulanmadı.
+
+**Bu belgenin gövdesi hakkında:** §3.2 SQL ve §3.3 `save_character` kodları 71c548f taslağıdır; **gerçek kaynak `supabase/migrations/...v2_character_store.sql` ve `supabase/README.md` "Sapmalar" listesidir** (FORCE RLS yok, `save_character` SECURITY DEFINER, `clock_timestamp()` kilit sonrası, 2 MiB tavan, ek sütunlar). Çelişkide migration kazanır.
+
+**Kullanıcı yapacaklar** (ajan yapamaz): Supabase hesabı + `myproject-dev` projesi (sonra alpha), anahtarı SOHBETE YAPIŞTIRMADAN yalnız yerel ortam değişkenine (`MMO_SUPABASE_URL`, `MMO_SUPABASE_SECRET_KEY`), Dashboard güvenlik ayarları (`supabase/README.md` listesi), psql / Supabase CLI kurulumu (makinede yok). Adımlar: §6 ve `docs/PLAYTEST_CHECKLIST.md` "Supabase dev projesi ilk kurulum".
+
+**Kaynaklar (okundu, tasarım anında):** `docs/SIX_MAP_PLAN.md` (§1.4, §1.5, A2/A3/A5, S12, S13, S15), `docs/SIX_MAP_SPRINT_BOARD.md` (S04-S07, S12), `docs/tasks/S04_00_PERSISTENCE_CONTRACT_2026-10-16.md`,
 `Source/MyProject/Public/Save/MMOCharacterStore.h`, `MMOCharacterStoreSubsystem.h/.cpp`, `MMOCharacterSaveJson.h`, `Public/Core/MMONameRules.h`, `Migrations/V1__initial_schema.sql`,
 `MyProject.Build.cs` (HTTP/Json zaten var), `.gitignore` (`.env`, `.env.*`, `Saved/` ignore), `MMODialogueSubsystem.cpp:155-161` (LLM anahtarı zaten ortam değişkeninden okunuyor).
 **Etiketler:** [Kesin] = bu repoda okundu. [Tahmin] = benim çıkarımım. **[Doğrulanmadı]** = Supabase'in güncel limit/özellik bilgisi; internet erişimi yasak olduğu için doğrulanmadı, hesap açmadan önce Supabase fiyat/dokümantasyon sayfasından kontrol edilmeli. Hiçbir Supabase sayısına kesinlik katılmadı.
@@ -12,7 +33,7 @@
 
 **Öneri (tek paragraf):** Supabase'i yalnız **barındırılan PostgreSQL + PostgREST RPC katmanı** olarak kullan; Supabase Auth, Realtime, Storage kullanma. Tüm karakter mantığı (revision karşılaştır-ve-yaz, kilit-kira/fencing, idempotent işlem günlüğü, içe aktarma) **veritabanındaki SQL fonksiyonlarında** durur (Seçenek C); UE harita sunucusu bu fonksiyonları HTTPS ile çağırır, yalnız sunucu makinesinde ortam değişkeninde duran **secret key** ile (oyun ikilisine, istemciye, `Config/*.ini`'ye girmez). Tablolar `public` değil özel `mmo` şemasında, RLS açık ve politikasız (varsayılan reddet), fonksiyonlar `mmo_api` şemasında yalnız `service_role`'e açık. Steam bilet doğrulaması (A5) ve sahiplik/bilet (A3) **ara serviste** kalır (S13 kararı bozulmaz); o servisin dili için Supabase Edge Function (TypeScript) bir aday olarak sunulur. Bu, S13(a)'nın DB yarısını alfa için gevşetir (harita sunucusu DB fonksiyonlarına doğrudan gider): **kullanıcı onayı gerekir (Karar 1)**. UE tarafı mevcut `IMMOCharacterStore` arayüzünü bozmadan eklenen `FMMOSupabaseCharacterStore` ile gelir; varsayılan yol (bayraksız) bugünkü yerel dosya deposudur; DB seçili iken DB kapalıysa durum ilerlemez ve **sessizce dosyaya düşülmez** (veri çatallanması).
 
-**Hemen yapılabilir (kod yazmadan):** kullanıcı Supabase hesabı + boş proje + şema uygulama + `select 1` (§6, ilk dilim). Kod dilimleri S04 uygulama kapısı (S03 + kararlar) açılana kadar BEKLER; yeni dosyalarla başlayabilen kısım §7'de.
+**Hemen yapılabilir:** kullanıcı Supabase hesabı + boş dev projesi + şema uygulama + `select 1` (§6, ilk dilim). Dilim 1 (SQL) ve Dilim 2 (UE depo) yazıldı (bkz. DURUM); çağıran geçişi (Dilim 3-4) S04 uygulama kapısı (S03 + kararlar) açılana kadar BEKLER.
 
 ---
 
@@ -62,7 +83,9 @@ Fark listesi (ırk, kanonik ad, `accounts`, lease/revision, eksik alanlar, başa
 
 **UYARI (V1'i Supabase'e UYGULAMA):** `Migrations/V1__initial_schema.sql` tabloları `public` şemasında RLS'siz yaratır. Supabase'de `public` şeması varsayılan olarak PostgREST'e açıktır [Doğrulanmadı ama yaygın bilinen varsayılan]; V1 uygulanırsa publishable key'e sahip herkes (anahtar istemci/ağ görünür olabilir) tabloları okuyup yazabilir. V1 hiçbir DB'ye uygulanmadı [Kesin]; Supabase'e uygulanmamalı. Ek: V1 `uuid-ossp` ister (Supabase'de `gen_random_uuid()` yerleşik, uzantı gerekmez).
 
-### 3.2 V2 taslak şema (UYGULANMADI; Supabase CLI için `supabase/migrations/<zaman>_v2_character_store.sql` olacak)
+### 3.2 V2 taslak şema (tasarım anı taslağı; gerçek dosya `supabase/migrations/20261017120000_v2_character_store.sql` YAZILDI ama HİÇBİR DB'ye UYGULANMADI)
+
+> Bu bölümdeki SQL 71c548f taslağıdır ve migration'dan SAPAR (sapma listesi: `supabase/README.md` "Sapmalar" 1-13): `force row level security` yok (yalnız `enable`; SECURITY DEFINER fonksiyonlar sahip olarak çalışır), `lease_ttl_s` / `import_sha256` ek sütunları, veri tavanı 2 MiB (aşağıdaki 1 MiB değil), zarf denetimi `check` değil tetikleyici, revision/lease_epoch geri gitmez tetikleyicisi, fonksiyonlar `set search_path = ''`. Gerçek şema için migration'a bak.
 
 Tasarım kuralları: tablolar `mmo` şemasında (API'ye açık değil), fonksiyonlar `mmo_api` şemasında, yalnız `service_role` EXECUTE; her tabloda RLS **açık + zorlanmış + politika yok**; `anon`/`authenticated` hiçbir yetkiye sahip değil. Yeni fonksiyonlarda PostgreSQL varsayılanı EXECUTE'u PUBLIC'e verir: açıkça geri alınır.
 
@@ -186,7 +209,7 @@ HTTP hata kodları yalnız altyapı arızası içindir; **iş sonucu** `outcome`
 - Zaman kararları (kira süresi dolmuş mu, yeni bitiş) satır/op_id kilidi beklendikten SONRA `clock_timestamp()` ile alınır; zarf (`data`) denetimi CHECK değil tetikleyicidir (yalnız veri değişince çalışır).
 - Gelecek migration'lar: yeni fonksiyon eklenirse dosya sonunda revoke/grant döngüsü tekrarlanır; sema düzeyi `alter default privileges` PUBLIC'in yerleşik EXECUTE'unu kaldırmaz (ayrıntı `supabase/README.md` sapma 12).
 
-`save_character` çekirdeği (taslak; düzen önemli):
+`save_character` çekirdeği (71c548f taslağı; düzen önemli. Gerçek fonksiyon `SECURITY DEFINER`, zamanı kilit SONRASI `clock_timestamp()` ile alır, `lease_epoch` döner, doğrulama hataları `invalid/<reason>`; aşağıdaki `security invoker` / `now()` / `epoch` taslak dilidir):
 
 ```sql
 create function mmo_api.save_character(p_key text, p_holder text, p_epoch bigint, p_expected_revision bigint,
@@ -245,14 +268,14 @@ Tek bir `Scripts/`-altı JSON vektör dosyası (ör. `supabase/tests/vectors.jso
 
 ## 4. UE tarafı
 
-### 4.1 Sınıflar (hepsi YENİ dosya, `Public/Save/` + `Private/Save/`)
-- `IMMOHttpTransport` (ince arayüz: `Send(Request, TFunction<void(Response)>)`), gerçeği `FHttpModule` ile, sahtesi test için. Oyun ipliği sözleşmesi: tamamlanma geri çağrıları oyun iş parçacığında döner (`FMMOSlotWriteTracker` `check(IsInGameThread())` ister [Kesin]).
+### 4.1 Sınıflar (hepsi YENİ dosya, `Public/Save/` + `Private/Save/`; Dilim 2'de YAZILDI, `e0fffdf`..`342ab17`)
+- `IMMOHttpTransport` (`MMOHttpTransport.h`; ince arayüz: `Send(Request, TFunction<void(Response)>)`), gerçeği `FMMOUnrealHttpTransport` (`FHttpModule`), sahtesi `MMOSupabaseStoreSelfTest.cpp` içinde. Oyun ipliği sözleşmesi: tamamlanma geri çağrıları oyun iş parçacığında döner (`FMMOSlotWriteTracker` `check(IsInGameThread())` ister [Kesin]).
 - `FMMOSupabaseRestClient`: URL, anahtar (ortam), zaman aşımı, yeniden deneme, anahtar maskeleme; JSON kur/çöz.
 - `FMMOSupabaseCharacterStore : IMMOCharacterStore`: `LoadAsync`/`SaveAsync`/`Exists`... asenkron; dahili `TMap<CanonicalKey, FSlotState{Epoch, Revision, Holder}>`; yuva başına seri yazım kuyruğu (aynı anda tek uçuştaki yazım; yenisi kuyruktakini birleştirir).
 
 ### 4.2 Arayüz sorunu (kritik, S04.00 ile uyumlu)
 `IMMOCharacterStore` senkron `Load/Save/Exists/ListSlotNames` (bool) ister [Kesin]; HTTP oyun ipliğini bloklayamaz. Uzak depoda senkron `Load` -> `false` döndürmek "kayıt yok" ile karışır ve **başlangıç paketi/ezme** hatasına yol açar (S04.00: kapalı DB "yok" değildir). Bu yüzden:
-1. Arayüze **eklemeli** (kırmayan) sonuç-türlü asenkron yöntemler: `LoadAsyncEx(Slot, Completion(EMMOStoreOutcome, Data&&))`, `SaveAsyncEx(...)` vb. Varsayılan gerçeklemeleri mevcut bool yöntemlerine düşer -> yerel depo ve mevcut çağıranlar değişmez.
+1. Arayüze **eklemeli** (kırmayan) sonuç-türlü asenkron yöntemler: `LoadAsyncEx(Slot, Completion(EMMOStoreOutcome, Data&&))`, `SaveAsyncEx(...)` vb. Varsayılan gerçeklemeleri mevcut bool yöntemlerine düşer -> yerel depo ve mevcut çağıranlar değişmez. **Gerçekleşen (Dilim 2) farkı:** `IMMOCharacterStore` DEĞİŞTİRİLMEDİ; sonuç-türlü yöntemler ayrı arayüz `IMMOAsyncCharacterStore`'da (`MMOSupabaseCharacterStore.h`: `LoadEx`, `CreateEx`, `SaveEx`, `RenewLeaseEx`, `ReleaseLeaseEx`, `ReconcileEx`, `HealthcheckEx`, `IsSlotFrozen`; sonuç türü `EMMOSupabaseStoreOutcome`). `IMMOCharacterStore`'a ortak bir `*AsyncEx` eklemek ve depo seçimi Dilim 3'ün işidir (yapılmadı).
 2. `FMMOSupabaseCharacterStore` senkron yöntemlerde **kapalı-başarısız** davranır (`false` + `LogMMOStore` Error; üretimde çağrılmamalı); doğru çağıranlar `*Ex` yollarına taşınır. Bu çağıranların listesi S04.00'da (MMOCharacter.cpp otomatik kayıt/ilk yükleme/manuel Save, MMOGameMode.cpp geçiş, Clan/Friends/Mail/Trade) [Kesin]; **dilim 4** onların işidir ve en ağır parçadır (§7).
 3. Yazma-arkada (write-behind) önbellek **reddedilir**: sync `Save`'in önbelleğe yazıp `true` dönmesi "DB kapalıyken durum ilerlemez" kuralını (S04) bozar; özellikle takas/posta/pazar için.
 
@@ -323,7 +346,7 @@ Adım adım kontrol listesi (ilk dilim, Dilim 0):
 - [ ] SQL Editor'de `select 1;` -> `1` döner. (Bağlantı ve proje canlı.)
 - [ ] V2 şemasını uygula (CLI `supabase db push` ya da ilk deneme için SQL Editor), ardından: `select count(*) from mmo.character_saves;` -> 0.
 - [ ] **Güvenlik doğrulaması:** publishable key ile `GET https://<ref>.supabase.co/rest/v1/character_saves` (ya da `mmo` altındaki herhangi bir tablo) -> erişim yok (401/404/boş). Yanıt veri dönüyorsa şemayı hemen kapat.
-- [ ] Secret key ile `mmo_api` fonksiyonlarından biri çağrılabiliyor (Dilim 1'de).
+- [ ] Secret key ile `mmo_api.healthcheck` çağrılabiliyor (`{"outcome":"ok","contract_version":2}`; SQL yazıldı, çalıştırılmadı; adım adım komutlar `supabase/README.md` "Kullanıcının dev projede çalıştıracağı sıra", güncel Dashboard listesi aynı dosyada).
 - [ ] Yedek stratejisi: katman ve yedek kapsamı Dashboard'da okunup yazılır; ilk elle dışa aktarım alınır.
 - [ ] V1 (`Migrations/V1__initial_schema.sql`) Supabase'e UYGULANMAZ.
 
@@ -331,7 +354,7 @@ Adım adım kontrol listesi (ilk dilim, Dilim 0):
 
 ## 7. Dilimler, çakışma planı, kabul ölçütleri
 
-### 7.1 Çakışma durumu (2026-10-17 `git status` / worktree; salt-okunur)
+### 7.1 Çakışma durumu (tasarım anı anlık görüntüsü, 2026-10-17 `git status` / worktree; salt-okunur. Güncel durum için `git status`; Dilim 1-2 yalnız yeni dosya ekledi, listedeki kirli dosyalara dokunmadı)
 - `MMOCharacterStore.h`, `MMOCharacterStoreSubsystem.h/.cpp`, `MMOLocalFileCharacterStore.*`, `MMOCharacterSaveJson.*`: **temiz** (status'ta yok).
 - **Kirli / başkasında:** `MMOCharacter.cpp/.h` (M, Codex; çağıran geçişi dilim 4 buraya dokunur), `MMOPlayerController.cpp`, `MMOHUD.*`, `Scripts/RunSystemTests.ps1` (M); `MMOTradeComponent.cpp`, `MMOTradeTransferSelfTest.cpp`, `Scripts/TestTradeTransfer.ps1` (staged, Codex takası; KATMA); `MMORace*`, `MMOZoneLayout*`, `Scripts/TestRace.ps1` (untracked, Codex). Bu tasarım belgesi dışında hiçbirine dokunulmadı.
 - Worktree'ler: `six-map-sprint0` (`4e0f0c5`, S04.00 taban) mevcut; S04 uygulaması için **yeni, ayrı worktree** gerekir (ortak dosyada tek sahip).
@@ -339,22 +362,24 @@ Adım adım kontrol listesi (ilk dilim, Dilim 0):
 
 ### 7.2 Dilimler
 
-| # | Dilim | Dosyalar | Paylaşılan dosyaya dokunur mu | Kabul ölçütü | Test | Tahmin [Tahmin] |
-|---|---|---|---|---|---|---|
-| 0 | Kullanıcı: hesap, boş proje, V2 şeması, `select 1`, anon erişim negatifi (§6) | yok (kod yok) | Hayır | Kontrol listesi tamam; publishable key ile `mmo` tablolarına erişim YOK | El ile (kullanıcı) | 0.5-1 gün |
-| 1 | SQL: `supabase/migrations/*_v2_character_store.sql`, `supabase/tests/*.sql` + `vectors.json`, `.gitignore` satırları | yeni dosyalar; `.gitignore` | `.gitignore` (küçük) | RPC sözleşmesi: eski revision, ölü epoch, çift `op_id` aynı/farklı yük, eşzamanlı iki `op_id` (kilit sırası), `check` kısıtları, kanonik anahtar vektörleri | Yerel PostgreSQL (kullanıcı kurar; `psql` yok [Kesin]) ya da dev projede entegrasyon betiği | 2-3 gün |
-| 2 | UE: `IMMOHttpTransport`, `FMMOSupabaseRestClient`, `FMMOSupabaseCharacterStore` (sync yöntemler kapalı-başarısız) + `MMOSupabaseStoreSelfTest.cpp` sahte ulaşımla | yalnız yeni dosyalar | `Scripts/RunSystemTests.ps1` kaydı (şu an Codex'te kirli: sonra) | Zaman aşımı sonrası aynı `op_id` ile tek etki; belirsiz sonuç donar; anahtar log'da yok; kapalı-başarısız; geri çağrı oyun ipliğinde | Native test (headless, izole worktree + `Scripts/CheckAgentTask.ps1 -Build` kilidi), mutasyon sınaması | 4-6 gün |
-| 3 | Arayüz eki: `EMMOStoreOutcome`, `LoadAsyncEx/SaveAsyncEx` (varsayılan = bool'a düşer) + depo seçimi (`-MMOCharacterStore`) | `MMOCharacterStore.h`, `MMOCharacterStoreSubsystem.h/.cpp` (temiz) | Evet, bu üç dosya | Yerel depo davranışı değişmez (bugünkü testler yeşil), bayraksız yol aynı | Mevcut `MMOTestStore` + yerel depo testleri | 1-2 gün |
-| 4 | Çağıran geçişi (S04.00 listesi): otomatik kayıt, ilk yükleme, ad kontrolü, bölge geçişi, klan/arkadaş/posta/takas | `MMOCharacter.*`, `MMOGameMode.*`, `MMOClanComponent.*`, `MMOFriendsComponent.*`, `MMOMailComponent.*`, `MMOTradeComponent.*` | **Evet, sıcak; hepsi şu an Codex'te kirli ya da staged** | S04.00 kabul tablosunun her satırı; DB kapalıyken ilerleme yok | Fault-injection ile her senkron çağıran noktasında ret; reconnect | 1.5-3 hafta (en büyük risk) |
-| 5 | İçe aktarma aracı + `import_character` | yeni komutlet dosyaları + SQL | Hayır | İdempotent yeniden koşu, çakışmada ezmeme, ayrılmış/ASCII-dışı atlama raporu | Fixture `.sav` kopyalarıyla native test; canlı `Saved/` ayrı onay | 2-3 gün |
-| 6 | Entegrasyon betiği: `Scripts/TestSupabaseIntegration.ps1` (yalnız kullanıcı anahtarları verilirse çalışır, yoksa atlar ve "çalışmadı" der) | yeni betik | Hayır | Gerçek dev projeye karşı vektörler geçer; test anahtarları `zz-test-*` ön ekli ve temizlenir | Kullanıcı anahtarıyla | 1-2 gün |
-| 7 | Yan veri (başarım/günlük) ve posta (S16 sonrası), pazar (S12) | S16/S12 kararlarına bağlı | Evet | Ayrıca tasarlanır | | -- |
+| # | Durum (2026-10-17) | Dilim | Dosyalar | Paylaşılan dosyaya dokunur mu | Kabul ölçütü | Test | Tahmin [Tahmin] |
+|---|---|---|---|---|---|---|---|
+| 0 | **BEKLİYOR (kullanıcı)** | Kullanıcı: hesap, boş proje, V2 şeması, `select 1`, anon erişim negatifi (§6) | yok (kod yok) | Hayır | Kontrol listesi tamam; publishable key ile `mmo` tablolarına erişim YOK | El ile (kullanıcı) | 0.5-1 gün |
+| 1 | **YAZILDI, ÇALIŞTIRILMADI** (`c8d81c1`, `bcde6a2`, `1ae80c7`) | SQL: `supabase/migrations/*_v2_character_store.sql`, `supabase/tests/*.sql` + `vectors.json`, `.gitignore` satırları | yeni dosyalar; `.gitignore` | `.gitignore` (küçük) | RPC sözleşmesi: eski revision, ölü epoch, çift `op_id` aynı/farklı yük, eşzamanlı iki `op_id` (kilit sırası), `check` kısıtları, kanonik anahtar vektörleri | Yerel PostgreSQL (kullanıcı kurar; `psql` yok [Kesin]) ya da dev projede entegrasyon betiği | 2-3 gün |
+| 2 | **YAZILDI, sahte ulaşımlı test 556 kontrol geçti, izole worktree** (`e0fffdf`, `43be747`, `932b565`, `342ab17`) | UE: `IMMOHttpTransport`, `FMMOSupabaseRestClient`, `FMMOSupabaseCharacterStore` (sync yöntemler kapalı-başarısız) + `MMOSupabaseStoreSelfTest.cpp` sahte ulaşımla | yalnız yeni dosyalar | `Scripts/RunSystemTests.ps1` kaydı (şu an Codex'te kirli: sonra) | Zaman aşımı sonrası aynı `op_id` ile tek etki; belirsiz sonuç donar; anahtar log'da yok; kapalı-başarısız; geri çağrı oyun ipliğinde | Native test (headless, izole worktree + `Scripts/CheckAgentTask.ps1 -Build` kilidi), mutasyon sınaması | 4-6 gün |
+| 3 | **YAPILMADI** | Arayüz eki: `EMMOStoreOutcome`, `LoadAsyncEx/SaveAsyncEx` (varsayılan = bool'a düşer) + depo seçimi (`-MMOCharacterStore`) | `MMOCharacterStore.h`, `MMOCharacterStoreSubsystem.h/.cpp` (temiz) | Evet, bu üç dosya | Yerel depo davranışı değişmez (bugünkü testler yeşil), bayraksız yol aynı | Mevcut `MMOTestStore` + yerel depo testleri | 1-2 gün |
+| 4 | **YAPILMADI** (periyodik `RenewLeaseEx`, çıkışta `ReleaseLeaseEx` dahil) | Çağıran geçişi (S04.00 listesi): otomatik kayıt, ilk yükleme, ad kontrolü, bölge geçişi, klan/arkadaş/posta/takas | `MMOCharacter.*`, `MMOGameMode.*`, `MMOClanComponent.*`, `MMOFriendsComponent.*`, `MMOMailComponent.*`, `MMOTradeComponent.*` | **Evet, sıcak; hepsi şu an Codex'te kirli ya da staged** | S04.00 kabul tablosunun her satırı; DB kapalıyken ilerleme yok | Fault-injection ile her senkron çağıran noktasında ret; reconnect | 1.5-3 hafta (en büyük risk) |
+| 5 | **YAPILMADI** (yalnız SQL `import_character` var) | İçe aktarma aracı + `import_character` | yeni komutlet dosyaları + SQL | Hayır | İdempotent yeniden koşu, çakışmada ezmeme, ayrılmış/ASCII-dışı atlama raporu | Fixture `.sav` kopyalarıyla native test; canlı `Saved/` ayrı onay | 2-3 gün |
+| 6 | **YAPILMADI** (`Scripts/TestSupabaseIntegration.ps1` yok) | Entegrasyon betiği: `Scripts/TestSupabaseIntegration.ps1` (yalnız kullanıcı anahtarları verilirse çalışır, yoksa atlar ve "çalışmadı" der) | yeni betik | Hayır | Gerçek dev projeye karşı vektörler geçer; test anahtarları `zz-test-*` ön ekli ve temizlenir | Kullanıcı anahtarıyla | 1-2 gün |
+| 7 | **YAPILMADI** | Yan veri (başarım/günlük) ve posta (S16 sonrası), pazar (S12) | S16/S12 kararlarına bağlı | Evet | Ayrıca tasarlanır | | -- |
 
 Dilim 1-2 ve 5-6 yeni dosyalarla yapılabilir ve Codex'in kirli dosyalarına dokunmaz; Dilim 3 temiz üç dosyaya dokunur (koordinatör onayı); Dilim 4 Codex ile aynı dosyalara dokunur: **Codex'in MMOCharacter/Trade işleri commit edilip yeni temel alınmadan başlanmaz**. Her dilim için mutasyon sınaması (`test-muhendisi`) ve bağımsız QA/güvenlik (`qa-kontrolcu`, `ag-guvenlik-denetcisi`) zorunlu. Bu tasarım için S04 kapısı: S03 ve S13/S16 kararları (pano).
 
 ---
 
 ## 8. Açık kararlar (kullanıcıya sorulacak, önerilerle)
+
+**Durum: hepsi BEKLİYOR (kullanıcı onaylamadı).** Dilim 1-2 koduna gömülü geçici varsayımlar (mimari C, Auth yok, `mmo_api` yalnız `service_role`) geri alınabilir. Hesap, proje, anahtar ve Dashboard ayarları kullanıcıdadır (karar 4-5-6 hesap/faturayla da ilgili). Kısa özet ve öneriler `docs/DECISIONS_NEEDED.md` "Supabase veritabanı".
 
 | # | Soru | Öneri | Gerekçe / etki |
 |---|---|---|---|
@@ -370,4 +395,4 @@ Dilim 1-2 ve 5-6 yeni dosyalarla yapılabilir ve Codex'in kirli dosyalarına dok
 | 10 | Yazma-arkada önbellek | **Reddet** | S04 "DB kapalıyken ilerleme yok" kuralı |
 
 ## 9. Bu belgenin doğrulama sınırları
-Okunan kaynaklar [Kesin]; Supabase özellikleri, limitler, fiyatlar, anahtar modeli, duraklatma, yedek, CLI Docker gereksinimi, Edge Function sınırları, Auth/Steam desteği **[Doğrulanmadı]** (ağ erişimi yasaktı, hesap yok). SQL taslağı hiçbir PostgreSQL'de çalıştırılmadı/sözdizimi denenmedi (makinede psql yok). UE tarafı hiç derlenmedi. Bu bir tasarım önerisidir; S04 uygulama kapısı, S13/S16 kararları ve R1 açık kalır.
+Okunan kaynaklar [Kesin]; Supabase özellikleri, limitler, fiyatlar, anahtar modeli, duraklatma, yedek, CLI Docker gereksinimi, Edge Function sınırları, Auth/Steam desteği **[Doğrulanmadı]** (ağ erişimi yasaktı, hesap yok). SQL (migration + testler) hiçbir PostgreSQL'de çalıştırılmadı/sözdizimi denenmedi (makinede psql yok); `vectors.json` yalnız Python ile ayrıştırıldı. UE tarafı (Dilim 2) izole worktree'de derlendi ve sahte sunucuya karşı 556 kontrol geçti; sahte sunucu SQL'in kendisi değil `vectors.json` kontratıdır, yani gerçek PostgREST/SQL davranışıyla uyum KANITLANMADI (ilk gerçek kanıt kullanıcının dev projesinde `run_all.sql` + entegrasyon betiği). Ana kopyada derleme başkasının dosyalarıyla engelli. Bu belgenin SQL taslakları 71c548f anıdır (bkz. DURUM). S04 uygulama kapısı, S13/S16 kararları ve R1 açık kalır.
