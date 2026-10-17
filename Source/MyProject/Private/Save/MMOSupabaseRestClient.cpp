@@ -48,6 +48,24 @@ namespace
 	}
 }
 
+bool FMMOSupabaseConfig::IsAllowedUserAgent(const FString& UserAgent)
+{
+	// Tarayici gibi gorunen UA, Supabase gecidinde secret API key'in reddedilmesine yol acar.
+	static const TCHAR* const Forbidden[] = {TEXT("mozilla"), TEXT("chrome"), TEXT("safari"), TEXT("edge"), TEXT("gecko"), TEXT("applewebkit"), TEXT("webkit")};
+	if (UserAgent.IsEmpty() || UserAgent.Len() > 64 || SupabaseHasBadChar(UserAgent))
+	{
+		return false;
+	}
+	for (const TCHAR* Word : Forbidden)
+	{
+		if (UserAgent.Contains(Word, ESearchCase::IgnoreCase))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 bool FMMOSupabaseConfig::Validate(const FMMOSupabaseConfig& Config, FString& OutError)
 {
 	OutError.Reset();
@@ -76,6 +94,11 @@ bool FMMOSupabaseConfig::Validate(const FMMOSupabaseConfig& Config, FString& Out
 	if (Config.SecretKey.Len() < 8 || SupabaseHasBadChar(Config.SecretKey))
 	{
 		OutError = TEXT("Supabase anahtari gecersiz");
+		return false;
+	}
+	if (!IsAllowedUserAgent(Config.UserAgent))
+	{
+		OutError = TEXT("Supabase User-Agent gecersiz (bos, uzun ya da tarayici gibi)");
 		return false;
 	}
 	if (Config.MaxAttempts < 1 || Config.RequestTimeoutSeconds <= 0.f || Config.BudgetSeconds <= 0.f)
@@ -279,6 +302,8 @@ void FMMOSupabaseRestClient::StartAttempt(const TSharedRef<FCall>& Call)
 	Request.Url = BaseUrl + TEXT("/rest/v1/rpc/") + Call->Function;
 	Request.Body = Call->Body;
 	Request.TimeoutSeconds = Config.RequestTimeoutSeconds;
+	// Acik, tarayici gibi gorunmeyen UA: UE HTTP (WinHttp: WINHTTP_ADDREQ_FLAG_REPLACE) varsayilan UA'yi bu basliga ezer.
+	Request.Headers.Add({TEXT("User-Agent"), Config.UserAgent});
 	Request.Headers.Add({TEXT("apikey"), Config.SecretKey});
 	if (UsesBearerAuth(Config.SecretKey))
 	{
@@ -397,6 +422,11 @@ void FMMOSupabaseRestClient::OnResponse(uint64 CallId, FMMOHttpResponse&& Respon
 		Result.Error = EMMORpcError::Http4xx;
 		Result.Message = FString::Printf(TEXT("http %d"), Response.HttpCode);
 		UE_LOG(LogMMOSupabase, Warning, TEXT("rpc fn=%s op=%s reddedildi: %s"), *Call->Function, *Call->OpId, *Result.Message);
+		if (Response.HttpCode == 401 || Response.HttpCode == 403)
+		{
+			// Sabit ipucu (govde/anahtar yazilmaz): gecit tarayici gibi UA'li secret key istegini de 4xx ile reddeder.
+			UE_LOG(LogMMOSupabase, Warning, TEXT("Supabase 401/403: anahtari ve User-Agent basligini kontrol et (tarayici gibi UA secret key'i reddeder)"));
+		}
 		Finish(Call, MoveTemp(Result));
 		return;
 	}

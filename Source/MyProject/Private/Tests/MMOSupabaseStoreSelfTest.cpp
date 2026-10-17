@@ -38,7 +38,7 @@ namespace
 
 	// vectors.json degisince (senaryo/vektor sayisi) test BILEREK kirilir; yeni sayi gozden gecirilip burada ve
 	// Scripts/TestSupabaseStore.ps1'de birlikte guncellenir.
-	constexpr int32 SupabaseTestExpectedChecks = 556;
+	constexpr int32 SupabaseTestExpectedChecks = 599;
 	const TCHAR* SupabaseTestKey = TEXT("sb_secret_TESTKEYDONOTLEAK0123456789abcdef");
 	// Eski service_role bicimi (JWT) icin SAHTE dize: gercek anahtar degil.
 	const TCHAR* SupabaseTestJwtKey = TEXT("eyJTESTFAKEHEADER.TESTFAKEPAYLOADDONOTLEAK.TESTFAKESIGNATURE0123");
@@ -1045,9 +1045,26 @@ namespace
 		return F;
 	}
 
+	// Gercek Supabase gecidi (dev projesi, 2026-10-17): tarayici gibi gorunen User-Agent ile gelen secret API key reddedilir:
+	// {"message":"Forbidden use of secret API key in browser", ...} (HTTP 4xx). Acik UA ('MMOGameServer/0.1') ile ayni cagri
+	// basarili; sb_secret_ anahtari YALNIZ `apikey` basligiyla (Bearer'siz) kabul edildi. Sahte sunucu bunu taklit eder.
+	// UA'siz istegi gercek gecidin kabul edip etmedigi DOGRULANMADI; sahte sunucu onu da reddeder ki baslik atlanirsa test kirilsin.
+	const TCHAR* SupabaseGatewayForbiddenBody = TEXT("{\"message\":\"Forbidden use of secret API key in browser\"}");
+
+	bool SupabaseUserAgentLooksBrowser(const FString& Ua)
+	{
+		static const TCHAR* const Words[] = {TEXT("mozilla"), TEXT("chrome"), TEXT("safari"), TEXT("edge"), TEXT("gecko"), TEXT("applewebkit")};
+		for (const TCHAR* W : Words)
+		{
+			if (Ua.Contains(W, ESearchCase::IgnoreCase)) return true;
+		}
+		return false;
+	}
+
 	class FSupabaseFakeTransport : public IMMOHttpTransport
 	{
 	public:
+		int32 GatewayRejects = 0;
 		FSupabaseFakeServer Server;
 		TArray<FMMOHttpRequest> Requests;
 		TArray<FSupabaseFault> Script;
@@ -1058,6 +1075,30 @@ namespace
 		virtual void Send(const FMMOHttpRequest& Request, FResponseHandler&& OnResponse) override
 		{
 			Requests.Add(Request);
+			{
+				int32 UaCount = 0;
+				bool bBrowser = false;
+				for (const FMMOHttpHeader& H : Request.Headers)
+				{
+					if (H.Name == TEXT("User-Agent"))
+					{
+						++UaCount;
+						bBrowser = bBrowser || SupabaseUserAgentLooksBrowser(H.Value);
+					}
+				}
+				if (UaCount != 1 || bBrowser)
+				{
+					++GatewayRejects;
+					FPending Rej;
+					Rej.Handler = MoveTemp(OnResponse);
+					Rej.Elapsed = 0.05;
+					Rej.Resp.Result = EMMOHttpResult::Ok;
+					Rej.Resp.HttpCode = 403;
+					Rej.Resp.Body = SupabaseGatewayForbiddenBody;
+					Pending.Add(MoveTemp(Rej));
+					return;
+				}
+			}
 			FSupabaseFault Fault;
 			if (Script.Num() > 0)
 			{
@@ -1189,6 +1230,25 @@ namespace
 		};
 		TArray<FPending> Pending;
 		TArray<FScheduled> Scheduled;
+	};
+
+	/** Mutasyon modeli: istemci UA'sini bozmus gibi, giden User-Agent'i tarayici gibi bir degerle degistirip sahte gecide iletir. */
+	class FSupabaseUaMutatingTransport : public IMMOHttpTransport
+	{
+	public:
+		TSharedRef<FSupabaseFakeTransport> Inner;
+		explicit FSupabaseUaMutatingTransport(const TSharedRef<FSupabaseFakeTransport>& InInner) : Inner(InInner) {}
+		virtual void Send(const FMMOHttpRequest& Request, FResponseHandler&& OnResponse) override
+		{
+			FMMOHttpRequest Mutated = Request;
+			for (FMMOHttpHeader& H : Mutated.Headers)
+			{
+				if (H.Name == TEXT("User-Agent")) H.Value = TEXT("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36");
+			}
+			Inner->Send(Mutated, MoveTemp(OnResponse));
+		}
+		virtual double NowSeconds() const override { return Inner->NowSeconds(); }
+		virtual void ScheduleAfter(float DelaySeconds, TFunction<void()>&& Task) override { Inner->ScheduleAfter(DelaySeconds, MoveTemp(Task)); }
 	};
 
 	class FSupabaseLogCapture : public FOutputDevice
@@ -2540,6 +2600,175 @@ namespace
 			Check(TEXT("leak"), TEXT("redact_url_masked"), MaskedUrl.Contains(TEXT("[supabase-url]")) && !SupabaseLeaks(MaskedUrl));
 			const FString Desc = C.Client->DescribeMasked();
 			Check(TEXT("leak"), TEXT("describe_masked"), !SupabaseLeaks(Desc) && Desc.Contains(TEXT("key=[supabase-key]")) && !Desc.Contains(FString::Printf(TEXT("(%d)"), FCString::Strlen(SupabaseTestKey))));
+		}
+
+		// ---------------- User-Agent (gecit tarayici gibi UA'li secret key'i reddeder; 2026-10-17 gercek dev projesi bulgusu) ----------------
+		// Gercek dogrulama: sb_secret_ anahtari Bearer'siz (yalniz apikey basligiyla) BASARILI oldu; Authorization: Bearer yalniz JWT biciminde gider.
+		{
+			using FRC = FMMOSupabaseRestClient;
+			const FString Def = FMMOSupabaseConfig::DefaultUserAgent;
+			Check(TEXT("ua"), TEXT("const_allowed"), FMMOSupabaseConfig::IsAllowedUserAgent(Def));
+			Check(TEXT("ua"), TEXT("const_prefix"), Def.StartsWith(TEXT("MMOGameServer/"), ESearchCase::CaseSensitive));
+			Check(TEXT("ua"), TEXT("const_not_browser_like"), !SupabaseUserAgentLooksBrowser(Def));
+			bool bNoForbidden = true;
+			for (const TCHAR* W : {TEXT("Mozilla"), TEXT("Chrome"), TEXT("Safari"), TEXT("Edge"), TEXT("Gecko"), TEXT("AppleWebKit")})
+			{
+				bNoForbidden = bNoForbidden && !Def.Contains(W, ESearchCase::IgnoreCase);
+			}
+			Check(TEXT("ua"), TEXT("const_no_forbidden_substring"), bNoForbidden);
+			Check(TEXT("ua"), TEXT("const_short_ascii_no_space"), Def.Len() <= 32 && Def.Len() > 0 && !Def.Contains(TEXT(" ")));
+			Check(TEXT("ua"), TEXT("config_default_is_const"), SupabaseGoodConfig().UserAgent == Def);
+
+			int32 Index = 0;
+			for (const TCHAR* Bad : {TEXT("Mozilla/5.0"), TEXT("MOZILLA/5.0"), TEXT("Chrome/120"), TEXT("Safari/537"), TEXT("Gecko/2010"),
+				TEXT("AppleWebKit/537"), TEXT("Edge/18"), TEXT("MMOGameServer-Edge/1"), TEXT("MMOChromeServer/1"), TEXT("WindowsPowerShell/5.1 Mozilla")})
+			{
+				FMMOSupabaseConfig Cfg = SupabaseGoodConfig();
+				Cfg.UserAgent = Bad;
+				FString E;
+				Check(TEXT("ua"), *FString::Printf(TEXT("validate_rejects_%02d"), Index++), !FMMOSupabaseConfig::Validate(Cfg, E) && !E.IsEmpty() && !SupabaseLeaks(E));
+			}
+			const FString Long = FString::ChrN(65, TEXT('a'));
+			const FString NonAscii = FString(TEXT("MMO")) + FString::Chr(static_cast<TCHAR>(0x00E9)) + TEXT("/1");
+			Check(TEXT("ua"), TEXT("empty_rejected"), !FMMOSupabaseConfig::IsAllowedUserAgent(FString()));
+			Check(TEXT("ua"), TEXT("space_rejected"), !FMMOSupabaseConfig::IsAllowedUserAgent(TEXT("MMO Game/1")));
+			Check(TEXT("ua"), TEXT("too_long_rejected"), !FMMOSupabaseConfig::IsAllowedUserAgent(Long));
+			Check(TEXT("ua"), TEXT("non_ascii_rejected"), !FMMOSupabaseConfig::IsAllowedUserAgent(NonAscii));
+			Check(TEXT("ua"), TEXT("custom_allowed"), FMMOSupabaseConfig::IsAllowedUserAgent(TEXT("MMOTestAgent/9.9")));
+			{
+				FMMOSupabaseConfig Cfg = SupabaseGoodConfig();
+				Cfg.UserAgent = TEXT("Mozilla/5.0");
+				FString E;
+				const TSharedRef<FSupabaseFakeTransport> T = MakeShared<FSupabaseFakeTransport>();
+				Check(TEXT("ua"), TEXT("create_refuses_browser_ua"), !FRC::Create(T, Cfg, E).IsValid() && !E.IsEmpty() && !SupabaseLeaks(E));
+			}
+
+			// Her istekte tam bir User-Agent basligi, izinli deger; gecit hicbirini reddetmez.
+			{
+				FSupabaseCtx C;
+				C.Tr->Server.Seed(TEXT("ali"), SupabaseFixture(5), 3, 0);
+				const TSharedRef<FSupabaseRes> L = SupabaseLoad(C, TEXT("MMOSave_Ali"));
+				const TSharedRef<FSupabaseRes> R = SupabaseRenew(C, TEXT("MMOSave_Ali"));
+				bool bAll = C.Tr->Requests.Num() >= 2;
+				for (const FMMOHttpRequest& Rq : C.Tr->Requests)
+				{
+					int32 N = 0;
+					for (const FMMOHttpHeader& H : Rq.Headers) N += H.Name == TEXT("User-Agent") ? 1 : 0;
+					bAll = bAll && N == 1 && SupabaseHeaderValue(Rq, TEXT("User-Agent")) == Def;
+				}
+				Check(TEXT("ua"), TEXT("every_request_has_exact_ua"), bAll);
+				Check(TEXT("ua"), TEXT("normal_flow_passes_gateway"), L->O == SupabaseOut::Ok && R->O == SupabaseOut::Ok && C.Tr->GatewayRejects == 0);
+			}
+			// Yapilandirmadaki UA kancasi gercekten giden basliga yansir.
+			{
+				FMMOSupabaseConfig Cfg = SupabaseGoodConfig();
+				Cfg.UserAgent = TEXT("MMOTestAgent/9.9");
+				FString E;
+				const TSharedRef<FSupabaseFakeTransport> T = MakeShared<FSupabaseFakeTransport>();
+				const TSharedPtr<FRC> Cl = FRC::Create(T, Cfg, E);
+				bool bDone = false;
+				if (Cl.IsValid())
+				{
+					const TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
+					P->SetStringField(TEXT("p_key"), TEXT("ali"));
+					Cl->Call(TEXT("character_exists"), P, TEXT("op-ua"), [&](FMMORpcResult&&) { bDone = true; });
+					T->Pump();
+				}
+				Check(TEXT("ua"), TEXT("custom_ua_sent"), bDone && T->Requests.Num() == 1 && SupabaseHeaderValue(T->Requests[0], TEXT("User-Agent")) == FString(TEXT("MMOTestAgent/9.9")));
+			}
+
+			// Sahte gecit: tarayici gibi UA ya da UA'siz istek 403 + gercek mesaj; sunucu mantigina ULASMAZ. Acik UA gecer.
+			{
+				const auto RawSend = [](FSupabaseFakeTransport& T, const TCHAR* Ua) -> FMMOHttpResponse
+				{
+					FMMOHttpRequest Rq;
+					Rq.Verb = TEXT("POST");
+					Rq.Url = FString(SupabaseTestUrl) + TEXT("/rest/v1/rpc/character_exists");
+					Rq.Body = TEXT("{\"p_key\":\"ali\"}");
+					Rq.Headers.Add({TEXT("apikey"), SupabaseTestKey});
+					if (Ua) Rq.Headers.Add({TEXT("User-Agent"), Ua});
+					FMMOHttpResponse Out;
+					T.Send(Rq, [&Out](FMMOHttpResponse&& Resp) { Out = MoveTemp(Resp); });
+					T.Pump();
+					return Out;
+				};
+				int32 Idx = 0;
+				for (const TCHAR* Ua : {TEXT("Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26300; en-US) WindowsPowerShell/5.1"),
+					TEXT("Chrome/120.0.0.0"), TEXT("Safari/537.36"), TEXT("Gecko/20100101 Firefox/120.0"), TEXT("AppleWebKit/537.36"), TEXT("Edge/18.19041")})
+				{
+					FSupabaseFakeTransport T;
+					const int32 Before = T.Server.Requests;
+					const FMMOHttpResponse Resp = RawSend(T, Ua);
+					Check(TEXT("ua"), *FString::Printf(TEXT("gateway_rejects_browser_%02d"), Idx++),
+						(Resp.HttpCode == 401 || Resp.HttpCode == 403) && Resp.Body.Contains(TEXT("Forbidden use of secret API key in browser"))
+						&& T.GatewayRejects == 1 && T.Server.Requests == Before);
+				}
+				{
+					FSupabaseFakeTransport T;
+					const FMMOHttpResponse Resp = RawSend(T, nullptr);
+					Check(TEXT("ua"), TEXT("gateway_rejects_missing_ua"), Resp.HttpCode == 403 && T.GatewayRejects == 1);
+				}
+				{
+					FSupabaseFakeTransport T;
+					const int32 Before = T.Server.Requests;
+					const FMMOHttpResponse Resp = RawSend(T, FMMOSupabaseConfig::DefaultUserAgent);
+					Check(TEXT("ua"), TEXT("gateway_accepts_default_ua"), T.GatewayRejects == 0 && T.Server.Requests == Before + 1 && Resp.HttpCode != 403);
+				}
+			}
+
+			// Acik negatif test: UA'yi bozan (Mozilla yapan) istemci gecitte reddedilir; yeniden denenmez, Failed/Unavailable, govde/anahtar sizmaz.
+			{
+				const TSharedRef<FSupabaseFakeTransport> Inner = MakeShared<FSupabaseFakeTransport>();
+				const TSharedRef<FSupabaseUaMutatingTransport> Mut = MakeShared<FSupabaseUaMutatingTransport>(Inner);
+				FString E;
+				const TSharedPtr<FRC> Cl = FRC::Create(Mut, SupabaseGoodConfig(), E);
+				FMMORpcResult Got;
+				bool bDone = false;
+				const FString LogBefore = Cap.Snapshot();
+				if (Cl.IsValid())
+				{
+					const TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
+					P->SetStringField(TEXT("p_key"), TEXT("ali"));
+					Cl->Call(TEXT("character_exists"), P, TEXT("op-mut"), [&](FMMORpcResult&& R) { Got = MoveTemp(R); bDone = true; });
+					Inner->Pump();
+				}
+				Check(TEXT("ua"), TEXT("mutated_rejected_failed"), bDone && Got.Status == EMMORpcStatus::Failed && Got.Error == EMMORpcError::Http4xx && Got.HttpCode == 403);
+				Check(TEXT("ua"), TEXT("mutated_no_retry"), Got.Attempts == 1 && Inner->Requests.Num() == 1 && Inner->GatewayRejects == 1);
+				Check(TEXT("ua"), TEXT("mutated_msg_constant"), Got.Message == TEXT("http 403") && !SupabaseLeaks(Got.Message) && !Got.Message.Contains(TEXT("Forbidden")));
+				const FString LogAfter = Cap.Snapshot().Mid(LogBefore.Len());
+				Check(TEXT("ua"), TEXT("mutated_log_has_hint"), LogAfter.Contains(TEXT("User-Agent")) && LogAfter.Contains(TEXT("kontrol et")));
+				Check(TEXT("ua"), TEXT("mutated_log_no_body_no_key"), !LogAfter.Contains(TEXT("Forbidden use of secret")) && !LogAfter.Contains(SupabaseTestKey, ESearchCase::CaseSensitive));
+
+				// Depo seviyesi: Unavailable (yukleme uygulanmadi), tek istek.
+				const TSharedRef<FSupabaseFakeTransport> Inner2 = MakeShared<FSupabaseFakeTransport>();
+				Inner2->Server.Seed(TEXT("ali"), SupabaseFixture(1), 3, 0);
+				const TSharedPtr<FRC> Cl2 = FRC::Create(MakeShared<FSupabaseUaMutatingTransport>(Inner2), SupabaseGoodConfig(), E);
+				SupabaseOut StoreOut = SupabaseOut::InternalError;
+				if (Cl2.IsValid())
+				{
+					FMMOSupabaseCharacterStore Store(Cl2.ToSharedRef(), TEXT("srv-a"));
+					Store.LoadEx(TEXT("MMOSave_Ali"), [&StoreOut](SupabaseOut O, FMMOCharacterSaveData&&) { StoreOut = O; });
+					Inner2->Pump();
+				}
+				Check(TEXT("ua"), TEXT("mutated_store_unavailable"), StoreOut == SupabaseOut::Unavailable && Inner2->Requests.Num() == 1);
+			}
+
+			// 401/403 (kimlik/UA) ipucu basar; baska 4xx (404) basmaz. Govde/anahtar loga sizmaz.
+			{
+				FSupabaseCtx C;
+				C.Tr->Server.Seed(TEXT("ali"), SupabaseFixture(1), 3, 0);
+				const FString B0 = Cap.Snapshot();
+				C.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::Http, 0.05, 403, SupabaseGatewayForbiddenBody));
+				const TSharedRef<FSupabaseRes> R403 = SupabaseLoad(C, TEXT("MMOSave_Ali"));
+				const FString After403 = Cap.Snapshot().Mid(B0.Len());
+				Check(TEXT("ua"), TEXT("h403_unavailable_no_retry"), R403->O == SupabaseOut::Unavailable && C.Tr->Requests.Num() == 1);
+				Check(TEXT("ua"), TEXT("h403_hint_logged"), After403.Contains(TEXT("User-Agent basligini kontrol et")));
+				Check(TEXT("ua"), TEXT("h403_log_clean"), !After403.Contains(TEXT("Forbidden use")) && !After403.Contains(SupabaseTestKey, ESearchCase::CaseSensitive));
+				const FString B1 = Cap.Snapshot();
+				C.Tr->Script.Add(SupabaseFaultOf(FSupabaseFault::EKind::Http, 0.05, 404, TEXT("{\"message\":\"nf\"}")));
+				SupabaseLoad(C, TEXT("MMOSave_Ali"));
+				Check(TEXT("ua"), TEXT("h404_no_auth_hint"), !Cap.Snapshot().Mid(B1.Len()).Contains(TEXT("User-Agent basligini kontrol et")));
+			}
 		}
 
 		// ---------------- LogHttp (istek basliklari / anahtar loga dusmez) ----------------

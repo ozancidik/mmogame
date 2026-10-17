@@ -12,6 +12,7 @@ void FMMOUnrealHttpTransport::Send(const FMMOHttpRequest& Request, FResponseHand
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Http = FHttpModule::Get().CreateRequest();
 	Http->SetURL(Request.Url);
 	Http->SetVerb(Request.Verb);
+	// Basliklar oldugu gibi gider; "User-Agent" verilmisse UE'nin varsayilan UA'sini ezer (WinHttp: ADD|REPLACE).
 	for (const FMMOHttpHeader& Header : Request.Headers)
 	{
 		Http->SetHeader(Header.Name, Header.Value);

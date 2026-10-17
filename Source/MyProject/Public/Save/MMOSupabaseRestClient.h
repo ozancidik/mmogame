@@ -21,6 +21,18 @@ struct MYPROJECT_API FMMOSupabaseConfig
 	float BudgetSeconds = 20.f;        // mantiksal islem (tum denemeler)
 	int32 MaxAttempts = 3;
 
+	/**
+	 * Her istekte giden ACIK User-Agent. Supabase gecidi tarayici gibi gorunen UA ile gelen secret API key'i reddeder
+	 * (HTTP 4xx, "Forbidden use of secret API key in browser"); UE'nin varsayilan UA'si (Proje/Surum Platform/Surum) ve
+	 * Windows PowerShell varsayilani buna takilabilir. Bu deger UE HTTP'nin kendi UA'sini ezer.
+	 * Yasakli alt dizgeler (Mozilla, Chrome, Safari, Edge, Gecko, AppleWebKit; buyuk/kucuk harf fark etmez) Validate'te reddedilir.
+	 */
+	static constexpr const TCHAR* DefaultUserAgent = TEXT("MMOGameServer/0.1");
+	FString UserAgent = DefaultUserAgent;
+
+	/** UserAgent: bos degil, <= 64 karakter, yalniz gorunur ASCII (bosluk yok), tarayici gibi gorunen alt dizge yok. */
+	static bool IsAllowedUserAgent(const FString& UserAgent);
+
 	/** https, kullanici bilgisi/sorgu yok; anahtar bos degil, bosluk/kontrol karakteri yok. OutError sabit metindir. */
 	static bool Validate(const FMMOSupabaseConfig& Config, FString& OutError);
 	/** Ortam degiskenlerinden okur ve dogrular. Eksik/bos = false (sunucu baslamaz, dosyaya DUSULMEZ). */
