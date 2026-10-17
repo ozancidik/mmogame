@@ -1,0 +1,392 @@
+{
+  "_doc": [
+    "Kontrat vektorleri (docs/DESIGN_SUPABASE.md 3.6). HEM SQL testi (supabase/tests/01, 02) HEM UE native testi (sahte ulasim) AYNI dosyayi okur.",
+    "Dosya ASCII'dir; ASCII disi karakterler \\uXXXX ile yazilir. Durum: GECICI VARSAYIM (mimari C), hicbir gercek DB'ye karsi calistirilmadi.",
+    "canonical_key[]: ad -> beklenen anahtar. ue_canonical_key = MMONameRules::CanonicalKey(name); ue_is_reserved = MMONameRules::IsReservedName(name). db_key = SQL mmo.canonical_key(name), null = DB adi REDDEDER (bad_name). db_reserved = mmo.is_reserved_key(db_key) (create/import reserved_name doner). Kural: db_key null degilse db_key == ue_canonical_key. UE, ASCII disi adi KIRPAR (Omer -> mer), DB REDDEDER.",
+    "scenarios[]: sirali adimlar. {rpc, args, expect[, exact]} bir RPC cagrisi: sonuc, expect'i kapsamali (jsonb @>; exact=true ise tam esit). {admin:'expire_lease', key} kiranin suresini doldurur (SQL harness: lease_until gecmise; UE sahtesi: sahte saati ilerletir).",
+    "args/expect degerlerinde '@isim' = fixtures[isim] (jsonb). Her sonuc: outcome alani + RPC'ye ozgu alanlar. HTTP her zaman 200; yalniz altyapi arizasi HTTP hatasidir.",
+    "Senaryolar birbirinden bagimsiz anahtarlar (zz-v-*) ve benzersiz op_id kullanir; bir veritabaninda sirayla kosulabilir. Sure olcmeye bagli adim yok (kira suresi admin adimiyla)."
+  ],
+  "contract_version": 1,
+
+  "outcomes": [
+    "ok", "committed", "imported", "already_imported", "not_found", "already_exists", "invalid",
+    "revision_conflict", "ownership_lost", "idempotency_conflict", "conflict", "internal"
+  ],
+
+  "limits": {
+    "name_max_len": 32,
+    "key_regex": "^[a-z0-9_-]{1,32}$",
+    "name_regex": "^[A-Za-z0-9_-]([A-Za-z0-9 _-]{0,30}[A-Za-z0-9_-])?$",
+    "data_max_octets": 2097152,
+    "side_value_max_octets": 262144,
+    "lease_ttl_min_s": 10,
+    "lease_ttl_max_s": 600,
+    "lease_ttl_default_s": 120,
+    "list_keys_max": 500,
+    "list_keys_default": 100
+  },
+
+  "rpc_params": {
+    "healthcheck": [],
+    "load_character": ["p_key"],
+    "character_exists": ["p_key"],
+    "list_keys": ["p_prefix", "p_limit"],
+    "create_character": ["p_key", "p_display_name", "p_holder", "p_op_id", "p_schema_version", "p_data", "p_race"],
+    "acquire_lease": ["p_key", "p_holder", "p_ttl_s"],
+    "renew_lease": ["p_key", "p_holder", "p_epoch", "p_ttl_s"],
+    "release_lease": ["p_key", "p_holder", "p_epoch"],
+    "save_character": ["p_key", "p_holder", "p_epoch", "p_expected_revision", "p_op_id", "p_schema_version", "p_data", "p_side"],
+    "get_op": ["p_op_id"],
+    "import_character": ["p_key", "p_display_name", "p_source_sha256", "p_schema_version", "p_data", "p_race"]
+  },
+
+  "fixtures": {
+    "envelope_a": { "SchemaVersion": 2, "Data": { "Level": 1, "Experience": 0, "Gold": 100, "NextInstanceId": 1 } },
+    "envelope_b": { "SchemaVersion": 2, "Data": { "Level": 2, "Experience": 50, "Gold": 150, "NextInstanceId": 2 } },
+    "envelope_c": { "SchemaVersion": 2, "Data": { "Level": 3, "Experience": 90, "Gold": 175, "NextInstanceId": 3 } },
+    "envelope_bad_gold": { "SchemaVersion": 2, "Data": { "Level": 1, "Experience": 0, "Gold": -1, "NextInstanceId": 1 } },
+    "envelope_bad_level": { "SchemaVersion": 2, "Data": { "Level": 0, "Experience": 0, "Gold": 0, "NextInstanceId": 1 } },
+    "envelope_version_mismatch": { "SchemaVersion": 1, "Data": { "Level": 1, "Experience": 0, "Gold": 0, "NextInstanceId": 1 } },
+    "side_ok": { "achievements": { "unlocked": ["first_kill"] }, "daily": { "day": "2026-10-17" } },
+    "side_bad_kind": { "inventory": {} }
+  },
+
+  "canonical_key": [
+    { "name": "Ali", "ue_canonical_key": "ali", "ue_is_reserved": false, "db_key": "ali", "db_reserved": false },
+    { "name": "ALI", "ue_canonical_key": "ali", "ue_is_reserved": false, "db_key": "ali", "db_reserved": false },
+    { "name": "Ali Veli", "ue_canonical_key": "ali_veli", "ue_is_reserved": false, "db_key": "ali_veli", "db_reserved": false },
+    { "name": "ali_veli", "ue_canonical_key": "ali_veli", "ue_is_reserved": false, "db_key": "ali_veli", "db_reserved": false, "note": "ayni anahtar: 'Ali Veli' ile cakisir (tek kayit)" },
+    { "name": "A B", "ue_canonical_key": "a_b", "ue_is_reserved": false, "db_key": "a_b", "db_reserved": false },
+    { "name": "a_b", "ue_canonical_key": "a_b", "ue_is_reserved": false, "db_key": "a_b", "db_reserved": false },
+    { "name": "A  B", "ue_canonical_key": "a__b", "ue_is_reserved": false, "db_key": "a__b", "db_reserved": false },
+    { "name": "Ali-Veli", "ue_canonical_key": "ali-veli", "ue_is_reserved": false, "db_key": "ali-veli", "db_reserved": false },
+    { "name": "Ali2", "ue_canonical_key": "ali2", "ue_is_reserved": false, "db_key": "ali2", "db_reserved": false },
+    { "name": "x", "ue_canonical_key": "x", "ue_is_reserved": false, "db_key": "x", "db_reserved": false },
+    { "name": "_", "ue_canonical_key": "_", "ue_is_reserved": false, "db_key": "_", "db_reserved": false },
+    { "name": "-", "ue_canonical_key": "-", "ue_is_reserved": false, "db_key": "-", "db_reserved": false },
+    { "name": "ZZ-Test-1", "ue_canonical_key": "zz-test-1", "ue_is_reserved": false, "db_key": "zz-test-1", "db_reserved": false },
+    { "name": "abcdefghijklmnopqrstuvwxyz012345", "ue_canonical_key": "abcdefghijklmnopqrstuvwxyz012345", "ue_is_reserved": false, "db_key": "abcdefghijklmnopqrstuvwxyz012345", "db_reserved": false, "note": "32 karakter: sinir icinde" },
+    { "name": "abcdefghijklmnopqrstuvwxyz0123456", "ue_canonical_key": "abcdefghijklmnopqrstuvwxyz012345", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "33 karakter: UE ilk 32'ye keser, DB reddeder" },
+    { "name": "", "ue_canonical_key": "default", "ue_is_reserved": true, "db_key": null, "db_reason": "bad_name", "note": "bos ad" },
+    { "name": "   ", "ue_canonical_key": "___", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "yalniz bosluk" },
+    { "name": " Ali", "ue_canonical_key": "_ali", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "bas bosluk: PreLogin kirpar, DB kirpmaz" },
+    { "name": "Ali ", "ue_canonical_key": "ali_", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "son bosluk" },
+    { "name": "Default", "ue_canonical_key": "default", "ue_is_reserved": true, "db_key": "default", "db_reserved": true },
+    { "name": "default", "ue_canonical_key": "default", "ue_is_reserved": true, "db_key": "default", "db_reserved": true },
+    { "name": "Default1", "ue_canonical_key": "default1", "ue_is_reserved": false, "db_key": "default1", "db_reserved": false },
+    { "name": "Player123", "ue_canonical_key": "player123", "ue_is_reserved": true, "db_key": "player123", "db_reserved": true },
+    { "name": "player0", "ue_canonical_key": "player0", "ue_is_reserved": true, "db_key": "player0", "db_reserved": true },
+    { "name": "Player9999999999999", "ue_canonical_key": "player9999999999999", "ue_is_reserved": true, "db_key": "player9999999999999", "db_reserved": true },
+    { "name": "Player", "ue_canonical_key": "player", "ue_is_reserved": false, "db_key": "player", "db_reserved": false },
+    { "name": "PlayerOne", "ue_canonical_key": "playerone", "ue_is_reserved": false, "db_key": "playerone", "db_reserved": false },
+    { "name": "Player 123", "ue_canonical_key": "player_123", "ue_is_reserved": false, "db_key": "player_123", "db_reserved": false },
+    { "name": "Gezgin123456", "ue_canonical_key": "gezgin123456", "ue_is_reserved": false, "db_key": "gezgin123456", "db_reserved": false },
+    { "name": "\u00d6mer", "ue_canonical_key": "mer", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "UE 'mer' anahtarina KIRPAR (baska kaydi acar); DB reddeder" },
+    { "name": "\u0130stanbul", "ue_canonical_key": "stanbul", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name" },
+    { "name": "Ali!", "ue_canonical_key": "ali", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "UE 'ali' anahtarina kirpar" },
+    { "name": "Ali.Veli", "ue_canonical_key": "aliveli", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name" },
+    { "name": "Ali\tVeli", "ue_canonical_key": "aliveli", "ue_is_reserved": false, "db_key": null, "db_reason": "bad_name", "note": "sekme karakteri" }
+  ],
+
+  "scenarios": [
+    {
+      "id": "happy_path",
+      "description": "create -> save -> release -> baska sunucu acquire: veri ve yan veri geri gelir, epoch 2",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-happy", "p_display_name": "ZZ-V-Happy", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000001", "p_schema_version": 2, "p_data": "@envelope_a", "p_race": "test_race" },
+          "expect": { "outcome": "committed", "canonical_key": "zz-v-happy", "revision": 0, "epoch": 1 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-happy", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000002", "p_schema_version": 2, "p_data": "@envelope_b", "p_side": "@side_ok" },
+          "expect": { "outcome": "committed", "revision": 1, "epoch": 1 } },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-happy", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ok" } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-happy", "p_holder": "srvB:boot2", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "epoch": 2, "revision": 1, "schema_version": 2, "data": "@envelope_b", "side": "@side_ok", "display_name": "ZZ-V-Happy", "race": "test_race" } },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-happy" },
+          "expect": { "outcome": "ok", "revision": 1, "data": "@envelope_b", "active_server": "srvB:boot2", "lease_epoch": 2 } }
+      ]
+    },
+    {
+      "id": "stale_revision",
+      "description": "eski expected_revision reddedilir, mevcut revision doner; dogru revision ile yazilir",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-stale", "p_display_name": "zz-v-stale", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000003", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "revision": 0, "epoch": 1 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-stale", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000004", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-stale", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000005", "p_schema_version": 2, "p_data": "@envelope_c" },
+          "expect": { "outcome": "revision_conflict", "revision": 1 }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-stale" },
+          "expect": { "revision": 1, "data": "@envelope_b" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-stale", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 1, "p_op_id": "00000000-0000-4000-8000-000000000006", "p_schema_version": 2, "p_data": "@envelope_c" },
+          "expect": { "outcome": "committed", "revision": 2 } }
+      ]
+    },
+    {
+      "id": "dead_epoch",
+      "description": "kira baska sunucuya gecince eski sunucunun (olu epoch) yazimi reddedilir",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-epoch", "p_display_name": "zz-v-epoch", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000007", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "epoch": 1 } },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-epoch", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ok" } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-epoch", "p_holder": "srvB:boot2", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "epoch": 2, "revision": 0 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-epoch", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000008", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "ownership_lost", "epoch": 2 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-epoch", "p_holder": "srvA:boot1", "p_epoch": 2, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000009", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-epoch", "p_holder": "srvB:boot2", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000010", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-epoch", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-epoch", "p_holder": "srvB:boot2", "p_epoch": 2, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000011", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1, "epoch": 2 } }
+      ]
+    },
+    {
+      "id": "live_lease_blocks_other",
+      "description": "gecerli kira baska sunucuya verilmez; ayni sunucu tekrar alirsa epoch artmaz",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-lease", "p_display_name": "zz-v-lease", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000012", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "epoch": 1 } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-lease", "p_holder": "srvB:boot2", "p_ttl_s": 120 },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-lease", "p_holder": "srvA:boot1", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "epoch": 1, "revision": 0 } }
+      ]
+    },
+    {
+      "id": "expired_lease",
+      "description": "suresi dolmus kira ile yazim reddedilir; yeni acquire epoch+1 verir",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-expire", "p_display_name": "zz-v-expire", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000013", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "epoch": 1 } },
+        { "admin": "expire_lease", "key": "zz-v-expire" },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-expire", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000014", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "renew_lease", "args": { "p_key": "zz-v-expire", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-expire", "p_holder": "srvB:boot2", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "epoch": 2, "revision": 0 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-expire", "p_holder": "srvB:boot2", "p_epoch": 2, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000015", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1 } }
+      ]
+    },
+    {
+      "id": "idempotent_same_payload",
+      "description": "ayni op_id + ayni yuk: tek etki, kayitli sonuc (replayed); kira bitse de kayitli sonuc doner; get_op uzlastirir",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-idem", "p_display_name": "zz-v-idem", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000016", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "epoch": 1 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-idem", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000017", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1, "epoch": 1 }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-idem", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000017", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1, "epoch": 1, "replayed": true }, "exact": true },
+        { "rpc": "get_op", "args": { "p_op_id": "00000000-0000-4000-8000-000000000017" },
+          "expect": { "outcome": "ok", "op_kind": "save", "canonical_key": "zz-v-idem", "result": { "outcome": "committed", "revision": 1, "epoch": 1 } } },
+        { "admin": "expire_lease", "key": "zz-v-idem" },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-idem", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000017", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1, "replayed": true } },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-idem" },
+          "expect": { "revision": 1, "data": "@envelope_b" } }
+      ]
+    },
+    {
+      "id": "idempotent_different_payload",
+      "description": "ayni op_id + farkli yuk (veri ya da expected_revision) idempotency_conflict; durum degismez",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-idemdiff", "p_display_name": "zz-v-idemdiff", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000018", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-idemdiff", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000019", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-idemdiff", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000019", "p_schema_version": 2, "p_data": "@envelope_c" },
+          "expect": { "outcome": "idempotency_conflict" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-idemdiff", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 1, "p_op_id": "00000000-0000-4000-8000-000000000019", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "idempotency_conflict" }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-idemdiff" },
+          "expect": { "revision": 1, "data": "@envelope_b" } }
+      ]
+    },
+    {
+      "id": "op_id_reused_for_other_key",
+      "description": "bir op_id baska anahtarda kullanilamaz",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-opa", "p_display_name": "zz-v-opa", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000020", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "create_character", "args": { "p_key": "zz-v-opb", "p_display_name": "zz-v-opb", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000021", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-opa", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000022", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-opb", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000022", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "idempotency_conflict" }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-opb" },
+          "expect": { "revision": 0 } }
+      ]
+    },
+    {
+      "id": "rejected_op_not_logged",
+      "description": "reddedilen islem gunluge yazilmaz: get_op not_found, ayni op_id dogru yukle yeniden kullanilabilir",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-rej", "p_display_name": "zz-v-rej", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000023", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-rej", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 5, "p_op_id": "00000000-0000-4000-8000-000000000024", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "revision_conflict", "revision": 0 } },
+        { "rpc": "get_op", "args": { "p_op_id": "00000000-0000-4000-8000-000000000024" },
+          "expect": { "outcome": "not_found" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-rej", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000024", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1 } }
+      ]
+    },
+    {
+      "id": "invalid_inputs",
+      "description": "gecersiz girdi invalid + reason doner, hicbir sey yazilmaz",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-inv", "p_display_name": "zz-v-inv", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000025", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_bad_gold" },
+          "expect": { "outcome": "invalid", "reason": "bad_gold" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_bad_level" },
+          "expect": { "outcome": "invalid", "reason": "bad_level" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_version_mismatch" },
+          "expect": { "outcome": "invalid", "reason": "schema_version_mismatch" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_b", "p_side": "@side_bad_kind" },
+          "expect": { "outcome": "invalid", "reason": "side_unknown_kind" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "ZZ-V-INV", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "invalid", "reason": "bad_key" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srv A", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "invalid", "reason": "bad_holder" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srvA:boot1", "p_epoch": 0, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000026", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "invalid", "reason": "bad_epoch_or_revision" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-inv", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": null, "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "invalid", "reason": "null_argument" }, "exact": true },
+        { "rpc": "get_op", "args": { "p_op_id": null },
+          "expect": { "outcome": "invalid", "reason": "null_argument" }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-inv" },
+          "expect": { "revision": 0, "data": "@envelope_a" } }
+      ]
+    },
+    {
+      "id": "not_found",
+      "description": "olmayan karakterde otoriter yokluk",
+      "steps": [
+        { "rpc": "load_character", "args": { "p_key": "zz-v-missing" }, "expect": { "outcome": "not_found" }, "exact": true },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-missing", "p_holder": "srvA:boot1", "p_ttl_s": 120 }, "expect": { "outcome": "not_found" }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-missing", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000036", "p_schema_version": 2, "p_data": "@envelope_a" }, "expect": { "outcome": "not_found" }, "exact": true },
+        { "rpc": "renew_lease", "args": { "p_key": "zz-v-missing", "p_holder": "srvA:boot1", "p_epoch": 1 }, "expect": { "outcome": "not_found" }, "exact": true },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-missing", "p_holder": "srvA:boot1", "p_epoch": 1 }, "expect": { "outcome": "not_found" }, "exact": true },
+        { "rpc": "character_exists", "args": { "p_key": "zz-v-missing" }, "expect": { "outcome": "ok", "exists": false }, "exact": true }
+      ]
+    },
+    {
+      "id": "create_rules",
+      "description": "create: tekrar, ayni op tekrari, ayrilmis ad, ASCII disi ad, anahtar uyusmazligi, bozuk veri",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-dup", "p_display_name": "zz-v-dup", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000027", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "revision": 0, "epoch": 1 } },
+        { "rpc": "create_character", "args": { "p_key": "zz-v-dup", "p_display_name": "zz-v-dup", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000028", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "already_exists" }, "exact": true },
+        { "rpc": "create_character", "args": { "p_key": "zz-v-dup", "p_display_name": "zz-v-dup", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000027", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "revision": 0, "epoch": 1, "replayed": true } },
+        { "rpc": "create_character", "args": { "p_key": "zz-v-dup2", "p_display_name": "zz-v-dup2", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000027", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "idempotency_conflict" }, "exact": true },
+        { "rpc": "create_character", "args": { "p_key": "default", "p_display_name": "Default", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000029", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "reserved_name" }, "exact": true },
+        { "rpc": "create_character", "args": { "p_key": "player123", "p_display_name": "Player123", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000029", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "reserved_name" }, "exact": true },
+        { "rpc": "create_character", "args": { "p_key": "mer", "p_display_name": "\u00d6mer", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000029", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "bad_name" }, "exact": true },
+        { "rpc": "create_character", "args": { "p_key": "bob", "p_display_name": "Alice", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000029", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "key_mismatch" }, "exact": true },
+        { "rpc": "create_character", "args": { "p_key": "zz-v-badgold", "p_display_name": "zz-v-badgold", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000029", "p_schema_version": 2, "p_data": "@envelope_bad_gold" },
+          "expect": { "outcome": "invalid", "reason": "bad_gold" }, "exact": true },
+        { "rpc": "character_exists", "args": { "p_key": "zz-v-badgold" }, "expect": { "outcome": "ok", "exists": false }, "exact": true },
+        { "rpc": "character_exists", "args": { "p_key": "zz-v-dup" }, "expect": { "outcome": "ok", "exists": true }, "exact": true }
+      ]
+    },
+    {
+      "id": "release_semantics",
+      "description": "release: yanlis sahip reddedilir, tekrar release guvenli, birakilmis kira ile yazim reddedilir",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-rel", "p_display_name": "zz-v-rel", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000030", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "epoch": 1 } },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-rel", "p_holder": "srvB:boot2", "p_epoch": 1 },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-rel", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ok" }, "exact": true },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-rel", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ok", "already_released": true }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-rel", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000031", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-rel", "p_holder": "srvA:boot1", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "epoch": 2 } }
+      ]
+    },
+    {
+      "id": "import_rules",
+      "description": "ice aktarma: idempotent, ayni ozet tekrar, oynanmamis ice aktarmanin yeni ozetle degisimi, oynanmis kaydi ASLA ezmez",
+      "steps": [
+        { "rpc": "import_character", "args": { "p_key": "zz-v-imp", "p_display_name": "ZZ-V-IMP", "p_source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "imported", "revision": 0 }, "exact": true },
+        { "rpc": "import_character", "args": { "p_key": "zz-v-imp", "p_display_name": "ZZ-V-IMP", "p_source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "already_imported", "revision": 0 }, "exact": true },
+        { "rpc": "import_character", "args": { "p_key": "zz-v-imp", "p_display_name": "ZZ-V-IMP", "p_source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "imported", "revision": 0, "replaced_import": true }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-imp" },
+          "expect": { "outcome": "ok", "revision": 0, "data": "@envelope_b", "display_name": "ZZ-V-IMP" } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-imp", "p_holder": "srvA:boot1", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "epoch": 1, "revision": 0 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-imp", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000032", "p_schema_version": 2, "p_data": "@envelope_c" },
+          "expect": { "outcome": "committed", "revision": 1 } },
+        { "rpc": "import_character", "args": { "p_key": "zz-v-imp", "p_display_name": "ZZ-V-IMP", "p_source_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "conflict", "revision": 1 }, "exact": true },
+        { "rpc": "import_character", "args": { "p_key": "zz-v-imp", "p_display_name": "ZZ-V-IMP", "p_source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "already_imported", "revision": 1 }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-imp" },
+          "expect": { "revision": 1, "data": "@envelope_c" } },
+        { "rpc": "import_character", "args": { "p_key": "mer", "p_display_name": "\u00d6mer", "p_source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "bad_name" }, "exact": true },
+        { "rpc": "import_character", "args": { "p_key": "default", "p_display_name": "Default", "p_source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "reserved_name" }, "exact": true },
+        { "rpc": "import_character", "args": { "p_key": "zz-v-imp2", "p_display_name": "zz-v-imp2", "p_source_sha256": "xyz", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "invalid", "reason": "bad_sha" }, "exact": true }
+      ]
+    },
+    {
+      "id": "renew_semantics",
+      "description": "renew: dogru sahip/epoch uzatir, digerleri ownership_lost, ttl araligi",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-renew", "p_display_name": "zz-v-renew", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000033", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "renew_lease", "args": { "p_key": "zz-v-renew", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ok", "epoch": 1 } },
+        { "rpc": "renew_lease", "args": { "p_key": "zz-v-renew", "p_holder": "srvA:boot1", "p_epoch": 2 },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "renew_lease", "args": { "p_key": "zz-v-renew", "p_holder": "srvB:boot2", "p_epoch": 1 },
+          "expect": { "outcome": "ownership_lost" } },
+        { "rpc": "renew_lease", "args": { "p_key": "zz-v-renew", "p_holder": "srvA:boot1", "p_epoch": 1, "p_ttl_s": 5 },
+          "expect": { "outcome": "invalid", "reason": "bad_ttl" }, "exact": true }
+      ]
+    },
+    {
+      "id": "listing_and_health",
+      "description": "list_keys (onek, sinir, kesilme), character_exists, healthcheck",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-lst-a", "p_display_name": "zz-v-lst-a", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000034", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "create_character", "args": { "p_key": "zz-v-lst-b", "p_display_name": "zz-v-lst-b", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000035", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed" } },
+        { "rpc": "list_keys", "args": { "p_prefix": "zz-v-lst-", "p_limit": 100 },
+          "expect": { "outcome": "ok", "keys": ["zz-v-lst-a", "zz-v-lst-b"], "truncated": false }, "exact": true },
+        { "rpc": "list_keys", "args": { "p_prefix": "zz-v-lst-", "p_limit": 1 },
+          "expect": { "outcome": "ok", "keys": ["zz-v-lst-a"], "truncated": true }, "exact": true },
+        { "rpc": "list_keys", "args": { "p_prefix": "ZZ", "p_limit": 10 },
+          "expect": { "outcome": "invalid", "reason": "bad_prefix" }, "exact": true },
+        { "rpc": "list_keys", "args": { "p_prefix": "zz", "p_limit": 0 },
+          "expect": { "outcome": "invalid", "reason": "bad_limit" }, "exact": true },
+        { "rpc": "healthcheck", "args": {},
+          "expect": { "outcome": "ok", "api_version": 1, "schema": "v2" } }
+      ]
+    }
+  ]
+}

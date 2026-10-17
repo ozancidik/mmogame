@@ -43,3 +43,8 @@ Art/
 *.sav
 .env
 .env.*
+
+# Supabase CLI (docs/DESIGN_SUPABASE.md 3.5): yerel gecici dosyalar ve sirlar
+supabase/.temp
+supabase/.branches
+supabase/.env*
