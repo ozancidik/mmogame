@@ -25,8 +25,9 @@
 // (FillSaveData/ApplySaveData bellek ici; unpossess oncesi yukleme bayragi kapatilir, ayrilma kaydi atlanir).
 namespace
 {
-	// 5 saf NextRarity + 9 FeeFor + 3x16 basari + 10 FindFromSlot + 20x4 ret + 2 mob + 4x2 sinir.
-	constexpr int32 FusionTestExpectedChecks = 162;
+	// 5 saf NextRarity + 9 FeeFor + 3x16 basari + 10 FindFromSlot + 20x4 ret + 2 mob + 4x2 sinir
+	// + 18 geri cagirim (5 ayni uclu tekrar + 6 baska uclu + 3 altin harcama + 4 sahibi yok etme).
+	constexpr int32 FusionTestExpectedChecks = 180;
 
 	FMMOEquipmentInstance FusionTestInst(int32 Id, const TCHAR* ItemId, EMMOItemRarity Rarity, int32 Plus = 0)
 	{
@@ -75,6 +76,11 @@ namespace
 		if (Vendor) { Fixtures.Add(Vendor); Vendor->SetActorEnableCollision(false); }
 		AMMOPlayerController* Controller = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Origin, FRotator::ZeroRotator, Params);
 		if (Controller) Fixtures.Add(Controller);
+		// Geri cagirim icinde yok edilen ikinci oyuncu (kendi controller'i, satici yaninda): ana pawn'a dokunmaz.
+		AMMOCharacter* Victim = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), Origin + FVector(0, 200, 0), FRotator::ZeroRotator, Params);
+		if (Victim) { Fixtures.Add(Victim); Victim->SetActorEnableCollision(false); }
+		AMMOPlayerController* VictimController = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), Origin, FRotator::ZeroRotator, Params);
+		if (VictimController) Fixtures.Add(VictimController);
 		// Mob sahibi (F3): kendi AI controller'i ile, satici yaninda. Ayni kare; tick kapali.
 		const FTransform MobTM(FRotator::ZeroRotator, Origin + FVector(0, -300, 0));
 		AMMOMob* Mob = World->SpawnActorDeferred<AMMOMob>(AMMOMob::StaticClass(), MobTM, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
@@ -92,6 +98,11 @@ namespace
 			if (Pawn) Pawn->SetSaveIdentityForTest(bLoaded, Pawn->GetActiveSaveSlot(), Pawn->GetLoadSerial());
 		};
 		if (Pawn && Controller) { Controller->Possess(Pawn); SetLoaded(true); }
+		const auto SetVictimLoaded = [&](bool bLoaded)
+		{
+			if (IsValid(Victim)) Victim->SetSaveIdentityForTest(bLoaded, Victim->GetActiveSaveSlot(), Victim->GetLoadSerial());
+		};
+		if (Victim && VictimController) { VictimController->Possess(Victim); SetVictimLoaded(true); }
 
 		int32 Failures = 0;
 		const auto Check = [&](const FString& Case, const FString& Label, bool bOK)
@@ -108,11 +119,12 @@ namespace
 		const bool bCompleted = [&]()
 		{
 			if (!Pawn || !Restore || !Vendor || !Controller || !Mob || !Pawn->GetInventory() || !Restore->GetInventory() || !Pawn->GetStats()
-				|| !Pawn->GetTradeComponent() || !Mob->GetInventory())
+				|| !Pawn->GetTradeComponent() || !Mob->GetInventory() || !Victim || !VictimController || !Victim->GetInventory())
 			{
 				OutError = TEXT("fixture spawn failed"); return false;
 			}
-			if (!Pawn->IsPlayerControlled() || !Pawn->IsInitialLoadComplete() || Mob->IsPlayerControlled())
+			if (!Pawn->IsPlayerControlled() || !Pawn->IsInitialLoadComplete() || Mob->IsPlayerControlled()
+				|| !Victim->IsPlayerControlled() || !Victim->IsInitialLoadComplete())
 			{
 				OutError = TEXT("fixture possession failed"); return false;
 			}
@@ -322,7 +334,9 @@ namespace
 				if (RC.Setup == 2) Pawn->SetActorLocation(Origin + FVector(2000, 0, 0));
 				if (RC.Setup == 5) Pawn->SetActorLocation(Origin + FVector(950, 0, 0)); // satici x=+100: 850 u
 				if (RC.Setup == 3) Pawn->GetStats()->bIsDead = true;
-				if (RC.Setup == 6) { SetLoaded(false); Controller->UnPossess(); }
+				// Unpossess kaydi yazilmasin diye once kapatilir, sonra yeniden acilir: yalniz oyuncu kapisi reddeder
+				// (IsPlayerControlled kontrolu silinirse kayit kilidi bunu ortmez, birlestirme gerceklesir).
+				if (RC.Setup == 6) { SetLoaded(false); Controller->UnPossess(); SetLoaded(true); }
 				if (RC.Setup == 7) SetLoaded(false);
 				if (RC.Setup == 8) Pawn->SetTravelSaveCommitted(true);
 				if (RC.Setup == 9) Offer(2);
@@ -335,7 +349,7 @@ namespace
 				Check(Case, TEXT("no_gold_delegate"), Res.GoldCalls == 0);
 				Pawn->GetStats()->bIsDead = false;
 				Pawn->SetActorLocation(Origin);
-				if (RC.Setup == 6) { Controller->Possess(Pawn); SetLoaded(true); }
+				if (RC.Setup == 6) { SetLoaded(false); Controller->Possess(Pawn); SetLoaded(true); }
 			}
 
 			// --- Mob sahibi (2): satici yaninda, 3 esdeger esya, yeterli altin; yine de reddedilir (F3) ---
@@ -403,11 +417,106 @@ namespace
 				Trade->bTradeActive = false;
 				Trade->MyOffer.Items.Reset();
 			}
+
+			// --- Geri cagirim vakalari (5 + 6 + 3 + 4): OnInventoryChanged icinden ikinci Execute, altin harcama,
+			// sahibini yok etme. Altin probu geri cagirimdan SONRA baglanir: yalniz dis Execute'un son
+			// OnGoldChanged yayinini gorur (canli bakiye mi, bayat mi).
+			const int32 CbFee = FMMOFusion::FeeFor(*Sword, R::Common);
+			struct FFusionCbRun { F Result = F::InternalError; int32 NewId = 0; int32 InvCalls = 0; int32 GoldCalls = 0; int32 Published = -1; };
+			const auto RunCb = [&](UMMOInventoryComponent* Target, int32 A, int32 B, int32 C, TFunction<void()> OnInv, FFusionCbRun& Out)
+			{
+				TStrongObjectPtr<UMMOPurchaseCallbackProbe> InvProbe(NewObject<UMMOPurchaseCallbackProbe>());
+				TStrongObjectPtr<UMMOPurchaseCallbackProbe> GoldProbe(NewObject<UMMOPurchaseCallbackProbe>());
+				GoldProbe->Callback = [&Out](int32 Published) { Out.Published = Published; };
+				InvProbe->Callback = [&](int32)
+				{
+					OnInv();
+					Target->OnGoldChanged.AddDynamic(GoldProbe.Get(), &UMMOPurchaseCallbackProbe::OnGold);
+				};
+				Target->OnInventoryChanged.AddDynamic(InvProbe.Get(), &UMMOPurchaseCallbackProbe::OnInventory);
+				Out.Result = FMMOFusion::Execute(*Target, A, B, C, &Out.NewId);
+				// Target yok edilmis olabilir: bellek bu karede gecerli (GC yok), baglar yine de sokulur.
+				Target->OnInventoryChanged.RemoveDynamic(InvProbe.Get(), &UMMOPurchaseCallbackProbe::OnInventory);
+				Target->OnGoldChanged.RemoveDynamic(GoldProbe.Get(), &UMMOPurchaseCallbackProbe::OnGold);
+				InvProbe->Callback = nullptr;
+				GoldProbe->Callback = nullptr;
+				Out.InvCalls = InvProbe->Calls;
+				Out.GoldCalls = GoldProbe->Calls;
+			};
+			const auto Three = [&]()
+			{
+				return TArray<FMMOEquipmentInstance>{ FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common) };
+			};
+			{
+				// Ayni uclu geri cagirimdan tekrar: girdiler zaten gitti, ikinci birlestirme ve ikinci ucret yok.
+				const FString Case = TEXT("reentry_same_ids");
+				Seed(Three(), 10000);
+				F Nested = F::Ok; int32 NestedId = -1;
+				FFusionCbRun Res;
+				RunCb(Inv, 1, 2, 3, [&]() { Nested = FMMOFusion::Execute(*Inv, 1, 2, 3, &NestedId); }, Res);
+				Check(Case, TEXT("outer_ok"), Res.Result == F::Ok && Res.NewId > 0);
+				Check(Case, TEXT("nested_not_in_bag"), Nested == F::NotInBag && NestedId == 0);
+				Check(Case, TEXT("single_output"), Inv->EquipmentBag.Num() == 1 && Inv->EquipmentBag[0].InstanceId == Res.NewId
+					&& Inv->EquipmentBag[0].Rarity == R::Uncommon);
+				Check(Case, TEXT("gold_one_fee"), Inv->Gold == 10000 - CbFee);
+				Check(Case, TEXT("gold_published_live"), Res.GoldCalls == 1 && Res.Published == Inv->Gold);
+			}
+			{
+				// Baska bir uclu geri cagirimdan: iki ayri cikti, iki ucret; dis yayin ic birlestirmeden sonraki bakiyeyi verir.
+				const FString Case = TEXT("reentry_other_ids");
+				TArray<FMMOEquipmentInstance> Six = Three();
+				Six.Append({ FusionTestInst(4, Short, R::Common), FusionTestInst(5, Short, R::Common), FusionTestInst(6, Short, R::Common) });
+				Seed(Six, 10000);
+				const int32 NextBefore = Snapshot().NextInstanceId;
+				F Nested = F::InternalError; int32 NestedId = -1;
+				FFusionCbRun Res;
+				RunCb(Inv, 1, 2, 3, [&]() { Nested = FMMOFusion::Execute(*Inv, 4, 5, 6, &NestedId); }, Res);
+				const auto HasUncommon = [&](int32 Id)
+				{
+					return Id > 0 && Inv->EquipmentBag.ContainsByPredicate([Id](const FMMOEquipmentInstance& I) { return I.InstanceId == Id && I.Rarity == R::Uncommon; });
+				};
+				Check(Case, TEXT("outer_ok"), Res.Result == F::Ok && Res.NewId > 0);
+				Check(Case, TEXT("nested_ok"), Nested == F::Ok && NestedId > 0 && NestedId != Res.NewId);
+				Check(Case, TEXT("bag_two_outputs"), Inv->EquipmentBag.Num() == 2 && HasUncommon(Res.NewId) && HasUncommon(NestedId));
+				Check(Case, TEXT("gold_two_fees"), Inv->Gold == 10000 - 2 * CbFee);
+				Check(Case, TEXT("next_id_two"), Snapshot().NextInstanceId == NextBefore + 2);
+				Check(Case, TEXT("gold_published_live"), Res.GoldCalls == 1 && Res.Published == Inv->Gold);
+			}
+			{
+				// OnInventoryChanged gozlemcisi altin harcar: OnGoldChanged canli bakiyeyi yayinlar (onceden alinmis degeri degil).
+				const FString Case = TEXT("callback_spends_gold");
+				Seed(Three(), 10000);
+				FFusionCbRun Res;
+				RunCb(Inv, 1, 2, 3, [&]() { Inv->AddGold(-500); }, Res);
+				Check(Case, TEXT("result_ok"), Res.Result == F::Ok && Res.NewId > 0);
+				Check(Case, TEXT("gold_fee_and_spend"), Inv->Gold == 10000 - CbFee - 500);
+				Check(Case, TEXT("gold_published_live"), Res.GoldCalls == 1 && Res.Published == Inv->Gold);
+			}
+			{
+				// Gozlemci sahibi yok eder: cokme yok, yok olmus envanterde altin yayini yok. Son vaka (Victim geri gelmez).
+				const FString Case = TEXT("callback_destroys_owner");
+				UMMOInventoryComponent* VInv = Victim->GetInventory();
+				FMMOCharacterSaveData D;
+				D.Gold = 10000;
+				D.EquipmentBag = Three();
+				D.EquippedItems.SetNum(static_cast<int32>(EMMOEquipSlot::MAX));
+				D.NextInstanceId = 100;
+				VInv->ApplySaveData(D);
+				FFusionCbRun Res;
+				// Ayrilma kaydi yazilmasin: yukleme bayragi yok etmeden once kapatilir.
+				RunCb(VInv, 1, 2, 3, [&]() { SetVictimLoaded(false); Victim->Destroy(); }, Res);
+				Check(Case, TEXT("result_ok"), Res.Result == F::Ok && Res.NewId > 0);
+				Check(Case, TEXT("owner_destroyed"), !IsValid(Victim));
+				Check(Case, TEXT("inventory_delegate_once"), Res.InvCalls == 1);
+				Check(Case, TEXT("no_gold_publish_after_destroy"), Res.GoldCalls == 0);
+			}
 			return true;
 		}();
 		// Ayrilma kaydi yazilmasin: yukleme bayragi kapali, sonra unpossess, sonra yok et.
 		SetLoaded(false);
 		if (IsValid(Controller)) Controller->UnPossess();
+		SetVictimLoaded(false);
+		if (IsValid(VictimController)) VictimController->UnPossess();
 		for (AActor* Fixture : Fixtures) if (IsValid(Fixture)) Fixture->Destroy();
 		if (!bCompleted) return false;
 		if (OutChecks != FusionTestExpectedChecks) { ++Failures; OutError += TEXT(" check_count_mismatch"); }
@@ -436,3 +545,6 @@ namespace
 // komutu, HUD ve zamanlayici kaniti DEGILDIR.
 // Execute icindeki geri alma dallari (cikti eklenemedi / ucret kismen kesildi) Check'in on kosullari
 // yuzunden bu testten ulasilamaz; yalniz "Gold >= Fee kontrolu silinirse" mutasyonuyla dolayli sinandi.
+// Ucret geri alma dalinda ApplyGoldInternal yerine dogrudan Gold yazimi ve test exec'teki dedicated/listen
+// korumasinin kaldirilmasi bu testten yakalanamaz (dal ulasilamaz; test yalniz NM_Standalone'da kosar).
+// Geri cagirim vakalari ayni karede, ayni yigin uzerinde yeniden girisi sinar; GC/sonraki kare degildir.
