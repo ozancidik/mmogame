@@ -20,8 +20,8 @@
 // controller'siz ayni-kare aktorler; diske kayit/yukleme yok (FillSaveData/ApplySaveData bellek ici).
 namespace
 {
-	// 5 saf NextRarity + 9 FeeFor + 3x16 basari + 7 FindFromSlot + 14x4 ret + 2x2 sinir.
-	constexpr int32 FusionTestExpectedChecks = 129;
+	// 5 saf NextRarity + 9 FeeFor + 3x16 basari + 7 FindFromSlot + 15x4 ret + 3x2 sinir.
+	constexpr int32 FusionTestExpectedChecks = 135;
 
 	FMMOEquipmentInstance FusionTestInst(int32 Id, const TCHAR* ItemId, EMMOItemRarity Rarity, int32 Plus = 0)
 	{
@@ -222,14 +222,15 @@ namespace
 				Check(Case, TEXT("no_mutation"), Same(Snapshot(), Before));
 			}
 
-			// --- Ret vakalari (14 x 4): sonuc dogru, anlik goruntu ayni, delege 0 ---
+			// --- Ret vakalari (15 x 4): sonuc dogru, anlik goruntu ayni, delege 0 ---
 			const TArray<FMMOEquipmentInstance> RejectBag = {
 				FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common),
 				FusionTestInst(4, Long, R::Common), FusionTestInst(5, Short, R::Uncommon), FusionTestInst(6, Short, R::Common, 1),
 				FusionTestInst(7, Short, R::Epic), FusionTestInst(8, Short, R::Epic), FusionTestInst(9, Short, R::Epic),
 				FusionTestInst(10, Short, R::Legendary), FusionTestInst(11, Short, R::Legendary), FusionTestInst(12, Short, R::Legendary) };
 			struct FFusionRejectCase { const TCHAR* Name; int32 A, B, C; F Expected; int32 Setup; };
-			// Setup: 0 normal, 1 Gold = Fee-1, 2 saticidan 2000 u uzak, 3 olu, 4 bilinmeyen esya cantasi.
+			// Setup: 0 normal, 1 Gold = Fee-1, 2 saticidan 2000 u uzak, 3 olu, 4 bilinmeyen esya cantasi,
+			// 5 saticidan 850 u (800 u esiginin hemen disi; esik genisletilirse yakalanir).
 			const FFusionRejectCase Rejects[] = {
 				{ TEXT("reject_bad_ids"), 0, 1, 2, F::BadIds, 0 },
 				{ TEXT("reject_duplicate_id"), 1, 1, 2, F::DuplicateId, 0 },
@@ -243,6 +244,7 @@ namespace
 				{ TEXT("reject_capped_legendary"), 10, 11, 12, F::RarityCapped, 0 },
 				{ TEXT("reject_not_enough_gold"), 1, 2, 3, F::NotEnoughGold, 1 },
 				{ TEXT("reject_not_near_vendor"), 1, 2, 3, F::NotNearVendor, 2 },
+				{ TEXT("reject_vendor_just_out_of_range"), 1, 2, 3, F::NotNearVendor, 5 },
 				{ TEXT("reject_dead"), 1, 2, 3, F::NotNearVendor, 3 },
 				{ TEXT("reject_unknown_item"), 1, 2, 3, F::UnknownItem, 4 },
 			};
@@ -259,6 +261,7 @@ namespace
 					Seed(RejectBag, RC.Setup == 1 ? FMMOFusion::FeeFor(*Sword, R::Common) - 1 : 10000);
 				}
 				if (RC.Setup == 2) Pawn->SetActorLocation(Origin + FVector(2000, 0, 0));
+				if (RC.Setup == 5) Pawn->SetActorLocation(Origin + FVector(950, 0, 0)); // satici x=+100: 850 u
 				if (RC.Setup == 3) Pawn->GetStats()->bIsDead = true;
 				const FMMOCharacterSaveData Before = Snapshot();
 				FFusionTestRun Res;
@@ -271,7 +274,7 @@ namespace
 				Pawn->SetActorLocation(Origin);
 			}
 
-			// --- Sinir: Gold == Fee tam (2), canta tam 12 dolu (2) ---
+			// --- Sinir: Gold == Fee tam (2), canta tam 12 dolu (2), saticiya 750 u (2) ---
 			{
 				const FString Case = TEXT("boundary_gold_equals_fee");
 				Seed({ FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common) },
@@ -292,6 +295,18 @@ namespace
 				Check(Case, TEXT("result_ok"), bWasFull && Res.Result == F::Ok);
 				Check(Case, TEXT("bag_ten"), Inv->EquipmentBag.Num() == UMMOInventoryComponent::MaxBagSize - 2
 					&& Inv->EquipmentBag.ContainsByPredicate([&](const FMMOEquipmentInstance& I) { return I.InstanceId == Res.NewId && Res.NewId != 0; }));
+			}
+			{
+				// 800 u esiginin hemen ici: esik daraltilirsa yakalanir.
+				const FString Case = TEXT("boundary_vendor_in_range");
+				const int32 Fee = FMMOFusion::FeeFor(*Sword, R::Common);
+				Seed({ FusionTestInst(1, Short, R::Common), FusionTestInst(2, Short, R::Common), FusionTestInst(3, Short, R::Common) }, 10000);
+				Pawn->SetActorLocation(Origin + FVector(-650, 0, 0)); // satici x=+100: 750 u
+				FFusionTestRun Res;
+				Run(1, 2, 3, Res);
+				Check(Case, TEXT("result_ok"), Res.Result == F::Ok);
+				Check(Case, TEXT("gold_exact"), Fee > 0 && Inv->Gold == 10000 - Fee);
+				Pawn->SetActorLocation(Origin);
 			}
 			return true;
 		}();
@@ -316,3 +331,8 @@ namespace
 	FMMOFusionTestExec GMMOFusionTestExec;
 }
 #endif
+
+// Kapsam notu: bu test tek senkron karede, controller'siz otorite dunyasinda FMMOFusion mantigini
+// dogrular. PIE, ag/replikasyon (uzak istemci), sohbet komutu, HUD ve zamanlayici kaniti DEGILDIR.
+// Execute icindeki geri alma dallari (cikti eklenemedi / ucret kismen kesildi) Check'in on kosullari
+// yuzunden bu testten ulasilamaz; yalniz "Gold >= Fee kontrolu silinirse" mutasyonuyla dolayli sinandi.
