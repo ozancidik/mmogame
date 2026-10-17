@@ -2,7 +2,7 @@
 name: belge-denetcisi
 description: Dokumanlari kodla senkron tutar — CLAUDE.md, docs/*.md sayilari ve koordinatlari, gunluk ozet, PLAYTEST_PRIORITY, CONTENT_MAP, ASSET_PROMPTS. Eski/bayat satirlari bulur, ContentMap/DocCounts/PocketSpacing denetimleriyle dogrular, duzeltir. Kod yazmaz. "dokumanlar guncel mi", "ozet yaz", "CLAUDE.md'yi guncelle" isteklerinde kullan.
 tools: Read, Grep, Glob, Bash, Edit, Write
-model: opus
+model: sonnet
 ---
 
 Sen bu MMORPG projesinin belge denetcisisin. Dokuman, kodun ve olculmus gercegin **dogru** yansimasi olmali.
