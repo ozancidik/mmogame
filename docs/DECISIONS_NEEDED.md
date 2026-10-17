@@ -397,18 +397,23 @@ Kaynak: `python Scripts/EconomyModel.py` "Birlestirme" bolumu; fiyat/zar/ucret k
 
 ## Yeni karar adaylari (2026-10-17: Supabase veritabani baglama; hepsi BEKLIYOR)
 
-Kaynak: `docs/DESIGN_SUPABASE.md` (§8 tam tablo, DURUM blogu). **Durum: kimse onaylamadi.** Kodda gecici varsayim: mimari C, Auth yok. SQL (`supabase/`) ve UE depo katmani
-(`Source/MyProject/Public/Save/MMOSupabase*`) yazildi; **SQL hicbir PostgreSQL'de calistirilmadi, UE tarafi yalniz sahte sunucuya karsi (556 kontrol, izole worktree) test edildi,
-oyundaki hicbir yol depoyu cagirmiyor, gercek Supabase hesabi/baglantisi yok, PIE yok.** Hesap, proje, anahtar ve Dashboard ayarlari **kullanicidadir** (anahtari SOHBETE
-YAPISTIRMA; yalniz yerel ortam degiskeni `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECRET_KEY`). Etiket hepsi [Tahmin]/oneri: Supabase limit/fiyat bilgisi dogrulanmadi.
+Kaynak: `docs/DESIGN_SUPABASE.md` (§8 tam tablo, DURUM blogu). **Durum: S-kararlarinin cogu onaylanmadi; bolge ve katman fiilen secildi (asagida).** Kodda gecici varsayim: mimari C, Auth yok. SQL (`supabase/`) ve UE depo katmani
+(`Source/MyProject/Public/Save/MMOSupabase*`) yazildi; UE tarafi yalniz sahte sunucuya karsi (556 kontrol, izole worktree) test edildi, oyundaki hicbir yol depoyu cagirmiyor, PIE yok.
+**2026-10-17 [Dogrulandi: dev]: Supabase hesabi ACILDI (FREE katman, bolge West EU (Ireland), tek proje `main` dev olarak); V2 migration SQL Editor'de HATASIZ uygulandi; katalog (12 RPC yalniz service_role, 6 tablo RLS acik, anon/authenticated yetkisi 0),
+Exposed schemas yalniz `mmo_api`, anahtarsiz tablo GET reddi ve gercek HTTPS `healthcheck` (`apikey` yalniz, Bearer yok) dogrulandi. Kural: tarayici gibi User-Agent secret key'i reddettirir ("Forbidden use of secret API key in browser"); UE istemcisi acik UA (`MMOGameServer/0.1`) gondermeli (duzeltme ayri ajanda, yapilmadi).
+`run_all.sql` testleri henuz KOSULMADI (psql yok).** Hesap, proje, anahtar ve Dashboard ayarlari **kullanicidadir** (anahtari SOHBETE
+YAPISTIRMA; yalniz yerel ortam degiskeni `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECRET_KEY`). Supabase limit/fiyat bilgisi hala dogrulanmadi.
+
+**S-kararlari durumu (2026-10-17):** S4 bolge: **West EU (Ireland) SECILDI** (oneri Frankfurt'tu; sonuc: KVKK yurt disi aktarim notu aynen gecerli, hukuki gorus acik); S5 katman: **FREE** (dev; alfa icin Pro karari ACIK; FREE'de duraklatma/yedek [Dogrulanmadi]);
+tek proje `main` var (ayri alpha projesi yok; S5/S6 alfa karari acik). **ACIK/BEKLIYOR:** S1 mimari (C gecici varsayim, onaylanmadi), S2, S3 (Auth: fiilen kullanilmiyor, onay yok), S6 yedek, S7, S8, S9, S10, S11. Kullanici adimlari: `supabase/README.md` "Kalan kullanici adimlari" (psql kur + `run_all.sql`, Auth signup/anonim kapat, legacy JWT kapat, yedek/PITR, MFA).
 
 | # | Soru | Oneri | Not |
 |---|---|---|---|
 | S1 | Mimari A (tablo uclari) / B (kendi ara servisi) / C (RPC, mantik SQL'de) | **C**, halka acik surumden once **B** | C'nin bedeli: harita sunucularinda genis bir secret key; kapali alfada kabul. Reddedilirse B (+3-5 hafta) |
 | S2 | S13 servis dili (Steam bilet dogrulama) | TypeScript (Supabase Edge Function) ya da Python | A5'ten once karar |
 | S3 | Supabase Auth kullanilsin mi | **Hayir** | Steam bileti ile cakisir, cift kimlik tablosu |
-| S4 | Bolge | **AB (Frankfurt)** | KVKK yurt disi aktarimi icin hukuki gorus |
-| S5 | Katman / ucret | alfa **Pro**, dev Free | Duraklatma/yedek kurali dogrulanmadi; harcama siniri acik |
+| S4 | Bolge | ~~AB (Frankfurt)~~ **SECILDI: West EU (Ireland)** (2026-10-17, proje kuruldu; bolge sonradan degistirilemez, yeni proje gerekir [Dogrulanmadi]) | KVKK yurt disi aktarimi icin hukuki gorus (acik); gecikme Turkiye'den olculmedi |
+| S5 | Katman / ucret | alfa **Pro**, dev Free. **Durum: dev FREE kuruldu (2026-10-17); alfa Pro karari ACIK** | Duraklatma/yedek kurali dogrulanmadi; harcama siniri acik |
 | S6 | Yedek | Pro gunluk yedek + kendi `export_all` | `export_all` ve silme/KVKK RPC'si YOK (yazilmadi) |
 | S7 | DB moduna gecis tek yonlu mu / DB -> dosya donus araci yazilsin mi | tek yonlu + `export_all` | Dosyaya donuste DB ilerlemesi kaybolur |
 | S8 | Kimlik | K-1 acikken yalniz bilinen oyuncularla; Steam (A5/A3) DB dilim 1-4'ten sonra | DB kimlik cozmez (tek paylasilan secret key, `canonical_key`'i bilen karakteri acar) |
@@ -423,7 +428,9 @@ Bearer yalniz JWT, `CreateEx` kirasi, donmus yuva release->acquire, `write_ops` 
 tavana yakin kayit UE'de gecip DB'de `invalid/data_too_large` alabilir (`supabase/README.md`); (f) motorun `LogHttp`/WinHttp davranisi (basliklar log'a sizar mi) dogrulanmadi;
 (g) `MMOSupabaseCharacterStore` / `RestClient` / `UnrealHttpTransport` hicbir oyun yoluna bagli degil, `RunSystemTests.ps1`/`RunAllChecks.ps1` adimi degil
 (`Scripts/TestSupabaseStore.ps1` izole worktree'de elle); (h) Dilim 3 (`-MMOCharacterStore`, acilista `HealthcheckEx`) ve Dilim 4 (cagiranlar) yapilmadi,
-Dilim 4 Codex'in kirli `MMOCharacter.*` / `MMOTradeComponent.*` dosyalarina dokunur: onlar commit edilmeden baslanmaz.
+Dilim 4 Codex'in kirli `MMOCharacter.*` / `MMOTradeComponent.*` dosyalarina dokunur: onlar commit edilmeden baslanmaz;
+(i) **UE istemcisi acik User-Agent gondermiyor olabilir** (motor varsayilani dogrulanmadi): tarayici gibi UA secret key'i reddettirir (2026-10-17 dev'de goruldu); Dilim 2 UA duzeltmesi ayri ajanda bekliyor;
+(j) `run_all.sql` / 05_* gercek DB'de kosulmadi (psql kurulumu kullanicida); (k) migration dev'e uygulandi: dosya artik degistirilmez, duzeltme yeni zaman damgali migration.
 
 ## Not (2026-10-17): proje ajanlari modeli
 

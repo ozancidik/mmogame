@@ -5656,22 +5656,23 @@ Tasarim ve guvenlik gereksinimleri: `docs/DESIGN_FUSION.md` §7.4, §11. Ucretle
 - [ ] **13. Seyahat/yukleme penceresi:** Bolge gecisi (Summer<->Winter) baslatildiktan hemen sonra ve karakter yuklenirken onay gonder:
   "Karakter yukleniyor ya da bolge degistiriyor..." (`Locked`), hicbir sey degismez; gecis sonrasi canta/altin tutarli.
 
-## Supabase dev projesi ilk kurulum (2026-10-17; KULLANICI calistirir; PIE DEGIL; hicbir madde henuz calistirilmadi)
+## Supabase dev projesi ilk kurulum (2026-10-17; KULLANICI calistirir; PIE DEGIL; [x] = 2026-10-17'de dev projesinde dogrulandi)
 
-**Durum:** SQL (`supabase/`, `c8d81c1`/`bcde6a2`/`1ae80c7`) ve UE depo katmani (`e0fffdf`..`342ab17`) yazildi; **SQL hicbir PostgreSQL'de calistirilmadi**, UE tarafi yalniz sahte sunucuya karsi
-test edildi (556 kontrol), oyun depoyu cagirmiyor. Bu liste gercek dev projesinde ilk dogrulamadir. Komutlar ve beklenen ciktilar: `supabase/README.md`
+**Durum:** SQL (`supabase/`, `c8d81c1`/`bcde6a2`/`1ae80c7`) ve UE depo katmani (`e0fffdf`..`342ab17`) yazildi; **V2 migration 2026-10-17'de dev Supabase'e (FREE, West EU (Ireland), proje `main`) SQL Editor ile HATASIZ uygulandi**
+ve katalog/HTTPS dogrulamasi gecti; `run_all.sql` testleri HENUZ KOSULMADI (psql yok). UE tarafi yalniz sahte sunucuya karsi test edildi (556 kontrol), oyun depoyu cagirmiyor. Bu liste gercek dev projesinde ilk dogrulamadir. Komutlar ve beklenen ciktilar: `supabase/README.md`
 ("Kullanicinin dev projede calistiracagi sira", "Dashboard guvenlik kontrol listesi"); hesap/proje/anahtar adimlari: `docs/DESIGN_SUPABASE.md` §6.
 **Sir kurali:** anahtar, DB sifresi, `.env` icerigi sohbete/commit'e/komut satirina yazilmaz; yalniz `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECRET_KEY` yerel ortam degiskeni. Yalniz **dev** projesinde dene (alpha degil). Bir hata cikarsa once SQL duzeltilir (migration henuz hicbir DB'ye uygulanmadigi icin dosya yerinde duzeltilebilir; uygulandiktan sonra yeni zaman damgali dosya).
 
-- [ ] **0. Onkosul:** Supabase hesabi + 2FA, `myproject-dev` projesi, DB sifresi parola yoneticisinde; psql >= 13 (ve istenirse Supabase CLI) kurulu (makinede su an YOK).
-- [ ] **1. Healthcheck / baglanti:** `psql "$DB" -c "select 1"` -> `1`. Migration SONRASI: `curl` ile `POST $MMO_SUPABASE_URL/rest/v1/rpc/healthcheck` (basliklar dosyadan, secret key komut satirinda gorunmez) ->
-  `{"outcome":"ok","contract_version":2,...}`.
-- [ ] **2. V2 migration:** `supabase/migrations/20261017120000_v2_character_store.sql` (`psql -v ON_ERROR_STOP=1 -f` ya da `supabase db push`). Sozdizimi/calisma hatasi cikarsa BULGU olarak not et (ilk gercek kosu). `Migrations/V1__initial_schema.sql` UYGULANMAZ.
-- [ ] **3. Dashboard guvenlik ayarlari:** exposed schemas yalniz `mmo_api`; pg_graphql kapali; legacy anon/service_role JWT devre disi; Auth signup/anonim kapali; Realtime'da `mmo.*` yok; SSL zorunlu;
-  Network Restrictions; MFA; yedek/PITR plani okunmus; harcama sinirlari (liste `supabase/README.md`).
+- [~] **0. Onkosul:** [x] Supabase hesabi acildi (FREE, West EU (Ireland), tek proje `main`, dev olarak; 2026-10-17); [x] anahtar yerel ortam degiskenlerinde; [ ] 2FA/MFA ve DB sifresinin parola yoneticisinde oldugu teyit edilmedi; [ ] psql >= 13 (ve istenirse Supabase CLI) kurulu degil.
+- [x] **1. Healthcheck / baglanti (HTTPS):** `POST $MMO_SUPABASE_URL/rest/v1/rpc/healthcheck` (`apikey` yalniz, `Content-Profile: mmo_api`, Bearer yok, **acik User-Agent `MMOGameServer/0.1`**; PowerShell `-UserAgent`, curl `-A`) ->
+  `{outcome:'ok', api_version:2, contract_version:2, schema:'v2'}` [Dogrulandi: dev, 2026-10-17]. **UA kurali:** tarayici gibi UA (PowerShell varsayilani) -> `Forbidden use of secret API key in browser`. `psql "$DB" -c "select 1"` yapilmadi (psql yok).
+- [x] **2. V2 migration:** `supabase/migrations/20261017120000_v2_character_store.sql` (824 satir) SQL Editor'de tek seferde `Success. No rows returned` [Dogrulandi: dev, 2026-10-17]. Artik DEGISTIRILMEZ (duzeltme = yeni zaman damgali dosya). `Migrations/V1__initial_schema.sql` UYGULANMAZ.
+- [~] **3. Dashboard guvenlik ayarlari:** [x] exposed schemas yalniz `mmo_api` (2026-10-17). [ ] pg_graphql kapali; [ ] legacy anon/service_role JWT devre disi; [ ] Auth signup/anonim kapali; [ ] Realtime'da `mmo.*` yok; [ ] SSL zorunlu;
+  [ ] Network Restrictions; [ ] MFA; [ ] yedek/PITR plani okunmus (FREE'de otomatik yedek olmayabilir [Dogrulanmadi]); [ ] harcama sinirlari (liste `supabase/README.md`).
 - [ ] **4. `run_all.sql`:** `psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/run_all.sql` (depo kokunden); 01-04 her dosya `PASS ...` yazar. Duz (Supabase olmayan) PG ise once `00_local_roles.sql`.
-- [ ] **5. Anon erisim negatifi:** publishable (anon) anahtarla `GET /rest/v1/character_saves` ve `healthcheck` RPC'si **veri/yetki DONMEMELI** (401/404/bos); `acquire_lease` cagrisina `p_op_id` eklenirse `404 PGRST202`. Veri donerse sema hemen kapatilir.
+- [~] **5. Anon erisim negatifi:** [x] anahtarsiz `GET /rest/v1/character_saves` REDDEDILDI (2026-10-17); [x] katalog: 12 RPC `anon=false/authenticated=false`, 6 tablo RLS acik, anon/authenticated/PUBLIC tablo yetkisi 0. [ ] Asagidaki publishable-anahtar denemeleri YAPILMADI: publishable (anon) anahtarla `GET /rest/v1/character_saves` ve `healthcheck` RPC'si **veri/yetki DONMEMELI** (401/404/bos); `acquire_lease` cagrisina `p_op_id` eklenirse `404 PGRST202`. Veri donerse sema hemen kapatilir.
 - [ ] **6. Sozlesme senaryolari:** 02 testi `vectors.json` 20 senaryosunu calistirir (run_all icinde); ek olarak iki terminalli eszamanlilik: `05_concurrency_a`/`_b`/`_check` (same_op, other_op) ve `05_concurrency_lease_a`/`_b`
   (kalici veri yazar, yalniz dev). Basarisiz her satir bulgudur; `vectors.json` UE sahte sunucusunun da kaynagi oldugu icin SQL ile ayrisma burada ortaya cikar.
 - [ ] **7. UE entegrasyon betigi: henuz YOK.** `Scripts/TestSupabaseIntegration.ps1` (Dilim 6) yazilmadi; `FMMOSupabaseCharacterStore` gercek Supabase'e karsi hic denenmedi. Betik yazilincaya kadar UE <-> gercek DB uyumu (gercek `FHttpModule`, TLS, `LogHttp` anahtar sizintisi, zaman asimi, 429/5xx) **DOGRULANMAMISTIR**.
 - [ ] **8. `write_ops` temizligi:** `pg_cron` ile `purge_write_ops(7, 20000)` kuruldu mu (ornek `supabase/README.md`); kurulmazsa tablo buyur (ucretsiz katmanda 500 MB).
+- [ ] **9. UE istemcisi User-Agent (2026-10-17 bulgusu):** `FMMOUnrealHttpTransport` acik, tarayici kelimesi (`Mozilla/Chrome/Safari/Gecko/AppleWebKit/Edge`) icermeyen bir `User-Agent` (`MMOGameServer/0.1`) gondermeli; aksi halde gercek DB'de `Forbidden use of secret API key in browser`. Duzeltme ayri ajanda (Dilim 2 UA), YAPILMADI; motorun varsayilan UA'si dogrulanmadi.

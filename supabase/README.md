@@ -1,12 +1,13 @@
 # supabase/ - V2 karakter deposu (Dilim 1, SQL)
 
-**Durum: YAZILDI, HICBIR PostgreSQL'DE CALISTIRILMADI.** Makinede psql / docker / supabase CLI yok; SQL soz dizimi bile bir ayristiriciyla dogrulanmadi
-(yalniz `vectors.json` bir Python betigiyle denetlendi, asagida). Ilk gercek kosu kullanicinin **dev** projesindedir; hata cikarsa once burada duzeltilir.
+**Durum (2026-10-17 dev projesinde ilk gercek kosu): migration Supabase SQL Editor'de HATASIZ uygulandi; katalog ve HTTPS RPC dogrulamasi gecti (asagida "Dev projesinde dogrulananlar").
+`tests/run_all.sql` ve 05_* esozamanlilik testleri HENUZ KOSULMADI (psql kurulu degil); sozlesme senaryolari (02) gercek DB'de DOGRULANMADI.** Makinede psql / docker / supabase CLI yok;
+SQL soz dizimi bir ayristiriciyla denenmedi (yalniz `vectors.json` bir Python betigiyle denetlendi, asagida). Hata cikarsa once burada duzeltilir.
 Tasarim: `docs/DESIGN_SUPABASE.md` (3.2 sema, 3.3 RPC, 3.4 idempotency, 3.6 vektorler, 5 guvenlik, 7.2 Dilim 1).
 
-**Henuz uygulanmadi, v2 dosyasi yerinde duzeltildi (2026-10-17, QA + guvenlik denetimi turu 1):** migration hicbir veritabanina uygulanmadigi icin
-`20261017120000_v2_character_store.sql` ayni dosyada duzeltildi (yeni migration dosyasi ACILMADI). Bir veritabanina uygulandiktan SONRA bu dosya degistirilmez;
-her degisiklik yeni zaman damgali dosyayla gelir. Degisenler: `lease_epoch` tek ad, `get_op.found`, `p_op_id` kapsami, `purge_write_ops`, varsayilan yetkiler,
+**v2 dosyasi yerinde duzeltildi (2026-10-17, QA + guvenlik denetimi turu 1-2), SONRA dev projesine uygulandi (ayni gun, SQL Editor):** uygulamadan once
+`20261017120000_v2_character_store.sql` ayni dosyada duzeltildi (yeni migration dosyasi ACILMADI). **Dev projesine uygulandigi icin bu dosya artik DEGISTIRILMEZ;**
+her degisiklik yeni zaman damgali dosyayla gelir (dev'de tablolari silip yeniden uygulamak ayri, bilincli bir karardir). Degisenler: `lease_epoch` tek ad, `get_op.found`, `p_op_id` kapsami, `purge_write_ops`, varsayilan yetkiler,
 kilit sonrasi zaman, zarf denetimi CHECK -> tetikleyici, `contract_version` 2 ve kati `vectors.json`.
 
 **Gecici varsayimlar (kullanici onaylamadi, geri alinabilir):** mimari C (Supabase = barindirilan PostgreSQL + PostgREST RPC; Auth/Realtime/Storage yok);
@@ -34,6 +35,8 @@ Tek kaynak `supabase/migrations/`.
 ## Sozlesme (contract_version 2) - UE tarafi icin
 
 Tasima: `POST {url}/rest/v1/rpc/{fonksiyon}`, govde = parametre adlari ile JSON nesnesi, basliklar `Content-Type: application/json`, `Content-Profile: mmo_api`, `apikey: <secret key>`. **`Authorization: Bearer` yalniz legacy JWT anahtari icin**; yeni `sb_secret_...` anahtari JWT degildir, Bearer'a KONMAZ (sozlesme listesindeki `Authorization` basligi, yeni anahtar modeline gecildiginde UE'de kaldirilir; Dilim 2 teyidi).
+**[Dogrulandi: dev, 2026-10-17]** `sb_secret_...` anahtari gercek HTTPS cagrisinda YALNIZ `apikey` ile (Bearer YOK) kabul edildi.
+**User-Agent kurali [Dogrulandi: dev, 2026-10-17]:** istek `User-Agent`'i tarayici gibi gorunurse secret key REDDEDILIR (`Forbidden use of secret API key in browser`). Istemci `Mozilla`, `Chrome`, `Safari`, `Gecko`, `AppleWebKit`, `Edge` icermeyen ACIK bir UA gondermeli (ornek `MMOGameServer/0.1`); `vectors.json` `transport.user_agent_note`.
 HTTP 200 + `outcome` alani is sonucudur. **Fazla veya eksik (zorunlu) parametre HTTP 404 `PGRST202`** (SQL'de `42883`); UE sahte sunucusu bunu aynen taklit eder. Opsiyonel parametre hic gonderilmeyebilir.
 `bigint` alanlari (`revision`, `lease_epoch`, `epoch`, `deleted`, ...) JSON **sayi**dir.
 
@@ -106,6 +109,44 @@ calisirsa B'nin aldigi kira (yeni epoch) A tarafindan devralinir (DB ikisini ayi
 - UE deposu acilista holder'i `^[A-Za-z0-9_.:-]{1,96}$` ile dogrular (uzunluk 1..96, karakter kumesi; `vectors.json` `holder` vektorleri); gecersizse depo acilmaz.
 - Ayni holder iki surecte KULLANILMAZ. DB bunu zorlayamaz (iki surec ayni dizeyi gonderir); onlem UE/isletme tarafindadir (DESIGN_SUPABASE.md §4.4/§5.1, Dilim 3 kabul olcutu).
 
+## Dev projesinde dogrulananlar [Dogrulandi: dev, 2026-10-17]
+Hesap: Supabase **FREE** katman, bolge **West EU (Ireland)**, tek proje `main` (dev olarak kullaniliyor; ayri `myproject-dev` / `myproject-alpha` projeleri YOK). Proje referansi/URL bu belgelerde yazilmaz (`<ref>`).
+Anahtar yerel kullanici ortam degiskenlerinde (`MMO_SUPABASE_URL`, `MMO_SUPABASE_SECRET_KEY`); PowerShell `Read-Host -AsSecureString` ile kaydedildi; sohbete/repoya yazilmadi.
+
+| # | Dogrulanan | Kanit turu |
+|---|---|---|
+| 1 | `20261017120000_v2_character_store.sql` (824 satir) SQL Editor'de tek seferde **HATASIZ** calisti (`Success. No rows returned`). Bu ilk gercek kosudur. | Dashboard ciktisi |
+| 2 | Katalog sorgusu: `mmo_api`'de **12 fonksiyon**, HEPSINDE `anon=false`, `authenticated=false`, `service_role=true`. `mmo` semasinda **6 tablo**, hepsinde **RLS acik**. `anon` / `authenticated` / PUBLIC icin tablo yetkisi **0**. | Katalog sorgusu (SQL Editor) |
+| 3 | `healthcheck` -> `{outcome:'ok', api_version:2, contract_version:2, schema:'v2'}`. | SQL Editor + HTTPS |
+| 4 | Data API **Exposed schemas: yalniz `mmo_api`**. Anahtarsiz `GET /rest/v1/character_saves` **REDDEDILDI**. | Dashboard + HTTPS |
+| 5 | Gercek HTTPS RPC cagrisi `POST /rest/v1/rpc/healthcheck` (`apikey: sb_secret_...`, `Content-Profile: mmo_api`, **Bearer YOK**) **BASARILI**: `sb_secret_` anahtari yalniz `apikey` ile kabul ediliyor. | HTTPS |
+| 6 | **User-Agent kurali:** tarayici gibi UA (Windows PowerShell varsayilani `Mozilla/5.0 ... WindowsPowerShell`) ile secret key REDDEDILIR: `{"message":"Forbidden use of secret API key in browser","hint":...}`. Acik UA (`MMOGameServer/0.1`) ile ayni cagri basarili. | HTTPS |
+
+**DOGRULANMADI (hala):** `tests/run_all.sql` (01-04) ve 05_* esozamanlilik testleri hicbir yerde kosulmadi; `vectors.json` 20 senaryosu gercek PostgREST/PG'ye karsi calistirilmadi
+(UE sahte sunucusu ile gercek ayrisabilir); `healthcheck` disindaki 11 RPC HTTPS ile cagrilmadi; Bearer'li `sb_secret_` cagrisi denenmedi; UE `FHttpModule` / WinHttp'nin varsayilan User-Agent'i
+ve basliklari ne gonderdigi; publishable (anon) anahtarla RPC/tablo negatifi ayri bir anahtarla denenmedi (madde 4 anahtarsiz GET'tir); Dashboard listesindeki diger maddeler (asagida).
+
+**Sonuc (UE tarafi icin):** oyun sunucusu istemcisi `User-Agent`'i acikca ayarlamali (tarayici kelimesi icermeyen, ornek `MMOGameServer/0.1`) ve secret key'i yalniz `apikey` ile gondermeli. Bu duzeltme ayri ajanda (Dilim 2 UA); bu belge kod degistirmez.
+
+Elle dogrulama ornekleri (anahtar komut satirina YAZILMAZ; ortam degiskeninden okunur; ciktiyi/anahtari sohbete yapistirma):
+```powershell
+# PowerShell: -UserAgent ZORUNLU (varsayilan UA "Mozilla/5.0 ... WindowsPowerShell" secret key'i reddettirir). Bearer YOK.
+$h = @{ 'apikey' = $env:MMO_SUPABASE_SECRET_KEY; 'Content-Profile' = 'mmo_api'; 'Content-Type' = 'application/json' }
+Invoke-RestMethod -Method Post -Uri "$env:MMO_SUPABASE_URL/rest/v1/rpc/healthcheck" -Headers $h -Body '{}' -UserAgent 'MMOGameServer/0.1'
+```
+```bash
+# curl: -A ZORUNLU degil ama acik UA'yi kesinlestirir (curl varsayilani curl/x.y, tarayici gibi degil). Basliklar dosyadan (adim 7).
+curl -s -A 'MMOGameServer/0.1' -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthcheck" -H @$HOME/.mmo_headers -d "{}"
+```
+
+### Sorun giderme
+| Belirti | Neden / cozum |
+|---|---|
+| `{"message":"Forbidden use of secret API key in browser","hint":...}` | Istek `User-Agent`'i tarayici gibi (Mozilla/Chrome/Safari/Gecko/AppleWebKit/Edge). Acik UA gonder: PowerShell `-UserAgent 'MMOGameServer/0.1'`, curl `-A 'MMOGameServer/0.1'`, UE istemcisi `User-Agent` basligini ayarlar. Anahtar dogru olabilir; anahtari degistirme/dondurme gerekmez. |
+| HTTP 404 `PGRST202` | Fazla/eksik parametre (ornek: `acquire_lease`'e `p_op_id`), ya da `Content-Profile: mmo_api` eksik. Sozlesme tablosuna bak. |
+| 401 / `Invalid API key` | `apikey` basligi yok/yanlis; `sb_secret_...` anahtarini `Authorization: Bearer` ile gonderme. |
+| `GET /rest/v1/<tablo>` anahtarsiz/anon ile veri donuyor | **ACIL:** Exposed schemas'ta `mmo`/`public` var demektir; yalniz `mmo_api` birak. |
+
 ## Kullanicinin dev projede calistiracagi sira
 Oncesi: `docs/DESIGN_SUPABASE.md` 6. bolum Dilim 0 (hesap, **dev** projesi, veritabani sifresi parola yoneticisinde; sifreyi/anahtari sohbete YAPISTIRMA).
 **Sir kurali (komut satirina sir YAZMA):** parola/anahtar komut satirinda `ps`, kabuk gecmisi ve CI loglarinda gorunur. Bu yuzden:
@@ -115,6 +156,8 @@ Oncesi: `docs/DESIGN_SUPABASE.md` 6. bolum Dilim 0 (hesap, **dev** projesi, veri
   `DATABASE_URL` icinde `postgresql://kullanici:PAROLA@...` KULLANMA.
 - curl icin anahtar `-H` ile komut satirina yazilmaz: basliklari kendi kullanicinin okuyabildigi bir dosyaya koy (`chmod 600`) ve `-H @dosya` (curl >= 7.55) ile ver, ya da `-K -` ile stdin'den yapilandirma oku
   (ornek asagida, adim 7). Anahtari asla `echo`/`export KEY=...` satirina elle yazip gecmise birakma; ortam degiskeni gerekiyorsa `read -rs`.
+**Durum (2026-10-17):** adim 3 (migration, SQL Editor yoluyla) ve 4 (Exposed schemas) ve 7'nin healthcheck kismi YAPILDI/dogrulandi (yukaridaki bolum); adim 1-2 psql gerektirir (psql YOK, yapilmadi);
+**adim 5 (`run_all.sql`) ve 6 (esozamanlilik) KOSULMADI.**
 1. Baglanti bilgisi (dev projesi, Dashboard -> Connect): host/kullanici `DB` degiskeninde (yukaridaki bicim, PAROLASIZ), parola `PGPASSWORD`/pgpass'ta; yalniz kendi makinende, repoya yazma.
 2. `psql "$DB" -c "select 1"`  -> `1` (baglanti canli).
 3. Migration (iki yoldan biri):
@@ -124,13 +167,26 @@ Oncesi: `docs/DESIGN_SUPABASE.md` 6. bolum Dilim 0 (hesap, **dev** projesi, veri
 5. `psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/run_all.sql` (depo kokunden, Git Bash; psql >= 13). Her dosya `PASS ...` yazmali.
 6. Eszamanlilik (iki terminal): `05_concurrency_a` + `-v mode=same_op` `05_concurrency_b` + `05_concurrency_check.sql`; sonra `other_op`; sonra `05_concurrency_lease_a` + `05_concurrency_lease_b` (basliklarda ayrinti).
 7. Uc uca HTTP denetimi (secret key komut satirinda GORUNMEZ). Basliklari `chmod 600` bir dosyaya yaz (repo disinda, orn. `~/.mmo_headers`; icerigi: `apikey: <sb_secret_...>`, `Content-Type: application/json`, `Content-Profile: mmo_api` satirlari; secret key'i `Authorization: Bearer` olarak **koyma**, bkz. asagidaki kontrol listesi) ve:
-   `curl -s -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthcheck" -H @$HOME/.mmo_headers -d "{}"`  (alternatif: `-K -` ile yapilandirmayi stdin'den ver; `header = "apikey: ..."` satiri komut satirinda degil stdin'de kalir)
+   `curl -s -A 'MMOGameServer/0.1' -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthcheck" -H @$HOME/.mmo_headers -d "{}"`  (`-A` acik User-Agent: tarayici gibi UA secret key'i reddettirir, bkz. sorun giderme; alternatif: `-K -` ile yapilandirmayi stdin'den ver; `header = "apikey: ..."` satiri komut satirinda degil stdin'de kalir)
    -> `{"outcome":"ok","contract_version":2,...}`. Publishable (anon) anahtarla ayni cagri **reddedilmeli**, `GET /rest/v1/character_saves` de veri DONMEMELI. `acquire_lease` cagrisina `p_op_id` eklenirse `404 PGRST202` gelmeli.
-### Dashboard guvenlik kontrol listesi (GUNCEL, elle; hicbiri psql/migration ile yapilamaz; dogrulanmadi, kullanici panelde teyit eder)
-- [ ] Data API -> **Exposed schemas: YALNIZ `mmo_api`** (`public`, `mmo`, `graphql_public` YOK).
+### Kalan kullanici adimlari (2026-10-17 sonrasi; sirayla)
+1. **Testleri kosmak icin** iki yoldan biri: psql >= 13 kur (PostgreSQL istemcisi), `PGPASSWORD`/pgpass ile `run_all.sql` (adim 5) ve iki terminalli 05_* (adim 6). **Testler psql'e baglidir:** `run_all.sql` `\set vectors \`cat ...\``, `\i`, `\echo` kullanir
+   (01/02 dosyalari psql meta-komutlari ve `:vectors` degiskeni icerir; her dosyada ROLLBACK gecer), bu yuzden SQL Editor'e yapistirilarak kosulamaz [okunan kaynaktan; denenmedi]. psql'siz secenek yalniz kisa smoke:
+   (SQL Editor, salt okuma) `select mmo_api.healthcheck();`, `select proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='mmo_api';` (12 satir) ve
+   `select tablename, rowsecurity from pg_tables where schemaname='mmo';` (6 satir, hepsi true).
+2. Dashboard Auth: **signup kapali, anonim giris kapali**, e-posta/OAuth saglayicilari kapali.
+3. **Legacy anon / service_role JWT anahtarlarini devre disi birak** (API Keys -> Legacy); once sb_secret_ ile calistigini teyit et (teyit edildi: madde 5 yukarida).
+4. **Yedek / PITR:** FREE katmanda otomatik yedek olmayabilir [Dogrulanmadi]; ilk elle `pg_dump` (psql ile birlikte kurulur) veya plan yukseltme karari (`docs/DECISIONS_NEEDED.md` S5/S6).
+5. **MFA** (Dashboard hesabi), kurtarma kodlari parola yoneticisinde.
+6. Digerleri asagidaki listede: pg_graphql, Realtime, SSL zorunlu, Network Restrictions, `write_ops` temizlik cron'u.
+7. Opsiyonel: Bearer'siz/Bearer'li `sb_secret_` karsilastirmasi ve publishable anahtarla RPC negatifi (ayri ve kasitli denemeler; sonucu not et).
+
+### Dashboard guvenlik kontrol listesi (GUNCEL, elle; hicbiri psql/migration ile yapilamaz; yalniz isaretli olanlar dogrulandi, kalani kullanici panelde teyit eder)
+- [x] Data API -> **Exposed schemas: YALNIZ `mmo_api`** (`public`, `mmo`, `graphql_public` YOK). [Dogrulandi: dev, 2026-10-17; "yalniz mmo_api" soylendi; `graphql_public` ayrica kontrol edilmedi, pg_graphql maddesine bak]
 - [ ] **pg_graphql kapali** (Database -> Extensions; `graphql_public` semasi acik kalmasin).
 - [ ] API anahtarlari: **yeni `sb_secret_...` anahtari** sunucuya; **legacy `service_role` / `anon` JWT anahtarlari DEVRE DISI** (API Keys -> Legacy). Publishable anahtar kullanilacaksa istemciye bile verilmez (oyun istemcisi DB'ye dogrudan baglanmaz).
-- [ ] **Anahtar basligi:** `sb_secret_` anahtarlari JWT DEGILDIR; `Authorization: Bearer <sb_secret_...>` olarak GONDERME (JWT sanilip reddedilir ya da yanlis yola duser); yalniz **`apikey: <sb_secret_...>`** basligi. (Bu README'nin onceki Bearer ornegi kaldirildi; `vectors.json` `transport.headers` UE'nin gonderdigi basliklari listeler: UE tarafi `apikey` ile uyumlu mu, Dilim 2'de teyit edilecek.)
+- [x] **Anahtar basligi:** `sb_secret_` anahtarlari JWT DEGILDIR; `Authorization: Bearer <sb_secret_...>` olarak GONDERME (JWT sanilip reddedilir ya da yanlis yola duser); yalniz **`apikey: <sb_secret_...>`** basligi. [Dogrulandi: dev, 2026-10-17: yalniz apikey ile basarili; Bearer'li hali denenmedi.] `vectors.json` `transport.headers` hala Authorization satirini listeler: UE tarafi `apikey`-only ile uyumlu mu, Dilim 2'de teyit edilecek.
+- [x] **User-Agent:** tarayici gibi UA secret key'i reddettirir; UE/curl/PowerShell acik UA gondermeli (`MMOGameServer/0.1`). [Dogrulandi: dev, 2026-10-17] UE tarafi duzeltmesi: ayri ajan (Dilim 2 UA), henuz yapilmadi.
 - [ ] Auth: **signup kapali, anonim giris kapali**, e-posta/OAuth saglayicilari kapali (Auth kullanilmiyor).
 - [ ] Realtime: yayinda (`supabase_realtime` publication) **`mmo.*` tablolari YOK**; Realtime hic kullanilmiyor.
 - [ ] **SSL zorunlu** (Database -> Settings -> SSL enforcement) ve baglanti `sslmode=verify-full`.
