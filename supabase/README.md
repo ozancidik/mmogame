@@ -83,20 +83,28 @@ Yanit ozeti (tam ornekler `vectors.json` `responses`):
 tek cagrida en cok `p_batch` satir (en eskiden), kalan varsa `more:true`. **Fonksiyon kendi icinde dongu yapmaz** (tek islem uzun kilit tutardi; bir `purge_write_ops_all` bilincli YOKTUR).
 Yalniz `mmo.write_ops` satirlari silinir. Saklama suresi istemcinin AYNI op_id ile yeniden deneme ufkundan uzun olmali.
 Boyut: dakikada bir kaydeden 4 oyuncu = gunde ~5760 satir; ucretsiz katmanda 500 MB. Gunde bir 5000 satirlik cron tabloyu buyutur; bu yuzden **5 dakikada bir, 20000 satirlik parti**
-(gunde 288 cagri x 20000 = ~5,7 milyon satir/gun kapasite, yuke gore bol) ve backlog varsa ek cagri. Zamanlama (Supabase'de `pg_cron` etkinlestirilirse, kullanici elle; BURADA CALISTIRILMADI):
+(gunde 288 cagri x 20000 = ~5,7 milyon satir/gun kapasite, yuke gore bol) ve backlog varsa tek seferlik elle dongu (asagida). Zamanlama (Supabase'de `pg_cron` etkinlestirilirse, kullanici elle; BURADA CALISTIRILMADI):
 ```sql
--- 1) temel is: her 5 dakikada bir parti (her cron calismasi AYRI islemdir)
+-- TEK is: her 5 dakikada bir parti (her cron calismasi AYRI islemdir). Ikinci/paralel is KURMA:
+-- iki is ayni en eski satirlari secer (bos is yapar, gereksiz kilit), kapasite artmaz.
 select cron.schedule('mmo-purge-write-ops', '*/5 * * * *', 'select mmo_api.purge_write_ops(7, 20000)');
--- 2) birikmis backlog varsa: ayni isi 1 dakika arayla ek isler olarak da kurmak yeterlidir (dongu YOK, her is tek islem):
-select cron.schedule('mmo-purge-write-ops-b', '2-59/5 * * * *', 'select mmo_api.purge_write_ops(7, 20000)');
 ```
-`more:true` ise bir sonraki cron calismasi devam eder; HIZLA bosaltmak gerekirse (elle, psql) her iterasyonu AYRI bir cagri olarak gonder, **tek `BEGIN`/`DO` blogu icinde dongu kurma**
+**`p_batch` tam sayi olmalidir** (`20000`, `20000.5` degil): ondalikli deger PostgREST'te `bad_batch` degil, tip donusturme hatasi (HTTP 4xx, `outcome` yok) verir; istemci tam sayi gondermeli.
+`more:true` ise bir sonraki cron calismasi devam eder; birikmis backlog icin tek seferlik elle dongu kullan (asagida); HIZLA bosaltmak gerekirse (elle, psql) her iterasyonu AYRI bir cagri olarak gonder, **tek `BEGIN`/`DO` blogu icinde dongu kurma**
 (`DO` bloku tek islemdir: tum silmeler tek COMMIT'te kilitli kalir). psql ile ornek (her `-c` ayri islemdir):
 ```
 psql -v ON_ERROR_STOP=1 -c "select mmo_api.purge_write_ops(7, 20000)"    # sonucta more=true ise tekrarla
 ```
 Dongu istersen kabuktan (her cagri ayri psql = ayri islem) `more` gorunene kadar tekrarla; baglanti dizesi asagidaki parolasiz kurala uyar. Bir `DO` bloku dongusu ONERILMEZ (tek islem).
-Silinen satirlar >= 1 gun eskidir; yazim yollari bu satirlari degistirmez, bu yuzden silme ile kaydetme arasinda satir kilidi cakismasi beklenmez.
+Silinen satirlar >= 1 gun eskidir; yazim yollari bu satirlari degistirmez, bu yuzden kaydetme ile silme arasinda satir kilidi cakismasi beklenmez. Tek cron isi oldugundan purge-purge cakismasi da beklenmez
+(bir calisma 5 dakikadan uzun surerse sonraki calisma ust uste binebilir: ayni satirlari silmeye calisan iki islem birbirini bekler, hata vermez; parti 20000 oldugundan pratikte beklenmez) [Tahmin, olculmedi].
+
+### `holder` benzersizligi (isletme kurali; N1)
+`p_holder` kira sahibini tanimlar. Donmus yuva duzeltmesi (release -> acquire ile epoch artirma) **`holder`'in SUREC BASINA BENZERSIZ oldugunu varsayar**: iki surec AYNI holder ile
+calisirsa B'nin aldigi kira (yeni epoch) A tarafindan devralinir (DB ikisini ayirt edemez) ve cit (fencing) asilir; iki surec ayni karakteri yazabilir (kopyalama riski).
+- Kural: `holder` = sunucu kimligi + acilis rastgeleligi (boot nonce/GUID), ornek `map01-3f9c2a1be07d4c55`. Her surec acilista yeni uretir; yeniden baslatilan surec ESKI holder'i kullanmaz.
+- UE deposu acilista holder'i `^[A-Za-z0-9_.:-]{1,96}$` ile dogrular (uzunluk 1..96, karakter kumesi; `vectors.json` `holder` vektorleri); gecersizse depo acilmaz.
+- Ayni holder iki surecte KULLANILMAZ. DB bunu zorlayamaz (iki surec ayni dizeyi gonderir); onlem UE/isletme tarafindadir (DESIGN_SUPABASE.md §4.4/§5.1, Dilim 3 kabul olcutu).
 
 ## Kullanicinin dev projede calistiracagi sira
 Oncesi: `docs/DESIGN_SUPABASE.md` 6. bolum Dilim 0 (hesap, **dev** projesi, veritabani sifresi parola yoneticisinde; sifreyi/anahtari sohbete YAPISTIRMA).

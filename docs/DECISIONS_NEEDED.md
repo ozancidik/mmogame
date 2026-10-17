@@ -414,6 +414,7 @@ YAPISTIRMA; yalniz yerel ortam degiskeni `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECR
 | S8 | Kimlik | K-1 acikken yalniz bilinen oyuncularla; Steam (A5/A3) DB dilim 1-4'ten sonra | DB kimlik cozmez (tek paylasilan secret key, `canonical_key`'i bilen karakteri acar) |
 | S9 | Migration kaynagi | `supabase/migrations/`; `Migrations/V1__initial_schema.sql` "kullanilmiyor, UYGULANMAZ" (S15 ile birlikte) | V1 `public` semasinda RLS'siz: Supabase'e uygulanirsa anon anahtarla acik |
 | S10 | Yazma-arkada (write-behind) onbellek | **Reddet** | "DB kapaliyken ilerleme yok" kurali |
+| S11 | `holder` uretimi (kira sahibi dizesi) | holder = sunucu kimligi + acilis GUID'i (surec basina benzersiz), UE `^[A-Za-z0-9_.:-]{1,96}$` dogrular; ayni holder iki surecte KULLANILMAZ; elle sabit holder yasak/uyarili; ikinci surec ayni holder ile baslarsa reddedilir (Dilim 3 testi) | Donmus yuva release->acquire duzeltmesi benzersizlige dayanir; ihlalde cit asilir ve cift yazim olur. DB zorlayamaz, isletme kurali (`DESIGN_SUPABASE.md` §4.4, §5.1) |
 
 Kapanan guvenlik bulgulari (iki bagimsiz QA + iki guvenlik turu; kod/SQL'de): `p_op_id` fazlaligi, `lease_epoch` adi, `get_op` `found`, `SlotToKey` bas/son bosluk, Shipping `NO_LOGGING` korumasi,
 Bearer yalniz JWT, `CreateEx` kirasi, donmus yuva release->acquire, `write_ops` purge `p_batch`, `LogHttp` Warning.
