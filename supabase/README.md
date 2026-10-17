@@ -147,6 +147,20 @@ curl -s -A 'MMOGameServer/0.1' -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthchec
 | 401 / `Invalid API key` | `apikey` basligi yok/yanlis; `sb_secret_...` anahtarini `Authorization: Bearer` ile gonderme. |
 | `GET /rest/v1/<tablo>` anahtarsiz/anon ile veri donuyor | **ACIL:** Exposed schemas'ta `mmo`/`public` var demektir; yalniz `mmo_api` birak. |
 
+## Entegrasyon betigi (Dilim 6): `Scripts/TestSupabaseIntegration.ps1`
+`vectors.json` senaryolarini GERCEK dev projesine HTTPS ile kosturur (psql gerekmez; Windows PowerShell 5.1). **Henuz KOSULMADI** (yazildi; yalniz soz dizimi ve `-DryRun` denendi). YALNIZ dev projesi icin.
+- **Calistirma** (repo kokunden; `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECRET_KEY` kullanici ortam degiskenleri zaten kayitli, anahtar komut satirina YAZILMAZ):
+  `powershell -NoProfile -File Scripts\TestSupabaseIntegration.ps1` - once hedef host yazilir ve `dev` yazman istenir (otomasyonda `-Yes`). `-DryRun`: ag yok, anahtar okunmaz, senaryo/adim sayilarini ve SKIP planini yazar. `-Scenario happy_path,dead_epoch`: secili senaryolar.
+- **Ne yapar:** her istek `POST {URL}/rest/v1/rpc/<fn>`, `apikey` (+ `Authorization: Bearer` yalniz `eyJ...` iki noktali legacy JWT ise), `Content-Profile`/`Accept-Profile: mmo_api`, `User-Agent: MMOGameServer-IntegrationTest/0.1`, HTTPS zorunlu, zaman asimi 30 sn, yonlendirme izlenmez. Anahtar hicbir ciktiya yazilmaz (Redact). Once `healthcheck` on kosulu (`contract_version` 2).
+  Test adlari her kosuda `zz-test-<8hex>-<ad>` (vectors'taki `zz-v-<ad>` yerine), holder `itest:<8hex>-a` / `-b`, `op_id`'ler yeni GUID. Her adimda `outcome` ve (varsa) `exact` anahtar kumesi/tipleri (bigint = JSON sayi) denetlenir; `expect_error` adimlari HTTP 404 + `PGRST202` bekler.
+  Adim reddedilmesi beklenen ASCII-disi / ayrilmis / bos ad vektorleri (`mer`, `default`, `ali`...) zz-test onekli DEGILDIR ama DB bunlari reddeder, satir yazmaz.
+- **Beklenen cikti:** senaryo basina `[PASS]` / `[FAIL]` / `[SKIP]`, FAIL'de adim + beklenen + gelen (anahtarsiz, kisaltilmis), sonda yazilan `zz-test-*` anahtarlari ve son satir
+  `[MMO_SUPABASE_INTEGRATION] PASS|FAIL checks=N skipped=M`. Cikis kodu: 0 = hepsi PASS (veya yalniz SKIP), 1 = FAIL, 3 = calismadi (anahtar/URL yok, http, onay yok, on kosul `healthcheck` basarisiz).
+- **SKIP nedenleri:** `{admin:'expire_lease'}` adimi (`lease_until`'i gecmise cekmek API ile yapilamaz; SQL harness'a ozgu): adimin kendisi ve ayni anahtarda ondan sonraki `save/renew/acquire/release` adimlari SKIP (yanlis PASS/FAIL verilmez; salt okuma adimlari kosar).
+  Etkilenen senaryolar: `expired_lease` (yalniz `create` kosar) ve `idempotent_same_payload` (kira bitiminden sonraki tekrar kaydi SKIP). Kira suresi dolma yolunu `tests/05_concurrency_lease_*.sql` + SQL Editor ile ayrica dogrula. Bir senaryoda FAIL olursa kalan adimlari kosulmaz (durum bagimli).
+- **Temizlik:** DB'de silme RPC'si yok; betik yazdigi anahtarlari sonda listeler. Sonra `supabase/tests/zz_cleanup.sql` dosyasini SQL Editor'de calistir (postgres rolu, tek ifade): yalniz `zz-test-` onekli satirlari `character_side`, `presence`, `travel_tickets`, `write_ops`, `character_saves` tablolarindan siler ve sayilari doner.
+- **Sorun giderme:** `Forbidden use of secret API key in browser` -> User-Agent tarayici gibi (bu betik acik UA yollar; betigi degistirdiysen `Mozilla/Chrome/Safari/Gecko/AppleWebKit/Edge` yazma). `401` / `Invalid API key` -> `MMO_SUPABASE_SECRET_KEY` yanlis/eski ya da yeni terminal acilmadi (ortam degiskeni yeni oturumda gorunur); `sb_secret_` anahtarina Bearer koyma. `404 PGRST202` bir `expect_error` adiminda BEKLENIR; baska adimda ise `Content-Profile`/Exposed schemas (`mmo_api`) ya da migration eksik demektir. `calismadi (anahtar yok)` -> exit 3, ortam degiskenlerini kontrol et.
+
 ## Kullanicinin dev projede calistiracagi sira
 Oncesi: `docs/DESIGN_SUPABASE.md` 6. bolum Dilim 0 (hesap, **dev** projesi, veritabani sifresi parola yoneticisinde; sifreyi/anahtari sohbete YAPISTIRMA).
 **Sir kurali (komut satirina sir YAZMA):** parola/anahtar komut satirinda `ps`, kabuk gecmisi ve CI loglarinda gorunur. Bu yuzden:
