@@ -19,6 +19,7 @@
 | 5 | Lv28–33 beceri boşluğu (asıl boşluk Lv33→45) | **UYGULANDI (`56de087`): Lv31 + Lv39 becerileri kodda**; denge/zehir/mana bulguları `SKILL_PLAN_LV31_45.md` | [Tahmin] | Evet (tasarım); değerler ölçümle |
 | 6 | Hız hedefi (Lv30 kaç saat) | 2–3 saat (B) | [Tahmin] | Evet (hedef); tutup tutmadığı ölçümle |
 | 7 | `CheckPrPaths` yalnız `claude/*` dallarına mı | Hayır, tüm PR'larda kalsın | [Muhtemel] | Evet |
+| 8 | Ekipman birleştirme ücreti (DESIGN_FUSION A3; ayrıntı aşağıda "Ekipman birlestirme A1-A4" → "A3 modeli") | `{0,5; 1; 2}` × alış fiyatı değişmesin; yüksek seviye sink'i karar 3'te | [Muhtemel] (model) | Kısmen (arbitraj yok kesin-hesap; kullanım için `ev=fusion` gerekli) |
 
 ---
 
@@ -313,17 +314,37 @@ Kaynak: bulut PR #3 (`9855256`) yerelde denetlendi, duzeltmeler `1f4a557`'de. Du
 
 Kaynak: `docs/DESIGN_FUSION.md` §10, §11. D1 kurallari master'da (`d7bb1b1`..`d7c75ed`, `TestFusion.ps1` 180 kontrol, izole worktree'de
 GECTI); hicbir komut/RPC/HUD bunu cagirmiyor, **PIE'da denenmedi**. Kod asagidaki onerilerle yazildi; karar degisirse yalniz
-`MMOFusion.cpp`/`.h` sabitleri ve test degisir. Ucret sayilari `[PLACEHOLDER]`, D0 ekonomi modeli (`EconomyModel.py` bolum d) yapilmadi.
+`MMOFusion.cpp`/`.h` sabitleri ve test degisir. Ucret sayilari `[PLACEHOLDER]`; D0 ekonomi modeli 2026-10-17'de calisti (`EconomyModel.py` "Birlestirme" bolumu, `[MODEL]`), A3 icin asagida.
 
 | # | Soru | Oneri | Kodda bugun [Kesin] | Etiket |
 |---|---|---|---|---|
 | A1 | Efsanevi birlestirmeyle uretilebilsin mi? | **Hayir**, yalniz ganimet | `MaxOutputRarity = Epic` (`MMOFusion.h:51`); 3 Destansi/Efsanevi -> `RarityCapped` | [Muhtemel] |
 | A2 | Artili (+N) esya birlestirilebilsin mi? | **Hayir** (ilk dilim): +N'ye harcanan altin kaybolmasin, +N aklanmasin | `Plus != 0` -> `PlusNotZero` (`MMOFusion.cpp:153-161`) | [Muhtemel] |
-| A3 | Ucret neye bagli? | **Satici alis fiyati** x nadirlik carpani (tek formul; `GetBuyPrice` seviyeyle buyur) | `FusionFeeMult = {0.5, 1.0, 2.0}` (`MMOFusion.cpp:19`); Lv1 Kisa Kilic 86/171/342, Lv25 Obsidyen 794/1.587/3.174 | [Tahmin], carpanlar D0 + `ev=fusion` olcumu ister |
+| A3 | Ucret neye bagli? | **Satici alis fiyati** x nadirlik carpani (tek formul; `GetBuyPrice` seviyeyle buyur) | `FusionFeeMult = {0.5, 1.0, 2.0}` (`MMOFusion.cpp:19`); Lv1 Kisa Kilic 86/171/342, Lv25 Obsidyen 794/1.587/3.174 | [Muhtemel] (D0 modeli destekliyor: `{0.5, 1.0, 2.0}` degismesin, asagidaki A3 modeli); oyuncu verisi icin `ev=fusion` olcumu ister |
 | A4 | Satici yerine ayri "Demirci" NPC'si? | **Sonra**; NPC yerlesimi S02 dosyalarinda (`MMOZoneLayout`, `MMOGameMode.cpp`) | Herhangi bir saticiya 800 u yakinlik (`IsOwnerNearVendor`) | [Muhtemel] |
 
 Ek acik nokta (kucuk, tasarim): `FindFromSlot` takastaki esdegerleri atlamiyor (en kucuk kimlikli kopya takastaysa ucuncu serbest kopya
 olsa bile `TradeLocked`); oneri: atla. Gereken olcum (A3): `[MMOMETRIC] ev=fusion` sayisi ve `ev=gold src=birlestirme` toplami / bant saatlik gelir.
+
+### A3 modeli (D0, 2026-10-17, `[MODEL]`, oyuncu verisi degil)
+
+Kaynak: `python Scripts/EconomyModel.py` "Birlestirme" bolumu; fiyat/zar/ucret kaynaktan okunur, elle sayi yok. Ayrinti: `DESIGN_FUSION.md` §6.1, `BALANCE_MODEL.md` "Ekipman birlestirme".
+
+| Carpan `{Siradan, Nadir, Ender}` | 27->1 toplam ucret | Satici yolu | Min. adim net sink | Anlamli bant D / S (14 bant, esik %10 [Tahmin]) | Her bantta set yapilsa toplam fazla payi D \| S | Lv16-32 S yolu / bant fazlasi |
+|---|---:|---:|---:|---:|---:|---:|
+| `{0.25, 0.5, 1}` | 4.75 B | 31.75 B | 0.95 B | 5 / 11 | %3.4 \| %22.3 | %72-134 |
+| **`{0.5, 1, 2}` (kod)** | 9.50 B | 36.50 B | 1.20 B | 6 / 11 | %6.9 \| %25.7 | %83-155 |
+| `{1, 2, 4}` | 19.00 B | 46.00 B | 1.69 B | 10 / 11 | %13.8 \| %32.6 | %105-196 |
+| `{2, 4, 8}` | 38.00 B | 65.00 B | 2.69 B | 11 / 11 | %27.5 \| %46.4 | %149-279 |
+
+(B = esyanin alis fiyati. D = girdiler ganimetten, yalniz ucret; S = 26 girdi saticidan alinir + ucret. "Fazla" = bant geliri - kademe gideri; Lv1-5 bantlarinda fazla yok, birlestirme kapali.)
+
+- **Arbitraj/bedava terfi: dort carpanda da yok** [Hesap]: 57 ekipman x 3 adim + zincirler + saticidan al-birlestir-sat; kodun carpani icin en iyi adim -120 altin. Makineli: `python Scripts/EconomyModel.py --check-fusion` (cikis 1 = hata); CI `EconomyModel.py`'yi zaten calistiriyor.
+- **Onerim [Muhtemel]: `{0.5, 1, 2}` degismesin, ucret alis fiyatina bagli kalsin.** Gerekce (model): (1) Lv1-15 fiilen kapali (Lv10-15'te D %167, S %623), Lv16'dan itibaren ganimet yolu bant icinde odenebilir (%41); (2) Lv16-32'de satici yolu bant fazlasinin %83-155'i, `{1,2,4}` bunu %105-196'ya cikarip kullanilamaz yapar; (3) yalniz ucret Lv72'de +5 yukseltmeyle (~ +%100 stat) ayni altin (39.007 vs 39.630), Lv25'te 2.8x (15.081 vs 5.436): kesin sonuc icin makul prim.
+- **Carpanla cozulmeyen:** Lv66+ bantlarinda ganimet yolu fazlanin %3.9-5.1'ini, satici yolu %15-19'unu emer (`{2,4,8}` ile bile D %16-21); Lv16+ gelir/gider farkini birlestirme kapatmaz. Bu karar 3'un isi; birlestirme onu tamamlar, yerini almaz. Seviyeye bagli ek terim (or. `x (1 + Lv/40)`) **modellenmedi**.
+- **Ganimet yolu:** normal mob zariyla kendi kademenin 3 ayni parcasi seviyelenirken gelmez (belirli esya 3 adet 494-1.341 oldurme = 3.4-9.3 sa [Hesap; oldurme 25 sn Tahmin]; bant suresi 0.1-1.5 sa). Elit ganimeti ve gercek dusme sikligi: **veri yok**.
+- **Gereken `[MMOMETRIC]` verisi:** `ev=fusion` sayisi + `ev=gold src=birlestirme` toplami / bant saatlik geliri (kod hazir); `ev=item_pickup rarity=..` (henuz yok). Karar kurali: oyuncularin cogu Lv16-32'de hic birlestirmiyor ve altin birikiyorsa `{0.25, 0.5, 1}`; Lv66+ hala >100x gelir/gider ise karar 3.
+- **Degisecek dosya:** yalniz olcum sonrasi gerekirse `MMOFusion.cpp::FusionFeeMult` (tek satir, mmo-developer).
 
 ## Not (2026-10-17): proje ajanlari modeli
 

@@ -97,6 +97,22 @@ Betik: `python3 Scripts/EconomyModel.py [--upgrade-to N]`. Gelir = öldürme (il
 - Yükseltme maliyeti `50×(artı+1)`, seviyeden bağımsız; ekipman fiyatı yalnız `12×(atk+def) + 25×seviye + 50` ile büyüyor. Gelir ise mob altınıyla ~×1,2/seviye büyüyor, bu yüzden oran açılıyor.
 - **Karar bekleyen:** yeni altın sink'i (ör. yükseltme/iksir/şifacı maliyetini seviyeyle ölçekle) ya da gelir düşürme. Ölçüm (`[MMOMETRIC]` `gold` olayları) olmadan körlemesine olur. Q_Gold* görevleri birikimi ödüllendirdiği için bu dengesizliği büyütüyor.
 
+## Ekipman birleştirme (nadirlik füzyonu) ekonomisi (2026-10-17, **[MODEL]**, oynanışta ölçülmedi)
+
+Betik: `python Scripts/EconomyModel.py` çıktısının sonundaki "Birleştirme" bölümü; `--check-fusion` yalnız denetim (CI), `--fusion-full` 57 ekipmanın tamamı. Fiyat (`(Atk+Def)×12 + Lv×25 + 50`), satış (`0,4 × alış × nadirlik çarpanı`), nadirlik zarı ve ücret çarpanı (`MMOFusion.cpp`) kaynaktan okunur. Tasarım: `DESIGN_FUSION.md` §6.1; karar: `DECISIONS_NEEDED.md` #8 (A3 modeli).
+
+| Sonuç (kod çarpanı `{0,5; 1; 2}`) | Değer |
+|---|---|
+| Arbitraj (satış kârı > 0 kombinasyon) | **yok**; adım başına net altın yok oluşu 1,20 / 1,85–1,87 / 3,06–3,09 × B |
+| 27 Sıradan → 1 Destansı toplam ücret | 9,50 B (57 ekipmanda 9,50–9,55 B); satıcıdan alınırsa 36,50 B |
+| Lv25 ObsidianBlade (B 1.587) | ücret 15.081, satıcı yolu 57.930, çıktı satış değeri 1.334 |
+| Bant fazlasını emme, 4 parçalık set, yalnız ücret (D) / satıcı yolu (S) | Lv16–24 %41 / %155, Lv25–32 %22 / %83, Lv42–50 %7,7 / %29, Lv72–79 %3,9 / %15 |
+| Her bantta set yapılsa toplam fazla payı | D %6,9; S %25,7 |
+
+- [Hesap] Birleştirme Lv16+ gelir/gider farkını (yukarıdaki "Altın ekonomisi" tablosunda 9–224×, güncel çıktıda 11–40×) kapatmaz; yüksek seviyede etkisi küçük. Lv1–15 fiilen kapalı. Seviyeyle ölçeklenen yükseltme/şifacı sink'i (karar 3) hâlâ gerekli.
+- [Hesap] Ganimetten kendi kademenin 3 aynı parçası seviyelenirken gelmez (belirli eşya 3 adet 494–1.341 öldürme, bant süresi 0,1–1,5 sa); elit ganimeti ve gerçek düşme sıklığı: veri yok.
+- Not: yukarıdaki "Altın ekonomisi" tablosu eski bir koşudan (2026-10-05); güncel `EconomyModel.py` çıktısında gelir/gider Lv16'da 11,3×, Lv72'de 40,4×.
+
 ## Uygulanan ayar (2026-10-04, DERLENMEDI): XP çarpan eğrisi, parti bonusu, Q_Gold
 
 **Tek ayar noktası:** `Source/MyProject/Private/Core/MMOXPTuning.cpp`. Mob XP'si mob seviyesine, görev ödül XP'si görev kapı seviyesine göre çarpılır (tablo değerleri ham kalır; çarpan `MakeMob`/`MakeQuest` içinde uygulanır). `Scripts/ProgressionModel.py` varsayılan olarak **aynı eğriyi dosyadan okur** (`--raw` ile çarpansız).

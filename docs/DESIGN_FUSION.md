@@ -1,14 +1,14 @@
 # Ekipman birleştirme (nadirlik füzyonu) — tasarım
 
 **Tarih:** 2026-10-17 · **Taban:** `29a44b1` (master) · ~~Durum: TASARIM, kod yok, derleme yok.~~ (ilk yazım, `26deb59`)
-**Yazan:** `oyun-tasarimcisi`. Sayıların hepsi `[PLACEHOLDER]`; `ekonomi-tasarimcisi` modeli (Dilim D0) bitmeden kesinleşmez.
+**Yazan:** `oyun-tasarimcisi`. Sayıların hepsi `[PLACEHOLDER]` (D0 modeli 2026-10-17'de çalıştı, §6.1; oynanış ölçümü yok, kesinleşmez).
 
 > **Güncel durum (2026-10-17, `f9b71c2` üzerinde, belge denetçisi):** **D1 TAMAM (180 kontrol)**, master'da: `d7bb1b1` (kurallar + 129 kontrol),
 > `df4c3c6` (135), `1a8ec3f` (QA/güvenlik düzeltmeleri, 162), `d7c75ed` (180). Kanıt: `%TEMP%\mmo_fusion_fusion_1aba1ee2….log` (2026-10-17 10:44)
 > `[MMO_FUSION_TEST] PASS checks=180`, 180 `CASE PASS`, 0 `FAIL`; koşu **izole worktree** `C:\Users\OZAN CIDIK\.claude\worktrees\fusion-d1`'de
 > (ana kopya, sahibi belirsiz izlenmeyen `MMOZoneLayout*`/`MMORace*` dosyaları yüzünden derlenmiyor; `d7bb1b1` mesajı: `MMOZoneLayout.h` UHT hatası).
 > **Oyun içi yüzeyi yok:** hiçbir komut, RPC veya HUD `FMMOFusion`'u çağırmıyor; `TestFusion.ps1` `RunSystemTests.ps1`/`RunAllChecks.ps1` adımı değil (D2).
-> **PIE'de denenmedi.** D0 (ekonomi modeli) yapılmadı: `FeeMult` ve `MaxOutputRarity` hâlâ PLACEHOLDER. Açık/ertelenen maddeler §11.
+> **PIE'de denenmedi.** D0 (ekonomi modeli) **yapıldı** (2026-10-17, `[MODEL]`, §6.1): arbitraj yok, öneri `FeeMult {0,5; 1; 2}` değişmesin; `FeeMult` ve `MaxOutputRarity` yine de PLACEHOLDER (oyuncu verisi yok). Açık/ertelenen maddeler §11.
 
 ## 1. Oyuncu deneyimi ve neden şimdi
 
@@ -169,9 +169,32 @@ struct MYPROJECT_API FMMOFusion
 
 - **Güç etkisi:** nadirlik çarpanı Uncommon 1.25, Rare 1.6, Epic 2.1 (`MMOItemDatabase.cpp:194-201`). `RequiredLevel` aynı kaldığı için kademe atlanmaz (satıcı seviye kapısının, `MMOInventoryComponent.cpp:947-949`, korumaya çalıştığı şey bozulmaz). Etki: "kendi kademende daha iyi sürüm" altınla satın alınabilir hale gelir.
 - **Satıcıdan alıp birleştirme yolu:** Nadir = 3B + 0.5B = **3.5B**, Ender = 11.5B, Destansı = 34.5B + 2B = **36.5B** [Hesap]. Lv25'te Destansı Obsidyen ≈ 57.900 altın. Model gelirine göre Lv16+'da bu bir sink olarak istenen davranış [Muhtemel]; Lv1–9 altın kıt olduğu için orada fiilen kapalıdır.
-- **Sömürü kontrolü:** satış arbitrajı yok: her adımda çıktının satış değeri (0.5B / 0.64B / 0.84B) üç girdinin satış değerinden (1.2B / 1.5B / 1.92B) düşük, ücret hariç bile.
+- **Sömürü kontrolü:** satış arbitrajı yok: her adımda çıktının satış değeri (0.5B / 0.64B / 0.84B) üç girdinin satış değerinden (1.2B / 1.5B / 1.92B) düşük, ücret hariç bile. **Makineli doğrulama (2026-10-17, `[MODEL]`):** `EconomyModel.py --check-fusion` 57 ekipmanın hepsini kod sabitlerinden hesaplar (aralık 1,19–1,21 / 1,49–1,52 / 1,89–1,94 B girdi, 0,50–0,51 / 0,63–0,65 / 0,83–0,85 B çıktı), satış kârı > 0 kombinasyon yok (§6.1).
 - **Ölçüm ihtiyacı:** `ev=fusion` sayısı ve `src=birlestirme` altın toplamı / bant saatlik geliri; eşya toplama hızı bilinmiyor (bugün ganimet alma metriği yok, `ev=` listesi: gold, xp, kill, death, levelup, quest_*). Öneri (ayrı küçük iş): `AMMOLootPickup`'a `ev=item_pickup rarity=..` satırı.
-- **D0 (`ekonomi-tasarimcisi`):** `EconomyModel.py`'ye bölüm (d): bant başına "saatte X birleştirme yapan oyuncunun gelir/gider oranı"; hedef: Lv16+ oranı 1 saat oyunda en az 1–2 birim aşağı çekmek [Tahmin], Lv1–15 etkisiz kalmalı. `FeeMult` sayıları buradan çıkar.
+- **D0 (`ekonomi-tasarimcisi`) — YAPILDI 2026-10-17:** `python Scripts/EconomyModel.py` çıktısının sonunda "Birleştirme" bölümü (a)–(e); `--check-fusion` yalnız denetim (CI), `--fusion-full` 57 ekipmanın hepsi. Fiyat, nadirlik çarpanı, ganimet zarı, düşme şansı ve `FusionFeeMult` kaynaktan **parse edilir** (elle sayı yok). Tüm sayılar `[MODEL]` (oyuncu verisi değil, oynanışta ölçülmedi). Özet §6.1. (İlk taslaktaki "Lv16+ oranını 1–2 birim düşür" hedefi kullanılamadı: fazla kavramı ve `%fazla` ölçüsü kullanıldı.)
+
+### 6.1 D0 model sonuçları (2026-10-17, `[MODEL]`)
+
+**Arbitraj (57 ekipman × 3 adım + her başlangıç nadirliğinden zincir + satıcıdan al-birleştir-sat):** satış kârı > 0 olan kombinasyon **yok**; adım başına en iyi sonuç -120 altın (LeatherBoots Sıradan→Nadir). Net altın yok oluşu (3 girdi satışı + ücret − çıktı satışı), alış fiyatı B'ye oranla: Sıradan→Nadir 1,20–1,21 B, Nadir→Ender 1,85–1,87 B, Ender→Destansı 3,06–3,09 B (min..maks altın 120..5.481, 185..8.497, 306..14.068). Yukarıdaki 1,2/1,86/3,08 B formülleri yuvarlama payıyla doğrulandı. Kontrol `--check-fusion` ile makinelenir: sıfır/negatif ücret, `net sink <= 0`, zincir kârı, Efsanevi tavanı, ücret dizisi kısalığı, nadirlik çarpanı artmıyor → çıkış 1 (geçici kopyada bozmalarla sınandı: ücret 0, tavan Efsanevi, Destansı çarpanı 20, çarpan sırası, `MMOFusion.cpp` yok → uyarı).
+
+**27 Sıradan → 1 Destansı:** toplam ücret 9,50 B (57 ekipmanda 9,50–9,55 B; 9×0,5 + 3×1 + 1×2). Satıcıdan alınan 27 parçayla yol maliyeti 36,50 B. Çıktının satış değeri 0,84 B: Lv1 ShortSword 6.246 altın (çıktı satışı 143), Lv25 ObsidianBlade 57.930 (1.334), Lv51 FrostboundBlade 102.679 (2.363), Lv72 AbyssBlade 149.869 (3.448). Karşılaştırma: aynı parçada +5 yükseltme (≈ +%100 stat, Destansı çarpanı 2,1; model riski/yanmayı hesaplamaz) Lv1 756, Lv25 5.436, Lv51 20.256, Lv72 39.630 altın; yani yalnız ücret (ganimetten gelen girdiyle) Lv1'de 2,2×, Lv25'te 2,8×, Lv72'de 1,0× +5 maliyeti.
+
+**Gelir fazlasını ne kadar emer** (bant başına 4 parçalık tek set Destansı'ya; kod ücretleri `{0,5; 1; 2}`; payda = bant geliri − bant gideri (4 parça + her parça +3 yükseltme); D = girdi ganimetten, yalnız ücret; S = 26 girdiyi saticidan al + ücret):
+
+| Bant | Gelir/saat | Fazla | D (yalnız ücret) | S (satıcı yolu) | S, bant saatlik gelirinin katı |
+|---|---:|---:|---:|---:|---:|
+| 1–5 | 3.471–22.443 | yok (gelir ≤ gider) | kapalı | kapalı | 2,1–5,3 sa |
+| 10–15 | 35.079 | 13.958 | %167 | %623 | 2,48 sa |
+| 16–24 | 82.498 | 79.329 | %41 | %155 | 1,49 sa |
+| 25–32 | 174.702 | 202.056 | %22 | %83 | 0,96 sa |
+| 33–41 | 322.108 | 437.709 | %13 | %48 | 0,65 sa |
+| 42–50 | 627.842 | 893.561 | %7,7 | %29 | 0,41 sa |
+| 58–65 | 1.429.666 | 1.667.399 | %5,5 | %21 | 0,24 sa |
+| 72–79 | 3.005.481 | 2.983.943 | %3,9 | %15 | 0,15 sa |
+
+- Her bantta bir set yapılsa bile (üst sınır) toplam ek gider toplam fazlanın yalnız **%6,9 (D) – %25,7 (S)**'si. Sink "anlamlı" (≥ %10 [Tahmin eşiği]) olan bant: D 6/14, S 11/14 (Lv6–Lv79; ama Lv6–15 yüzdeleri ≫ %100, yani ödenemez, anlamlılık yalnız ödenebilir bantlarda geçerli: D Lv16–41, S Lv25–79). Lv16–24'te S yolu bant fazlasından büyük (%155): oyuncu ancak sonraki bantta ödeyebilir; Lv1–15 fiilen kapalı (D de fazlayı aşıyor: Lv10–15'te %167; Lv1–9 altın kıt hedefiyle uyumlu).
+- Yüksek seviyede (Lv66+) hiçbir makul çarpanla büyük sink olmaz: `{2,4,8}` ile bile D yolu Lv72–79'da %15,8, bant saatlik gelirinin 0,16 saati. Lv16+ gelir/gider 11–40 kat farkı (BALANCE_MODEL.md "Altın ekonomisi") birleştirmeyle **kapanmaz**; karar 3'teki seviyeyle ölçeklenen yükseltme/şifacı sink'iyle birlikte düşünülmeli.
+- **Ganimetten besleme** (normal mob zarı, `MMOMob.cpp`/`MMOItemDatabase.cpp`; öldürme başına kullanılabilir Sıradan+0 = 0,25 × 0,60 × 0,85 = 0,1275; havuz tüm ekipman, Lv ≤ mob+3, eşit olasılık; elit ganimeti dahil değil; öldürme 25 sn [Tahmin]): *herhangi bir* eşyadan 3 aynı ≈ 117 (Lv10) – 215 (Lv79) öldürme (0,8–1,5 sa) ama bunlar çoğunlukla düşük kademe parçalar; *belirli* tek eşyadan 3 aynı 494–1.341 öldürme (3,4–9,3 sa); belirli Destansı parça yalnız düşmeyle 1.680–4.560 öldürme (11,7–31,7 sa), düşme+birleştirmeyle (MC, 3000 tekrar) 838–2.304 (5,8–16,0 sa). Bant süresi 0,1–1,5 sa olduğundan seviyelenirken kendi kademenin 3 aynı parçası ganimetten pratikte **gelmez**; gerçek besleme saticidan alış (S yolu) ya da Lv80 sonrası grind. Elit havuzu (EliteEquipDropChance 0,5, dar kademe bandı) ve kaynak-dışı düşme: **veri yok** (`ev=item_pickup` yok, bkz. yukarıdaki ölçüm ihtiyacı).
 
 ## 7. Kabul ölçütleri ve test planı
 
@@ -179,12 +202,12 @@ struct MYPROJECT_API FMMOFusion
 
 | Dilim | İş | Bitti = |
 |---|---|---|
-| **D0** | `ekonomi-tasarimcisi`: `EconomyModel.py` (d) bölümü, `FeeMult` önerisi | `python Scripts/EconomyModel.py` çıktısında bölüm (d) tablosu; CI yeşil |
+| **D0** — **TAMAM** (2026-10-17, `[MODEL]`) | `ekonomi-tasarimcisi`: `EconomyModel.py` Birleştirme bölümü, `FeeMult` önerisi | `python Scripts/EconomyModel.py` çıktısında "Birleştirme" bölümü (a)–(e) + `--check-fusion` (CI zaten `EconomyModel.py` çalıştırıyor, hata = çıkış 1); öneri: `FeeMult {0,5; 1; 2}` değişmesin (§6.1, A3). Oynanışta ölçülmedi |
 | **D1** — **TAMAM** (`d7bb1b1`, `df4c3c6`, `1a8ec3f`, `d7c75ed`) | `MMOFusion.h/.cpp`, `friend` satırı, `MMOFusionSelfTest.cpp`, `TestFusion.ps1` | Build 0 hata; `StaticLint.py` + `ValidateData.py` 0 hata; `TestFusion.ps1` `PASS checks=N` (N tam, CASE satırı = benzersiz etiket = N); mutasyonların hepsi yakalanır (§7.3). **Sonuç:** `PASS checks=180` (izole worktree; ana kopyada derleme kırık, §9); mutasyonlar §7.3 |
 | **D2** — bekliyor (kirli dosyalar) | `/birlestir` sohbet dalı, `/yardim`, `RunSystemTests.ps1` + `RunAllChecks.ps1` adımı, `PLAYTEST_CHECKLIST.md` maddeleri, `PlaytestMetrics.py` `ev=fusion` | D1 testleri + yeni sohbet vakaları geçer; `NetSmokeTest.ps1` hata 0; `qa-kontrolcu` + `ag-guvenlik-denetcisi` engelleyici bulgu yok; güvenlik gereksinimleri §11.1 |
 | **D3** — bekliyor (D2'ye bağlı) | PIE (kullanıcı) | §7.4 listesi GEÇTİ (`PLAYTEST_CHECKLIST.md` "Ekipman birleştirme" bölümü) |
 | **D4** — bekliyor (HUD sahipleri) | HUD düğmesi + `ServerFuseEquipment` RPC (HUD sahipleri bitince) | RPC vakaları (bekleme, bayat id, uzak istemci, takastaki eşya, seyahat penceresi) + NetSmoke; gereksinimler §11.2 |
-| **D0** — yapılmadı | (yukarıda) | `FeeMult` hâlâ PLACEHOLDER |
+| **D0** — tamam | (yukarıda) | Model 2026-10-17; `FeeMult` ölçüm gelene kadar PLACEHOLDER |
 
 ### 7.2 Native self-test (`MMOTestFusion`, D1)
 
@@ -257,7 +280,7 @@ Her biri tek başına geri alınınca `TestFusion.ps1` **FAIL** vermeli (geri y�
 |---|---|---|
 | A1 | Efsanevi birleştirmeyle üretilebilsin mi? | Hayır (yalnız ganimet) |
 | A2 | Artılı (+N) eşya birleştirilebilsin mi? (örn. üçü aynı +N ise çıktı +N) | İlk dilimde hayır |
-| A3 | Ücret satıcı alış fiyatına mı bağlı, yoksa seviyeye bağlı ayrı tablo mu? | Alış fiyatı (tek formül, `GetBuyPrice` zaten seviyeyle büyür) |
+| A3 | Ücret satıcı alış fiyatına mı bağlı, yoksa seviyeye bağlı ayrı tablo mu? | Alış fiyatı (tek formül, `GetBuyPrice` zaten seviyeyle büyür). **D0 modeli (2026-10-17, `[MODEL]`) destekliyor:** `{0,5; 1; 2}` korunsun; arbitraj yok, Lv1–15 fiilen kapalı, Lv16–32'de satıcı yolu bant fazlasının %83–155'i. `{1,2,4}` bu bantları ödenemez yapar (%105–196). Yüksek seviye zayıflığı (Lv72+ D %3,9) çarpanla değil karar 3 ile çözülür. Ayrıntı §6.1, `DECISIONS_NEEDED.md` A3 modeli |
 | A4 | Satıcı yerine ayrı bir "Demirci" NPC'si? | Sonra; NPC yerleşimi S02'nin dosyalarında |
 
 **Durum (2026-10-17):** dördü de **açık**; D1 kodu önerilen varsayılanlarla yazıldı (A1: `MaxOutputRarity = Epic`, A2: `PlusNotZero`, A3: `GetBuyPrice × FeeMult`, A4: satıcı yakınlığı). Karar bloğu `DECISIONS_NEEDED.md` "Ekipman birleştirme A1-A4".
@@ -292,4 +315,4 @@ Kod yok; aşağıdakiler D2/D4 yazılırken uyulacak kurallar. Satır numaralar�
 | D-3 / F2 | Ulaşılamaz geri alma dalları: `AddEquipmentInstanceInternal` başarısızlığı (`MMOFusion.cpp:292-300`) ve kısmi ücret kesintisi (`:304-317`); `Check` çanta yerini (3 çıkar, 1 girer) ve `Gold >= Fee`'yi önceden doğruladığı için tetiklenemez, test edilemez (mutasyonu yakalanmadı, beklenen). İade `ApplyGoldInternal(-Applied, "birlestirme-iade")` ile metrik dengeli | Kabul; dal savunma amaçlı kalır |
 | — | **`FindFromSlot` semantiği:** (a) tıklanan slot her zaman ilk girdi; (b) kalan ikisi eşdeğerlerin en küçük kimlikleri, **takastaki eşdeğerler atlanmaz**: en küçük kimlikli kopya takastaysa üçüncü serbest kopya olsa bile sonuç `TradeLocked`; (c) seçilen eşya Destansı/Efsanevi ise eşdeğer yoksa `BadIds`, varsa `RarityCapped`. Takastakileri atlamak mı, bugünkü gibi reddetmek mi? | Açık (D2 önizleme metni buna göre); öneri: takastakileri atla |
 | A1-A4 | §10 | Açık, `DECISIONS_NEEDED.md` |
-| D0 | `FeeMult`, `MaxOutputRarity` PLACEHOLDER | Yapılmadı |
+| D0 | `FeeMult`, `MaxOutputRarity` PLACEHOLDER | Model yapıldı (2026-10-17, §6.1); oyuncu ölçümü (`ev=fusion`) yok, sayılar yine PLACEHOLDER |
