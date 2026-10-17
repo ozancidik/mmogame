@@ -3,6 +3,9 @@
 --
 -- DURUM: YAZILDI, HIC CALISTIRILMADI (makinede psql/docker/supabase CLI yok). Ilk uygulama dev projede, ardindan
 -- supabase/tests/run_all.sql ile dogrulanir. Bkz. supabase/README.md.
+-- Bu dosya HENUZ HICBIR veritabanina uygulanmadi; 2026-10-17 QA/guvenlik turu bulgulari (lease_epoch adi, get_op.found,
+-- purge_write_ops, varsayilan yetkiler, kilit sonrasi zaman, envelope tetikleyicisi, sozlesme surumu 2) YERINDE duzeltildi
+-- (yeni migration dosyasi acilmadi). Bir veritabanina uygulandiktan SONRA bu dosya degistirilmez; yeni dosya acilir.
 --
 -- GECICI VARSAYIMLAR (kullanici henuz onaylamadi, geri alinabilir):
 --   * Mimari C: Supabase = barindirilan PostgreSQL + PostgREST RPC. Auth / Realtime / Storage kullanilmaz.
@@ -17,7 +20,12 @@
 -- Belgeden bilincli sapmalar (ayrinti: supabase/README.md "Sapmalar"):
 --   write_ops adi korundu (gorev metnindeki op_log ayni sey); character_saves'e lease_ttl_s ve import_sha256 eklendi;
 --   FORCE RLS yerine ENABLE RLS; save_character SECURITY DEFINER (belgede invoker); acquire_lease'te p_op_id yok;
---   veri boyut tavani 2 MiB (UE MaxJsonChars ile ayni; belgede 1 MiB tahmindi); load_character / healthcheck eklendi.
+--   veri boyut tavani 2 MiB (UE MaxJsonChars ile ayni; belgede 1 MiB tahmindi); load_character / healthcheck eklendi;
+--   purge_write_ops eklendi (yalniz service_role, en az 1 gun, tek seferde en cok 5000 satir).
+--
+-- SOZLESME (contract_version 2): kira donemi alani TEK ad `lease_epoch`. Eski `epoch` alani geriye donuk uyumluluk icin
+--   yanitlarda KALIR (ayni deger); yeni istemci yalniz `lease_epoch` okur. p_op_id YALNIZ create_character, save_character
+--   ve get_op'ta vardir (acquire_lease / renew_lease / release_lease / character_exists / import_character'da YOK).
 -- =====================================================================================================
 
 begin;
@@ -27,6 +35,16 @@ create schema if not exists mmo_api;
 revoke all on schema mmo from public, anon, authenticated, service_role;
 revoke all on schema mmo_api from public, anon, authenticated;
 grant usage on schema mmo_api to service_role;
+
+-- Gelecek migration'lar icin: bu iki semada SEMA DUZEYINDE varsayilan yetkiler fonksiyonlarda EXECUTE vermez.
+-- DURUST SINIR: PostgreSQL'de sema duzeyindeki varsayilan yetkiler KUMELIDIR (global varsayilanlara eklenir); bu REVOKE,
+-- Supabase'in ya da PostgreSQL'in yerlesik/GLOBAL varsayilan EXECUTE'unu (yeni fonksiyonda PUBLIC'e EXECUTE) kaldirmaz.
+-- Gercek koruma: her migration sonunda 6. bolumdeki revoke/grant dongusu + supabase/tests/04_security.sql (katalogdaki HER
+-- fonksiyonu denetler). Rol-genisligindeki (tum semalar) kati hali sahip karari: asagidaki satir acilirsa migration rolunun
+-- olusturdugu HER yeni fonksiyon PUBLIC'e kapali olur (Supabase public semasini etkileyebilir, bu yuzden KAPALI birakildi):
+--   alter default privileges revoke execute on functions from public;
+alter default privileges in schema mmo_api revoke execute on functions from public, anon, authenticated;
+alter default privileges in schema mmo revoke execute on functions from public, anon, authenticated, service_role;
 
 -- -----------------------------------------------------------------------------------------------------
 -- 1) Yardimci fonksiyonlar (mmo semasi, hicbir rol dogrudan cagiramaz; yalniz sahip-hakli fonksiyon/CHECK kullanir)
@@ -178,8 +196,9 @@ create table mmo.character_saves (
   constraint character_saves_ttl            check (lease_ttl_s between 10 and 600),
   constraint character_saves_lease_pair     check ((active_server is null) = (lease_until is null)),
   constraint character_saves_holder         check (active_server is null or mmo.valid_holder(active_server)),
-  constraint character_saves_import_sha     check (import_sha256 is null or import_sha256 ~ '^[0-9a-f]{64}$'),
-  constraint character_saves_envelope       check (mmo.envelope_problem(data, schema_version) is null)
+  constraint character_saves_import_sha     check (import_sha256 is null or import_sha256 ~ '^[0-9a-f]{64}$')
+  -- Zarf (data) denetimi CHECK DEGIL, tetikleyicidir (3. bolum): CHECK her UPDATE'te (kira yenileme dahil) 2 MiB'a kadar
+  -- jsonb'yi yeniden metne cevirip tarardi; tetikleyici yalniz data / schema_version DEGISINCE calisir. Hata kodu ayni (23514).
 );
 create index character_saves_account_idx on mmo.character_saves (account_id) where account_id is not null;
 create index character_saves_lease_idx   on mmo.character_saves (lease_until) where active_server is not null;
@@ -201,7 +220,7 @@ create table mmo.write_ops (            -- idempotency gunlugu (gorev metnindeki
   result         jsonb not null check (jsonb_typeof(result) = 'object'),
   created_at     timestamptz not null default now()
 );
-create index write_ops_created_idx on mmo.write_ops (created_at);   -- temizlik; saklama suresi tekrar-deneme ufkundan uzun (7 gun [Tahmin])
+create index write_ops_created_idx on mmo.write_ops (created_at);   -- temizlik: mmo_api.purge_write_ops; saklama suresi tekrar-deneme ufkundan uzun olmali (varsayilan 7 gun [Tahmin])
 
 create table mmo.presence (             -- A4'te kullanilir (henuz RPC yok)
   canonical_key text primary key references mmo.character_saves(canonical_key) on delete cascade,
@@ -255,6 +274,29 @@ $$;
 
 create trigger character_saves_guard_trg before update on mmo.character_saves
   for each row execute function mmo.character_saves_guard();
+
+-- Zarf denetimi (eski CHECK character_saves_envelope'un yerine). Ekleme: her zaman. Guncelleme: yalniz data ya da
+-- schema_version SET listesinde VE degeri degismisse. Kira yenileme / birakma (yalniz lease_*) zarfa dokunmaz ve bu
+-- denetimi tetiklemez. Hata: SQLSTATE 23514 (check_violation), kisit adi character_saves_envelope (eskisiyle ayni).
+create function mmo.character_saves_envelope_guard() returns trigger
+language plpgsql set search_path = '' as $$
+declare
+  v_problem text;
+begin
+  v_problem := mmo.envelope_problem(new.data, new.schema_version);
+  if v_problem is not null then
+    raise exception 'character_saves envelope invalid: %', v_problem
+      using errcode = 'check_violation', constraint = 'character_saves_envelope';
+  end if;
+  return new;
+end
+$$;
+
+create trigger character_saves_envelope_ins_trg before insert on mmo.character_saves
+  for each row execute function mmo.character_saves_envelope_guard();
+create trigger character_saves_envelope_upd_trg before update of data, schema_version on mmo.character_saves
+  for each row when (old.data is distinct from new.data or old.schema_version is distinct from new.schema_version)
+  execute function mmo.character_saves_envelope_guard();
 create trigger character_side_touch_trg before update on mmo.character_side
   for each row execute function mmo.touch_updated_at();
 
@@ -281,7 +323,8 @@ revoke all on all tables in schema mmo from public, anon, authenticated, service
 
 create function mmo_api.healthcheck() returns jsonb
 language sql security definer set search_path = '' as $$
-  select jsonb_build_object('outcome', 'ok', 'api_version', 1, 'schema', 'v2', 'server_time', clock_timestamp())
+  select jsonb_build_object('outcome', 'ok', 'api_version', 2, 'contract_version', 2, 'schema', 'v2',
+                            'server_time', clock_timestamp())
 $$;
 
 -- Salt-okunur anlik goruntu: kira ALMAZ. Oyun akisinda yukleme acquire_lease iledir; bu export/denetim icindir.
@@ -346,6 +389,10 @@ $$;
 
 -- Yeni karakter. Olusturan sunucu kirayi (epoch 1) hemen tutar; ayri acquire gerekmez.
 -- Ayni op_id + ayni yuk tekrari kayitli sonucu doner (replayed=true). Zaten varsa already_exists.
+-- SONUC BELIRSIZLIGI (yanit kayboldu / zaman asimi): yeniden deneme MUTLAKA AYNI op_id ile yapilir -> kayitli sonuc doner.
+-- Yeni op_id ile tekrar edilirse, ilk deneme commit olmussa already_exists doner ve bu, "baska biri olusturdu" ile
+-- AYIRT EDILEMEZ; ayirt etmek icin ilk op_id ile get_op(found=true, op_kind=create) sorulur.
+-- Zaman (kira bitisi) op_id kilidi ve unique-ekleme beklemesinden SONRA alinir.
 create function mmo_api.create_character(p_key text, p_display_name text, p_holder text, p_op_id uuid,
                                          p_schema_version int, p_data jsonb, p_race text default null)
 returns jsonb
@@ -354,7 +401,7 @@ declare
   prev mmo.write_ops;
   v_problem text;
   v_digest text;
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
   v_rows int;
   v_res jsonb;
 begin
@@ -386,6 +433,7 @@ begin
     return mmo.err('idempotency_conflict');
   end if;
 
+  v_now := clock_timestamp();   -- op_id kilidi beklendikten SONRA
   insert into mmo.character_saves
     (canonical_key, display_name, race, schema_version, revision, data, active_server, lease_epoch, lease_until, lease_ttl_s)
   values
@@ -396,7 +444,8 @@ begin
     return mmo.err('already_exists');
   end if;
 
-  v_res := jsonb_build_object('outcome', 'committed', 'canonical_key', p_key, 'revision', 0, 'epoch', 1);
+  v_res := jsonb_build_object('outcome', 'committed', 'canonical_key', p_key, 'revision', 0,
+                              'lease_epoch', 1, 'epoch', 1);
   insert into mmo.write_ops (op_id, canonical_key, op_kind, payload_sha256, result)
   values (p_op_id, p_key, 'create', v_digest, v_res);
   return v_res;
@@ -405,12 +454,13 @@ $$;
 
 -- Kira al + yukle. Ayni sahip gecerli kirayi tekrar alirsa epoch ARTMAZ (kira uzar). Kira bitmis/birakilmis ise epoch+1.
 -- Baska sahibin gecerli kirasi: ownership_lost (+ retry_after_s). op_id yok: kayitli sonuc tekrari eski veriyi dondurebilirdi;
--- ayni sahip icin cagri zaten dogal idempotent.
+-- ayni sahip icin cagri zaten dogal idempotent. Yanit: `lease_epoch` (asil ad) + `epoch` (geriye donuk, ayni deger).
+-- Zaman (kira dolmus mu karari, yeni bitis) satir kilidi beklendikten SONRA alinir.
 create function mmo_api.acquire_lease(p_key text, p_holder text, p_ttl_s int default 120) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   r mmo.character_saves;
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
   v_epoch bigint;
   v_until timestamptz;
   v_side jsonb;
@@ -432,6 +482,7 @@ begin
   if not found then
     return mmo.err('not_found');
   end if;
+  v_now := clock_timestamp();   -- FOR UPDATE beklendikten SONRA
 
   if r.active_server is not null and r.lease_until > v_now then
     if r.active_server <> p_holder then
@@ -454,7 +505,8 @@ begin
   return jsonb_build_object(
     'outcome', 'ok', 'canonical_key', r.canonical_key, 'character_id', r.character_id,
     'display_name', r.display_name, 'race', r.race, 'schema_version', r.schema_version,
-    'revision', r.revision, 'epoch', v_epoch, 'lease_until', v_until, 'data', r.data, 'side', v_side);
+    'revision', r.revision, 'lease_epoch', v_epoch, 'epoch', v_epoch, 'lease_until', v_until,
+    'data', r.data, 'side', v_side);
 end
 $$;
 
@@ -463,7 +515,7 @@ create function mmo_api.renew_lease(p_key text, p_holder text, p_epoch bigint, p
 language plpgsql security definer set search_path = '' as $$
 declare
   r mmo.character_saves;
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
   v_ttl int;
   v_until timestamptz;
 begin
@@ -487,20 +539,22 @@ begin
   if not found then
     return mmo.err('not_found');
   end if;
+  v_now := clock_timestamp();   -- FOR UPDATE beklendikten SONRA
   if r.active_server is distinct from p_holder or r.lease_epoch <> p_epoch
      or r.lease_until is null or r.lease_until <= v_now then
-    return mmo.err('ownership_lost', null, jsonb_build_object('epoch', r.lease_epoch));
+    return mmo.err('ownership_lost', null, jsonb_build_object('lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch));
   end if;
 
   v_ttl := coalesce(p_ttl_s, r.lease_ttl_s);
   v_until := v_now + v_ttl * interval '1 second';
   update mmo.character_saves set lease_until = v_until, lease_ttl_s = v_ttl where canonical_key = p_key;
-  return jsonb_build_object('outcome', 'ok', 'epoch', r.lease_epoch, 'lease_until', v_until);
+  return jsonb_build_object('outcome', 'ok', 'lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch, 'lease_until', v_until);
 end
 $$;
 
 -- Cikista kirayi birakir (kaydi save_character ile bitirdikten sonra). Epoch korunur ve artar (sonraki acquire epoch+1).
--- Zaten birakilmis (ayni epoch) ise tekrar cagri: ok + already_released (zaman asimi sonrasi guvenli tekrar).
+-- Zaten birakilmis (ayni epoch) ise tekrar cagri: ok + already_released=true (zaman asimi sonrasi guvenli tekrar).
+-- Yanit sekli tek tiptir: {outcome:'ok', already_released:bool, lease_epoch, epoch}.
 create function mmo_api.release_lease(p_key text, p_holder text, p_epoch bigint) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -524,14 +578,14 @@ begin
     return mmo.err('not_found');
   end if;
   if r.active_server is null and r.lease_epoch = p_epoch then
-    return jsonb_build_object('outcome', 'ok', 'already_released', true);
+    return jsonb_build_object('outcome', 'ok', 'already_released', true, 'lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch);
   end if;
   if r.active_server is distinct from p_holder or r.lease_epoch <> p_epoch then
-    return mmo.err('ownership_lost', null, jsonb_build_object('epoch', r.lease_epoch));
+    return mmo.err('ownership_lost', null, jsonb_build_object('lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch));
   end if;
 
   update mmo.character_saves set active_server = null, lease_until = null where canonical_key = p_key;
-  return jsonb_build_object('outcome', 'ok');
+  return jsonb_build_object('outcome', 'ok', 'already_released', false, 'lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch);
 end
 $$;
 
@@ -547,7 +601,7 @@ declare
   prev mmo.write_ops;
   v_problem text;
   v_digest text;
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
   v_res jsonb;
   v_kind text;
   v_val jsonb;
@@ -588,9 +642,10 @@ begin
   if not found then
     return mmo.err('not_found');
   end if;
+  v_now := clock_timestamp();   -- op_id kilidi VE satir kilidi beklendikten SONRA (kira suresi karari bu zamanla)
   if r.active_server is distinct from p_holder or r.lease_epoch <> p_epoch
      or r.lease_until is null or r.lease_until <= v_now then
-    return mmo.err('ownership_lost', null, jsonb_build_object('epoch', r.lease_epoch));
+    return mmo.err('ownership_lost', null, jsonb_build_object('lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch));
   end if;
   if r.revision <> p_expected_revision then
     return mmo.err('revision_conflict', null, jsonb_build_object('revision', r.revision));
@@ -609,7 +664,8 @@ begin
     end loop;
   end if;
 
-  v_res := jsonb_build_object('outcome', 'committed', 'revision', r.revision + 1, 'epoch', r.lease_epoch);
+  v_res := jsonb_build_object('outcome', 'committed', 'revision', r.revision + 1,
+                              'lease_epoch', r.lease_epoch, 'epoch', r.lease_epoch);
   insert into mmo.write_ops (op_id, canonical_key, op_kind, payload_sha256, result)
   values (p_op_id, p_key, 'save', v_digest, v_res);
   return v_res;
@@ -619,6 +675,8 @@ $$;
 -- Belirsiz sonuc uzlastirma. Islem op_id kilidini bekler: sunucuda ucusta olan islem bitince kesin cevap verilir.
 -- not_found = ISLEM COMMIT OLMADI (su an); henuz DB'ye ulasmamis gecikmis bir istek sonradan commit olabilir.
 -- Guvenli devam yolu: AYNI op_id + AYNI yuk ile yeniden gondermek (idempotent), kor yeniden yazma degil.
+-- Yanit: bulundu -> {outcome:'ok', found:true, ...}; yok -> {outcome:'not_found', found:false}.
+-- Not: purge_write_ops ile silinmis (varsayilan 7 gunden eski) bir op_id de found=false doner.
 create function mmo_api.get_op(p_op_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -630,9 +688,9 @@ begin
   perform mmo.op_lock(p_op_id);
   select * into prev from mmo.write_ops where op_id = p_op_id;
   if not found then
-    return mmo.err('not_found', 'op_unknown');
+    return mmo.err('not_found', null, jsonb_build_object('found', false));
   end if;
-  return jsonb_build_object('outcome', 'ok', 'op_kind', prev.op_kind, 'canonical_key', prev.canonical_key,
+  return jsonb_build_object('outcome', 'ok', 'found', true, 'op_kind', prev.op_kind, 'canonical_key', prev.canonical_key,
                             'result', prev.result, 'created_at', prev.created_at);
 end
 $$;
@@ -649,7 +707,7 @@ language plpgsql security definer set search_path = '' as $$
 declare
   r mmo.character_saves;
   v_problem text;
-  v_now timestamptz := clock_timestamp();
+  v_now timestamptz;
   v_rows int;
 begin
   if p_source_sha256 is null or p_schema_version is null then
@@ -677,13 +735,14 @@ begin
   on conflict (canonical_key) do nothing;
   get diagnostics v_rows = row_count;
   if v_rows = 1 then
-    return jsonb_build_object('outcome', 'imported', 'revision', 0);
+    return jsonb_build_object('outcome', 'imported', 'revision', 0, 'replaced_import', false);
   end if;
 
   select * into r from mmo.character_saves where canonical_key = p_key for update;
   if not found then
     return mmo.err('internal', 'row_vanished');
   end if;
+  v_now := clock_timestamp();   -- FOR UPDATE beklendikten SONRA (kira bitmis mi karari)
   if r.import_sha256 is not distinct from p_source_sha256 then
     return jsonb_build_object('outcome', 'already_imported', 'revision', r.revision);
   end if;
@@ -699,9 +758,40 @@ begin
 end
 $$;
 
+-- Islem gunlugu (write_ops) temizligi. YALNIZ service_role (bkz. 6. bolum); anon/authenticated cagiramaz.
+-- Sinirlar: p_older_than_days 1..3650 (varsayilan 7; bugunku / dunku islemler ASLA silinmez); tek cagrida EN FAZLA 5000 satir
+-- (en eskiden baslayarak); kalan varsa `more:true` -> cagiran tekrar cagirir. Sadece write_ops satirlari silinir
+-- (karakter / yan veri / kira dokunulmaz). Saklama suresi, istemcinin AYNI op_id ile yeniden deneme ufkundan UZUN olmali:
+-- silinen op_id ile gelen gec tekrar "yeni islem" gibi islenir (save: revision/epoch denetimi yine korur; create: already_exists).
+-- Zamanlama ornegi (pg_cron, Supabase'de eklenti etkinlestirilirse; BURADA CALISTIRILMAZ):
+--   select cron.schedule('mmo-purge-write-ops', '17 3 * * *', 'select mmo_api.purge_write_ops(7)');
+create function mmo_api.purge_write_ops(p_older_than_days int default 7) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_cutoff timestamptz;
+  v_deleted int;
+  v_more boolean;
+begin
+  if p_older_than_days is null or p_older_than_days < 1 or p_older_than_days > 3650 then
+    return mmo.err('invalid', 'bad_days');
+  end if;
+  v_cutoff := clock_timestamp() - p_older_than_days * interval '1 day';
+  with doomed as (
+    delete from mmo.write_ops w
+     where w.op_id in (select o.op_id from mmo.write_ops o where o.created_at < v_cutoff order by o.created_at limit 5000)
+    returning 1
+  )
+  select count(*)::int into v_deleted from doomed;
+  select exists (select 1 from mmo.write_ops w where w.created_at < v_cutoff) into v_more;
+  return jsonb_build_object('outcome', 'ok', 'deleted', v_deleted, 'more', v_more);
+end
+$$;
+
 -- -----------------------------------------------------------------------------------------------------
 -- 6) Fonksiyon yetkileri. PostgreSQL varsayilani EXECUTE'u PUBLIC'e verir: her fonksiyondan acikca geri alinir,
 --    sonra yalniz mmo_api fonksiyonlari service_role'e acilir. mmo.* yardimcilari hicbir role acik degildir.
+--    GELECEK MIGRATION'LAR: yeni fonksiyon eklerlerse bu dongunun AYNISINI (revoke all ... + grant execute) dosya sonunda
+--    tekrarlamalidir; 04_security.sql katalogdaki her fonksiyonu denetler ve unutulani yakalar.
 -- -----------------------------------------------------------------------------------------------------
 
 do $$

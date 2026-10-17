@@ -210,6 +210,125 @@ begin
 end
 $do$;
 
+-- Zarf denetimi tetikleyicidir (CHECK degil): yalniz data / schema_version DEGISINCE calisir; kira guncellemeleri tetiklemez.
+do $do$
+declare
+  env jsonb := '{"SchemaVersion":2,"Data":{"Level":1,"Experience":0,"Gold":0,"NextInstanceId":1}}';
+  bad jsonb := '{"SchemaVersion":2,"Data":{"Level":1,"Experience":0,"Gold":-5,"NextInstanceId":1}}';
+  bad2 jsonb := '{"SchemaVersion":2,"Data":{"Level":1,"Experience":0,"Gold":-6,"NextInstanceId":1}}';
+  v_state text;
+  n int;
+begin
+  -- eski CHECK kalmamali; iki tetikleyici etkin olmali
+  select count(*) into n from pg_constraint where conrelid = 'mmo.character_saves'::regclass and conname = 'character_saves_envelope';
+  if n <> 0 then raise exception 'FAIL: character_saves_envelope CHECK hala var'; end if;
+  select count(*) into n from pg_trigger
+   where tgrelid = 'mmo.character_saves'::regclass and not tgisinternal
+     and tgname in ('character_saves_envelope_ins_trg', 'character_saves_envelope_upd_trg') and tgenabled = 'O';
+  if n <> 2 then raise exception 'FAIL: zarf tetikleyicileri etkin degil (%)', n; end if;
+
+  insert into mmo.character_saves (canonical_key, display_name, schema_version, data) values ('zz-c-trg', 'zz-c-trg', 2, env);
+
+  -- veri degisince denetlenir
+  v_state := '00000';
+  begin update mmo.character_saves set data = bad where canonical_key = 'zz-c-trg';
+  exception when others then v_state := sqlstate; end;
+  if v_state <> '23514' then raise exception 'FAIL: bozuk veri guncellemesi reddedilmedi (state %)', v_state; end if;
+
+  -- schema_version degisince de denetlenir (zarf surumu ile uyusmaz)
+  v_state := '00000';
+  begin update mmo.character_saves set schema_version = 3 where canonical_key = 'zz-c-trg';
+  exception when others then v_state := sqlstate; end;
+  if v_state <> '23514' then raise exception 'FAIL: schema_version uyusmazligi reddedilmedi (state %)', v_state; end if;
+
+  -- gecerli veri guncellemesi gecer
+  update mmo.character_saves set data = jsonb_set(env, '{Data,Gold}', '77') where canonical_key = 'zz-c-trg';
+
+  -- Kanit: bozuk bir "eski" satir (tetikleyiciler gecici kapali eklenir); kira guncellemeleri bu satirda HATA VERMEZ,
+  -- yani zarf kira yenilemede yeniden denetlenmiyor. Veri degisirse yine reddedilir.
+  alter table mmo.character_saves disable trigger character_saves_envelope_ins_trg;
+  insert into mmo.character_saves (canonical_key, display_name, schema_version, data) values ('zz-c-legacy', 'zz-c-legacy', 2, bad);
+  alter table mmo.character_saves enable trigger character_saves_envelope_ins_trg;
+
+  update mmo.character_saves
+     set active_server = 'srv:1', lease_until = now() + interval '1 minute', lease_epoch = lease_epoch + 1
+   where canonical_key = 'zz-c-legacy';
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: kira guncellemesi etkilemedi'; end if;
+  update mmo.character_saves set lease_until = now() + interval '2 minutes' where canonical_key = 'zz-c-legacy';
+  update mmo.character_saves set active_server = null, lease_until = null where canonical_key = 'zz-c-legacy';
+  -- ayni veriyi yeniden yazmak (degisiklik yok) da denetlenmez
+  update mmo.character_saves set data = data where canonical_key = 'zz-c-legacy';
+
+  v_state := '00000';
+  begin update mmo.character_saves set data = bad2 where canonical_key = 'zz-c-legacy';
+  exception when others then v_state := sqlstate; end;
+  if v_state <> '23514' then raise exception 'FAIL: legacy satirda veri degisimi reddedilmedi (state %)', v_state; end if;
+
+  select count(*) into n from pg_trigger
+   where tgrelid = 'mmo.character_saves'::regclass and not tgisinternal
+     and tgname in ('character_saves_envelope_ins_trg', 'character_saves_envelope_upd_trg') and tgenabled = 'O';
+  if n <> 2 then raise exception 'FAIL: tetikleyiciler yeniden etkinlestirilemedi (%)', n; end if;
+  raise notice 'OK zarf tetikleyicisi (veri degisince) / kira guncellemesi denetimsiz';
+end
+$do$;
+
+-- purge_write_ops: yalniz eski satirlar, sinirlar, parti tavani (5000). Her sey ROLLBACK ile geri alinir.
+do $do$
+declare
+  r jsonb;
+  n int;
+begin
+  delete from mmo.write_ops where created_at < now() - interval '1 day';   -- deterministik baslangic (islem icinde)
+  insert into mmo.write_ops (op_id, canonical_key, op_kind, payload_sha256, result, created_at) values
+    ('d0000000-0000-4000-8000-0000000000a1', 'zz-c-p', 'save', repeat('a', 64), '{}'::jsonb, now() - interval '3 days'),
+    ('d0000000-0000-4000-8000-0000000000a2', 'zz-c-p', 'save', repeat('a', 64), '{}'::jsonb, now() - interval '10 days'),
+    ('d0000000-0000-4000-8000-0000000000a3', 'zz-c-p', 'save', repeat('a', 64), '{}'::jsonb, now() - interval '2 hours');
+
+  set local role service_role;
+  r := mmo_api.purge_write_ops(7);
+  reset role;
+  if r is distinct from '{"outcome":"ok","deleted":1,"more":false}'::jsonb then raise exception 'FAIL purge(7): %', r; end if;
+  select count(*) into n from mmo.write_ops where op_id = 'd0000000-0000-4000-8000-0000000000a2';
+  if n <> 0 then raise exception 'FAIL: 10 gunluk satir silinmedi'; end if;
+  select count(*) into n from mmo.write_ops where op_id in ('d0000000-0000-4000-8000-0000000000a1', 'd0000000-0000-4000-8000-0000000000a3');
+  if n <> 2 then raise exception 'FAIL: yeni satirlar silindi (%)', n; end if;
+
+  set local role service_role;
+  r := mmo_api.purge_write_ops(1);
+  reset role;
+  if r is distinct from '{"outcome":"ok","deleted":1,"more":false}'::jsonb then raise exception 'FAIL purge(1): %', r; end if;
+  select count(*) into n from mmo.write_ops where op_id = 'd0000000-0000-4000-8000-0000000000a3';
+  if n <> 1 then raise exception 'FAIL: 2 saatlik satir silindi'; end if;
+
+  -- alt sinir ve gecersiz degerler: hicbir sey silinmez
+  set local role service_role;
+  r := mmo_api.purge_write_ops(0);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_days"}'::jsonb then raise exception 'FAIL purge(0): %', r; end if;
+  r := mmo_api.purge_write_ops(-1);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_days"}'::jsonb then raise exception 'FAIL purge(-1): %', r; end if;
+  r := mmo_api.purge_write_ops(3651);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_days"}'::jsonb then raise exception 'FAIL purge(3651): %', r; end if;
+  r := mmo_api.purge_write_ops(null);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_days"}'::jsonb then raise exception 'FAIL purge(null): %', r; end if;
+  reset role;
+
+  -- parti tavani: 5001 eski satir -> ilk cagri 5000 siler ve more:true, ikincisi kalan 1'i siler
+  insert into mmo.write_ops (op_id, canonical_key, op_kind, payload_sha256, result, created_at)
+  select gen_random_uuid(), 'zz-c-p', 'save', repeat('b', 64), '{}'::jsonb, now() - interval '20 days' - g * interval '1 second'
+    from generate_series(1, 5001) g;
+  set local role service_role;
+  r := mmo_api.purge_write_ops(7);
+  if r is distinct from '{"outcome":"ok","deleted":5000,"more":true}'::jsonb then raise exception 'FAIL purge parti 1: %', r; end if;
+  r := mmo_api.purge_write_ops();
+  reset role;
+  if r is distinct from '{"outcome":"ok","deleted":1,"more":false}'::jsonb then raise exception 'FAIL purge parti 2 (varsayilan gun): %', r; end if;
+  select count(*) into n from mmo.write_ops where created_at < now() - interval '1 day';
+  if n <> 0 then raise exception 'FAIL: eski satir kaldi (%)', n; end if;
+  raise notice 'OK purge_write_ops';
+end
+$do$;
+
 -- RPC yolunda boyut tavani ve bos/yanlis girdiler (service_role olarak)
 do $do$
 declare

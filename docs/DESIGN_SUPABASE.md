@@ -167,14 +167,22 @@ HTTP hata kodları yalnız altyapı arızası içindir; **iş sonucu** `outcome`
 
 | Fonksiyon | Girdi | Davranış |
 |---|---|---|
-| `acquire_lease` | `p_key, p_holder, p_ttl_s, p_op_id` | Yok: `not_found`. Başka kiracı ve kira geçerli: `ownership_lost`. Aksi: `lease_epoch+1`, `active_server=p_holder`; **veri + revision + epoch + schema_version** döner (yükleme budur). Aynı holder yeniden çağırırsa epoch artmaz, kira uzar. |
-| `create_character` | `p_key, p_display_name, p_holder, p_op_id, p_schema_version, p_data, p_race` | `insert ... on conflict do nothing`; varsa `already_exists`. Başlangıç paketi kararı yalnız `acquire_lease -> not_found` sonrası verilir (S04.00: DB kapalı = "yok" DEĞİL). |
+| `acquire_lease` | `p_key, p_holder, p_ttl_s` (**`p_op_id` YOK**) | Yok: `not_found`. Başka kiracı ve kira geçerli: `ownership_lost` (+`retry_after_s`). Aksi: `lease_epoch+1`, `active_server=p_holder`; **veri + side + revision + `lease_epoch` + schema_version** döner (yükleme budur). Aynı holder geçerli kirayı yeniden alırsa epoch artmaz, kira uzar; süresi dolmuş/bırakılmış kirada artar. Kayıtlı sonuç tekrarı eski veriyi döndürebileceği için `p_op_id` yoktur; çağrı aynı sahip için doğal idempotent. |
+| `create_character` | `p_key, p_display_name, p_holder, p_op_id, p_schema_version, p_data, p_race` | `insert ... on conflict do nothing`; varsa `already_exists`. Başlangıç paketi kararı yalnız `acquire_lease -> not_found` sonrası verilir (S04.00: DB kapalı = "yok" DEĞİL). **Sonuç belirsizliği:** yeniden deneme AYNI `p_op_id` ile yapılır (kayıtlı sonuç `replayed:true`); yeni op_id ile `already_exists` "kendi önceki commit'imiz" ile "başkası aldı"yı ayırt ettirmez, ayırmak için ilk op_id ile `get_op` (`found:true`, `op_kind:create`). |
 | `save_character` | `p_key, p_holder, p_epoch, p_expected_revision, p_op_id, p_schema_version, p_data, p_side jsonb` | Aşağıdaki gövde. İsteğe bağlı `p_side` ile başarım/günlük aynı transaction'da. |
 | `renew_lease` | `p_key, p_holder, p_epoch, p_ttl_s` | Yalnız kira uzatır; veri yazmaz. |
 | `release_lease` | `p_key, p_holder, p_epoch` | Çıkışta kira bırakır (kaydı `save_character` ile bitirdikten sonra). Çökmede kira süresiyle düşer. |
 | `character_exists` / `list_keys(p_prefix)` | | Ad çakışması / klan adı taraması (şu an `Exists`/`ListSlotNames`). Otoriter; yalnız `outcome` + liste. |
-| `get_op` | `p_op_id` | Zaman aşımı sonrası uzlaştırma: işlem kayıtlı mı, sonucu ne. |
-| `import_character` | `p_key, p_display_name, p_source_sha256, p_schema_version, p_data` | İdempotent içe aktarma (§4.6). Mevcut ve `revision > 0` ise **asla ezmez**. |
+| `get_op` | `p_op_id` | Zaman aşımı sonrası uzlaştırma: işlem kayıtlı mı, sonucu ne. Bulunursa `{outcome:'ok', found:true, op_kind, canonical_key, result, created_at}`; bulunamazsa `{outcome:'not_found', found:false}` (temizlenmiş >= 7 gün eski op_id de `found:false`). |
+| `import_character` | `p_key, p_display_name, p_source_sha256, p_schema_version, p_data, p_race` (**`p_op_id` YOK**; idempotency `p_source_sha256` ile) | İdempotent içe aktarma (§4.6). Mevcut ve `revision > 0` ise **asla ezmez**. |
+| `purge_write_ops` | `p_older_than_days` (varsayılan 7; 1..3650) | İşlem günlüğü (`write_ops`) temizliği. Yalnız `service_role`; tek çağrıda en çok 5000 satır, `{outcome:'ok', deleted, more}`; yalnız `write_ops` silinir. Zamanlama: `pg_cron` örneği `supabase/README.md`. |
+
+**Sözleşme sürümü 2 (2026-10-17, henüz hiçbir DB'ye uygulanmadı; tek doğruluk kaynağı `supabase/tests/vectors.json` + `supabase/README.md`):**
+- Kira dönemi alanı TEK ad **`lease_epoch`** (`load_character`, `acquire_lease`, `renew_lease`, `release_lease`, `create_character`, `save_character`, `ownership_lost` gövdeleri). Geriye dönük `epoch` aynı değerle yanıtlarda kalır; yeni kod yalnız `lease_epoch` okur.
+- `p_op_id` yalnız `create_character`, `save_character`, `get_op`'ta. `acquire_lease`, `renew_lease`, `release_lease`, `character_exists`, `import_character` almaz; UE bu çağrılara `p_op_id` göndermeyecek. Fazla/eksik parametre = HTTP 404 `PGRST202` (SQL `42883`).
+- `release_lease` yanıtı tek şekil: `{outcome:'ok', already_released:bool, lease_epoch, epoch}`. `healthcheck`: `{api_version:2, contract_version:2, ...}`.
+- Zaman kararları (kira süresi dolmuş mu, yeni bitiş) satır/op_id kilidi beklendikten SONRA `clock_timestamp()` ile alınır; zarf (`data`) denetimi CHECK değil tetikleyicidir (yalnız veri değişince çalışır).
+- Gelecek migration'lar: yeni fonksiyon eklenirse dosya sonunda revoke/grant döngüsü tekrarlanır; sema düzeyi `alter default privileges` PUBLIC'in yerleşik EXECUTE'unu kaldırmaz (ayrıntı `supabase/README.md` sapma 12).
 
 `save_character` çekirdeği (taslak; düzen önemli):
 

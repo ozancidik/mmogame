@@ -57,6 +57,31 @@ begin
   end if;
   raise notice 'OK canonical_key vektorleri: %', n;
 
+  -- p_holder kurali (UE ayni regex'i onceden dogrular): vectors.json "holder"
+  n := 0;
+  for e in select value from jsonb_array_elements(v -> 'holder') loop
+    n := n + 1;
+    if mmo.valid_holder(e ->> 'value') is distinct from (e ->> 'valid')::boolean then
+      raise exception 'FAIL valid_holder(%): beklenen %', e ->> 'value', e ->> 'valid';
+    end if;
+    -- regex sozlesmesi: limits.holder_regex ile ayni karar
+    if ((e ->> 'value') ~ (v -> 'limits' ->> 'holder_regex')) is distinct from (e ->> 'valid')::boolean then
+      raise exception 'FAIL limits.holder_regex(%): beklenen %', e ->> 'value', e ->> 'valid';
+    end if;
+  end loop;
+  if n < 10 then
+    raise exception 'FAIL: holder vektor sayisi beklenenden az (%)', n;
+  end if;
+  raise notice 'OK holder vektorleri: %', n;
+
+  -- ad regex'i (limits.name_regex): SQL canonical_key ile ayni karar (null <=> regex eslesmez)
+  for e in select value from jsonb_array_elements(v -> 'canonical_key') loop
+    if ((e ->> 'name') ~ (v -> 'limits' ->> 'name_regex')) is distinct from ((e ->> 'db_key') is not null) then
+      raise exception 'FAIL limits.name_regex(%): canonical_key ile ayrisiyor', e ->> 'name';
+    end if;
+  end loop;
+  raise notice 'OK name_regex == canonical_key';
+
   -- satir ici ek kontroller
   if mmo.canonical_key(null) is not null then raise exception 'FAIL canonical_key(null)'; end if;
   if mmo.canonical_key(E'Ali\n') is not null then raise exception 'FAIL: sonda satir sonu kabul edildi'; end if;

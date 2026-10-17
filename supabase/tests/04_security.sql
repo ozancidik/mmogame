@@ -15,10 +15,12 @@ declare
   r record;
   n int;
   expected_fns text[] := array['acquire_lease', 'character_exists', 'create_character', 'get_op', 'healthcheck',
-                               'import_character', 'list_keys', 'load_character', 'release_lease', 'renew_lease', 'save_character'];
+                               'import_character', 'list_keys', 'load_character', 'purge_write_ops', 'release_lease',
+                               'renew_lease', 'save_character'];   -- "C" siralamasi (asagidaki order by ile ayni)
   got_fns text[];
+  src text;
 begin
-  -- Altı tablo, hepsinde RLS acik
+  -- Alti tablo, hepsinde RLS acik
   select count(*) into n from pg_class c join pg_namespace s on s.oid = c.relnamespace
    where s.nspname = 'mmo' and c.relkind = 'r';
   if n <> 6 then raise exception 'FAIL: mmo tablo sayisi % (6 beklenir)', n; end if;
@@ -53,7 +55,7 @@ begin
   end if;
 
   -- mmo_api: tam beklenen fonksiyon kumesi
-  select array_agg(p.proname::text order by p.proname) into got_fns
+  select array_agg(p.proname::text order by p.proname::text collate "C") into got_fns
     from pg_proc p join pg_namespace s on s.oid = p.pronamespace where s.nspname = 'mmo_api';
   if got_fns is distinct from expected_fns then
     raise exception 'FAIL: mmo_api fonksiyon kumesi farkli: %', got_fns;
@@ -84,6 +86,52 @@ begin
     end if;
   end loop;
   raise notice 'OK katalog denetimi';
+
+  -- Gelecek migration'lar icin varsayilan yetkiler: mmo / mmo_api semalarinda anon/authenticated/PUBLIC'e
+  -- fonksiyon EXECUTE'u veren sema duzeyi varsayilan YOK (pg_default_acl). Not: PUBLIC'in yerlesik global varsayilani
+  -- bu tabloda gorunmez; onu yukaridaki "her fonksiyon" denetimi yakalar (bkz. migration notu).
+  select count(*) into n
+    from pg_default_acl d
+    join pg_namespace s on s.oid = d.defaclnamespace
+    cross join lateral aclexplode(d.defaclacl) a
+   where s.nspname in ('mmo', 'mmo_api') and d.defaclobjtype = 'f' and a.privilege_type = 'EXECUTE'
+     and (a.grantee = 0 or a.grantee in (select oid from pg_roles where rolname in ('anon', 'authenticated')));
+  if n <> 0 then raise exception 'FAIL: mmo/mmo_api icin anon/authenticated/PUBLIC varsayilan EXECUTE var (%)', n; end if;
+  select count(*) into n
+    from pg_default_acl d
+    join pg_namespace s on s.oid = d.defaclnamespace
+    cross join lateral aclexplode(d.defaclacl) a
+   where s.nspname = 'mmo' and d.defaclobjtype = 'f' and a.privilege_type = 'EXECUTE'
+     and a.grantee = (select oid from pg_roles where rolname = 'service_role');
+  if n <> 0 then raise exception 'FAIL: mmo yardimci semasinda service_role varsayilan EXECUTE var (%)', n; end if;
+  raise notice 'OK varsayilan yetkiler (pg_default_acl)';
+
+  -- Zaman kararlari kilit beklendikten SONRA alinmali (kaba kaynak bekcisi): v_now bildirimde ilklenmez,
+  -- ve atama satir kilidinden (FOR UPDATE) / op_id kilidinden (op_lock) sonra gelir.
+  for r in select p.proname::text as nm, p.prosrc from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+            where s.nspname = 'mmo_api' and p.proname::text in ('acquire_lease', 'renew_lease', 'save_character', 'import_character', 'create_character') loop
+    src := lower(r.prosrc);
+    if src ~ 'v_now\s+timestamptz\s*:=' then
+      raise exception 'FAIL: mmo_api.% v_now bildirimde ilkleniyor (kilit oncesi zaman)', r.nm;
+    end if;
+    if position('v_now := clock_timestamp()' in src) = 0 then
+      raise exception 'FAIL: mmo_api.% v_now atamasi yok', r.nm;
+    end if;
+    if r.nm = 'create_character' then
+      if position('v_now := clock_timestamp()' in src) < position('mmo.op_lock' in src) then
+        raise exception 'FAIL: mmo_api.create_character zamani op_lock oncesi aliyor';
+      end if;
+    elsif r.nm = 'import_character' then
+      if position('v_now := clock_timestamp()' in src) < position('for update' in src) then
+        raise exception 'FAIL: mmo_api.import_character zamani FOR UPDATE oncesi aliyor';
+      end if;
+    else
+      if position('v_now := clock_timestamp()' in src) < position('for update' in src) then
+        raise exception 'FAIL: mmo_api.% zamani FOR UPDATE oncesi aliyor', r.nm;
+      end if;
+    end if;
+  end loop;
+  raise notice 'OK zaman kilit sonrasi (kaynak bekcisi)';
 end
 $do$;
 
@@ -101,6 +149,11 @@ begin
       ('anon',          'insert into mmo.accounts (provider, external_id) values (''dev'', ''x'')', '42501'),
       ('anon',          'select mmo_api.healthcheck()',                                  '42501'),
       ('anon',          'select mmo_api.load_character(''zz-s-none'')',                  '42501'),
+      ('anon',          'select mmo_api.purge_write_ops(7)',                             '42501'),
+      ('authenticated', 'select mmo_api.purge_write_ops(7)',                             '42501'),
+      ('authenticated', 'select mmo_api.get_op(gen_random_uuid())',                      '42501'),
+      ('anon',          'select mmo_api.acquire_lease(''zz-s-none'', ''srv:1'')',        '42501'),
+      ('service_role',  'select mmo_api.purge_write_ops(7)',                             '00000'),
       ('anon',          'select mmo.canonical_key(''x'')',                               '42501'),
       ('authenticated', 'select count(*) from mmo.character_saves',                     '42501'),
       ('authenticated', 'delete from mmo.write_ops',                                     '42501'),
