@@ -6,9 +6,9 @@
 -- (zaman kilit sonrasi alinir). Eski/yanlis davranis (zaman cagri basinda): B kirayi gecerli sanip commit ederdi (revision 1).
 --
 -- Sira:
---   1) Terminal 1:  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_lease_a.sql
+--   1) Terminal 1:  psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_lease_a.sql
 --   2) "A: kilit tutuluyor" yazisini gorur gormez (6 sn icinde) Terminal 2:
---        psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_lease_b.sql
+--        psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_lease_b.sql
 --   B "PASS 05_concurrency_lease_b" yazar ve zz-conc-lease verisini siler.
 -- DURUM: HIC CALISTIRILMADI.
 

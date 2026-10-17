@@ -1,6 +1,6 @@
 -- 03: tablo CHECK / FK / UNIQUE kisitlari, tetikleyiciler (revision/epoch geri gitmez, anahtar degismez, updated_at, cascade)
 -- ve boyut tavani. DOGRUDAN SQL ile (tablo sahibi / superuser olarak); RPC yolunun reddi 02'de.
--- Kullanim (depo kokunden):  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/03_constraints.sql
+-- Kullanim (depo kokunden):  psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/03_constraints.sql
 -- Tum test islem icinde calisir ve ROLLBACK ile biter. DURUM: HIC CALISTIRILMADI.
 -- Beklenen SQLSTATE: 23514 check_violation, 23503 foreign_key_violation, 23505 unique_violation, 00000 = basarili.
 
@@ -325,6 +325,33 @@ begin
   if r is distinct from '{"outcome":"ok","deleted":1,"more":false}'::jsonb then raise exception 'FAIL purge parti 2 (varsayilan gun): %', r; end if;
   select count(*) into n from mmo.write_ops where created_at < now() - interval '1 day';
   if n <> 0 then raise exception 'FAIL: eski satir kaldi (%)', n; end if;
+  -- p_batch: aralik 1..50000 disi = bad_batch; kucuk parti -> more:true; son 24 saat korunur (p_older_than_days = 1 alt sinir)
+  set local role service_role;
+  r := mmo_api.purge_write_ops(7, 0);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_batch"}'::jsonb then raise exception 'FAIL purge batch 0: %', r; end if;
+  r := mmo_api.purge_write_ops(7, -1);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_batch"}'::jsonb then raise exception 'FAIL purge batch -1: %', r; end if;
+  r := mmo_api.purge_write_ops(7, 50001);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_batch"}'::jsonb then raise exception 'FAIL purge batch 50001: %', r; end if;
+  r := mmo_api.purge_write_ops(7, null);
+  if r is distinct from '{"outcome":"invalid","reason":"bad_batch"}'::jsonb then raise exception 'FAIL purge batch null: %', r; end if;
+  reset role;
+
+  insert into mmo.write_ops (op_id, canonical_key, op_kind, payload_sha256, result, created_at)
+  select gen_random_uuid(), 'zz-c-p', 'save', repeat('c', 64), '{}'::jsonb, now() - interval '30 days' - g * interval '1 second'
+    from generate_series(1, 7) g;
+  insert into mmo.write_ops (op_id, canonical_key, op_kind, payload_sha256, result, created_at)
+  values ('d0000000-0000-4000-8000-0000000000a4', 'zz-c-p', 'save', repeat('c', 64), '{}'::jsonb, now() - interval '23 hours');
+  set local role service_role;
+  r := mmo_api.purge_write_ops(7, 3);
+  if r is distinct from '{"outcome":"ok","deleted":3,"more":true}'::jsonb then raise exception 'FAIL purge batch 3: %', r; end if;
+  r := mmo_api.purge_write_ops(7, 3);
+  if r is distinct from '{"outcome":"ok","deleted":3,"more":true}'::jsonb then raise exception 'FAIL purge batch 3 (2): %', r; end if;
+  r := mmo_api.purge_write_ops(1, 50000);
+  reset role;
+  if r is distinct from '{"outcome":"ok","deleted":1,"more":false}'::jsonb then raise exception 'FAIL purge batch son: %', r; end if;
+  select count(*) into n from mmo.write_ops where op_id = 'd0000000-0000-4000-8000-0000000000a4';
+  if n <> 1 then raise exception 'FAIL: 23 saatlik satir silindi (son 24 saat korunmali)'; end if;
   raise notice 'OK purge_write_ops';
 end
 $do$;

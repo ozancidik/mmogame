@@ -19,6 +19,7 @@
     "path": "/rest/v1/rpc/{function}",
     "body": "JSON nesnesi: anahtarlar parametre adlari (rpc_params). Opsiyonel parametre atlanabilir; null gonderilirse SQL NULL.",
     "headers": ["Content-Type: application/json", "Content-Profile: mmo_api", "apikey: <secret>", "Authorization: Bearer <secret>"],
+    "headers_note": "sb_secret_ anahtarlari JWT degildir: yalniz 'apikey' basligina konur, 'Authorization: Bearer' basligina KONMAZ. Authorization satiri yalniz legacy JWT service_role anahtari icindir ve yeni anahtar modeline gecildiginde UE'den kalkar (davranis sozlesmesi icin sahte sunucu ikisini de kabul eder).",
     "success_status": 200,
     "result": "govde = tek jsonb nesnesi (yanit); outcome alani is sonucudur",
     "param_mismatch_status": 404,
@@ -33,7 +34,7 @@
 
   "invalid_reasons": [
     "null_argument", "bad_key", "bad_holder", "bad_ttl", "bad_epoch", "bad_epoch_or_revision", "bad_race", "bad_name",
-    "key_mismatch", "reserved_name", "bad_limit", "bad_prefix", "bad_sha", "bad_days",
+    "key_mismatch", "reserved_name", "bad_limit", "bad_prefix", "bad_sha", "bad_days", "bad_batch",
     "data_not_object", "data_too_large", "schema_version_mismatch", "data_missing", "bad_level", "bad_experience",
     "bad_gold", "bad_next_instance_id", "side_not_object", "side_unknown_kind", "side_bad_value"
   ],
@@ -45,6 +46,7 @@
     "holder_regex": "^[A-Za-z0-9_.:-]{1,96}$",
     "holder_max_len": 96,
     "data_max_octets": 2097152,
+    "data_octet_limit_note": "data_max_octets SQL'de octet_length(p_data::text) ile olculur: jsonb::text anahtar/deger ayiraclarindan sonra bosluk koyar ({\"a\": 1, \"b\": [1, 2]}), yani UE'nin yogun (bosluksuz) JSON'undan UZUNDUR; olcu bayttir (UTF-8), karakter degil. UE tarafi karakter sayiyorsa 2 MiB'a yakin kayitlar UE'de gecip DB'de data_too_large alabilir; UE bunu invalid/data_too_large olarak ele almali (yeniden denemeyle duzelmez). Davranis degismedi; yalniz belge. side_value_max_octets ayni sekilde jsonb::text octet.",
     "side_value_max_octets": 262144,
     "side_kinds": ["achievements", "daily", "mail"],
     "lease_ttl_min_s": 10,
@@ -55,7 +57,9 @@
     "purge_default_days": 7,
     "purge_min_days": 1,
     "purge_max_days": 3650,
-    "purge_batch_rows": 5000
+    "purge_batch_rows": 5000,
+    "purge_batch_min": 1,
+    "purge_batch_max": 50000
   },
 
   "rpc_params": {
@@ -117,7 +121,8 @@
       { "name": "p_race", "pg_type": "text", "json_type": "string", "required": false, "nullable": true, "default": null }
     ],
     "purge_write_ops": [
-      { "name": "p_older_than_days", "pg_type": "integer", "json_type": "number", "required": false, "nullable": false, "default": 7 }
+      { "name": "p_older_than_days", "pg_type": "integer", "json_type": "number", "required": false, "nullable": false, "default": 7 },
+      { "name": "p_batch", "pg_type": "integer", "json_type": "number", "required": false, "nullable": false, "default": 5000 }
     ]
   },
 
@@ -593,7 +598,39 @@
         { "rpc": "purge_write_ops", "args": { "p_older_than_days": null },
           "expect": { "outcome": "invalid", "reason": "bad_days" }, "exact": true },
         { "rpc": "purge_write_ops", "args": { "p_older_than_days": 3650 },
+          "expect": { "outcome": "ok", "deleted": 0, "more": false }, "exact": true },
+        { "rpc": "purge_write_ops", "args": { "p_older_than_days": 7, "p_batch": 0 },
+          "expect": { "outcome": "invalid", "reason": "bad_batch" }, "exact": true },
+        { "rpc": "purge_write_ops", "args": { "p_older_than_days": 7, "p_batch": -1 },
+          "expect": { "outcome": "invalid", "reason": "bad_batch" }, "exact": true },
+        { "rpc": "purge_write_ops", "args": { "p_older_than_days": 7, "p_batch": 50001 },
+          "expect": { "outcome": "invalid", "reason": "bad_batch" }, "exact": true },
+        { "rpc": "purge_write_ops", "args": { "p_older_than_days": 7, "p_batch": null },
+          "expect": { "outcome": "invalid", "reason": "bad_batch" }, "exact": true },
+        { "rpc": "purge_write_ops", "args": { "p_older_than_days": 3650, "p_batch": 50000 },
+          "expect": { "outcome": "ok", "deleted": 0, "more": false }, "exact": true },
+        { "rpc": "purge_write_ops", "args": { "p_older_than_days": 3650, "p_batch": 1 },
           "expect": { "outcome": "ok", "deleted": 0, "more": false }, "exact": true }
+      ]
+    },
+    {
+      "id": "frozen_slot_epoch_bump",
+      "description": "donmus/gec-yazim: acquire_lease CANLI kirada epoch artirmaz; sunucu yeniden baslamadan epoch'u artirmak icin release_lease(p_epoch) sonra acquire_lease cagirir (lease_epoch + 1); eski epoch ile yazim ownership_lost",
+      "steps": [
+        { "rpc": "create_character", "args": { "p_key": "zz-v-frz", "p_display_name": "zz-v-frz", "p_holder": "srvA:boot1", "p_op_id": "00000000-0000-4000-8000-000000000040", "p_schema_version": 2, "p_data": "@envelope_a" },
+          "expect": { "outcome": "committed", "revision": 0, "lease_epoch": 1, "epoch": 1 } },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-frz", "p_holder": "srvA:boot1", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "lease_epoch": 1, "epoch": 1, "revision": 0 } },
+        { "rpc": "release_lease", "args": { "p_key": "zz-v-frz", "p_holder": "srvA:boot1", "p_epoch": 1 },
+          "expect": { "outcome": "ok", "already_released": false, "lease_epoch": 1, "epoch": 1 }, "exact": true },
+        { "rpc": "acquire_lease", "args": { "p_key": "zz-v-frz", "p_holder": "srvA:boot1", "p_ttl_s": 120 },
+          "expect": { "outcome": "ok", "lease_epoch": 2, "epoch": 2, "revision": 0 } },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-frz", "p_holder": "srvA:boot1", "p_epoch": 1, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000041", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "ownership_lost", "lease_epoch": 2, "epoch": 2 }, "exact": true },
+        { "rpc": "save_character", "args": { "p_key": "zz-v-frz", "p_holder": "srvA:boot1", "p_epoch": 2, "p_expected_revision": 0, "p_op_id": "00000000-0000-4000-8000-000000000042", "p_schema_version": 2, "p_data": "@envelope_b" },
+          "expect": { "outcome": "committed", "revision": 1, "lease_epoch": 2, "epoch": 2 }, "exact": true },
+        { "rpc": "load_character", "args": { "p_key": "zz-v-frz" },
+          "expect": { "outcome": "ok", "revision": 1, "lease_epoch": 2, "data": "@envelope_b" } }
       ]
     },
     {

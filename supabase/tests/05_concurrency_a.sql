@@ -6,11 +6,11 @@
 -- (b) farkli op_id + ayni expected_revision 0: satir kilidini bekler, A commit edince revision_conflict (revision 1) doner.
 --
 -- Sira:
---   1) Terminal 1:  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_a.sql
+--   1) Terminal 1:  psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_a.sql
 --   2) "A: kilit tutuluyor" yazisini gorur gormez (10 sn icinde) Terminal 2:
---        psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v mode=same_op  -f supabase/tests/05_concurrency_b.sql
+--        psql "$DB" -v ON_ERROR_STOP=1 -v mode=same_op  -f supabase/tests/05_concurrency_b.sql
 --      sonra A bittikten sonra, A'yi YENIDEN kosup bu kez  -v mode=other_op  ile B'yi calistir.
---   3) HER kosudan (A+B cifti) sonra:  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_check.sql
+--   3) HER kosudan (A+B cifti) sonra:  psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/05_concurrency_check.sql
 -- Beklenen: B "PASS 05_concurrency_b (...)" yazar; check "PASS 05_concurrency_check" yazar.
 -- DURUM: HIC CALISTIRILMADI.
 

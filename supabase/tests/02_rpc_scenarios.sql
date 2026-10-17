@@ -8,7 +8,7 @@
 --   d) her yanitin anahtar kumesi ve deger tipleri vectors.json "responses" ornegiyle ayni (replayed haric; null = herhangi tip);
 --   e) her "invalid" yanitin reason'i "invalid_reasons" listesinde.
 -- UE native testi ayni dosyadaki ayni senaryolari sahte ulasimla kosar; sahte ile gercek ayrismasin diye tek kaynak.
--- Kullanim (depo kokunden, psql >= 13):  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v vectors="$(cat supabase/tests/vectors.json)" -f supabase/tests/02_rpc_scenarios.sql
+-- Kullanim (depo kokunden, psql >= 13):  psql "$DB" -v ON_ERROR_STOP=1 -v vectors="$(cat supabase/tests/vectors.json)" -f supabase/tests/02_rpc_scenarios.sql
 -- Tum test islem icinde calisir ve ROLLBACK ile biter. DURUM: HIC CALISTIRILMADI.
 
 \set ON_ERROR_STOP on

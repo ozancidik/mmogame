@@ -21,7 +21,7 @@
 --   write_ops adi korundu (gorev metnindeki op_log ayni sey); character_saves'e lease_ttl_s ve import_sha256 eklendi;
 --   FORCE RLS yerine ENABLE RLS; save_character SECURITY DEFINER (belgede invoker); acquire_lease'te p_op_id yok;
 --   veri boyut tavani 2 MiB (UE MaxJsonChars ile ayni; belgede 1 MiB tahmindi); load_character / healthcheck eklendi;
---   purge_write_ops eklendi (yalniz service_role, en az 1 gun, tek seferde en cok 5000 satir).
+--   purge_write_ops eklendi (yalniz service_role, en az 1 gun, parti p_batch 1..50000, varsayilan 5000).
 --
 -- SOZLESME (contract_version 2): kira donemi alani TEK ad `lease_epoch`. Eski `epoch` alani geriye donuk uyumluluk icin
 --   yanitlarda KALIR (ayni deger); yeni istemci yalniz `lease_epoch` okur. p_op_id YALNIZ create_character, save_character
@@ -106,6 +106,9 @@ $$;
 -- Karakter zarfi (FMMOCharacterSaveJson::ToJson ciktisi: {"SchemaVersion":n,"Data":{...}}) sorunu. NULL = sorun yok.
 -- Yalnis JSON icinde denetlenebilen invariantlar: tip, boyut, surum eslesmesi, Level/Experience/Gold/NextInstanceId.
 -- (Gold, Experience, Level, NextInstanceId UE tarafinda int32 = JSON sayisi.)
+-- BOYUT OLCUMU: tavan `octet_length(jsonb::text)` ile olculur. jsonb'nin metin cikisi ANAHTAR/DEGER ayiraclarindan sonra bosluk
+-- koyar ({"a": 1, "b": [1, 2]}), yani UE'nin yogun JSON'undan (bosluksuz) UZUNDUR; ayrica olcu bayt'tir, karakter degil (ASCII disi
+-- UTF-8'de >1 bayt). UE tarafi 2 MiB'a yakin kayitlarda DB'nin reddedebilecegini bilmeli (bkz. vectors.json limits.data_octet_limit_note).
 create function mmo.envelope_problem(p_data jsonb, p_schema_version int) returns text
 language sql immutable set search_path = '' as $$
   select case
@@ -392,7 +395,8 @@ $$;
 -- SONUC BELIRSIZLIGI (yanit kayboldu / zaman asimi): yeniden deneme MUTLAKA AYNI op_id ile yapilir -> kayitli sonuc doner.
 -- Yeni op_id ile tekrar edilirse, ilk deneme commit olmussa already_exists doner ve bu, "baska biri olusturdu" ile
 -- AYIRT EDILEMEZ; ayirt etmek icin ilk op_id ile get_op(found=true, op_kind=create) sorulur.
--- Zaman (kira bitisi) op_id kilidi ve unique-ekleme beklemesinden SONRA alinir.
+-- Zaman (kira bitisi): op_id kilidi beklendikten SONRA, insert'ten ONCE alinir (v_now := clock_timestamp() asagida). Insert unique-indeks
+-- beklemesine takilirsa (ayni anahtara es zamanli create) bu zaman kullanilmaz: kaybeden already_exists doner (kira yazmaz).
 create function mmo_api.create_character(p_key text, p_display_name text, p_holder text, p_op_id uuid,
                                          p_schema_version int, p_data jsonb, p_race text default null)
 returns jsonb
@@ -759,13 +763,16 @@ end
 $$;
 
 -- Islem gunlugu (write_ops) temizligi. YALNIZ service_role (bkz. 6. bolum); anon/authenticated cagiramaz.
--- Sinirlar: p_older_than_days 1..3650 (varsayilan 7; bugunku / dunku islemler ASLA silinmez); tek cagrida EN FAZLA 5000 satir
--- (en eskiden baslayarak); kalan varsa `more:true` -> cagiran tekrar cagirir. Sadece write_ops satirlari silinir
--- (karakter / yan veri / kira dokunulmaz). Saklama suresi, istemcinin AYNI op_id ile yeniden deneme ufkundan UZUN olmali:
--- silinen op_id ile gelen gec tekrar "yeni islem" gibi islenir (save: revision/epoch denetimi yine korur; create: already_exists).
--- Zamanlama ornegi (pg_cron, Supabase'de eklenti etkinlestirilirse; BURADA CALISTIRILMAZ):
---   select cron.schedule('mmo-purge-write-ops', '17 3 * * *', 'select mmo_api.purge_write_ops(7)');
-create function mmo_api.purge_write_ops(p_older_than_days int default 7) returns jsonb
+-- Sinirlar: p_older_than_days 1..3650 (varsayilan 7; son 24 saatin islemleri ASLA silinmez); p_batch 1..50000 (varsayilan 5000),
+-- aralik disi = invalid/bad_batch. Tek cagrida EN FAZLA p_batch satir silinir (en eskiden baslayarak); kalan varsa `more:true`.
+-- Fonksiyon DONGU YAPMAZ: bir cagri = bir islem = kisa kilit. Cagiran `more:true` oldukca YENIDEN cagirir; her cagri AYRI islem
+-- olmalidir (tek BEGIN icinde dongu uzun kilit tutar; README cron ornegi her cagriyi ayri cron isi/COMMIT olarak calistirir).
+-- Sadece write_ops satirlari silinir (karakter / yan veri / kira dokunulmaz). Saklama suresi, istemcinin AYNI op_id ile yeniden
+-- deneme ufkundan UZUN olmali: silinen op_id ile gelen gec tekrar "yeni islem" gibi islenir
+-- (save: revision/epoch denetimi yine korur; create: already_exists).
+-- Zamanlama ornegi (pg_cron; BURADA CALISTIRILMAZ; ayrinti supabase/README.md):
+--   select cron.schedule('mmo-purge-write-ops', '*/5 * * * *', 'select mmo_api.purge_write_ops(7, 20000)');
+create function mmo_api.purge_write_ops(p_older_than_days int default 7, p_batch int default 5000) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   v_cutoff timestamptz;
@@ -775,10 +782,13 @@ begin
   if p_older_than_days is null or p_older_than_days < 1 or p_older_than_days > 3650 then
     return mmo.err('invalid', 'bad_days');
   end if;
+  if p_batch is null or p_batch < 1 or p_batch > 50000 then
+    return mmo.err('invalid', 'bad_batch');
+  end if;
   v_cutoff := clock_timestamp() - p_older_than_days * interval '1 day';
   with doomed as (
     delete from mmo.write_ops w
-     where w.op_id in (select o.op_id from mmo.write_ops o where o.created_at < v_cutoff order by o.created_at limit 5000)
+     where w.op_id in (select o.op_id from mmo.write_ops o where o.created_at < v_cutoff order by o.created_at limit p_batch)
     returning 1
   )
   select count(*)::int into v_deleted from doomed;

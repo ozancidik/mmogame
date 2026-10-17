@@ -1,7 +1,7 @@
 -- 04: yetki / RLS / fonksiyon guvenligi. anon ve authenticated hicbir tabloya ya da RPC'ye erisemez;
 -- service_role yalniz mmo_api fonksiyonlarini cagirabilir (tablolara dogrudan YETKISI YOK, en az ayricalik).
 -- RLS ikinci savunma hatti: yanlislikla GRANT verilse bile politikasiz RLS satir gostermez.
--- Kullanim (depo kokunden):  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/04_security.sql
+-- Kullanim (depo kokunden):  psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/04_security.sql
 -- Roller (anon, authenticated, service_role) onceden var olmali: Supabase'de var, duz PG'de 00_local_roles.sql olusturur.
 -- Tum test islem icinde calisir ve ROLLBACK ile biter. DURUM: HIC CALISTIRILMADI.
 
@@ -151,6 +151,9 @@ begin
       ('anon',          'select mmo_api.load_character(''zz-s-none'')',                  '42501'),
       ('anon',          'select mmo_api.purge_write_ops(7)',                             '42501'),
       ('authenticated', 'select mmo_api.purge_write_ops(7)',                             '42501'),
+      ('anon',          'select mmo_api.purge_write_ops(7, 50000)',                      '42501'),
+      ('authenticated', 'select mmo_api.purge_write_ops(7, 50000)',                      '42501'),
+      ('service_role',  'select mmo_api.purge_write_ops(7, 20000)',                      '00000'),
       ('authenticated', 'select mmo_api.get_op(gen_random_uuid())',                      '42501'),
       ('anon',          'select mmo_api.acquire_lease(''zz-s-none'', ''srv:1'')',        '42501'),
       ('service_role',  'select mmo_api.purge_write_ops(7)',                             '00000'),

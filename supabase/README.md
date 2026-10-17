@@ -33,7 +33,7 @@ Tek kaynak `supabase/migrations/`.
 
 ## Sozlesme (contract_version 2) - UE tarafi icin
 
-Tasima: `POST {url}/rest/v1/rpc/{fonksiyon}`, govde = parametre adlari ile JSON nesnesi, basliklar `Content-Type: application/json`, `Content-Profile: mmo_api`, `apikey` + `Authorization: Bearer` (secret key).
+Tasima: `POST {url}/rest/v1/rpc/{fonksiyon}`, govde = parametre adlari ile JSON nesnesi, basliklar `Content-Type: application/json`, `Content-Profile: mmo_api`, `apikey: <secret key>`. **`Authorization: Bearer` yalniz legacy JWT anahtari icin**; yeni `sb_secret_...` anahtari JWT degildir, Bearer'a KONMAZ (sozlesme listesindeki `Authorization` basligi, yeni anahtar modeline gecildiginde UE'de kaldirilir; Dilim 2 teyidi).
 HTTP 200 + `outcome` alani is sonucudur. **Fazla veya eksik (zorunlu) parametre HTTP 404 `PGRST202`** (SQL'de `42883`); UE sahte sunucusu bunu aynen taklit eder. Opsiyonel parametre hic gonderilmeyebilir.
 `bigint` alanlari (`revision`, `lease_epoch`, `epoch`, `deleted`, ...) JSON **sayi**dir.
 
@@ -50,7 +50,7 @@ HTTP 200 + `outcome` alani is sonucudur. **Fazla veya eksik (zorunlu) parametre 
 | `save_character` | `p_key`* text, `p_holder`* text, `p_epoch`* bigint, `p_expected_revision`* bigint, `p_op_id`* uuid, `p_schema_version`* int, `p_data`* jsonb, `p_side` jsonb (null) | **var** |
 | `get_op` | `p_op_id`* uuid | **var** |
 | `import_character` | `p_key`* text, `p_display_name`* text, `p_source_sha256`* text, `p_schema_version`* int, `p_data`* jsonb, `p_race` text (null) | **yok** |
-| `purge_write_ops` | `p_older_than_days` int (7; 1..3650) | yok |
+| `purge_write_ops` | `p_older_than_days` int (7; 1..3650), `p_batch` int (5000; 1..50000) | yok |
 
 `p_op_id` YALNIZ `create_character`, `save_character`, `get_op`'ta: `acquire_lease` (kayitli sonuc tekrari eski veriyi dondurebilirdi; ayni sahip icin cagri zaten dogal idempotent) ve `character_exists`/`import_character`
 (ice aktarma `p_source_sha256` ile idempotent) `p_op_id` ALMAZ. UE bu fonksiyonlara `p_op_id` **gondermeyecek**.
@@ -68,7 +68,8 @@ Yanit ozeti (tam ornekler `vectors.json` `responses`):
 - `release_lease`: `{outcome:'ok', already_released:bool, lease_epoch, epoch}` (tekrar cagri `already_released:true`).
 - `import_character`: `imported` her zaman `replaced_import:bool` tasir.
 - `healthcheck`: `{outcome:'ok', api_version:2, contract_version:2, schema:'v2', server_time}` (UE bunu `contract_version` ile karsilastirir).
-- `purge_write_ops`: `{outcome:'ok', deleted, more}`; `invalid/bad_days`.
+- `purge_write_ops`: `{outcome:'ok', deleted, more}`; `invalid/bad_days` (gun araligi disi), `invalid/bad_batch` (`p_batch` 1..50000 disi).
+- **Boyut tavani semantigi:** `data_max_octets` (2097152) ve `side_value_max_octets` (262144) SQL'de `octet_length(jsonb::text)` ile olculur: `jsonb::text` ayiraclardan sonra bosluk koyar, yani UE'nin yogun JSON'undan **uzundur**, ve olcu **bayttir** (UTF-8), karakter degil. UE karakter sayarsa 2 MiB'a yakin bir kayit UE'de gecip DB'de `invalid/data_too_large` alabilir (yeniden denemeyle duzelmez). Davranis degismedi; `vectors.json` `limits.data_octet_limit_note`.
 - `p_data` = `FMMOCharacterSaveJson::ToJson` zarfi `{"SchemaVersion":n,"Data":{...}}`; DB yalniz tip/boyut/surum eslesmesi ve Level 1..999, Experience>=0, Gold>=0, NextInstanceId>=1 (int32, tam sayi) denetler.
 
 ### create_character ve sonuc belirsizligi (yanit kayboldu / zaman asimi)
@@ -78,24 +79,58 @@ Yanit ozeti (tam ornekler `vectors.json` `responses`):
 - `not_found` (`get_op`) kesin "olmayacak" demek degildir (R1, asagida). `purge_write_ops` ile silinen (>=7 gun) op_id de `found:false` doner.
 
 ### write_ops temizligi ve pg_cron (BURADA CALISTIRILMADI)
-`mmo_api.purge_write_ops(p_older_than_days default 7)`: yalniz `service_role`; en az 1 gun, en cok 3650; tek cagrida en cok **5000** satir (en eskiden), kalan varsa `more:true`.
-Yalniz `mmo.write_ops` satirlari silinir. Saklama suresi istemcinin AYNI op_id ile yeniden deneme ufkundan uzun olmali. Zamanlama (Supabase'de `pg_cron` eklentisi etkinlestirilirse, kullanici elle):
+`mmo_api.purge_write_ops(p_older_than_days default 7, p_batch default 5000)`: yalniz `service_role`; gun 1..3650 (son 24 saat korunur), `p_batch` 1..50000 (aralik disi `bad_batch`);
+tek cagrida en cok `p_batch` satir (en eskiden), kalan varsa `more:true`. **Fonksiyon kendi icinde dongu yapmaz** (tek islem uzun kilit tutardi; bir `purge_write_ops_all` bilincli YOKTUR).
+Yalniz `mmo.write_ops` satirlari silinir. Saklama suresi istemcinin AYNI op_id ile yeniden deneme ufkundan uzun olmali.
+Boyut: dakikada bir kaydeden 4 oyuncu = gunde ~5760 satir; ucretsiz katmanda 500 MB. Gunde bir 5000 satirlik cron tabloyu buyutur; bu yuzden **5 dakikada bir, 20000 satirlik parti**
+(gunde 288 cagri x 20000 = ~5,7 milyon satir/gun kapasite, yuke gore bol) ve backlog varsa ek cagri. Zamanlama (Supabase'de `pg_cron` etkinlestirilirse, kullanici elle; BURADA CALISTIRILMADI):
 ```sql
-select cron.schedule('mmo-purge-write-ops', '17 3 * * *', 'select mmo_api.purge_write_ops(7)');
+-- 1) temel is: her 5 dakikada bir parti (her cron calismasi AYRI islemdir)
+select cron.schedule('mmo-purge-write-ops', '*/5 * * * *', 'select mmo_api.purge_write_ops(7, 20000)');
+-- 2) birikmis backlog varsa: ayni isi 1 dakika arayla ek isler olarak da kurmak yeterlidir (dongu YOK, her is tek islem):
+select cron.schedule('mmo-purge-write-ops-b', '2-59/5 * * * *', 'select mmo_api.purge_write_ops(7, 20000)');
 ```
-`more:true` doner ise oyun yoneticisi ayni cagriyi tekrarlar (ya da cron gunde birkac kez calisir).
+`more:true` ise bir sonraki cron calismasi devam eder; HIZLA bosaltmak gerekirse (elle, psql) her iterasyonu AYRI bir cagri olarak gonder, **tek `BEGIN`/`DO` blogu icinde dongu kurma**
+(`DO` bloku tek islemdir: tum silmeler tek COMMIT'te kilitli kalir). psql ile ornek (her `-c` ayri islemdir):
+```
+psql -v ON_ERROR_STOP=1 -c "select mmo_api.purge_write_ops(7, 20000)"    # sonucta more=true ise tekrarla
+```
+Dongu istersen kabuktan (her cagri ayri psql = ayri islem) `more` gorunene kadar tekrarla; baglanti dizesi asagidaki parolasiz kurala uyar. Bir `DO` bloku dongusu ONERILMEZ (tek islem).
+Silinen satirlar >= 1 gun eskidir; yazim yollari bu satirlari degistirmez, bu yuzden silme ile kaydetme arasinda satir kilidi cakismasi beklenmez.
 
 ## Kullanicinin dev projede calistiracagi sira
 Oncesi: `docs/DESIGN_SUPABASE.md` 6. bolum Dilim 0 (hesap, **dev** projesi, veritabani sifresi parola yoneticisinde; sifreyi/anahtari sohbete YAPISTIRMA).
-1. Baglanti dizesi (dev projesi, Dashboard -> Connect) `DATABASE_URL` ortam degiskeni olarak (yalniz kendi makinende; repoya yazma).
-2. `psql "$DATABASE_URL" -c "select 1"`  -> `1` (baglanti canli).
+**Sir kurali (komut satirina sir YAZMA):** parola/anahtar komut satirinda `ps`, kabuk gecmisi ve CI loglarinda gorunur. Bu yuzden:
+- psql icin baglanti dizesinde **parola olmaz**; parola `PGPASSWORD` ortam degiskeninden (oturum basina, gecmise yazmadan, ornegin `read -rs PGPASSWORD; export PGPASSWORD`) ya da `~/.pgpass` (Windows: `%APPDATA%\\postgresql\\pgpass.conf`, yalniz kendi kullanicin okuyabilsin) gelir.
+  Parolasiz baglanti dizesi, `sslmode=verify-full` ile (Supabase CA sertifikasini Dashboard -> Database -> SSL'den indir):
+  `export DB="host=<host> port=5432 dbname=postgres user=<kullanici> sslmode=verify-full sslrootcert=/yol/prod-ca-2021.crt"` ve cagri `psql "$DB" ...` (parola `PGPASSWORD`/pgpass'tan).
+  `DATABASE_URL` icinde `postgresql://kullanici:PAROLA@...` KULLANMA.
+- curl icin anahtar `-H` ile komut satirina yazilmaz: basliklari kendi kullanicinin okuyabildigi bir dosyaya koy (`chmod 600`) ve `-H @dosya` (curl >= 7.55) ile ver, ya da `-K -` ile stdin'den yapilandirma oku
+  (ornek asagida, adim 7). Anahtari asla `echo`/`export KEY=...` satirina elle yazip gecmise birakma; ortam degiskeni gerekiyorsa `read -rs`.
+1. Baglanti bilgisi (dev projesi, Dashboard -> Connect): host/kullanici `DB` degiskeninde (yukaridaki bicim, PAROLASIZ), parola `PGPASSWORD`/pgpass'ta; yalniz kendi makinende, repoya yazma.
+2. `psql "$DB" -c "select 1"`  -> `1` (baglanti canli).
 3. Migration (iki yoldan biri):
-   - psql: `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261017120000_v2_character_store.sql`
+   - psql: `psql "$DB" -v ON_ERROR_STOP=1 -f supabase/migrations/20261017120000_v2_character_store.sql`
    - CLI: `supabase link --project-ref <ref>` ardindan `supabase db push` (once `supabase init`; olusan `supabase/config.toml` icinde `[api] schemas = ["mmo_api"]` olsun).
 4. Dashboard -> Data API -> **Exposed schemas**: yalniz `mmo_api` (`public` ve `mmo` YOK). Bu psql ile yapilamaz, elle.
-5. `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/run_all.sql` (depo kokunden, Git Bash; psql >= 13). Her dosya `PASS ...` yazmali.
+5. `psql "$DB" -v ON_ERROR_STOP=1 -f supabase/tests/run_all.sql` (depo kokunden, Git Bash; psql >= 13). Her dosya `PASS ...` yazmali.
 6. Eszamanlilik (iki terminal): `05_concurrency_a` + `-v mode=same_op` `05_concurrency_b` + `05_concurrency_check.sql`; sonra `other_op`; sonra `05_concurrency_lease_a` + `05_concurrency_lease_b` (basliklarda ayrinti).
-7. Uc uca HTTP denetimi (secret key yalniz ortam degiskeninden): `curl -s -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthcheck" -H "apikey: $MMO_SUPABASE_SECRET_KEY" -H "Authorization: Bearer $MMO_SUPABASE_SECRET_KEY" -H "Content-Type: application/json" -H "Content-Profile: mmo_api" -d "{}"` -> `{"outcome":"ok","contract_version":2,...}`. Publishable (anon) anahtarla ayni cagri **reddedilmeli**, `GET /rest/v1/character_saves` de veri DONMEMELI. `acquire_lease` cagrisina `p_op_id` eklenirse `404 PGRST202` gelmeli.
+7. Uc uca HTTP denetimi (secret key komut satirinda GORUNMEZ). Basliklari `chmod 600` bir dosyaya yaz (repo disinda, orn. `~/.mmo_headers`; icerigi: `apikey: <sb_secret_...>`, `Content-Type: application/json`, `Content-Profile: mmo_api` satirlari; secret key'i `Authorization: Bearer` olarak **koyma**, bkz. asagidaki kontrol listesi) ve:
+   `curl -s -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthcheck" -H @$HOME/.mmo_headers -d "{}"`  (alternatif: `-K -` ile yapilandirmayi stdin'den ver; `header = "apikey: ..."` satiri komut satirinda degil stdin'de kalir)
+   -> `{"outcome":"ok","contract_version":2,...}`. Publishable (anon) anahtarla ayni cagri **reddedilmeli**, `GET /rest/v1/character_saves` de veri DONMEMELI. `acquire_lease` cagrisina `p_op_id` eklenirse `404 PGRST202` gelmeli.
+### Dashboard guvenlik kontrol listesi (GUNCEL, elle; hicbiri psql/migration ile yapilamaz; dogrulanmadi, kullanici panelde teyit eder)
+- [ ] Data API -> **Exposed schemas: YALNIZ `mmo_api`** (`public`, `mmo`, `graphql_public` YOK).
+- [ ] **pg_graphql kapali** (Database -> Extensions; `graphql_public` semasi acik kalmasin).
+- [ ] API anahtarlari: **yeni `sb_secret_...` anahtari** sunucuya; **legacy `service_role` / `anon` JWT anahtarlari DEVRE DISI** (API Keys -> Legacy). Publishable anahtar kullanilacaksa istemciye bile verilmez (oyun istemcisi DB'ye dogrudan baglanmaz).
+- [ ] **Anahtar basligi:** `sb_secret_` anahtarlari JWT DEGILDIR; `Authorization: Bearer <sb_secret_...>` olarak GONDERME (JWT sanilip reddedilir ya da yanlis yola duser); yalniz **`apikey: <sb_secret_...>`** basligi. (Bu README'nin onceki Bearer ornegi kaldirildi; `vectors.json` `transport.headers` UE'nin gonderdigi basliklari listeler: UE tarafi `apikey` ile uyumlu mu, Dilim 2'de teyit edilecek.)
+- [ ] Auth: **signup kapali, anonim giris kapali**, e-posta/OAuth saglayicilari kapali (Auth kullanilmiyor).
+- [ ] Realtime: yayinda (`supabase_realtime` publication) **`mmo.*` tablolari YOK**; Realtime hic kullanilmiyor.
+- [ ] **SSL zorunlu** (Database -> Settings -> SSL enforcement) ve baglanti `sslmode=verify-full`.
+- [ ] **Network Restrictions**: veritabani dogrudan baglantisi yalniz bilinen IP'lere (sunucu/kendi makinen).
+- [ ] Dashboard hesabinda **MFA** (ve organizasyon sahibi icin); kurtarma kodlari parola yoneticisinde.
+- [ ] **Yedek / PITR**: plan neyi destekliyorsa etkin; ucretsiz katmanda otomatik yedek olmayabilir [Dogrulanmadi]; ilk migration oncesi elle `pg_dump`.
+- [ ] **Spend cap acik** (Pro plana gecildiyse, beklenmedik fatura korumasi); kullanim/disk (500 MB ucretsiz) uyarilari acik, `write_ops` temizlik cron'u kurulu.
+
 Duz yerel PG (Docker'siz kurulum) ile denemek istersen once `tests/00_local_roles.sql`, sonra migration, sonra testler.
 
 ## Sapmalar (belge -> bu uygulama)
@@ -103,13 +138,13 @@ Duz yerel PG (Docker'siz kurulum) ile denemek istersen once `tests/00_local_role
 2. **FORCE RLS yok**, `ENABLE` var: SECURITY DEFINER fonksiyonlar tablo sahibi olarak calisir; FORCE + sahibin BYPASSRLS'siz olmasi fonksiyonlari sessizce 0 satira mahkum ederdi. Asil koruma: tablolarda hicbir rolun (service_role dahil) yetkisi yok + `mmo` API'ye acik degil. (Belge: FORCE.)
 3. **`save_character` SECURITY DEFINER** (belge taslagi `security invoker`): invoker olsaydi `service_role`a tablo yetkisi vermek gerekirdi. Tum fonksiyonlarda `set search_path = ''`, dinamik SQL yok (`04` kaba bekci).
 4. **`acquire_lease`'te `p_op_id` yok** (belge var): bkz. yukaridaki sozlesme tablosu. Belge 3.3 bu sozlesmeyle guncellendi.
-5. **Kira suresi dolmus + ayni sahip tekrar `acquire_lease`**: epoch +1 (belge yalniz "ayni sahip -> artmaz" diyordu; gecerli kirada artmaz, dolmus/birakilmis kirada artar: olu istek karsi onlemi).
+5. **Kira suresi dolmus + ayni sahip tekrar `acquire_lease`**: epoch +1 (belge yalniz "ayni sahip -> artmaz" diyordu; gecerli kirada artmaz, dolmus/birakilmis kirada artar: olu istek karsi onlemi). **Donmus/gec-yazim yuvasi:** CANLI kirada ayni sahip icin epoch artmaz (bilincli); sunucu epoch'u artirmak isterse `release_lease(p_epoch)` sonra `acquire_lease` cagirir (`lease_epoch + 1`), eski epoch'lu `save_character` `ownership_lost` doner. Senaryo: `vectors.json` `frozen_slot_epoch_bump` (02 testi calistirir).
 6. **Ek sutunlar:** `character_saves.lease_ttl_s` (acquire/renew/save ayni sureyle uzatir), `import_sha256` (ice aktarma idempotency'si). `character_id` degismez, `canonical_key` degismez, `revision`/`lease_epoch` geri gitmez (tetikleyici).
 7. **Boyut tavani 2 MiB** (belge 1 MiB [Tahmin]): UE `MaxJsonChars` = 2 MiB, daha dusuk tavan gecerli bir kaydi reddederdi. Yan veri tavani 256 KiB (belge ile ayni).
 8. **Eklenenler:** `load_character`, `healthcheck`, `character_exists`, `list_keys`, `renew_lease`, `create_character`, `purge_write_ops` (belge listesinde vardi; `load` gorev metninde). `list_keys` onek aramasi `starts_with` (LIKE degil: `_` joker olurdu).
 9. **Ad kurali SQL'de katilastirildi:** bas/son bosluk, 32 karakter ustu ve her ASCII disi karakter `bad_name` ile reddedilir (UE bunlari kirpar/keser: bkz. `vectors.json` `Omer`, `Ali!`). Bu bilincli: kirpma baskasinin kaydini acardi.
 10. **JSON invariantlari:** `Level 1..999`, `Experience/Gold >= 0`, `NextInstanceId >= 1`, `SchemaVersion` sutunla ayni. Envanter/esya icerigi DB'de denetlenmez (UE `FromJson` sorumlulugu). **Denetim CHECK degil tetikleyicidir** (`character_saves_envelope_ins_trg` / `_upd_trg`): CHECK her UPDATE'te (kira yenileme dahil) 2 MiB'a kadar jsonb'yi yeniden metne cevirirdi; tetikleyici yalniz `data`/`schema_version` DEGISINCE calisir. SQLSTATE hala `23514`. Bedel: veri hic degismeyen eski bozuk satir kira yenilemede yakalanmaz (kasitli; 03'te kanitli).
-11. **`purge_write_ops` VAR** (QA/guvenlik turu 1; onceki surumde bilincli yoktu): yalniz `service_role`, en az 1 gun, parti tavani 5000, yalniz `write_ops` silinir; kayit silme yetenegi anahtarla ACILMAZ.
+11. **`purge_write_ops` VAR** (QA/guvenlik turu 1; onceki surumde bilincli yoktu): yalniz `service_role`, en az 1 gun, parti `p_batch` 1..50000 (varsayilan 5000; tur 2), yalniz `write_ops` silinir; kayit silme yetenegi anahtarla ACILMAZ.
 12. **Varsayilan yetkiler:** `alter default privileges in schema mmo_api|mmo revoke execute ...`. **DURUST SINIR:** PostgreSQL'de sema duzeyi varsayilanlar global varsayilanlara eklenir; bu REVOKE, yeni fonksiyonda PUBLIC'in yerlesik EXECUTE'unu kaldirmaz. Asil koruma: gelecek her migration sonunda 6. bolumdeki revoke/grant dongusu + `04_security.sql` (katalogdaki her fonksiyonu denetler, unutani yakalar). Rol-genisligi `alter default privileges revoke execute on functions from public;` migration'da yorum olarak duruyor (Supabase `public` semasini etkileyebilir; sahip karari).
 13. **Zaman kilit sonrasi:** kira bitisi kararlari (acquire/renew/save/import) `FOR UPDATE`/`op_lock` beklendikten SONRA `clock_timestamp()` ile alinir. Kaniti: `04` kaynak bekcisi + `05_concurrency_lease_*` (iki terminal).
 

@@ -1,6 +1,6 @@
 -- 01: kanonik anahtar + dogrulama yardimcilari (vectors.json "canonical_key" dizisi + satir ici birim kontrolleri).
 -- Kosul: migration uygulanmis olmali. Duz psql, pgTAP YOK. Hata = istisna (psql ON_ERROR_STOP ile sifirdan farkli cikis).
--- Kullanim (depo kokunden, psql >= 13):  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -v vectors="$(cat supabase/tests/vectors.json)" -f supabase/tests/01_canonical_key.sql
+-- Kullanim (depo kokunden, psql >= 13):  psql "$DB" -v ON_ERROR_STOP=1 -v vectors="$(cat supabase/tests/vectors.json)" -f supabase/tests/01_canonical_key.sql
 -- Tum test islem icinde calisir ve ROLLBACK ile biter (veritabanina kalici iz birakmaz).
 -- DURUM: HIC CALISTIRILMADI.
 
