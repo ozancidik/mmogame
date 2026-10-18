@@ -398,7 +398,8 @@ Kaynak: `python Scripts/EconomyModel.py` "Birlestirme" bolumu; fiyat/zar/ucret k
 ## Yeni karar adaylari (2026-10-17: Supabase veritabani baglama; hepsi BEKLIYOR)
 
 Kaynak: `docs/DESIGN_SUPABASE.md` (§8 tam tablo, DURUM blogu). **Durum: S-kararlarinin cogu onaylanmadi; bolge ve katman fiilen secildi (asagida).** Kodda gecici varsayim: mimari C, Auth yok. SQL (`supabase/`) ve UE depo katmani
-(`Source/MyProject/Public/Save/MMOSupabase*`) yazildi; UE tarafi yalniz sahte sunucuya karsi (556 kontrol, izole worktree) test edildi, oyundaki hicbir yol depoyu cagirmiyor, PIE yok.
+(`Source/MyProject/Public/Save/MMOSupabase*`) yazildi; UE tarafi yalniz sahte sunucuya karsi (556 kontrol `342ab17`, 599 kontrol `d3d56ec` acik User-Agent; izole worktree) test edildi, oyundaki hicbir yol depoyu cagirmiyor, PIE yok.
+**2026-10-18 [Dogrulandi: dev, kullanici kosusu]: Dilim 6 `Scripts/TestSupabaseIntegration.ps1` (`1399123`) gercek dev projesinde `PASS checks=132 skipped=7`, 20/20 senaryo PASS** (7 SKIP: `expire_lease` yonetici adimi API ile yapilamaz; kira suresi dolma yolu kanitlanmadi); `zz_cleanup.sql` kosuldu, gercek veriye dokunulmadi. UE istemcisi hala gercek Supabase'e baglanmadi.
 **2026-10-17 [Dogrulandi: dev]: Supabase hesabi ACILDI (FREE katman, bolge West EU (Ireland), tek proje `main` dev olarak); V2 migration SQL Editor'de HATASIZ uygulandi; katalog (12 RPC yalniz service_role, 6 tablo RLS acik, anon/authenticated yetkisi 0),
 Exposed schemas yalniz `mmo_api`, anahtarsiz tablo GET reddi ve gercek HTTPS `healthcheck` (`apikey` yalniz, Bearer yok) dogrulandi. Kural: tarayici gibi User-Agent secret key'i reddettirir ("Forbidden use of secret API key in browser"); UE istemcisi acik UA (`MMOGameServer/0.1`) gondermeli (duzeltme ayri ajanda, yapilmadi).
 `run_all.sql` testleri henuz KOSULMADI (psql yok).** Hesap, proje, anahtar ve Dashboard ayarlari **kullanicidadir** (anahtari SOHBETE
@@ -409,7 +410,7 @@ tek proje `main` var (ayri alpha projesi yok; S5/S6 alfa karari acik). **ACIK/BE
 
 | # | Soru | Oneri | Not |
 |---|---|---|---|
-| S1 | Mimari A (tablo uclari) / B (kendi ara servisi) / C (RPC, mantik SQL'de) | **C**, halka acik surumden once **B** | C'nin bedeli: harita sunucularinda genis bir secret key; kapali alfada kabul. Reddedilirse B (+3-5 hafta) |
+| S1 | Mimari A (tablo uclari) / B (kendi ara servisi) / C (RPC, mantik SQL'de) | **C**, halka acik surumden once **B** | C'nin bedeli: harita sunucularinda genis bir secret key; kapali alfada kabul. Reddedilirse B (+3-5 hafta). **2026-10-18: S04 Codex ile CAKISIYOR: karar bekliyor** (asagidaki "Kalicilik mimarisi" karari; oneri artik "once D, sonra A") |
 | S2 | S13 servis dili (Steam bilet dogrulama) | TypeScript (Supabase Edge Function) ya da Python | A5'ten once karar |
 | S3 | Supabase Auth kullanilsin mi | **Hayir** | Steam bileti ile cakisir, cift kimlik tablosu |
 | S4 | Bolge | ~~AB (Frankfurt)~~ **SECILDI: West EU (Ireland)** (2026-10-17, proje kuruldu; bolge sonradan degistirilemez, yeni proje gerekir [Dogrulanmadi]) | KVKK yurt disi aktarimi icin hukuki gorus (acik); gecikme Turkiye'den olculmedi |
@@ -429,8 +430,25 @@ tavana yakin kayit UE'de gecip DB'de `invalid/data_too_large` alabilir (`supabas
 (g) `MMOSupabaseCharacterStore` / `RestClient` / `UnrealHttpTransport` hicbir oyun yoluna bagli degil, `RunSystemTests.ps1`/`RunAllChecks.ps1` adimi degil
 (`Scripts/TestSupabaseStore.ps1` izole worktree'de elle); (h) Dilim 3 (`-MMOCharacterStore`, acilista `HealthcheckEx`) ve Dilim 4 (cagiranlar) yapilmadi,
 Dilim 4 Codex'in kirli `MMOCharacter.*` / `MMOTradeComponent.*` dosyalarina dokunur: onlar commit edilmeden baslanmaz;
-(i) **UE istemcisi acik User-Agent gondermiyor olabilir** (motor varsayilani dogrulanmadi): tarayici gibi UA secret key'i reddettirir (2026-10-17 dev'de goruldu); Dilim 2 UA duzeltmesi ayri ajanda bekliyor;
+(i) UE istemcisi artik acik User-Agent `MMOGameServer/0.1` gonderiyor (`d3d56ec`, 599 kontrol, yalniz sahte sunucuya karsi); tarayici gibi UA secret key'i reddettirir (2026-10-17 dev'de goruldu); gercek DB'ye UE'den gonderilmedi, motorun gercek UA'si dogrulanmadi;
 (j) `run_all.sql` / 05_* gercek DB'de kosulmadi (psql kurulumu kullanicida); (k) migration dev'e uygulandi: dosya artik degistirilmez, duzeltme yeni zaman damgali migration.
+
+## Kalicilik mimarisi: Python servis (S04 Codex) mi, Supabase RPC mi (2026-10-18; KULLANICI KARARI, BEKLIYOR)
+
+Kaynak: `docs/DESIGN_SUPABASE.md` §10 (tam karsilastirma tablosu). **Sorun:** Codex hatti S04'u kendi mimarisiyle uyguladi (aday `bfc197d`, `master`'da YOK): UE `FMMODbCharacterStore` -> Python HTTP servisi `Scripts/MMOPersistenceService.py` -> PostgreSQL/SQLite, `-MMOStore=db`, sema `Migrations/V2__character_store.sql`.
+Benim hattim (`master`): UE `FMMOSupabaseCharacterStore` -> HTTPS -> Supabase PostgREST `mmo_api` RPC (mantik SQL'de), sema `supabase/migrations/...v2_character_store.sql`. Ikisi ayni kavramlari (revision CAS, sahiplik epoch'u, idempotency, ice aktarma) iki sema, iki UE istemcisi ve iki sozlesmeyle cozuyor.
+**Kanit durumu (Codex sayilari panodan, belge denetcisi kosmadi):** Codex: servis 97 kontrol ve UE 118/119 native, hepsi SQLite; canli PostgreSQL kabulu ACIK. Claude: SQL sozlesmesi gercek Supabase dev'e karsi 132 PASS / 7 SKIP (kullanici kosusu); UE 599 yalniz sahte sunucuya.
+
+| Secenek | Anlami | Is / risk | Geri alma |
+|---|---|---|---|
+| **A** | Supabase = yalniz barindirilan PostgreSQL; Codex servisi Postgres'e baglanir (S04 mimarisi korunur). Benim RPC katmanim kullanilmaz; hesap/guvenlik ayarlari ve 132 adimlik deneyim kavram kanitidir | Servisin PostgreSQL dali hic kosmadi (kabul isi: iki baglanti CAS/idempotency/epoch/import-rollback); V2'ye RLS eklenmeli; Supabase doğrudan baglanti IPv4/pooler ve Free duraklatma [Dogrulanmadi]; Dilim 1-2 emegi (5 UE commit + 824 satir SQL) kullanilmaz | Dusuk: `-MMOStore=file` varsayilan kalir |
+| **B** | Supabase RPC mimarisi (C) benimsenir; Python servis yalniz Steam/bilet icin | Yan veri, posta, `.sav` ice aktarma, cagiran baglama bende YOK (~2-3 hafta [Tahmin]); Codex S04.02/.03 emegi ve 118/119 kaniti atilir; harita sunucularinda genis secret key; halka acik oncesi servise gecis sarti | Orta (pano/S05-S06 servise gore yazili) |
+| **C** | Iki yol paralel | **Oneri DEGIL:** cakisan cagiran gecisleri, cift sema/sozlesme/bakim, aldatici cift kanit | Pahali |
+| **D** | Karar verilene kadar yalniz dosya deposu | Hicbir sey atilmaz; DB sarti (S04) ertelenir | Sifir |
+
+**Oneri (tarafsiz; gerekce `DESIGN_SUPABASE.md` §10.5): once D, sonra A.** (1) Steam bilet dogrulamasi ve bilet/kira devri zaten bir anahtar tutan sunucu servisi ister, kalicilik ayni serviste olursa harita sunuculari DB anahtari tasimaz; (2) Codex kapsami daha genis (yan veri, posta, ice aktarma, cagiran baglama); (3) gercek bir Supabase dev DB'si Codex'in "canli PostgreSQL kabulu ACIK" bosluğunu kapatmak icin hazir test hedefidir; (4) geri alma ucuz. Karsi arguman: B daha az hareketli parca ve 132 PASS'li DB katmani var; Steam servisi ayri ve kucuk kalir.
+**Karar gelene kadar:** Dilim 3-5 ve 7 (Supabase) ve Codex'in sonraki S04 uygulamalari icin kendi dosyalarina dokunulmaz; bu belge Codex dosyalarini degistirmez. Dokunulacak Codex dosyalari (S04 sozlesme/panosu) kullanici karari sonrasi koordinatorle guncellenir.
+**Kisa sorular:** (1) A / B / D? (2) A secilirse Supabase dev DB'si Codex servisinin PostgreSQL kabulunde kullanilabilir mi (Codex tarafi onayi)? (3) `mmo` semasi ve `supabase/` klasoru A'da dondurulsun mu, silinsin mi?
 
 ## Not (2026-10-17): proje ajanlari modeli
 

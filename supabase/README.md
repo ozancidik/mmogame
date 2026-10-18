@@ -1,7 +1,7 @@
 # supabase/ - V2 karakter deposu (Dilim 1, SQL)
 
 **Durum (2026-10-17 dev projesinde ilk gercek kosu): migration Supabase SQL Editor'de HATASIZ uygulandi; katalog ve HTTPS RPC dogrulamasi gecti (asagida "Dev projesinde dogrulananlar").
-`tests/run_all.sql` ve 05_* esozamanlilik testleri HENUZ KOSULMADI (psql kurulu degil); sozlesme senaryolari (02) gercek DB'de DOGRULANMADI.** Makinede psql / docker / supabase CLI yok;
+`tests/run_all.sql` ve 05_* esozamanlilik testleri HENUZ KOSULMADI (psql kurulu degil); SQL testi 02 (psql ile) kosulmadi; ama ayni `vectors.json` senaryolari 2026-10-18'de HTTPS ile gercek dev DB'ye karsi 132 PASS / 7 SKIP kosuldu (asagida "Entegrasyon betigi").** Makinede psql / docker / supabase CLI yok;
 SQL soz dizimi bir ayristiriciyla denenmedi (yalniz `vectors.json` bir Python betigiyle denetlendi, asagida). Hata cikarsa once burada duzeltilir.
 Tasarim: `docs/DESIGN_SUPABASE.md` (3.2 sema, 3.3 RPC, 3.4 idempotency, 3.6 vektorler, 5 guvenlik, 7.2 Dilim 1).
 
@@ -148,7 +148,14 @@ curl -s -A 'MMOGameServer/0.1' -X POST "$MMO_SUPABASE_URL/rest/v1/rpc/healthchec
 | `GET /rest/v1/<tablo>` anahtarsiz/anon ile veri donuyor | **ACIL:** Exposed schemas'ta `mmo`/`public` var demektir; yalniz `mmo_api` birak. |
 
 ## Entegrasyon betigi (Dilim 6): `Scripts/TestSupabaseIntegration.ps1`
-`vectors.json` senaryolarini GERCEK dev projesine HTTPS ile kosturur (psql gerekmez; Windows PowerShell 5.1). **Henuz KOSULMADI** (yazildi; yalniz soz dizimi ve `-DryRun` denendi). YALNIZ dev projesi icin.
+`vectors.json` senaryolarini GERCEK dev projesine HTTPS ile kosturur (psql gerekmez; Windows PowerShell 5.1). **2026-10-18'de dev projesinde KOSTU: `PASS checks=132 skipped=7` (asagidaki "dev'de 2026-10-18 sonucu").** YALNIZ dev projesi icin.
+
+### dev'de 2026-10-18 sonucu [Dogrulandi: dev, kullanici kosusu; belge denetcisi betigi KENDI kosmadi, sonuc sahibinin bildirimine dayanir]
+- Son satir: `[MMO_SUPABASE_INTEGRATION] PASS checks=132 skipped=7`; `healthcheck` `api_version=2 contract_version=2`; 20 senaryonun 20'si PASS.
+- Kismi senaryolar: `expired_lease` (1 adim kosti, 5 SKIP) ve `idempotent_same_payload` (5 adim kosti, 2 SKIP). Tek SKIP nedeni: `expire_lease` yonetici adimi API ile yapilamaz (asagida "SKIP nedenleri"). Yani **kira suresi dolma yolu gercek DB'de kanitlanmadi**; `tests/05_concurrency_lease_*.sql` ile SQL Editor'de ayrica dogrulanmali.
+- Temizlik (`tests/zz_cleanup.sql`, SQL Editor, postgres rolu): `character_side` 2, `presence` 0, `travel_tickets` 0, `write_ops` 28, `character_saves` 19 satir silindi (yalniz `zz-test-` onekli; gercek veriye dokunulmadi).
+- Ne kanitlar: `vectors.json` sozlesmesinin 20 senaryosu gercek PostgREST + SQL ile uyusuyor (UE sahte sunucusunun dayandigi kontrat dahil). Ne kanitlamaz: UE istemcisinin kendisi (599 kontrol hala yalniz sahte sunucuya, `d3d56ec`), `run_all.sql`, esozamanlilik, kira suresi dolma, FREE katmanda duraklatma/yedek.
+- Mimari uyari: bu RPC yolu, Codex'in S04 Python servisi (`-MMOStore=db`) ile cakisiyor; karar bekliyor (`docs/DESIGN_SUPABASE.md` §10, `docs/DECISIONS_NEEDED.md`).
 - **Calistirma** (repo kokunden; `MMO_SUPABASE_URL` / `MMO_SUPABASE_SECRET_KEY` kullanici ortam degiskenleri zaten kayitli, anahtar komut satirina YAZILMAZ):
   `powershell -NoProfile -File Scripts\TestSupabaseIntegration.ps1` - once hedef host yazilir ve `dev` yazman istenir (otomasyonda `-Yes`). `-DryRun`: ag yok, anahtar okunmaz, senaryo/adim sayilarini ve SKIP planini yazar. `-Scenario happy_path,dead_epoch`: secili senaryolar.
 - **Ne yapar:** her istek `POST {URL}/rest/v1/rpc/<fn>`, `apikey` (+ `Authorization: Bearer` yalniz `eyJ...` iki noktali legacy JWT ise), `Content-Profile`/`Accept-Profile: mmo_api`, `User-Agent: MMOGameServer-IntegrationTest/0.1`, HTTPS zorunlu, zaman asimi 30 sn, yonlendirme izlenmez. Anahtar hicbir ciktiya yazilmaz (Redact). Once `healthcheck` on kosulu (`contract_version` 2).
