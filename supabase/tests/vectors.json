@@ -1,6 +1,6 @@
 {
   "_doc": [
-    "KONTRAT (contract_version 2). HEM SQL testi (supabase/tests/01, 02) HEM UE native testi (sahte sunucu) AYNI dosyayi okur. Durum: HICBIR gercek DB'ye karsi calistirilmadi.",
+    "KONTRAT (contract_version 2). HEM SQL testi (supabase/tests/01, 02) HEM UE native testi (sahte sunucu) AYNI dosyayi okur. Durum: 2026-10-18'de gercek Supabase dev projesine karsi Scripts/TestSupabaseIntegration.ps1 ile calistirildi (PASS checks=132 skipped=7; skipped = expire_lease admin adimlari). supabase/tests/*.sql (psql) testleri henuz kosulmadi.",
     "Dosya ASCII'dir; ASCII disi karakterler \\uXXXX ile yazilir. Bolumler: transport, outcomes, invalid_reasons, limits, rpc_params, responses, fixtures, canonical_key, holder, scenarios.",
     "rpc_params: HER fonksiyonun TAM parametre adi kumesi (sirali), tipi, zorunlu/opsiyonel. UE sahte sunucusu: listede olmayan parametre VEYA eksik zorunlu parametre = HTTP 404 {code:PGRST202} (gercek PostgREST/PG de ayni: 42883 'function does not exist'). Opsiyonel parametre (required=false) hic gonderilmeyebilir.",
     "p_op_id YALNIZ create_character, save_character ve get_op'ta vardir. acquire_lease / renew_lease / release_lease / character_exists / import_character / list_keys / load_character / purge_write_ops'ta YOKTUR; UE bu fonksiyonlara p_op_id GONDERMEYECEK (gonderirse 404 PGRST202).",
