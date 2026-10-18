@@ -74,43 +74,50 @@ Ortak şart: SQLite kanıtı bu listedeki hiçbir maddeyi tek başına kapatmaz.
 - **Ölçüt:** Servisin `--backend postgres` dalı, ayrı dev/test PostgreSQL'inde (SQLite değil) şu işlemleri doğru yapar: karakter yazma/okuma, `expectedRevision` CAS (null/-1/eksik dahil REDDEDİLİR), `writerEpoch`, idempotency, yan veri, ırk, posta op, içe aktarma geri alma. SQLite ile PG davranış farkı varsa FAIL.
 - **Kanıt türü:** Otomatik test günlüğü + SQL katalog çıktısı (tablolar, kısıtlar, RLS durumu).
 - **Doğrulayan:** Bağımsız QA (Antigravity/ayrı oturum); Codex koşar ama onaylamaz.
-- **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED (PG ortamı yok)  [x] NOT TESTED
+- **Durum:** [ ] PASS  [ ] FAIL  [x] BLOCKED (PG ortamı yok)  [ ] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** BLOCKED. Sürücü ve PG ortamı yok (UE python 3.11.8'de psycopg/psycopg2/pg8000 yok); servisin PostgreSQL dalının hiçbiri koşmadı, testte postgres geçmiyor. Kod okumayla da `expectedRevision` null/-1 PG'de CAS'ı atlıyor (svc:1414).
 
 ### K2 — Eşzamanlı veri tutarlılığı (envanter / para / karakter)
 - **Ölçüt:** Gerçek PG üzerinde, iki bağlantı/iki harita sunucusu aynı anda: (a) aynı karakter için iki yazma: biri kazanır, eski revision reddedilir; (b) AYNI eşya iki oyuncuya aktarılırsa yalnız biri sahip olur, çoğaltma/kayıp yok; (c) para transferi sırasında servis çökerse toplam para korunur (çift sayma/kayıp yok), yeniden başlatma sonrası durum tutarlı.
 - **Kanıt türü:** Çok bağlantılı test betiği (iki ayrı işlem), servis öldürme (kill) senaryosu, sonrasında DB sayımı (toplam altın, eşya InstanceId benzersizliği).
 - **Doğrulayan:** Bağımsız QA.
 - **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** NOT TESTED (çok bağlantılı/çok süreçli test hiç koşmadı) ve kodla riskli: PG'de satır yokken `SELECT FOR UPDATE` kilit bulamaz, iki süreç aynı anda ilk kayıtta PK ihlali -> genel Exception -> 409 yerine 503; aynı idempotency anahtarı için aynı; advisory lock yok, READ COMMITTED; tek global RLock.
 
 ### K3 — Idempotency + epoch
 - **Ölçüt:** Aynı `idempotencyKey` + aynı yük tekrarında yan etki YOK ve aynı sonuç döner; aynı anahtar + farklı yük REDDEDİLİR; eski `writerEpoch` / `ownershipEpoch` sahibinin yazısı REDDEDİLİR (fencing); epoch geriye gitmez.
 - **Kanıt türü:** Otomatik test + DB satır sayımı (tekrar sonrası satır/revision değişmedi).
 - **Doğrulayan:** Bağımsız QA.
-- **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Durum:** [ ] PASS  [x] FAIL  [ ] BLOCKED  [ ] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** KISMİ PASS (yalnız SQLite, açık revizyonla) / FAIL. Kanıtlanan: SQLite motoru, açık revizyonla CAS, epoch çit, R1 idempotency tekrarı (`TestPersistenceService.py` 152 kontrol, exit 0). FAIL: `expectedRevision` null/-1 CAS'ı atlıyor (QA SQLite'ta koşturdu: rev2 iken None -> 200 rev3, -1 -> rev4, 1 -> 409; svc:1275, 1414); `ownershipEpoch` istemci girdisi (`body.get("ownershipEpoch",1)`), INT64_MAX ile kalıcı kilitleme. PostgreSQL dalı bu madde için de koşmadı.
 
 ### K4 — Hata ve kurtarma
 - **Ölçüt:** (a) DB bağlantı kesintisi: servis `503 unavailable` döner, oyun durumu "kaydedildi" saymaz (DB kapalıyken durum ilerlemez); (b) zaman aşımı, (c) servis restart, (d) retry güvenli (yinelenmez), (e) **R1 kayıp ACK:** yanıt kaybolduktan sonra istemci sonucu uzlaştırır (aynı anahtarla yeniden deneme ya da sorgu), yazım ne kaybolur ne ikilenir; "bilinmeyen outcome" bool başarı sayılmaz; (f) Async WinHTTP oyun thread'ini tick'te bloklamaz (kare süresi ölçümü).
 - **Kanıt türü:** Fault-injection (test ortamında), servis/DB kesme, UE günlüğü, kare süresi ölçümü.
 - **Doğrulayan:** Bağımsız QA; fault-injection yalnız test ortamında (K6 ile bağlantılı).
-- **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Durum:** [ ] PASS  [x] FAIL  [ ] BLOCKED  [ ] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** FAIL (kod okuma) / NOT TESTED (koşu). R1 kayıp ACK uzlaştırma yok (her kayıt yeni GUID, yeniden deneme yok, testte `reconcil` yok); kira yenileme servis tarafında yok (kira yalnız `consume_entry_ticket`'te, 60 sn); `SaveWithOptions` (MMODbPersistenceClient.cpp:925) yalnız `committed && CommittedRev <= Expected` reddediyor, bilinmeyen outcome başarı; SaveAsync/LoadAsync FTSTicker içinde senkron WinHTTP. UE derlemesi yapılmadı.
 
 ### K5 — UE dedicated server uçtan uca
 - **Ölçüt:** Gerçek bir UE dedicated server süreci (sahte sunucu/mock DEĞİL), gerçek servise ve gerçek PG'ye karşı: karakter oluştur -> oyna -> kaydet -> sunucuyu kapat -> aç -> geri yükle; envanter, para, görev, ırk, başarım, günlük, posta aynı. İki sunucu aynı karakteri aynı anda sahiplenemez.
 - **Kanıt türü:** UE günlüğü + servis günlüğü + DB önce/sonra satırları (hash karşılaştırması).
 - **Doğrulayan:** Bağımsız QA. PIE/istemci tarafı kısmı ayrıca kullanıcı zamanı gerektirir (PIE'da denenmedi notu korunur).
 - **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** NOT TESTED. Gerçek dedicated server + gerçek servis + gerçek PG koşusu yok; UE derlemesi yapılmadı.
 
 ### K6 — Güvenlik ve yetkilendirme
 - **Ölçüt:** (a) harita sunucusu <-> servis karşılıklı kimlik doğrulama vardır (yetkisiz çağrı REDDEDİLİR); **şu an DOĞRULANMADI:** adayda istemci/servis kodunda Bearer/jeton ifadesi bulunamadı, tam okuma yapılmadı. (b) Secret yönetimi: DB parolası, Steam anahtarı, servis sırrı depoda/günlükte/komut satırında YOK; yalnız ortam değişkeni/gizli depo. (c) Ağ izolasyonu: DB yalnız servisten erişilebilir; harita sunucusunda DB bağlantı bilgisi YOK. (d) `/v1/admin/fault` benzeri hata-enjeksiyon uçları üretim yapılandırmasında KAPALI (varsayılan kapalı + üretim profili testi). (e) Harita sunucusuna geniş DB yetkisi verilmez. (f) Şema: `public` API'ye açıksa RLS veya erişim kapatma (Codex V2'de RLS yok, ayrıntı K7).
 - **Kanıt türü:** Kod incelemesi + yetkisiz istek testi + yapılandırma/ağ taraması + günlük gizli-bilgi taraması.
 - **Doğrulayan:** Bağımsız QA + `ag-guvenlik-denetcisi` (salt okunur).
-- **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Durum:** [ ] PASS  [x] FAIL  [ ] BLOCKED  [ ] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** FAIL. Servis kimlik doğrulaması yok (Authorization/Bearer/HMAC/compare_digest/mTLS yok; QA loopback'te varsayılan bayraklarla set-admin 200, GET /v1/accounts 200, `POST /v1/admin/shutdown` 200 ve servisi kapattı). Güvenlik denetçisi (kodu okudu, koşturmadı): 3 KRİTİK, 3 YÜKSEK. Ayrıntı ve kapı koşulları incelemede.
 
 ### K7 — Şema ve migration uyumu
 - **Ölçüt:** (a) Tablo adı tutarsızlığı giderilmiş (§6.2); (b) V2 -> V3 -> V4 temiz DB'de sırayla uygulanır, tekrar uygulama zararsız; (c) sürüm geçişleri (şema sürümü) ve geri alma yolu belgeli; (d) eski kayıt (`.sav` + yan veri) içe aktarma idempotent: aynı girdiyle ikinci koşu satırı değiştirmez; (e) **eksik veya hatalı enumeration** (importer bir dosyayı atlar/yanlış sayar) tespit edilir ve rapor eder, sessiz atlama YOK; (f) kısmi hata batch'i geri alır.
 - **Kanıt türü:** Temiz DB'de migration koşusu, katalog dökümü, içe aktarma iki kez koşu + sayım, kasıtlı bozuk girdi.
 - **Doğrulayan:** Bağımsız QA.
-- **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Durum:** [ ] PASS  [x] FAIL  [ ] BLOCKED  [ ] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** FAIL. V1-V4'te RLS/POLICY/GRANT/REVOKE yok, tablolar `public` şemasında; tablo adı tutarsızlığı sürüyor (S04_01 kaydı `characters`/`write_idempotency`/`save_import_log`/`writer_epoch` ile V2 `character_saves`/`persistence_idempotency`/`legacy_import_ledger`/`ownership_epoch`); şema sürüm tablosu ve down betiği yok, V2-V4 her başlangıçta yeniden; import tamlığı (kaynak SHA-256 yeniden hesaplanmıyor, eksik klasör sessizce atlanır) kanıtsız.
 
 ### K8 — Yük ve gecikme (2000 eşzamanlı oyuncu hedefi)
 - **Ölçüt (ölçülecek, SAYI UYDURULMAZ):** saniyedeki kalıcı yazma sayısı, p95/p99 gecikme, DB bağlantı sayısı, hata oranı, servis CPU/bellek, kuyruk derinliği. Bu belgede ölçülmüş yük verisi YOK.
@@ -120,6 +127,7 @@ Ortak şart: SQLite kanıtı bu listedeki hiçbir maddeyi tek başına kapatmaz.
 - **Yöntem:** Yük üreteci (sahte oyuncular, gerçek servis HTTP'si) + gerçek PG dev/test; kademeli (örn. 100, 500, 1000, 2000 [TAHMİN]) artış; her kademe sabit süre; ölçüm: servis metrikleri + PG istatistikleri; ortam özellikleri (CPU/RAM/Supabase katmanı) rapora yazılır. Free katman sonuçları üretim kapasitesini temsil ETMEZ. Mevcut `Scripts/k6_load_test.js` var olmayan HTTP uçlarını hedefler (yeniden yazılmalı).
 - **Doğrulayan:** Bağımsız QA + `performance` (profiler kanıtı olmadan kapasite sözü verilmez).
 - **Durum:** [ ] PASS  [ ] FAIL  [ ] BLOCKED  [x] NOT TESTED
+- **Son durum (2026-10-18, bağımsız QA/güvenlik, aday `bfc197d`, kaynak `docs/S04_BAGIMSIZ_INCELEME_2026-10-18.md`):** NOT TESTED. Yük ölçümü yapılmadı.
 
 ### 2.9 Kanıt kaydı biçimi (her kutu için zorunlu)
 ```
