@@ -868,6 +868,12 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 		ResultPlus = -1;
 	}
 
+	// Olcum alanlari delegelerden ONCE okunur: AddGoldFrom geri cagirimlari sahibi/bileseni yok edebilir.
+	const FString MetricWho = MMOMetrics::WhoName(GetOwner());
+	const AMMOCharacter* MetricChar = Cast<AMMOCharacter>(GetOwner());
+	const UMMOStatsComponent* MetricStats = MetricChar ? MetricChar->GetStats() : nullptr;
+	const int32 MetricPlayerLevel = MetricStats ? MetricStats->Level : 0;
+
 	// O49: AddGoldFrom publishes OnGoldChanged synchronously. Its authority listeners
 	// may equip/reorder/remove items or take a save snapshot. Settle the item outcome
 	// before publication, and never use a bag reference/index after that callback.
@@ -878,6 +884,11 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 		TEXT("event=item_upgrade actor=\"%s\" slot=\"%s\" item=\"%s\" instance=%d rarity=%d from_plus=%d to_plus=%d cost=%d chance=%d result=%s balance=%d"),
 		*InventoryActorName(this), *InventorySlotName(this), *UpgradedItemId.ToString(), InstanceId,
 		UpgradeRarity, OldPlus, ResultPlus, Cost, ChancePct, Result, BalanceAfterUpgrade);
+	// Olcum (yalniz sunucu: erken HasAuthority dali yukarida). Altin satiri ev=gold src=yukseltme ayri basilir;
+	// burada +N sonucu ve seviye baglami var. Yanmada to=-1. Scripts/PlaytestMetrics.py okur.
+	UE_LOG(LogTemp, Display, TEXT("[MMOMETRIC] t=%.1f ev=upgrade who=%s item=%s lv=%d item_lv=%d from=%d to=%d result=%s cost=%d"),
+		MMOMetrics::Seconds(), *MetricWho, *UpgradedItemId.ToString(), MetricPlayerLevel, Def->RequiredLevel,
+		OldPlus, ResultPlus, bSuccess ? TEXT("success") : (bBurned ? TEXT("burn") : TEXT("fail")), Cost);
 
 	OnInventoryChanged.Broadcast();
 }

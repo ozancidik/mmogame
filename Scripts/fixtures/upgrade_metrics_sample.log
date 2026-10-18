@@ -1,0 +1,19 @@
+Log file open, 10/18/26 12:00:00
+[2026.10.18-12.00.00:000][  0]LogInit: Display: Engine is initialized. (olcum satiri degil)
+[2026.10.18-12.00.01:000][  1]LogTemp: Display: [MMOMETRIC] t=1.0 ev=upgrade who=Ozan item=ShortSword lv=20 item_lv=15 from=0 to=1 result=success cost=100
+[2026.10.18-12.00.01:000][  1]LogTemp: Display: [MMOMETRIC] t=1.0 ev=gold who=Ozan src=yukseltme amount=-100 balance=900
+[2026.10.18-12.00.02:000][  2]LogTemp: Display: [MMOMETRIC] t=2.0 ev=upgrade who=Ozan item=ShortSword lv=20 item_lv=15 from=1 to=2 result=success cost=200
+[2026.10.18-12.00.03:000][  3]LogTemp: Display: [MMOMETRIC] t=3.0 ev=upgrade who=Ozan item=ShortSword lv=20 item_lv=15 from=2 to=2 result=fail cost=300
+[2026.10.18-12.00.04:000][  4]LogTemp: Display: [MMOMETRIC] t=4.0 ev=upgrade who=Ozan item=ShortSword lv=30 item_lv=15 from=2 to=3 result=success cost=400
+[2026.10.18-12.00.05:000][  5]LogTemp: Display: [MMOMETRIC] t=5.0 ev=upgrade who=Ozan item=ShortSword lv=30 item_lv=15 from=3 to=-1 result=burn cost=500
+[2026.10.18-12.00.06:000][  6]LogTemp: Display: [MMOMETRIC] t=6.0 ev=upgrade who=Mert item=IronAxe lv=45 item_lv=40 from=0 to=1 result=success cost=50
+[2026.10.18-12.00.07:000][  7]LogTemp: Display: [MMOMETRIC] t=7.0 ev=upgrade who=Mert item=IronAxe lv=45 item_lv=40 from=7 to=-1 result=burn cost=1000
+[2026.10.18-12.00.08:000][  8]LogTemp: Display: [MMOMETRIC] t=8.0 ev=upgrade who=Mert item=IronAxe lv=80 item_lv=40 from=7 to=8 result=success cost=2000
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=20 item_lv=15 from=0 to=1 result=win cost=100
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=20 item_lv=15 from=1 to=3 result=success cost=100
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=20 item_lv=15 from=1 to=2 result=success
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=20 item_lv=15 from=8 to=9 result=success cost=100
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=81 item_lv=15 from=1 to=2 result=success cost=100
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad lv=20 item_lv=15 from=1 to=2 result=success cost=100
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=20 item_lv=15 from=1 to=2 result=success cost=-5
+[2026.10.18-12.00.09:000][  9]LogTemp: Display: [MMOMETRIC] t=9.0 ev=upgrade who=Bad item=ShortSword lv=20 item_lv=15 from=1 to=-1 result=fail cost=100

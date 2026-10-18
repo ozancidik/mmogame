@@ -24,6 +24,7 @@ BASIC_ATTACK_FIXTURE = os.path.join(HERE, "fixtures", "first_basic_attack_metric
 DEATH_FIXTURE = os.path.join(HERE, "fixtures", "first_death_metrics_sample.log")
 LEVELUP_FIXTURE = os.path.join(HERE, "fixtures", "first_levelup_metrics_sample.log")
 MOVE_FIXTURE = os.path.join(HERE, "fixtures", "first_move_metrics_sample.log")
+UPGRADE_FIXTURE = os.path.join(HERE, "fixtures", "upgrade_metrics_sample.log")
 
 failures = []
 assertions = 0
@@ -530,6 +531,64 @@ def test_first_levelup(pm):
         code, out = run_levelup_validator(pm, fh.read(), 9)
     check(code == 1 and "raw=9 parsed=8 accepted=5 invalid=2 duplicates=1 sessions=3" in out,
           "full levelup fixture exposes missing who, malformed payloads, duplicates and shared SIDs")
+
+
+def test_upgrade(pm):
+    events = pm.parse_log(UPGRADE_FIXTURE)
+    check(len(events) == 17, "upgrade fixture: 17 parsed events (16 upgrade + 1 gold)")
+    players = pm.build_stats(events)
+    ozan, mert, bad = players["Ozan"], players["Mert"], players["Bad"]
+    check({k: list(v) for k, v in ozan["upg"].items()} == {0: [1, 1, 0, 0], 1: [1, 1, 0, 0],
+                                                          2: [2, 1, 1, 0], 3: [1, 0, 0, 1]},
+          "per +N attempts/success/fail/burn for Ozan")
+    check(ozan["upg_max"] == 3, "Ozan max reached +3 (burn at +3 still reached +3)")
+    check({k: list(v) for k, v in ozan["upg_band"].items()} == {"16-24": [3, 600], "25-32": [2, 900]},
+          "Ozan spend by level band uses player lv, not item lv")
+    check({k: list(v) for k, v in mert["upg"].items()} == {0: [1, 1, 0, 0], 7: [2, 1, 0, 1]},
+          "Mert +7 attempts include one success and one burn")
+    check(mert["upg_max"] == 8, "Mert max reached +8")
+    check({k: list(v) for k, v in mert["upg_band"].items()} == {"42-50": [2, 1050], ">=80": [1, 2000]},
+          "Mert bands 42-50 and level 80")
+    check(bad["upg_invalid"] == 8 and not bad["upg"] and bad["upg_max"] is None
+          and not bad["timing_started"] and bad["first_t"] == bad["last_t"] == 0,
+          "8 malformed upgrade lines skipped without starting timing")
+    check(ozan["src"]["yukseltme"] == [0, 100] and ozan["lv"][0]["gold_out"] == 100,
+          "ev=upgrade cost is NOT added to gold tables (ev=gold src=yukseltme owns it)")
+    check(ozan["level"] is None and mert["level"] is None and not ozan["quests"] and not ozan["first_actions"],
+          "upgrade events do not establish a gameplay level or other counters")
+    for index, (label, change) in enumerate((
+            ("result", {"result": "win"}), ("to mismatch success", {"to": "3"}), ("to mismatch fail", {"result": "fail"}),
+            ("from=8", {"from": "8", "to": "9"}), ("lv=81", {"lv": "81"}), ("cost negative", {"cost": "-5"}),
+            ("cost missing", {"cost": None}), ("item missing", {"item": None}), ("from float", {"from": "1.5"}))):
+        base = {"who": "X", "ev": "upgrade", "t": "1", "item": "S", "lv": "20", "item_lv": "5",
+                "from": "1", "to": "2", "result": "success", "cost": "10"}
+        check(pm.build_stats([base])["X"]["upg_invalid"] == 0, "valid base line accepted #%d" % index)
+        for key, value in change.items():
+            if value is None:
+                base.pop(key)
+            else:
+                base[key] = value
+        p = pm.build_stats([base])["X"]
+        check(p["upg_invalid"] == 1 and not p["upg"], "malformed upgrade rejected: " + label)
+    for level, band in ((0, "<16"), (15, "<16"), (16, "16-24"), (24, "16-24"), (25, "25-32"), (41, "33-41"),
+                        (42, "42-50"), (57, "51-57"), (58, "58-65"), (71, "66-71"), (72, "72-79"),
+                        (79, "72-79"), (80, ">=80")):
+        check(pm.upgrade_band(level) == band, "band %d -> %s" % (level, band))
+    code, out = run_main(pm, ["x", UPGRADE_FIXTURE])
+    check(code == 0 and "Yukseltme olaylari: upgrade=16" in out
+          and "Olay sayisi: 17 (levelup=0 kill=0 death=0 gold=1)" in out, "upgrade report header counts")
+    check("+2 -> +3 deneme=2 basari=1 basarisiz=1 yanma=0" in out and "ulasilan max +3" in out
+          and "bant 16-24  deneme=3    harcama=600" in out, "per-player upgrade section")
+    check("=== Yukseltme ozeti (2 oyuncu) ===" in out and "+7->+8    2        1        0          1" in out
+          and "Ulasilan max +N dagilimi (oyuncu sayisi): +3=1, +8=1" in out
+          and "16-24  deneme=3     harcama=600" in out and "Toplam harcama=4550" in out,
+          "global summary: totals per +N, max +N distribution, band spend")
+    check("gecersiz upgrade satiri atlandi: 8" in out, "invalid upgrade count reported")
+    code, out = run_main(pm, ["x", UPGRADE_FIXTURE, "--who", "Mert"])
+    check(code == 0 and "Yukseltme ozeti (1 oyuncu)" in out and "Toplam harcama=3050" in out
+          and "Oyuncu: Ozan" not in out, "--who filters the summary too")
+    code, out = run_main(pm, ["x", FIXTURE])
+    check("Yukseltme" not in out, "logs without upgrade events print no upgrade section")
 
 
 def main(argv):
@@ -1135,6 +1194,7 @@ def main(argv):
           "full adversarial fixture validator rejects raw missing-who, malformed and duplicate markers")
 
     test_first_levelup(pm)
+    test_upgrade(pm)
     test_first_move(pm)
 
     # Rejected duplicate first markers must not extend observation or level duration.

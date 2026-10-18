@@ -34,6 +34,10 @@ Olaylar (Source/MyProject, UE_LOG LogTemp Display):
   first_move who lv mode=walking|navwalking|falling distance scope=controller sid start elapsed
     (finite distance >=1: actual XY cm at an engine movement update, emitted %.3f)
     (controller lifetime observation; no gameplay counters or anti-cheat guarantee)
+  upgrade  who item lv item_lv from to result cost
+    (sunucu yukseltme denemesi; result=success|fail|burn; to=from+1 / from / -1; cost = harcanan altin;
+     lv = oyuncu seviyesi, item_lv = esyanin gereken seviyesi. Altin ayrica ev=gold src=yukseltme olarak
+     gelir: upgrade harcamasi altin tablosuna tekrar EKLENMEZ, yalniz +N ve seviye bandi dagilimi icin okunur)
   xp       who lv src amount                 (src=gunluk: gunluk gorev XP'si; tablolarda sayilmaz, logda ayri kalem)
   src: loot, gorev, satis, satin_alma, yukseltme, iyilestirme, diger (ticaret dahil);
        posta (ek), posta_ucret (gonderim ucreti sink'i), posta-iade, basarim, gunluk - bilinmeyen src de kabul edilir
@@ -72,6 +76,34 @@ def bounded_int_text(text, minimum, maximum):
         return None
     value = int(digits) * (-1 if text.startswith("-") else 1)
     return value if minimum <= value <= maximum else None
+
+
+# EconomyModel.py --sink-scenarios ile ayni seviye bantlari (oyuncu seviyesine gore).
+UPGRADE_BANDS = ((16, 24), (25, 32), (33, 41), (42, 50), (51, 57), (58, 65), (66, 71), (72, 79))
+UPGRADE_RESULTS = ("success", "fail", "burn")
+UPGRADE_MAX_PLUS = 8
+
+
+def upgrade_band(level):
+    for lo, hi in UPGRADE_BANDS:
+        if lo <= level <= hi:
+            return "%d-%d" % (lo, hi)
+    return "<16" if level < UPGRADE_BANDS[0][0] else ">=80"
+
+
+def parse_upgrade(e):
+    """Gecerli ev=upgrade satirini (from, to, result, cost, lv) olarak dondurur; bozuksa None."""
+    frm = bounded_int_text(e.get("from"), 0, UPGRADE_MAX_PLUS - 1)
+    to = bounded_int_text(e.get("to"), -1, UPGRADE_MAX_PLUS)
+    cost = bounded_int_text(e.get("cost"), 0, 2147483647)
+    lv = bounded_int_text(e.get("lv"), 0, 80)
+    result = e.get("result")
+    if None in (frm, to, cost, lv) or result not in UPGRADE_RESULTS or not e.get("item"):
+        return None
+    expected_to = {"success": frm + 1, "fail": frm, "burn": -1}[result]
+    if to != expected_to:
+        return None
+    return frm, to, result, cost, lv
 
 
 def parse_log(path):
@@ -129,8 +161,15 @@ def build_stats(events):
                                             "seconds": [], "unmatched": 0, "capped": 0}),
             "quest_start": {},
             "first_actions": {}, "first_invalid": 0, "first_duplicates": 0,
+            # yukseltme: +N basina [deneme, basari, basarisiz, yanma]; bant basina harcama/deneme
+            "upg": defaultdict(lambda: [0, 0, 0, 0]), "upg_max": None, "upg_invalid": 0,
+            "upg_band": defaultdict(lambda: [0, 0]),
         })
         ev = e["ev"]
+        upgrade = parse_upgrade(e) if ev == "upgrade" else None
+        if ev == "upgrade" and upgrade is None:
+            p["upg_invalid"] += 1  # bozuk satir saati/oyuncu durumunu etkilemez
+            continue
         if ev not in FIRST_ACTIONS:
             record_time(p, t)
         if ev in FIRST_ACTIONS:
@@ -275,6 +314,16 @@ def build_stats(events):
                         q["seconds"].append(t - start)
                     else:
                         q["unmatched"] += 1
+        elif ev == "upgrade":
+            frm, to, result, cost, lv = upgrade
+            row = p["upg"][frm]
+            row[0] += 1
+            row[{"success": 1, "fail": 2, "burn": 3}[result]] += 1
+            reached = to if result == "success" else frm  # yanmada esya yok oldu, ulasilan = denenen +N
+            p["upg_max"] = reached if p["upg_max"] is None else max(p["upg_max"], reached)
+            band = p["upg_band"][upgrade_band(lv)]
+            band[0] += 1
+            band[1] += cost
         elif ev == "gold":
             amount = int(to_num(e.get("amount")))
             src = e.get("src", "diger")
@@ -299,6 +348,46 @@ def build_stats(events):
 def fmt_time(sec):
     sec = int(round(sec))
     return "%d:%02d" % (sec // 60, sec % 60)
+
+
+def band_sort_key(label):
+    if label == "<16":
+        return -1
+    if label == ">=80":
+        return 10 ** 6
+    return int(label.split("-")[0])
+
+
+def print_upgrade_summary(players):
+    """Tum (gosterilen) oyuncular: +N basina toplam, oyuncu basina ulasilan max +N dagilimi, bant harcamasi."""
+    active = {w: p for w, p in players.items() if p["upg"]}
+    if not active:
+        return
+    print("")
+    print("=== Yukseltme ozeti (%d oyuncu) ===" % len(active))
+    total = defaultdict(lambda: [0, 0, 0, 0])
+    for p in active.values():
+        for plus, row in p["upg"].items():
+            for i in range(4):
+                total[plus][i] += row[i]
+    print("%-9s %-8s %-8s %-10s %-8s" % ("+N", "Deneme", "Basari", "Basarisiz", "Yanma"))
+    for plus in sorted(total):
+        n, ok, fail, burn = total[plus]
+        print("+%d->+%-4d %-8d %-8d %-10d %-8d" % (plus, plus + 1, n, ok, fail, burn))
+    dist = defaultdict(int)
+    for p in active.values():
+        dist[p["upg_max"]] += 1
+    print("Ulasilan max +N dagilimi (oyuncu sayisi): " + ", ".join(
+        "+%d=%d" % (k, dist[k]) for k in sorted(dist)))
+    bands = defaultdict(lambda: [0, 0])
+    for p in active.values():
+        for band, (n, spend) in p["upg_band"].items():
+            bands[band][0] += n
+            bands[band][1] += spend
+    print("Seviye bandina gore yukseltme harcamasi (oyuncu seviyesi):")
+    for band in sorted(bands, key=band_sort_key):
+        print("  %-6s deneme=%-5d harcama=%d" % (band, bands[band][0], bands[band][1]))
+    print("  Toplam harcama=%d" % sum(v[1] for v in bands.values()))
 
 
 def print_player(who, p):
@@ -337,6 +426,18 @@ def print_player(who, p):
         print("Altin akisi (kaynaga gore):")
         for src, (gin, gout) in sorted(p["src"].items()):
             print("  %-12s giris=%-8d cikis=%-8d" % (src, gin, gout))
+    if p["upg"] or p["upg_invalid"]:
+        print("Yukseltme (+N basina; harcama ev=gold src=yukseltme icinde zaten sayilir):")
+        for plus in sorted(p["upg"]):
+            n, ok, fail, burn = p["upg"][plus]
+            print("  +%d -> +%d deneme=%d basari=%d basarisiz=%d yanma=%d" % (plus, plus + 1, n, ok, fail, burn))
+        if p["upg_max"] is not None:
+            print("  ulasilan max +%d" % p["upg_max"])
+        for band in sorted(p["upg_band"], key=band_sort_key):
+            n, spend = p["upg_band"][band]
+            print("  bant %-6s deneme=%-4d harcama=%d" % (band, n, spend))
+        if p["upg_invalid"]:
+            print("  gecersiz upgrade satiri atlandi: %d" % p["upg_invalid"])
     if p["mobs"]:
         top = sorted(p["mobs"].items(), key=lambda kv: -kv[1])[:8]
         print("En cok oldurulen: " + ", ".join("%s x%d" % kv for kv in top))
@@ -427,12 +528,16 @@ def main(argv):
     print("Gorev olaylari: quest_accept=%d quest_claim=%d" % (
         sum(1 for e in events if e["ev"] == "quest_accept"),
         sum(1 for e in events if e["ev"] == "quest_claim")))
+    upgrades = sum(1 for e in events if e["ev"] == "upgrade")
+    if upgrades:
+        print("Yukseltme olaylari: upgrade=%d" % upgrades)
     shown = 0
     for who in sorted(players):
         if only and who != only:
             continue
         print_player(who, players[who])
         shown += 1
+    print_upgrade_summary({w: p for w, p in players.items() if not only or w == only})
     if only and shown == 0:
         print("'%s' adli oyuncu icin olay yok. Mevcut: %s" % (only, ", ".join(sorted(players))))
     return 0

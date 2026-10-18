@@ -42,6 +42,7 @@ public:
 	static bool RunUpgradeCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunPurchaseCallbackSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 	static bool RunGoldMetricSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
+	static bool RunUpgradeMetricSelfTest(UWorld* World, FString& OutError, int32& OutChecks);
 #endif
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
