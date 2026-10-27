@@ -263,6 +263,11 @@ OVERRIDE_WHITELIST = {
     "PostInitializeComponents": ([], False),
     "TakeDamage": (["float", "const FDamageEvent&", "AController*", "AActor*"], False),
     "Initialize": (["FSubsystemCollectionBase&"], False),
+    # UTickableWorldSubsystem / UWorldSubsystem ezmeleri (UE 5.7 WorldSubsystem.h, Subsystem.h; UMMOServerLifecycleSubsystem derlendi 2026-10-27).
+    "ShouldCreateSubsystem": (["UObject*"], True),
+    "OnWorldBeginPlay": (["UWorld&"], False),
+    "IsTickable": ([], True),
+    "GetStatId": ([], True),
     "Deinitialize": ([], False),
     "NotifyActorBeginOverlap": (["AActor*"], False),
     "OnConstruction": (["const FTransform&"], False),

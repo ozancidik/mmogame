@@ -1,6 +1,7 @@
 # Planli kapatma / bakim modu (sunucu yasam dongusu) - tasarim
 
 **Tarih:** 2026-10-27 · **Taban:** `1a67ec1` (master) · **Durum: TASARIM, kod yok, derleme yok.**
+**L1 UYGULANDI (2026-10-27, izole worktree, PIE degil):** `Core/MMOServerLifecycle.*` (alt sistem, komut satiri + konsol, duyuru, PreLogin reddi, R1 kapisi), `Scripts/TestServerLifecycle.ps1` (90 vaka, mutasyon 10 + R1 kapisi yakalandi). Kayit turu/atma/cikis (L2/L3) yok; `Exiting`da surec SONLANMAZ. R1 sonucu: uzak istemci FSelfRegisteringExec komutuna ulasamaz (kaynak satirlari `MMOServerLifecycle.cpp` basindaki notta). Surec-geneli statik plan (bolge gecisi geri sayimi sifirlamaz).
 **Yazan:** `oyun-tasarimcisi`. Sayilar `[PLACEHOLDER]`; oynanista/uzun kosuda olculmedi.
 
 ## 1. Oyuncu deneyimi ve neden simdi
