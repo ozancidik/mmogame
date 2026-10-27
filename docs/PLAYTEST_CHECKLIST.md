@@ -5676,3 +5676,14 @@ ve katalog/HTTPS dogrulamasi gecti; Dilim 6 entegrasyon betigi 2026-10-18'de ger
 - [~] **7. Entegrasyon betigi (Dilim 6):** [x] `Scripts/TestSupabaseIntegration.ps1` (`1399123`) kullanici tarafindan gercek dev projesinde KOSTU (2026-10-18): `[MMO_SUPABASE_INTEGRATION] PASS checks=132 skipped=7`, 20/20 senaryo PASS (`expired_lease` 1 adim/5 SKIP, `idempotent_same_payload` 5 adim/2 SKIP; SKIP nedeni `expire_lease` yonetici adimi API ile yapilamaz); `zz_cleanup.sql` kosuldu (19 `character_saves`, 28 `write_ops`, 2 `character_side`). [ ] **Hala DOGRULANMADI:** `FMMOSupabaseCharacterStore` (UE) gercek Supabase'e karsi hic denenmedi (gercek `FHttpModule`, TLS, `LogHttp` anahtar sizintisi, zaman asimi, 429/5xx); kira suresi dolma yolu (SQL Editor + `05_concurrency_lease_*.sql`). **Mimari cakisma:** S04 Codex Python servisiyle cakisiyor, karar bekliyor (`DESIGN_SUPABASE.md` §10): bu madde UE'yi gercek DB'ye baglama isi karara kadar ertelenir.
 - [ ] **8. `write_ops` temizligi:** `pg_cron` ile `purge_write_ops(7, 20000)` kuruldu mu (ornek `supabase/README.md`); kurulmazsa tablo buyur (ucretsiz katmanda 500 MB).
 - [~] **9. UE istemcisi User-Agent (2026-10-17 bulgusu):** [x] kodda duzeltildi (`d3d56ec`, 599 kontrol, yalniz sahte sunucuya karsi): `FMMOSupabaseRestClient` her istege sabit acik `User-Agent` `MMOGameServer/0.1` ekler (`FMMOSupabaseConfig::DefaultUserAgent`), `Validate` tarayici kelimeli UA'yi reddeder. [ ] Gercek Supabase'e UE'den gonderilmedi; motorun fiilen yolladigi UA basligi dogrulanmadi (aksi halde gercek DB'de `Forbidden use of secret API key in browser`).
+
+## Karar 3 = P1 (PIE'de denenmedi) (2026-10-27; `4ad5092`)
+Sifaci kup bedeli `100 + 0,09 x (Lv-1)^3` (`MMOHealerNPC.h:31-37`) + 7 yeni bagis gorevi (Q_Gold41000/160000/310000/440000/710000/1100000/1500000). Tum sayilar PLACEHOLDER; oynanista hicbiri olculmedi.
+- [ ] **Sifaci bedeli:** Lv10 ~165, Lv30 = 2295, Lv60 = 18584 altin. Altin yetmezken ipucu cikar ve altin dusmez.
+- [ ] **Altinsiz olum:** altin yokken olunce 5 sn'de otomatik dogus olur (kilitlenme yok).
+- [ ] **Bagis gorevi akisi:** Lv16'da 41.000 altinla Yasli Doran'dan "Pazar Bagiscisi" alinir; tesliminde tam 41.000 duser; bildirim `+400 XP, +0 altin, -41000 altin bagislandi`; gorev tekrar alinamaz.
+- [ ] **Diger 6 gorev** (160000/310000/440000/710000/1100000/1500000) ayni akisla denenir; sunucu logunda `[MMOMETRIC] ev=gold src=gorev_bagis amount=-<hedef>` satiri gorulur.
+- [ ] **XP orani:** gorev basina yaklasik 0,15-0,2 seviye.
+- [ ] **Lv72 GOREVLER paneli:** satirlar sigar ve "odul al" satiri tiklanabilir kalir (`MMOHUD.cpp` commit'siz/Codex'te; bu madde ona dokunmaz).
+- [ ] **Ikinci istemciden bagis:** OnRep ile bakiye guncellenir ve bildirim gorunur.
+- [ ] **Oynanis sonu olcum:** `py -3 Scripts/PlaytestMetrics.py` ile gercek sink/gelir. Kural [Tahmin]: medyan sink/gelir >= %60 ise P1 geri cekilir; < %30 ise C1 degerlendirilir.

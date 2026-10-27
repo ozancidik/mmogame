@@ -954,6 +954,8 @@ def sink_report(income_by_level, kills_by_level, bands, tiers, upg_to):
     xh0, q0 = SINK_DONATE[0]
     print(f"  B1 icin bant basina tek bagis hedefi (= {xh0:g} sa gelir, 2 anlamli basamak; mevcut Q_Gold bagislari bant icinde ise o bant 0 EK): "
           + ", ".join("Lv%d: %d" % (x["a"], int(float("%.2g" % (xh0 * x["inc_h"])))) for x in hi) + ".")
+    print("  NOT: P1 (A1 kup + B1 bagislar) artik kod tabaninin parcasi (commit 4ad5092); EK degil, bu yuzden A1/B1 sutunlari ve P1 EK %0 gorunur (gider/sink tablosuna zaten dahil). "
+          "Lv33 bandi hedefi burada 100000 yazar ama uygulanan Q_Gold160000'dir: ayni bantta duran Q_Gold50000 da sayilir (bagis toplami 210000), tek satir hedefi buna gore secildi.")
     print(f"  Duyarlilik: A'da sifa bypass 0 ise etki x{1 / (1 - SINK_HEAL_BYPASS):g}; olum {DEATHS_PER_HOUR[0]}/{DEATHS_PER_HOUR[-1]} /sa ise x{DEATHS_PER_HOUR[0] / SINK_DEATHS:g}"
           f" / x{DEATHS_PER_HOUR[-1] / SINK_DEATHS:g}. B ve D katilim oranina dogrusal. C'de oyuncunun +N'den vazgecmesi (talep esnekligi) modellenmedi: etkiyi azaltir.")
 
