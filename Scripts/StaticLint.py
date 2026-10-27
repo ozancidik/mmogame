@@ -84,7 +84,9 @@ def check_definitions():
             if fn.startswith("~") or fn == cls or cls not in class_header:
                 continue
             base = re.sub(r"_(Implementation|Validate)$", "", fn)
-            if not re.search(r"\b" + re.escape(base) + r"\b", header_text[class_header[cls]]):
+            # motor RPC sanallarini ezen bildirim ("virtual ... ServerFoo_Implementation() override") base adiyla \b eslesmez: tam adi da kabul et
+            ht = header_text[class_header[cls]]
+            if not (re.search(r"\b" + re.escape(base) + r"\b", ht) or re.search(r"\b" + re.escape(fn) + r"\b", ht)):
                 errs.append(f"{c.relative_to(ROOT)}: {cls}::{fn} tanimli ama {class_header[cls].name} icinde bildirimi yok")
     return errs
 
@@ -271,6 +273,14 @@ OVERRIDE_WHITELIST = {
     "Deinitialize": ([], False),
     "NotifyActorBeginOverlap": (["AActor*"], False),
     "OnConstruction": (["const FTransform&"], False),
+    # Y-9 uzak Exec koruması (AMMOPlayerController, fe86275/fc19d0b; imzalar UE 5.7 Object.h:1544, PlayerController.h:638,1490,1999 ile dogrulandi, derlendi 2026-10-27).
+    "ProcessConsoleExec": (["const TCHAR*", "FOutputDevice&", "UObject*"], False),
+    "ServerExecRPC_Validate": (["const FString&"], False),
+    "ServerExecRPC_Implementation": (["const FString&"], False),
+    "ServerPause_Validate": ([], False),
+    "ServerPause_Implementation": ([], False),
+    "AddCheats": (["bool"], False),
+    "HandleSeamlessTravelPlayer": (["AController*&"], False),
 }
 
 
