@@ -36,6 +36,13 @@ namespace
 	double LifecycleLastTickTime = 0.0;
 	bool bLifecycleCommandLineHandled = false;
 
+	void LifecycleResetState()
+	{
+		LifecyclePlan = FMMOShutdownPlan();
+		LifecycleLastTickTime = 0.0;
+		bLifecycleCommandLineHandled = false;
+	}
+
 	const TCHAR* LifecyclePhaseName(EMMOShutdownPhase Phase)
 	{
 		switch (Phase)
@@ -168,6 +175,65 @@ bool MMOServerLifecycle::IsExecAuthorized(ENetMode NetMode)
 	return NetMode == NM_DedicatedServer || NetMode == NM_ListenServer;
 }
 
+MMOServerLifecycle::ECmdLineShutdown MMOServerLifecycle::ParseCmdLineShutdown(const TCHAR* CmdLine, double& OutSeconds, EMMOShutdownReason& OutReason, FString& OutError)
+{
+	OutSeconds = 0.0;
+	OutReason = EMMOShutdownReason::Maintenance;
+	OutError.Reset();
+	const TCHAR* Line = CmdLine ? CmdLine : TEXT("");
+	FString SecondsText, ReasonText;
+	const bool bHasSeconds = FParse::Value(Line, TEXT("MMOShutdownAfterSeconds="), SecondsText);
+	const bool bHasReason = FParse::Value(Line, TEXT("MMOMaintenanceReason="), ReasonText);
+	if (!bHasSeconds && !bHasReason) return ECmdLineShutdown::NotRequested;
+	if (!bHasSeconds)
+	{
+		OutError = TEXT("MMOMaintenanceReason verildi ama MMOShutdownAfterSeconds yok.");
+		return ECmdLineShutdown::Invalid;
+	}
+	if (SecondsText.IsEmpty())
+	{
+		OutError = TEXT("MMOShutdownAfterSeconds degeri bos.");
+		return ECmdLineShutdown::Invalid;
+	}
+	for (int32 i = 0; i < SecondsText.Len(); ++i)
+	{
+		if (FChar::IsWhitespace(SecondsText[i]))
+		{
+			OutError = TEXT("MMOShutdownAfterSeconds tek bir sayi olmali.");
+			return ECmdLineShutdown::Invalid;
+		}
+	}
+	if (!ParseShutdownArgs(*SecondsText, OutSeconds, OutReason, OutError))
+	{
+		return ECmdLineShutdown::Invalid;
+	}
+	if (bHasReason && !ParseReason(ReasonText, OutReason))
+	{
+		OutError = TEXT("MMOMaintenanceReason bakim, guncelleme ya da acil olmali.");
+		return ECmdLineShutdown::Invalid;
+	}
+	if (OutSeconds < FMMOShutdownPlan::MinDelaySeconds || OutSeconds > FMMOShutdownPlan::MaxDelaySeconds)
+	{
+		OutError = FString::Printf(TEXT("Sure %d..%d saniye araliginda olmali."), static_cast<int32>(FMMOShutdownPlan::MinDelaySeconds), static_cast<int32>(FMMOShutdownPlan::MaxDelaySeconds));
+		return ECmdLineShutdown::Invalid;
+	}
+	return ECmdLineShutdown::Ok;
+}
+
+bool MMOServerLifecycle::IsCmdLineTriggerSupported()
+{
+#if UE_BUILD_SHIPPING
+	return false; // L3 (cikis kodu) gelene kadar: plan Exiting'e varsa surec sonlanmaz, giris sonsuza dek kapali kalir.
+#else
+	return true;
+#endif
+}
+
+bool MMOServerLifecycle::ResetsPlanWithWorldType(EWorldType::Type WorldType)
+{
+	return WorldType == EWorldType::PIE;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Alt sistem
 // ---------------------------------------------------------------------------------------------------------------------
@@ -184,6 +250,12 @@ bool UMMOServerLifecycleSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 void UMMOServerLifecycleSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	// Yeni bir PIE oturumu onceki oturumdan kalan statik plani miras almasin (gercek ServerTravel'da dunya turu Game: korunur).
+	const UWorld* World = GetWorld();
+	if (World && MMOServerLifecycle::ResetsPlanWithWorldType(World->WorldType))
+	{
+		LifecycleResetState();
+	}
 }
 
 void UMMOServerLifecycleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
@@ -191,9 +263,15 @@ void UMMOServerLifecycleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	bServerActive = MMOServerLifecycle::IsExecAuthorized(InWorld.GetNetMode());
 	if (!bServerActive) return;
+	// Cift abonelik olmasin (OnWorldBeginPlay tekrar gelirse eski handle once kaldirilir).
+	if (PreLoginHandle.IsValid())
+	{
+		FGameModeEvents::OnGameModePreLoginEvent().Remove(PreLoginHandle);
+		PreLoginHandle.Reset();
+	}
 	PreLoginHandle = FGameModeEvents::OnGameModePreLoginEvent().AddUObject(this, &UMMOServerLifecycleSubsystem::HandlePreLogin);
 	UE_LOG(LogMMOLifecycle, Display, TEXT("event=lifecycle_ready netmode=%d phase=%s"), static_cast<int32>(InWorld.GetNetMode()), LifecyclePhaseName(LifecyclePlan.GetPhase()));
-	TryScheduleFromCommandLine();
+	TryScheduleFromCommandLine(FCommandLine::Get(), MMOServerLifecycle::IsCmdLineTriggerSupported());
 }
 
 void UMMOServerLifecycleSubsystem::Deinitialize()
@@ -204,12 +282,20 @@ void UMMOServerLifecycleSubsystem::Deinitialize()
 		PreLoginHandle.Reset();
 	}
 	bServerActive = false;
+	// PIE dunyasi ortadan kalkinca plan da gider; ServerTravel'da (Game dunyasi) surec-geneli plan korunur.
+	const UWorld* World = GetWorld();
+	if (World && MMOServerLifecycle::ResetsPlanWithWorldType(World->WorldType))
+	{
+		LifecycleResetState();
+	}
 	Super::Deinitialize();
 }
 
 bool UMMOServerLifecycleSubsystem::IsTickable() const
 {
-	return bServerActive && LifecyclePlan.GetPhase() != EMMOShutdownPhase::Idle;
+	// Exiting son durumdur ve L1'de cikis yoktur: bosuna tick etme (Exiting'e giriste Warning loglanir).
+	const EMMOShutdownPhase Phase = LifecyclePlan.GetPhase();
+	return bServerActive && Phase != EMMOShutdownPhase::Idle && Phase != EMMOShutdownPhase::Exiting;
 }
 
 TStatId UMMOServerLifecycleSubsystem::GetStatId() const
@@ -220,11 +306,16 @@ TStatId UMMOServerLifecycleSubsystem::GetStatId() const
 void UMMOServerLifecycleSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	if (!bServerActive || LifecyclePlan.GetPhase() == EMMOShutdownPhase::Idle) return;
 	// Gercek (duvar) saati: oyun zamani dilation'i ya da dunya gecisi yukleme suresi geri sayimi bozmaz; buyuk fark plan'da olay atlatmaz.
-	const double Now = FPlatformTime::Seconds();
-	const double Delta = Now - LifecycleLastTickTime;
-	LifecycleLastTickTime = Now;
+	TickWithWallClock(FPlatformTime::Seconds());
+}
+
+void UMMOServerLifecycleSubsystem::TickWithWallClock(double NowSeconds)
+{
+	if (!bServerActive || LifecyclePlan.GetPhase() == EMMOShutdownPhase::Idle) return;
+	// Son tick zamani yoksa (0) ilk tick yalniz saati kaydeder: iki oturum arasi bosta gecen sure tek hamlede sayilmaz.
+	const double Delta = LifecycleLastTickTime > 0.0 ? NowSeconds - LifecycleLastTickTime : 0.0;
+	LifecycleLastTickTime = NowSeconds;
 	AdvanceSeconds(Delta);
 }
 
@@ -292,7 +383,11 @@ void UMMOServerLifecycleSubsystem::ProcessEvents(const TArray<FMMOShutdownEvent>
 		{
 			UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_phase phase=%s remaining=%.0f players=%d"), LifecyclePhaseName(E.Phase), LifecyclePlan.GetRemainingSeconds(), Players);
 			UE_LOG(LogMMOLifecycle, Display, TEXT("[MMOMETRIC] t=%.1f ev=shutdown phase=%s players=%d"), MMOMetrics::Seconds(), LifecyclePhaseName(E.Phase), Players);
-			if (E.Phase >= EMMOShutdownPhase::Flushing)
+			if (E.Phase == EMMOShutdownPhase::Exiting)
+			{
+				UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_exiting_not_implemented note=cikis-kodu-L3-yok-surec-SONLANMAZ-giris-kapali-kalir players=%d"), Players);
+			}
+			else if (E.Phase >= EMMOShutdownPhase::Flushing)
 			{
 				UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_phase_note phase=%s note=kayit-turu-atma-cikis-L2-L3-yok-surec-sonlanmaz"), LifecyclePhaseName(E.Phase));
 			}
@@ -312,7 +407,19 @@ void UMMOServerLifecycleSubsystem::ProcessEvents(const TArray<FMMOShutdownEvent>
 void UMMOServerLifecycleSubsystem::BroadcastToPlayers(const FString& Message)
 {
 	LastRecipientCount = 0;
-	if (UWorld* World = GetWorld())
+	// Bolge gecisinde (ServerTravel) eski ve yeni dunya bir sure birlikte yasar, oyuncular hangisinde olursa olsun duyuruyu almali:
+	// bu alt sistemin dunyasi + tum dunya baglamlarindaki istemci olmayan oyun dunyalari (tekrar yok).
+	TArray<UWorld*> Worlds;
+	if (UWorld* Own = GetWorld()) Worlds.Add(Own);
+	if (GEngine)
+	{
+		for (const FWorldContext& Context : GEngine->GetWorldContexts())
+		{
+			UWorld* W = Context.World();
+			if (W && W->IsGameWorld() && W->GetNetMode() != NM_Client) Worlds.AddUnique(W);
+		}
+	}
+	for (UWorld* World : Worlds)
 	{
 		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 		{
@@ -339,20 +446,23 @@ void UMMOServerLifecycleSubsystem::HandlePreLogin(AGameModeBase* GameMode, const
 	}
 }
 
-void UMMOServerLifecycleSubsystem::TryScheduleFromCommandLine()
+void UMMOServerLifecycleSubsystem::TryScheduleFromCommandLine(const TCHAR* CmdLine, bool bTriggerSupported)
 {
 	if (bLifecycleCommandLineHandled) return; // surec basina bir kez (bolge gecisinde yeni dunya yeniden planlamaz)
-	FString SecondsText;
-	if (!FParse::Value(FCommandLine::Get(), TEXT("MMOShutdownAfterSeconds="), SecondsText)) return;
-	bLifecycleCommandLineHandled = true;
-	FString ReasonText;
-	FParse::Value(FCommandLine::Get(), TEXT("MMOMaintenanceReason="), ReasonText);
 	double Seconds = 0.0;
 	EMMOShutdownReason Reason = EMMOShutdownReason::Maintenance;
 	FString Error;
-	if (!MMOServerLifecycle::ParseShutdownArgs(*(SecondsText + TEXT(" ") + ReasonText), Seconds, Reason, Error) || !RequestShutdown(Seconds, Reason, Error))
+	const MMOServerLifecycle::ECmdLineShutdown Parsed = MMOServerLifecycle::ParseCmdLineShutdown(CmdLine, Seconds, Reason, Error);
+	if (Parsed == MMOServerLifecycle::ECmdLineShutdown::NotRequested) return;
+	bLifecycleCommandLineHandled = true; // anahtar varsa gecersiz de olsa tuketilir (yeniden denenmez)
+	if (!bTriggerSupported)
 	{
-		UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_cmdline_rejected error=%s"), *Error);
+		UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_cmdline_unsupported note=bu-surumde-desteklenmez-L3-bekleniyor"));
+		return;
+	}
+	if (Parsed == MMOServerLifecycle::ECmdLineShutdown::Invalid || !RequestShutdown(Seconds, Reason, Error))
+	{
+		UE_LOG(LogMMOLifecycle, Error, TEXT("event=shutdown_cmdline_rejected error=%s"), *Error);
 	}
 }
 
@@ -360,9 +470,12 @@ void UMMOServerLifecycleSubsystem::TryScheduleFromCommandLine()
 
 void UMMOServerLifecycleSubsystem::ResetPlanForTest()
 {
-	LifecyclePlan = FMMOShutdownPlan();
-	LifecycleLastTickTime = 0.0;
-	bLifecycleCommandLineHandled = false;
+	LifecycleResetState();
+}
+
+void UMMOServerLifecycleSubsystem::SetLastTickTimeForTest(double Seconds)
+{
+	LifecycleLastTickTime = Seconds;
 }
 
 bool UMMOServerLifecycleSubsystem::HandleExecCommand(UWorld* World, const TCHAR* Cmd, FOutputDevice& Ar)
@@ -371,7 +484,8 @@ bool UMMOServerLifecycleSubsystem::HandleExecCommand(UWorld* World, const TCHAR*
 	const TCHAR* ProbeA = Cmd;
 	const TCHAR* ProbeB = Cmd;
 	if (!FParse::Command(&ProbeA, TEXT("MMOShutdown")) && !FParse::Command(&ProbeB, TEXT("MMOShutdownCancel"))) return false;
-	if (!World && GEngine)
+	// Editor Cmd cubugundan gelen dunya editor dunyasi olabilir (game world degil): o zaman PIE/oyun dunyasini ara.
+	if ((!World || !World->IsGameWorld()) && GEngine)
 	{
 		for (const FWorldContext& Context : GEngine->GetWorldContexts())
 		{

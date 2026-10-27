@@ -36,7 +36,12 @@ $lines = Get-Content -LiteralPath $log
 $cases = @($lines | Select-String '\[MMO_LIFECYCLE_CASE\] (PASS|FAIL) case=\S+ check=\S+')
 $summaries = @($lines | Select-String '\[MMO_LIFECYCLE_TEST\] (PASS|FAIL) checks=')
 $passes = @($lines | Select-String '\[MMO_LIFECYCLE_TEST\] PASS checks=(\d+) reason=')
-$errors = @($lines | Select-String '\[MMO_LIFECYCLE_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation')
+# Test kasitli olarak 2 komut satiri reddi (cmdapply: aralik disi + gecersiz deger) provoke eder; bu 2 beklenen Error satiri hata sayilmaz,
+# ama sayilari TAM 2 olmali (eksik = log Error'a dusurulmemis, fazla = beklenmeyen).
+$expectedErrorPattern = 'LogMMOLifecycle: Error: event=shutdown_cmdline_rejected'
+$expectedErrorLines = @($lines | Select-String $expectedErrorPattern)
+$errors = @($lines | Select-String '\[MMO_LIFECYCLE_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation' | Where-Object { $_.Line -notmatch $expectedErrorPattern })
+if ($expectedErrorLines.Count -ne 2) { $errors += [pscustomobject]@{ Line = "expected_cmdline_error_lines=2 observed=$($expectedErrorLines.Count)" } }
 $summaries | ForEach-Object { Write-Output $_.Line }
 $errors | ForEach-Object { Write-Output $_.Line }
 # Kontrol sayisi, ozet satiri ve tek tek CASE satirlari birbiriyle tutarli olmali (sessizce eksik kosan test gecmesin).
@@ -45,7 +50,7 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
 # Beklenen = LifecycleTestExpectedChecks (MMOServerLifecycleSelfTest.cpp); CASE sayisi = benzersiz case/check etiketi.
-$expected = 90
+$expected = 137
 $consistent = ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_LIFECYCLE_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }

@@ -11,6 +11,7 @@
 #include "Player/MMOPlayerController.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
+#include "Misc/OutputDeviceRedirector.h"
 #include "Misc/Parse.h"
 #include "Misc/StringOutputDevice.h"
 
@@ -20,7 +21,7 @@
 // Her Check benzersiz case/check cifti basar. Anonim namespace adlari LifecycleTest onekli (unity-build tuzagi).
 namespace
 {
-	constexpr int32 LifecycleTestExpectedChecks = 90;
+	constexpr int32 LifecycleTestExpectedChecks = 137;
 
 	UWorld* LifecycleTestFindWorld(UWorld* Hint)
 	{
@@ -33,6 +34,65 @@ namespace
 			}
 		}
 		return nullptr;
+	}
+
+	int32 LifecycleTestCountMMOControllers(UWorld* World)
+	{
+		int32 Count = 0;
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (Cast<AMMOPlayerController>(It->Get())) ++Count;
+		}
+		return Count;
+	}
+
+	// LogMMOLifecycle satirlarini yakalar (Warning/Error beklentileri icin). Okumadan once Sync().
+	class FLifecycleTestLogCapture final : public FOutputDevice
+	{
+	public:
+		FLifecycleTestLogCapture() { GLog->AddOutputDevice(this); }
+		virtual ~FLifecycleTestLogCapture() override { GLog->RemoveOutputDevice(this); }
+		void Sync() { GLog->Flush(); }
+		int32 Count(ELogVerbosity::Type Verbosity, const TCHAR* Needle) const
+		{
+			int32 N = 0;
+			for (const FLine& L : Lines)
+			{
+				if (L.Verbosity == Verbosity && L.Text.Contains(Needle)) ++N;
+			}
+			return N;
+		}
+		virtual void Serialize(const TCHAR* Text, ELogVerbosity::Type Verbosity, const FName& Category) override
+		{
+			if (Category == LogMMOLifecycle.GetCategoryName())
+			{
+				Lines.Add({ static_cast<ELogVerbosity::Type>(Verbosity & ELogVerbosity::VerbosityMask), FString(Text) });
+			}
+		}
+	private:
+		struct FLine { ELogVerbosity::Type Verbosity; FString Text; };
+		TArray<FLine> Lines;
+	};
+
+	// Ek dunya (ServerTravel/PIE benzetimi). bAddContext: GEngine dunya baglamina da eklenir (duyuru taramasi gorsun).
+	UWorld* LifecycleTestCreateWorld(EWorldType::Type Type, const TCHAR* Name, bool bAddContext)
+	{
+		UWorld* W = UWorld::CreateWorld(Type, false, FName(Name));
+		if (W && bAddContext && GEngine)
+		{
+			FWorldContext& Context = GEngine->CreateNewWorldContext(Type);
+			Context.SetCurrentWorld(W);
+			// Aktorler baslatilmadan SpawnActor bilesenleri baslatmaz (denetleyici dunya listesine girmez).
+			W->InitializeActorsForPlay(FURL());
+		}
+		return W;
+	}
+
+	void LifecycleTestDestroyWorld(UWorld* W, bool bHadContext)
+	{
+		if (!W) return;
+		if (bHadContext && GEngine) GEngine->DestroyWorldContext(W);
+		W->DestroyWorld(false);
 	}
 
 	FString LifecycleTestPreLogin(AGameModeBase* GameMode)
@@ -137,6 +197,12 @@ namespace
 		UMMOServerLifecycleSubsystem::ResetPlanForTest();
 		Check(TEXT("world"), TEXT("idle_at_start"), Sub->GetPhase() == P::Idle && !Sub->IsLoginClosed());
 		Check(TEXT("world"), TEXT("prelogin_open_at_start"), LifecycleTestPreLogin(GameMode).IsEmpty());
+		// Alici sayisi vakasi 0==0 ile bos gecmesin: canli dunyada MMO denetleyicisi yoksa bir tane dogurulur (sonda yok edilir).
+		AMMOPlayerController* TestMMOPC = nullptr;
+		if (LifecycleTestCountMMOControllers(World) == 0)
+		{
+			TestMMOPC = World->SpawnActor<AMMOPlayerController>();
+		}
 
 		// 6) Konsol komutu ile 60 sn: duyuru + Closing + PreLogin reddi (gercek GameMode->PreLogin -> motor olayi).
 		{
@@ -150,12 +216,9 @@ namespace
 			Check(TEXT("sched60"), TEXT("message_count"), Sent.Num() == 2);
 			Check(TEXT("sched60"), TEXT("message_announce"), Sent.Num() == 2 && Sent[0] == TEXT("Bakim: sunucu 1 dakika icinde kapanacak. Ilerlemen kaydedilecek."));
 			Check(TEXT("sched60"), TEXT("message_closed"), Sent.Num() == 2 && Sent[1] == TEXT("Bakim: yeni girisler kapandi."));
-			int32 MMOControllers = 0;
-			for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
-			{
-				if (Cast<AMMOPlayerController>(It->Get())) ++MMOControllers;
-			}
-			Check(TEXT("sched60"), TEXT("recipient_count_matches_mmo_controllers"), Sub->GetLastRecipientCount() == MMOControllers);
+			const int32 MMOControllers = LifecycleTestCountMMOControllers(World);
+			Check(TEXT("sched60"), TEXT("recipient_precondition_has_mmo_controller"), MMOControllers >= 1);
+			Check(TEXT("sched60"), TEXT("recipient_count_matches_mmo_controllers"), MMOControllers >= 1 && Sub->GetLastRecipientCount() == MMOControllers);
 			UE_LOG(LogTemp, Display, TEXT("[MMO_LIFECYCLE_INFO] mmo_controllers=%d"), MMOControllers);
 			Check(TEXT("sched60"), TEXT("prelogin_rejected_text"), LifecycleTestPreLogin(GameMode) == MMOServerLifecycle::LoginRejectText());
 			// Baska bir hata zaten doluysa bizim ret ustune yazmaz (motor ApproveLogin/diger abone hatasi korunur).
@@ -273,6 +336,138 @@ namespace
 			}
 		}
 
+		// 12) Tick yolu: duvar saati farki aynen uygulanir, son tick zamani guncellenir, ilk tick bosta sureyi saymaz.
+		{
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Check(TEXT("tick"), TEXT("counting_is_tickable"), Sub->IsTickable());
+			Sub->SetLastTickTimeForTest(1000.0);
+			Sub->TickWithWallClock(1010.0);
+			Check(TEXT("tick"), TEXT("delta_applied"), FMath::IsNearlyEqual(Sub->GetRemainingSeconds(), 590.0, 1e-6));
+			Sub->TickWithWallClock(1020.0);
+			Check(TEXT("tick"), TEXT("last_tick_time_updated"), FMath::IsNearlyEqual(Sub->GetRemainingSeconds(), 580.0, 1e-6));
+			Sub->SetLastTickTimeForTest(0.0);
+			Sub->TickWithWallClock(9000.0);
+			Check(TEXT("tick"), TEXT("first_tick_counts_no_idle_gap"), FMath::IsNearlyEqual(Sub->GetRemainingSeconds(), 580.0, 1e-6));
+			Sub->TickWithWallClock(9010.0);
+			Check(TEXT("tick"), TEXT("first_tick_records_clock"), FMath::IsNearlyEqual(Sub->GetRemainingSeconds(), 570.0, 1e-6));
+			// Exiting'e varinca: Warning loglanir, tick durur (L1'de cikis yok).
+			FLifecycleTestLogCapture Capture;
+			Sub->TickWithWallClock(9700.0);
+			Capture.Sync();
+			Check(TEXT("tick"), TEXT("exiting_reached"), Sub->GetPhase() == P::Exiting);
+			Check(TEXT("tick"), TEXT("exiting_not_tickable"), !Sub->IsTickable());
+			Check(TEXT("tick"), TEXT("exiting_warning_logged"), Capture.Count(ELogVerbosity::Warning, TEXT("shutdown_exiting_not_implemented")) == 1);
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+		}
+
+		// 13) Komut satiri ayristirma (saf).
+		{
+			double S = -1.0; R Reason = R::Emergency; FString Err;
+			using CL = L::ECmdLineShutdown;
+			Check(TEXT("cmdline"), TEXT("not_requested"), L::ParseCmdLineShutdown(TEXT("-game -log -port=7777"), S, Reason, Err) == CL::NotRequested);
+			Check(TEXT("cmdline"), TEXT("null_not_requested"), L::ParseCmdLineShutdown(nullptr, S, Reason, Err) == CL::NotRequested);
+			Check(TEXT("cmdline"), TEXT("ok_seconds_default_reason"), L::ParseCmdLineShutdown(TEXT("-game -MMOShutdownAfterSeconds=60"), S, Reason, Err) == CL::Ok && S == 60.0 && Reason == R::Maintenance);
+			Check(TEXT("cmdline"), TEXT("ok_with_reason"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=300 -MMOMaintenanceReason=acil"), S, Reason, Err) == CL::Ok && S == 300.0 && Reason == R::Emergency);
+			Check(TEXT("cmdline"), TEXT("ok_quoted_values"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=\"120\" -MMOMaintenanceReason=\"guncelleme\""), S, Reason, Err) == CL::Ok && S == 120.0 && Reason == R::Update);
+			Check(TEXT("cmdline"), TEXT("empty_value_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds= -log"), S, Reason, Err) == CL::Invalid && !Err.IsEmpty());
+			Check(TEXT("cmdline"), TEXT("only_reason_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOMaintenanceReason=acil"), S, Reason, Err) == CL::Invalid && !Err.IsEmpty());
+			Check(TEXT("cmdline"), TEXT("below_min_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=10"), S, Reason, Err) == CL::Invalid && Err.Contains(TEXT("30..86400")));
+			Check(TEXT("cmdline"), TEXT("above_max_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=86401"), S, Reason, Err) == CL::Invalid);
+			Check(TEXT("cmdline"), TEXT("min_boundary_ok"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=30"), S, Reason, Err) == CL::Ok && S == 30.0);
+			Check(TEXT("cmdline"), TEXT("max_boundary_ok"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=86400"), S, Reason, Err) == CL::Ok && S == 86400.0);
+			Check(TEXT("cmdline"), TEXT("bad_reason_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=60 -MMOMaintenanceReason=serbest"), S, Reason, Err) == CL::Invalid);
+			Check(TEXT("cmdline"), TEXT("empty_reason_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=60 -MMOMaintenanceReason= -log"), S, Reason, Err) == CL::Invalid);
+			Check(TEXT("cmdline"), TEXT("letters_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=abc"), S, Reason, Err) == CL::Invalid);
+			Check(TEXT("cmdline"), TEXT("negative_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=-5"), S, Reason, Err) == CL::Invalid);
+			Check(TEXT("cmdline"), TEXT("spaced_value_invalid"), L::ParseCmdLineShutdown(TEXT("-MMOShutdownAfterSeconds=\"60 acil\""), S, Reason, Err) == CL::Invalid);
+		}
+
+		// 14) Komut satiri tetikleyicisi: Shipping kapisi, Error logu, anahtar tuketimi. (Beklenen 2 Error satiri: TestServerLifecycle.ps1 sayar.)
+		{
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			FLifecycleTestLogCapture Capture;
+			Sub->TryScheduleFromCommandLine(TEXT("-game -log"), true);
+			Check(TEXT("cmdapply"), TEXT("unrelated_cmdline_ignored"), Sub->GetPhase() == P::Idle);
+			Sub->TryScheduleFromCommandLine(TEXT("-MMOShutdownAfterSeconds=60"), false);
+			Capture.Sync();
+			Check(TEXT("cmdapply"), TEXT("unsupported_gate_no_plan"), Sub->GetPhase() == P::Idle && !Sub->IsLoginClosed());
+			Check(TEXT("cmdapply"), TEXT("unsupported_warning_logged"), Capture.Count(ELogVerbosity::Warning, TEXT("shutdown_cmdline_unsupported")) == 1);
+			Sub->TryScheduleFromCommandLine(TEXT("-MMOShutdownAfterSeconds=60"), true);
+			Check(TEXT("cmdapply"), TEXT("unsupported_consumes_flag"), Sub->GetPhase() == P::Idle);
+
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			Sub->TryScheduleFromCommandLine(TEXT("-MMOShutdownAfterSeconds=5"), true);
+			Capture.Sync();
+			Check(TEXT("cmdapply"), TEXT("range_rejected_no_plan"), Sub->GetPhase() == P::Idle);
+			Check(TEXT("cmdapply"), TEXT("range_error_logged"), Capture.Count(ELogVerbosity::Error, TEXT("shutdown_cmdline_rejected")) == 1 && Capture.Count(ELogVerbosity::Warning, TEXT("shutdown_cmdline_rejected")) == 0);
+			Sub->TryScheduleFromCommandLine(TEXT("-MMOShutdownAfterSeconds=60"), true);
+			Check(TEXT("cmdapply"), TEXT("range_consumes_flag"), Sub->GetPhase() == P::Idle);
+
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			Sub->TryScheduleFromCommandLine(TEXT("-MMOShutdownAfterSeconds=abc"), true);
+			Capture.Sync();
+			Check(TEXT("cmdapply"), TEXT("invalid_no_plan"), Sub->GetPhase() == P::Idle);
+			Check(TEXT("cmdapply"), TEXT("invalid_error_logged"), Capture.Count(ELogVerbosity::Error, TEXT("shutdown_cmdline_rejected")) == 2);
+
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			Sub->TryScheduleFromCommandLine(TEXT("-MMOShutdownAfterSeconds=90 -MMOMaintenanceReason=guncelleme"), true);
+			Check(TEXT("cmdapply"), TEXT("valid_schedules"), Sub->GetPhase() == P::Counting && Sub->GetReason() == R::Update);
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+		}
+
+		// 15) Duyuru, bu alt sistemin dunyasi disindaki sunucu dunyalarina da gider (ServerTravel penceresi).
+		{
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			const int32 Primary = LifecycleTestCountMMOControllers(World);
+			UWorld* Extra = LifecycleTestCreateWorld(EWorldType::Game, TEXT("LifecycleTestExtraGame"), true);
+			AMMOPlayerController* ExtraPC = Extra ? Extra->SpawnActor<AMMOPlayerController>() : nullptr;
+			Check(TEXT("multiworld"), TEXT("extra_world_created"), Extra != nullptr);
+			Check(TEXT("multiworld"), TEXT("extra_pc_spawned"), ExtraPC != nullptr && LifecycleTestCountMMOControllers(Extra) == 1);
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Check(TEXT("multiworld"), TEXT("recipients_include_extra_world"), Primary >= 1 && Sub->GetLastRecipientCount() == Primary + 1);
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			LifecycleTestDestroyWorld(Extra, true);
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Check(TEXT("multiworld"), TEXT("recipients_back_to_primary_after_destroy"), Sub->GetLastRecipientCount() == Primary);
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+		}
+
+		// 16) PIE sizintisi: PIE dunyasinin Initialize/Deinitialize'i statik plani sifirlar; Game dunyasininki (ServerTravel) korur.
+		{
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			UWorld* Pie = LifecycleTestCreateWorld(EWorldType::PIE, TEXT("LifecycleTestPie"), false);
+			Check(TEXT("pie"), TEXT("pie_world_created"), Pie != nullptr);
+			Check(TEXT("pie"), TEXT("new_pie_subsystem_starts_idle"), Sub->GetPhase() == P::Idle && !Sub->IsLoginClosed() && LifecycleTestPreLogin(GameMode).IsEmpty());
+			Sub->RequestShutdown(60.0, R::Maintenance, Err);
+			Check(TEXT("pie"), TEXT("plan_active_before_teardown"), Sub->GetPhase() == P::Closing);
+			LifecycleTestDestroyWorld(Pie, false);
+			Check(TEXT("pie"), TEXT("pie_teardown_resets_plan"), Sub->GetPhase() == P::Idle && !Sub->IsLoginClosed() && LifecycleTestPreLogin(GameMode).IsEmpty());
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			UWorld* Travel = LifecycleTestCreateWorld(EWorldType::Game, TEXT("LifecycleTestTravelGame"), false);
+			Check(TEXT("pie"), TEXT("game_world_created"), Travel != nullptr);
+			LifecycleTestDestroyWorld(Travel, false);
+			Check(TEXT("pie"), TEXT("game_world_teardown_keeps_plan"), Sub->GetPhase() == P::Counting);
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+		}
+
+		// 17) Konsol komutu editor (game olmayan) dunyasindan gelirse oyun/PIE dunyasi aranir.
+		{
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			UWorld* NonGame = LifecycleTestCreateWorld(EWorldType::Inactive, TEXT("LifecycleTestInactive"), false);
+			Check(TEXT("execworld"), TEXT("non_game_world_created"), NonGame != nullptr && !NonGame->IsGameWorld());
+			FStringOutputDevice Out;
+			UMMOServerLifecycleSubsystem::HandleExecCommand(NonGame, TEXT("MMOShutdown 600"), Out);
+			Check(TEXT("execworld"), TEXT("falls_back_to_game_world"), Sub->GetPhase() == P::Counting && Out.Contains(TEXT("600 saniye sonra kapanacak")));
+			LifecycleTestDestroyWorld(NonGame, false);
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+		}
+
+		if (TestMMOPC) TestMMOPC->Destroy();
 		UMMOServerLifecycleSubsystem::ResetPlanForTest();
 		Check(TEXT("end"), TEXT("plan_reset"), Sub->GetPhase() == P::Idle && !Sub->IsLoginClosed());
 		if (OutChecks != LifecycleTestExpectedChecks) { ++Failures; OutError += TEXT(" check_count_mismatch"); }
