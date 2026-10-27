@@ -992,6 +992,34 @@ bölümüyle uyumludur.*
   yolun sonunda kasaya değil, ardında bıraktığına bakılır."
   - *Dönüşte:* "Elli bin altın bıraktın. Bütün bölge adını anıyor, evlat. En zengin yolcu,
     geride bir iyilik bırakandır; unutma."
+- **Pazar Bağışçısı** *(Q_Gold41000)* — "Kırk bir bin altını pazarın kasasına bağışla,
+  evlat; tezgâhlar ayakta kalsın, kervanlar yolunu şaşırmasın. Verilen altın geri gelmez."
+  - *Dönüşte:* "Kırk bir bin altın… Pazar bunu unutmaz, evlat. Tezgâhlar senin sayende
+    açık; ama verdiğinle övünme, veren el sessiz olur."
+- **Şehir Bağışçısı** *(Q_Gold160000)* — "Yüz altmış bin altını şehrin surlarına bağışla,
+  evlat; taş da demir de altınla örülür. Bu altın geri dönmez, ama sur dönmez."
+  - *Dönüşte:* "Yüz altmış bin altın… Sur bir kat daha yükseldi, evlat. Kapı bekçileri
+    adını anacak; sen yine de kılıcını paslandırma."
+- **Kale Bağışçısı** *(Q_Gold310000)* — "Üç yüz on bin altını kalenin ocağına bağışla,
+  evlat; Kış Diyarı'nın ayazında kale sıcak tutulur, sıcak da altınla alınır."
+  - *Dönüşte:* "Üç yüz on bin altın… Kalenin ocağı bu kış sönmeyecek, evlat. Ayaz seni
+    değil, vereni sever; adın surlarda kalsın."
+- **Krallık Bağışçısı** *(Q_Gold440000)* — "Dört yüz kırk bin altını krallığın kasasına
+  bağışla, evlat; Kuzey Yolu'nun nöbeti bedavaya tutulmaz. Altın gider, söz kalır."
+  - *Dönüşte:* "Dört yüz kırk bin altın verdin. Kuzey Yolu'nun nöbetçileri bu gece daha
+    rahat uyur, evlat. Krallık borcunu unutmaz; sen de yükünü unutma."
+- **Taç Bağışçısı** *(Q_Gold710000)* — "Yedi yüz on bin altını tacın hazinesine bağışla,
+  evlat; bu ağırlığı taşıyan az çıkar. Altın geri gelmez, ama taç seni görür."
+  - *Dönüşte:* "Yedi yüz on bin altın… Taç ağırlaştı, kesen hafifledi, evlat. Hafif
+    kese iyidir; kılıç tutan elin yükü az olur."
+- **Hazine Bağışçısı** *(Q_Gold1100000)* — "Bir milyon yüz bin altını hazineye bırak,
+  evlat; Fısıltı'nın gölgesi uzadıkça kasalar da derinleşmeli. Bu yük geri dönmez."
+  - *Dönüşte:* "Bir milyon yüz bin altın… Hazinenin dibi göründü diyenler artık
+    susar, evlat. Bu kadar servet bırakan, bir de cesaretini bırakmasın."
+- **Efsane Bağışçısı** *(Q_Gold1500000)* — "Bir milyon beş yüz bin altını bağışla,
+  evlat; destanlara geçen bağışlar böyle olur. Altın gider, ad kalır."
+  - *Dönüşte:* "Bir milyon beş yüz bin altın. Kasalar seni anlatır, ozanlar da bir gün
+    anlatır, evlat. Ama unutma: destan altınla değil, vazgeçmekle yazılır."
 
 ## Depocu Rana: Ortak Defter
 
