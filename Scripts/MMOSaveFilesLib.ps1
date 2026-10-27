@@ -607,6 +607,7 @@ function New-MMOManifest {
         [ValidateSet('quiesced', 'live')][string]$Mode = 'quiesced',
         $ShutdownProof = $null,
         [string]$CreatedUtc = '',
+        [string[]]$UnstablePaths = @(),
         [switch]$AllowRootAncestorReparse
     )
     if ($CreatedUtc -eq '') { $CreatedUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture) }
@@ -619,18 +620,28 @@ function New-MMOManifest {
     }
     $coll = @(Find-MMOCollisions $rels)
     if ($coll.Count -gt 0) { throw ('collision:' + (@($coll[0]) -join '|')) }
+    # B1: canli yedekte kararsiz kalan dosyalar (UnstablePaths) valid=false notes='unstable' olarak isaretlenir (iceriginden turetilemez;
+    # Test-MMOSnapshot bunu yalniz "gecersiz" yonunde kabul eder). Goruntude olmayan yol = throw.
+    $unstableSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($u in @($UnstablePaths)) { [void]$unstableSet.Add([string]$u) }
+    $relSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($rel in $rels) { [void]$relSet.Add($rel) }
+    foreach ($u in $unstableSet) { if (-not $relSet.Contains($u)) { throw ('unstable_path_unknown:' + $u) } }
     $entries = New-Object System.Collections.ArrayList
     foreach ($rel in $rels) {
         $c = Get-MMOSaveFileClass $rel
         $full = Resolve-MMOSafePath -Root $FilesRoot -RelPath $rel -MustExist -AllowRootAncestorReparse:$AllowRootAncestorReparse
         try { $info = Get-MMOFileSnapshotInfo -Path $full -ClassInfo $c } catch { throw ('file_unreadable:' + $rel + ':' + $_.Exception.Message) }
+        $eValid = $info.Valid
+        $eNotes = $info.Notes
+        if ($unstableSet.Contains($rel)) { $eValid = $false; $eNotes = 'unstable' }
         [void]$entries.Add([ordered]@{
             path = $rel
             class = $c.Class
             size = $info.Size
             sha256 = $info.Sha256
-            valid = $info.Valid
-            notes = $info.Notes
+            valid = $eValid
+            notes = $eNotes
         })
     }
     $arr = $entries.ToArray()
@@ -832,6 +843,11 @@ function Test-MMOSnapshot {
             if ($isInvalid) { [void]$invalid.Add($e.path) }
             continue
         }
+        if (($e.notes -ceq 'unstable') -and ($e.valid -eq $false)) {
+            # B1 canli yedek: kararsizlik icerikten yeniden hesaplanamaz; yalniz "gecersiz" yonunde kabul edilir (valid=true + unstable = uyusmazlik).
+            [void]$invalid.Add($e.path)
+            continue
+        }
         $integ = Get-MMOBytesIntegrity -Bytes $bytes -ClassInfo (Get-MMOSaveFileClass $e.path)
         if ([bool]$integ.Valid -ne [bool]$e.valid) { [void]$errs.Add('valid_mismatch:' + $e.path) }
         elseif ([string]$integ.Notes -cne [string]$e.notes) { [void]$errs.Add('notes_mismatch:' + $e.path) }
@@ -848,4 +864,58 @@ function Test-MMOSnapshot {
         Ok = ($errs.Count -eq 0); Incomplete = $false
         Errors = @($errs.ToArray()); Extra = @($extra.ToArray()); InvalidEntries = @($invalid.ToArray())
     }
+}
+
+# ---- B1: yedek alma yardimcilari (BackupSaves.ps1) ----------------------------------------------------------------------
+function Get-MMOBlockingProcesses {
+    # Yedegi engelleyen UE/derleme surecleri (kalip: build.ps1 Assert-NoUnrealRunning). Girdi: Name/ProcessId/CommandLine uyeli nesneler
+    # (Win32_Process ya da test saglayicisi). dotnet.exe: komut satiri bos (okunamadi) ya da UBT/UAT/UE ise engeller.
+    param($Processes)
+    $out = New-Object System.Collections.ArrayList
+    foreach ($p in @($Processes)) {
+        if ($null -eq $p) { continue }
+        $name = [string](Get-MMOMember $p 'Name')
+        $cmd = [string](Get-MMOMember $p 'CommandLine')
+        $hit = $false
+        if ($name -match '^(UnrealEditor.*|LiveCoding.*|UnrealBuildTool.*|AutomationTool.*|MSBuild|UAT|MyProject(?:Server|Client)?(?:-.*)?)\.exe$') { $hit = $true }
+        elseif ($name -eq 'dotnet.exe') {
+            if ([string]::IsNullOrWhiteSpace($cmd) -or $cmd -match 'UnrealBuildTool|AutomationTool|RunUAT|Epic Games[\\/]UE_') { $hit = $true }
+        }
+        if ($hit) { [void]$out.Add([pscustomobject]@{ Name = $name; ProcessId = (Get-MMOMember $p 'ProcessId') }) }
+    }
+    return $out.ToArray()
+}
+
+function Read-MMOShutdownResult {
+    # Saved\Logs\MMOShutdownResult.json (yalniz OKUNUR): run_id ^[0-9TZ-]{1,40}$, exit_code tam sayi 0..255, time_utc (UE ISO8601, kesirli saniye
+    # olabilir; kanonik saniyeye indirilir). Donus: Ok, Reason ('' | shutdown_result_missing | shutdown_result_invalid | shutdown_not_clean), Proof.
+    # Ok yalniz exit_code=0 iken $true. Dosya tek basina "sunucu simdi kapali" kaniti DEGILDIR (surec denetimi ayri kapi).
+    param([string]$SavedDir)
+    try { $saved = (ConvertTo-MMOFullPath $SavedDir).TrimEnd('\') } catch { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $logs = $saved + '\Logs'
+    $file = $logs + '\MMOShutdownResult.json'
+    $la = Get-MMOAttributes $logs
+    if ($la.State -eq 'missing') { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_missing'; Proof = $null } }
+    if ($la.State -ne 'ok' -or (($la.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $fa = Get-MMOAttributes $file
+    if ($fa.State -eq 'missing') { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_missing'; Proof = $null } }
+    if ($fa.State -ne 'ok' -or (($fa.Attributes -band ([IO.FileAttributes]::ReparsePoint -bor [IO.FileAttributes]::Directory)) -ne 0)) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    try { $bytes = Read-MMOFileBytes -Path $file -MaxBytes 65536 } catch { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    try {
+        $r = ConvertFrom-MMOUtf8Bytes $bytes
+        $o = $r.Text | ConvertFrom-Json -ErrorAction Stop
+    } catch { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    if ($null -eq $o -or $o -isnot [pscustomobject]) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $rid = Get-MMOMember $o 'run_id'
+    if ($rid -isnot [string] -or $rid -cnotmatch '^[0-9TZ-]{1,40}\z') { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $ec = Get-MMOMember $o 'exit_code'
+    if (-not (($ec -is [int]) -or ($ec -is [long])) -or $ec -lt 0 -or $ec -gt 255) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $tv = Get-MMOMember $o 'time_utc'
+    if ($null -eq $tv -or (($tv -isnot [string]) -and ($tv -isnot [datetime]))) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $ts = ConvertTo-MMOUtcString $tv
+    $ts = [regex]::Replace($ts, '^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})\.[0-9]{1,7}Z\z', '$1Z')
+    if (-not (Test-MMOUtcStamp $ts)) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_result_invalid'; Proof = $null } }
+    $proof = [ordered]@{ run_id = $rid; exit_code = [int]$ec; time_utc = $ts }
+    if ([int]$ec -ne 0) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_not_clean'; Proof = $proof } }
+    return [pscustomobject]@{ Ok = $true; Reason = ''; Proof = $proof }
 }

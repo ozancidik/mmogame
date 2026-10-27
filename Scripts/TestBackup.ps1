@@ -1,4 +1,5 @@
-# Kayit dosyalari yedekleme kutuphanesi testi (docs/DESIGN_BACKUP.md, dilim B0): Scripts/MMOSaveFilesLib.ps1 saf mantik + fikstur.
+# Kayit dosyalari yedekleme kutuphanesi testi (docs/DESIGN_BACKUP.md, dilim B0 + B1): Scripts/MMOSaveFilesLib.ps1 saf mantik + fikstur;
+# B1 = Scripts/BackupSaves.ps1 fikstur Saved/yedek koku uzerinde (surec denetimi sahte saglayiciyla; gercek surec taramasi cagrilmaz).
 # Her sey gecici fikstur dizininde calisir (sentetik .sav/JSON); GERCEK Saved/ okunmaz ve yazilmaz. Tek istisna: "degismedi" kaniti
 # icin gercek Saved\{SaveGames,MMOAchievements,MMODaily,MMOMail,MMORace} altinin YALNIZ dosya adi + boyut + zaman damgasi listesi
 # (icerik okunmaz) testin basinda ve sonunda alinip karsilastirilir.
@@ -13,7 +14,7 @@ if ($RepoRoot -eq '') { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 . (Join-Path $PSScriptRoot 'MMOSaveFilesLib.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi (asagidaki bolumlerin toplami; degisirse burada guncelle).
-$expected = 759
+$expected = 955
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -1071,6 +1072,527 @@ try {
     $bigRev = $big.ToArray(); [Array]::Reverse($bigRev)
     Check 'digest' 'ten_thousand_order_independent' ((Get-MMOEntriesDigest $bigRev) -ceq $bigDigest)
 
+    # ---- 15. B1: kutuphane eklemeleri (kararsiz dosya, surec/kapanis okuyucular) -------------------------------------------
+    $pTable = @(
+        @('UnrealEditor.exe', '', $true), @('UnrealEditor-Cmd.exe', '', $true), @('UnrealEditor-Win64-DebugGame.exe', '', $true), @('unrealeditor.exe', '', $true),
+        @('LiveCodingConsole.exe', '', $true), @('UnrealBuildTool.exe', '', $true), @('AutomationTool.exe', '', $true), @('MSBuild.exe', '', $true),
+        @('UAT.exe', '', $true), @('MyProject.exe', '', $true), @('MyProjectServer.exe', '', $true), @('MyProjectClient.exe', '', $true),
+        @('MyProject-Win64-Shipping.exe', '', $true), @('MyProjectServer-Win64-Shipping.exe', '', $true),
+        @('dotnet.exe', 'dotnet C:\x\UnrealBuildTool.dll -Mode=Build', $true), @('dotnet.exe', '', $true), @('dotnet.exe', $null, $true),
+        @('dotnet.exe', 'C:\Program Files\Epic Games\UE_5.7\Engine\x.dll', $true), @('dotnet.exe', 'dotnet RunUAT.dll', $true),
+        @('notepad.exe', '', $false), @('explorer.exe', 'explorer.exe', $false), @('powershell.exe', 'powershell', $false),
+        @('dotnet.exe', 'dotnet C:\tools\foo.dll', $false), @('MyProjectFoo.exe', '', $false), @('MyProjectServers.exe', '', $false),
+        @('UnrealEditor.txt', '', $false), @('xUnrealEditor.exe', '', $false), @('MSBuildX.exe', '', $false)
+    )
+    $pi = 0
+    foreach ($c in $pTable) {
+        $pi++
+        $got = @(Get-MMOBlockingProcesses -Processes @([pscustomobject]@{ Name = $c[0]; ProcessId = $pi; CommandLine = $c[1] }))
+        Check 'procs' ('row' + $pi) ((($got.Count -eq 1) -eq $c[2]) -and ((-not $c[2]) -or ($got[0].Name -ceq $c[0])))
+    }
+    Check 'procs' 'null_element_ignored' (@(Get-MMOBlockingProcesses -Processes @($null, [pscustomobject]@{ Name = 'notepad.exe'; ProcessId = 1; CommandLine = '' })).Count -eq 0)
+    Check 'procs' 'empty_list_no_blockers' (@(Get-MMOBlockingProcesses -Processes @()).Count -eq 0)
+    Check 'procs' 'missing_commandline_member_dotnet_blocks' (@(Get-MMOBlockingProcesses -Processes @([pscustomobject]@{ Name = 'dotnet.exe'; ProcessId = 1 })).Count -eq 1)
+
+    $uDir = Join-Path $fx 'snap_unstable'
+    $uFiles = Join-Path $uDir 'files'
+    [void][IO.Directory]::CreateDirectory($uFiles)
+    New-BaseFiles $uFiles
+    $um = New-MMOManifest -FilesRoot $uFiles -SourceSavedDir $fx -UnstablePaths @('SaveGames/MMOSave_Ali.sav') -CreatedUtc '2026-10-27T10:00:00Z'
+    Write-MMOManifest -Manifest $um -SnapshotDir $uDir
+    $ue = @($um.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' })
+    Check 'unstable' 'entry_marked_invalid' (($ue.Count -eq 1) -and ($ue[0].valid -eq $false) -and ($ue[0].notes -ceq 'unstable'))
+    Check 'unstable' 'hash_still_content_hash' ($ue[0].sha256 -ceq (Get-OracleSha (Join-Path $uFiles 'SaveGames\MMOSave_Ali.sav')))
+    $ut = Test-MMOSnapshot -SnapshotDir $uDir
+    Check 'unstable' 'snapshot_ok_with_unstable_entry' ($ut.Ok -and ($ut.InvalidEntries -contains 'SaveGames/MMOSave_Ali.sav') -and ($ut.InvalidEntries -contains 'SaveGames/MMOSave_Bad.sav'))
+    Check 'unstable' 'other_entries_unaffected' (@($um.entries | Where-Object { $_.notes -ceq 'unstable' }).Count -eq 1)
+    CheckThrows 'unstable' 'unknown_path_throws' { New-MMOManifest -FilesRoot $uFiles -SourceSavedDir $fx -UnstablePaths @('SaveGames/MMOSave_Nope.sav') } 'unstable_path_unknown:'
+    Edit-TestManifest $uDir { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' }).valid = $true } -FixDigest
+    $ut2 = Test-MMOSnapshot -SnapshotDir $uDir
+    Check 'unstable' 'unstable_with_valid_true_rejected' ((-not $ut2.Ok) -and (HasErr $ut2.Errors 'notes_mismatch:SaveGames/MMOSave_Ali.sav'))
+    Edit-TestManifest $uDir { param($m) $e = ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' }); $e.valid = $false; $e.notes = 'tampered' } -FixDigest
+    $ut3 = Test-MMOSnapshot -SnapshotDir $uDir
+    Check 'unstable' 'other_notes_with_valid_false_rejected' ((-not $ut3.Ok) -and (HasErr $ut3.Errors 'valid_mismatch:SaveGames/MMOSave_Ali.sav'))
+    Edit-TestManifest $uDir { param($m) $e = ($m.entries | Where-Object { $_.path -ceq 'MMODaily/MMOSave_Ali.json' }); $e.valid = $false; $e.notes = 'unstable' } -FixDigest
+    $ut4 = Test-MMOSnapshot -SnapshotDir $uDir
+    Check 'unstable' 'conservative_direction_accepts_extra_unstable_flag' (@($ut4.Errors | Where-Object { $_ -like '*MMODaily/MMOSave_Ali.json' }).Count -eq 0)
+
+    # ---- 16. B1: BackupSaves.ps1 (yalniz fikstur Saved/yedek koku; gercek Saved'e dokunulmaz) ----------------------------------
+    $bkScript = Join-Path $PSScriptRoot 'BackupSaves.ps1'
+    $b1 = Join-Path $fx 'b1'
+    [void][IO.Directory]::CreateDirectory($b1)
+    $benign = { @([pscustomobject]@{ Name = 'powershell.exe'; ProcessId = 4; CommandLine = 'x' }, [pscustomobject]@{ Name = 'explorer.exe'; ProcessId = 5; CommandLine = '' }) }
+    $repoReject = Join-Path $RepoRoot ('_mmo_bk_reject_' + $guard)
+    $global:hookCalls = @{}
+
+    function Invoke-TestBackup {
+        param([string]$Saved, [string]$Root, [hashtable]$Extra = @{}, [switch]$RootOutsideFixture)
+        # Kaynak her zaman fikstur icinde olmali: gercek Saved'e hicbir kosuda gitmez.
+        if (-not (Test-MMOPathUnder -Path $Saved -Root $fx)) { throw 'test_guard_saved_outside_fixture' }
+        if ((-not $RootOutsideFixture) -and -not (Test-MMOPathUnder -Path $Root -Root $fx -AllowEqual)) { throw 'test_guard_root_outside_fixture' }
+        $p = @{ SavedDir = $Saved; BackupRoot = $Root; ProcessProvider = $benign }
+        foreach ($k in $Extra.Keys) { $p[$k] = $Extra[$k] }
+        $global:LASTEXITCODE = -999
+        $lines = @(& $bkScript @p *>&1 | ForEach-Object { [string]$_ })
+        return [pscustomobject]@{ Code = $global:LASTEXITCODE; Out = ($lines -join "`n") }
+    }
+    function New-FakeSaved {
+        param([string]$Dir, [switch]$KeepBad)
+        New-BaseFiles $Dir
+        if (-not $KeepBad) { [IO.File]::Delete((Join-Path $Dir 'SaveGames\MMOSave_Bad.sav')) }
+        Write-TestText (Join-Path $Dir 'Logs\app.log') 'log line'
+        Write-TestText (Join-Path $Dir 'Autosaves\x.txt') 'autosave'
+    }
+    function Get-TreeOracle {
+        param([string]$Dir)
+        $l = New-Object System.Collections.ArrayList
+        $base = [IO.Path]::GetFullPath($Dir).TrimEnd('\')
+        if (Test-Path -LiteralPath $Dir) {
+            foreach ($f in (Get-ChildItem -LiteralPath $Dir -Recurse -Force -File)) { [void]$l.Add($f.FullName.Substring($base.Length) + '|' + (Get-OracleSha $f.FullName)) }
+        }
+        $a = [string[]]@($l.ToArray()); [Array]::Sort($a, [StringComparer]::Ordinal)
+        return ($a -join "`n")
+    }
+    function Get-SnapDirs {
+        param([string]$Root)
+        if (-not (Test-Path -LiteralPath $Root)) { return @() }
+        return @(Get-ChildItem -LiteralPath $Root -Force | ForEach-Object { $_.Name })
+    }
+    function Read-TestManifest {
+        param([string]$Snap)
+        return ((Read-MMOUtf8Text (Join-Path $Snap 'manifest.json')).Text | ConvertFrom-Json)
+    }
+
+    # 16a Varsayilanlar (K1) ve ASCII
+    $perr = $null
+    $past = [System.Management.Automation.Language.Parser]::ParseFile($bkScript, [ref]$null, [ref]$perr)
+    $pdef = @{}
+    foreach ($pp in $past.ParamBlock.Parameters) { if ($null -ne $pp.DefaultValue) { $pdef[$pp.Name.VariablePath.UserPath] = $pp.DefaultValue.Extent.Text } }
+    Check 'bk_defaults' 'script_parses' (($null -eq $perr) -or ($perr.Count -eq 0))
+    Check 'bk_defaults' 'saved_default_is_repo_saved' ($pdef['SavedDir'] -like "*'Saved'*" -and $pdef['SavedDir'] -like '*Split-Path -Parent $PSScriptRoot*')
+    Check 'bk_defaults' 'backup_root_default_outside_repo' ($pdef['BackupRoot'] -like "*'MMOBackups'*" -and $pdef['BackupRoot'] -like '*Split-Path -Parent (Split-Path -Parent $PSScriptRoot)*')
+    Check 'bk_defaults' 'script_is_ascii' (-not (([IO.File]::ReadAllBytes($bkScript)) | Where-Object { $_ -gt 127 }))
+
+    # 16b Temiz yedek
+    $sA = Join-Path $b1 'sA'; $rA = Join-Path $b1 'rA'
+    New-FakeSaved $sA
+    Write-TestText (Join-Path $sA 'SaveGames\notes.txt') 'not whitelisted'
+    Write-TestText (Join-Path $sA 'SaveGames\other.sav') 'not MMOSave_'
+    Write-TestText (Join-Path $sA 'MMOMail\sub\deep.json') '{"version":1}'
+    $treeA0 = Get-TreeOracle $sA
+    $stampA0 = Get-SavedStamp -SavedRoot $sA
+    $expRel = @('MMOAchievements/MMOSave_Ali.json', 'MMOAchievements/MMOSave_Ali.json.bad', 'MMODaily/MMOSave_Ali.json', 'MMODaily/MMOSave_Ali.json.tmp',
+        'MMOMail/MMOMail_ali.json', 'MMOMail/MMOMail_ali.json.bak', 'MMOMail/MMOMail_ali_baba.json', 'MMORace/MMORace_mmosave_ali.json',
+        'MMORace/MMORace_mmosave_ali.json.bad', 'SaveGames/MMOSave_Ali Baba.sav', 'SaveGames/MMOSave_Ali.sav')
+    $a1 = Invoke-TestBackup $sA $rA @{ Timestamp = '20261027T100000Z'; Label = 'ok' }
+    $snapA = Join-Path $rA '20261027T100000Z-ok'
+    Check 'bk_ok' 'exit_0' ($a1.Code -eq 0)
+    Check 'bk_ok' 'status_line' ($a1.Out -like '*[[]MMO_BACKUP] status=ok reason=ok exit=0*')
+    Check 'bk_ok' 'root_created_with_only_the_snapshot' ((@(Get-SnapDirs $rA)).Count -eq 1 -and (Test-Path -LiteralPath $snapA -PathType Container))
+    Check 'bk_ok' 'lock_released_and_removed' (-not (Test-Path -LiteralPath (Join-Path $rA '.lock')))
+    $tA = Test-MMOSnapshot -SnapshotDir $snapA
+    Check 'bk_ok' 'own_verification_ok' ($tA.Ok -and -not $tA.Incomplete -and $tA.InvalidEntries.Count -eq 0 -and $tA.Extra.Count -eq 0)
+    $mA = Read-TestManifest $snapA
+    $gotRel = [string[]]@($mA.entries | ForEach-Object { $_.path }); [Array]::Sort($gotRel, [StringComparer]::Ordinal)
+    $wantRel = [string[]]@($expRel); [Array]::Sort($wantRel, [StringComparer]::Ordinal)
+    Check 'bk_ok' 'entries_are_exactly_the_whitelisted_files' (($gotRel -join '|') -ceq ($wantRel -join '|') -and $mA.entries.Count -eq 11)
+    $hashOk = $true; $copyOk = $true; $sizeOk = $true
+    foreach ($e in $mA.entries) {
+        $srcF = Join-Path $sA ($e.path.Replace('/', '\')); $dstF = Join-Path (Join-Path $snapA 'files') ($e.path.Replace('/', '\'))
+        if ($e.sha256 -cne (Get-OracleSha $srcF)) { $hashOk = $false }
+        if ((Get-OracleSha $dstF) -cne (Get-OracleSha $srcF)) { $copyOk = $false }
+        if ([long]$e.size -ne (Get-Item -LiteralPath $srcF).Length) { $sizeOk = $false }
+        if ($e.valid -ne $true) { $hashOk = $false }
+    }
+    Check 'bk_ok' 'manifest_hashes_match_independent_oracle_and_all_valid' $hashOk
+    Check 'bk_ok' 'copies_are_byte_identical' $copyOk
+    Check 'bk_ok' 'manifest_sizes_match' $sizeOk
+    Check 'bk_ok' 'manifest_mode_quiesced' ($mA.mode -ceq 'quiesced')
+    Check 'bk_ok' 'manifest_shutdown_proof_null_without_flag' ($null -eq $mA.shutdown_proof)
+    Check 'bk_ok' 'manifest_source_dir_recorded' ($mA.source_saved_dir -ceq [IO.Path]::GetFullPath($sA).TrimEnd('\'))
+    Check 'bk_ok' 'ignored_count_reported' ($a1.Out -like '*ignored=3*')
+    Check 'bk_ok' 'ignored_names_in_console_only' ($a1.Out -like '*[[]MMO_BACKUP_IGNORED] SaveGames/notes.txt*')
+    $filesA = Join-Path $snapA 'files'
+    Check 'bk_ok' 'ignored_files_not_copied' (-not (Test-Path -LiteralPath (Join-Path $filesA 'SaveGames\notes.txt')) -and -not (Test-Path -LiteralPath (Join-Path $filesA 'SaveGames\other.sav')) -and -not (Test-Path -LiteralPath (Join-Path $filesA 'MMOMail\sub')))
+    Check 'bk_ok' 'logs_and_autosaves_not_copied' (-not (Test-Path -LiteralPath (Join-Path $filesA 'Logs')) -and -not (Test-Path -LiteralPath (Join-Path $filesA 'Autosaves')))
+    Check 'bk_ok' 'no_partial_files_left' (@(Get-ChildItem -LiteralPath $snapA -Recurse -Force -File | Where-Object { $_.Name -like '*.partial' }).Count -eq 0)
+    $logPathA = Join-Path $snapA 'backup.log'
+    $logA = ''
+    if (Test-Path -LiteralPath $logPathA) { $logA = [IO.File]::ReadAllText($logPathA) }
+    Check 'bk_ok' 'backup_log_status_ok' ($logA -like '*status=ok*')
+    Check 'bk_ok' 'backup_log_manifest_sha_matches_manifest_file' ($logA -like ('*manifest_sha256=' + (Get-OracleSha (Join-Path $snapA 'manifest.json')) + '*'))
+    Check 'bk_ok' 'backup_log_has_no_player_data' (($logA -cnotmatch 'Ali|Baba|Gezgin|notes\.txt') -and ($logA.Length -gt 0))
+    Check 'bk_ok' 'console_prints_manifest_sha' ($a1.Out -like ('*manifest_sha256=' + (Get-OracleSha (Join-Path $snapA 'manifest.json')) + '*'))
+    Check 'bk_ok' 'source_tree_byte_identical_after' ((Get-TreeOracle $sA) -ceq $treeA0)
+    Check 'bk_ok' 'source_stamp_unchanged_after' ((Get-SavedStamp -SavedRoot $sA).Digest -ceq $stampA0.Digest)
+
+    # 16c Birden fazla yedek: silme yok, var olan goruntu uzerine yazma yok, varsayilan saat damgasi
+    $manShaA = Get-OracleSha (Join-Path $snapA 'manifest.json')
+    $a2 = Invoke-TestBackup $sA $rA @{ Timestamp = '20261027T100001Z'; Label = 'ok2' }
+    Check 'bk_multi' 'second_backup_exit_0' ($a2.Code -eq 0)
+    $a3 = Invoke-TestBackup $sA $rA @{ Timestamp = '20261027T100000Z'; Label = 'ok' }
+    Check 'bk_multi' 'same_name_refused_exit_1' (($a3.Code -eq 1) -and ($a3.Out -like '*reason=snapshot_exists*'))
+    Check 'bk_multi' 'refused_run_did_not_touch_existing_snapshot' ((Get-OracleSha (Join-Path $snapA 'manifest.json')) -ceq $manShaA -and -not ((Get-Content -LiteralPath $logPathA -Raw) -like '*snapshot_exists*'))
+    Check 'bk_multi' 'both_snapshots_still_present_nothing_deleted' ((@(Get-SnapDirs $rA)).Count -eq 2)
+    $a4 = Invoke-TestBackup $sA $rA @{ Label = 'now' }
+    $nowDirs = @(Get-SnapDirs $rA | Where-Object { $_ -cmatch '^[0-9]{8}T[0-9]{6}Z-now\z' })
+    Check 'bk_multi' 'default_clock_name_and_exit_0' (($a4.Code -eq 0) -and ($nowDirs.Count -eq 1))
+    $nowStamp = [datetime]::ParseExact($nowDirs[0].Substring(0, 16), "yyyyMMdd'T'HHmmss'Z'", [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal)
+    Check 'bk_multi' 'default_clock_is_now_utc' ([math]::Abs(([datetime]::UtcNow - $nowStamp).TotalSeconds) -lt 300)
+    $a5 = Invoke-TestBackup $sA $rA @{ Timestamp = '20261027T100002Z'; Label = '' }
+    Check 'bk_multi' 'empty_label_name_is_timestamp_only' (($a5.Code -eq 0) -and (Test-Path -LiteralPath (Join-Path $rA '20261027T100002Z') -PathType Container))
+    Check 'bk_multi' 'first_snapshot_manifest_unchanged_after_more_runs' ((Get-OracleSha (Join-Path $snapA 'manifest.json')) -ceq $manShaA)
+    Check 'bk_multi' 'source_still_unchanged' ((Get-TreeOracle $sA) -ceq $treeA0)
+
+    # 16d Surec denetimi (canli sunucu/editor)
+    $procBlock = @('UnrealEditor.exe', 'UnrealEditor-Cmd.exe', 'MyProjectServer.exe', 'MyProjectServer-Win64-Shipping.exe', 'MyProject.exe', 'UnrealBuildTool.exe')
+    $bi = 0
+    foreach ($pn in $procBlock) {
+        $bi++
+        $rB = Join-Path $b1 ('rB' + $bi)
+        $nameCopy = $pn
+        $prov = { @([pscustomobject]@{ Name = 'explorer.exe'; ProcessId = 1; CommandLine = '' }, [pscustomobject]@{ Name = $nameCopy; ProcessId = 99; CommandLine = '' }) }.GetNewClosure()
+        $r = Invoke-TestBackup $sA $rB @{ ProcessProvider = $prov }
+        Check 'bk_proc' ('blocked_' + $bi) (($r.Code -eq 3) -and ($r.Out -like '*reason=process_running*') -and ($r.Out -like ('*process=' + $pn + '*')) -and -not (Test-Path -LiteralPath $rB))
+    }
+    $rP = Join-Path $b1 'rP'
+    $r = Invoke-TestBackup $sA $rP @{ ProcessProvider = { throw 'cim failed' } }
+    Check 'bk_proc' 'provider_throws_defers_fail_closed' (($r.Code -eq 3) -and ($r.Out -like '*reason=process_query_failed*') -and -not (Test-Path -LiteralPath $rP))
+    $r = Invoke-TestBackup $sA $rP @{ ProcessProvider = { @() } }
+    Check 'bk_proc' 'provider_empty_defers_fail_closed' (($r.Code -eq 3) -and ($r.Out -like '*reason=process_query_empty*') -and -not (Test-Path -LiteralPath $rP))
+    $r = Invoke-TestBackup $sA $rP @{ ProcessProvider = { $null } }
+    Check 'bk_proc' 'provider_null_defers_fail_closed' (($r.Code -eq 3) -and ($r.Out -like '*reason=process_query_empty*') -and -not (Test-Path -LiteralPath $rP))
+    $r = Invoke-TestBackup $sA $rP @{ ProcessProvider = { @([pscustomobject]@{ Name = 'dotnet.exe'; ProcessId = 7; CommandLine = '' }) } }
+    Check 'bk_proc' 'unreadable_dotnet_commandline_defers' (($r.Code -eq 3) -and ($r.Out -like '*reason=process_running*') -and -not (Test-Path -LiteralPath $rP))
+
+    # 16e -AllowLive: surec denetimi atlanir, mode=live + uyari, kararsiz dosya valid=false
+    $rL = Join-Path $b1 'rL'
+    $blocker = { @([pscustomobject]@{ Name = 'UnrealEditor.exe'; ProcessId = 99; CommandLine = '' }) }
+    $r = Invoke-TestBackup $sA $rL @{ ProcessProvider = $blocker; AllowLive = $true; Timestamp = '20261027T110000Z'; Label = 'live' }
+    $snapL = Join-Path $rL '20261027T110000Z-live'
+    Check 'bk_live' 'blocker_ignored_with_flag_exit_0' ($r.Code -eq 0)
+    Check 'bk_live' 'manifest_mode_live' ((Read-TestManifest $snapL).mode -ceq 'live')
+    Check 'bk_live' 'warning_in_console_and_log' (($r.Out -like '*[[]MMO_BACKUP_WARN]*mode=live*') -and ([IO.File]::ReadAllText((Join-Path $snapL 'backup.log')) -like '*mode=live*'))
+    Check 'bk_live' 'live_snapshot_verifies' ((Test-MMOSnapshot -SnapshotDir $snapL).Ok)
+    $r = Invoke-TestBackup $sA (Join-Path $b1 'rL2') @{ ProcessProvider = { throw 'cim failed' }; AllowLive = $true; Timestamp = '20261027T110001Z' }
+    Check 'bk_live' 'provider_not_consulted_with_flag' ($r.Code -eq 0)
+    $r = Invoke-TestBackup $sA (Join-Path $b1 'rL3') @{ AllowLive = $true; RequireCleanShutdown = $true }
+    Check 'bk_live' 'allowlive_and_requirecleanshutdown_is_usage_error' (($r.Code -eq 2) -and ($r.Out -like '*reason=allowlive_and_requirecleanshutdown*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rL3')))
+
+    $sU = Join-Path $b1 'sU'; $rU = Join-Path $b1 'rU'
+    New-FakeSaved $sU
+    $global:hookCalls = @{}
+    $hookAlways = { param($rel, $attempt, $src)
+        if (-not $global:hookCalls.ContainsKey($rel)) { $global:hookCalls[$rel] = 0 }
+        $global:hookCalls[$rel] = $global:hookCalls[$rel] + 1
+        if ($rel -ceq 'SaveGames/MMOSave_Ali.sav') { $fsx = [IO.File]::Open($src, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite); try { $fsx.WriteByte(7) } finally { $fsx.Dispose() } }
+    }
+    $r = Invoke-TestBackup $sU $rU @{ AllowLive = $true; Timestamp = '20261027T120000Z'; Label = 'unstable'; TestHooks = @{ DuringCopy = $hookAlways } }
+    $snapU = Join-Path $rU '20261027T120000Z-unstable'
+    Check 'bk_unstable' 'exit_1' ($r.Code -eq 1)
+    Check 'bk_unstable' 'reason_invalid_files' ($r.Out -like '*reason=invalid_files*' -and $r.Out -like '*unstable=1*')
+    Check 'bk_unstable' 'retried_three_times' ($global:hookCalls['SaveGames/MMOSave_Ali.sav'] -eq 3)
+    Check 'bk_unstable' 'stable_files_read_once_each' ($global:hookCalls['MMODaily/MMOSave_Ali.json'] -ge 1)
+    $mU = Read-TestManifest $snapU
+    $eU = @($mU.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' })
+    Check 'bk_unstable' 'entry_valid_false_notes_unstable' (($eU.Count -eq 1) -and ($eU[0].valid -eq $false) -and ($eU[0].notes -ceq 'unstable'))
+    Check 'bk_unstable' 'only_that_entry_is_invalid' (@($mU.entries | Where-Object { $_.valid -eq $false }).Count -eq 1)
+    $tU = Test-MMOSnapshot -SnapshotDir $snapU
+    Check 'bk_unstable' 'snapshot_complete_and_verifies_with_one_invalid' ($tU.Ok -and ($tU.InvalidEntries.Count -eq 1) -and ((Read-TestManifest $snapU).mode -ceq 'live'))
+    Check 'bk_unstable' 'log_status_complete_with_invalid' ([IO.File]::ReadAllText((Join-Path $snapU 'backup.log')) -like '*status=complete_with_invalid_files*')
+    $sV = Join-Path $b1 'sV'; $rV = Join-Path $b1 'rV'
+    New-FakeSaved $sV
+    $global:hookCalls = @{}
+    $hookOnce = { param($rel, $attempt, $src)
+        if (-not $global:hookCalls.ContainsKey($rel)) { $global:hookCalls[$rel] = 0 }
+        $global:hookCalls[$rel] = $global:hookCalls[$rel] + 1
+        if (($rel -ceq 'SaveGames/MMOSave_Ali.sav') -and ($attempt -eq 1)) { $fsx = [IO.File]::Open($src, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite); try { $fsx.WriteByte(9) } finally { $fsx.Dispose() } }
+    }
+    $r = Invoke-TestBackup $sV $rV @{ AllowLive = $true; Timestamp = '20261027T120001Z'; Label = 'transient'; TestHooks = @{ DuringCopy = $hookOnce } }
+    $snapV = Join-Path $rV '20261027T120001Z-transient'
+    $eV = @((Read-TestManifest $snapV).entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' })
+    Check 'bk_unstable' 'transient_change_retried_and_stable_exit_0' (($r.Code -eq 0) -and ($global:hookCalls['SaveGames/MMOSave_Ali.sav'] -eq 2) -and ($eV[0].valid -eq $true))
+    Check 'bk_unstable' 'transient_snapshot_holds_final_content' ($eV[0].sha256 -ceq (Get-OracleSha (Join-Path $sV 'SaveGames\MMOSave_Ali.sav')))
+
+    # 16f -RequireCleanShutdown
+    $shGood = '{"run_id":"20261027T100000Z-1234","exit_code":0,"failed":0,"gone":1,"still_connected":0,"kick_failed":0,"time_utc":"2026-10-27T10:00:00.123Z"}'
+    $sS = Join-Path $b1 'sS'; $rS = Join-Path $b1 'rS'
+    New-FakeSaved $sS
+    Write-TestText (Join-Path $sS 'Logs\MMOShutdownResult.json') $shGood
+    $logTreeBefore = Get-TreeOracle (Join-Path $sS 'Logs')
+    $r = Invoke-TestBackup $sS $rS @{ RequireCleanShutdown = $true; Timestamp = '20261027T130000Z'; Label = 'clean' }
+    $snapS = Join-Path $rS '20261027T130000Z-clean'
+    Check 'bk_shutdown' 'clean_shutdown_accepted_exit_0' ($r.Code -eq 0)
+    $mS = Read-TestManifest $snapS
+    $prS = $mS.shutdown_proof
+    Check 'bk_shutdown' 'proof_recorded_run_id_exit_time' (($null -ne $prS) -and ($prS.run_id -ceq '20261027T100000Z-1234') -and ($prS.exit_code -eq 0) -and ($prS.time_utc -ceq '2026-10-27T10:00:00Z'))
+    Check 'bk_shutdown' 'snapshot_with_proof_verifies' ((Test-MMOSnapshot -SnapshotDir $snapS).Ok)
+    Check 'bk_shutdown' 'proof_summary_line' ($r.Out -like '*shutdown_proof=recorded*')
+    Check 'bk_shutdown' 'shutdown_result_file_untouched' ((Get-TreeOracle (Join-Path $sS 'Logs')) -ceq $logTreeBefore)
+    Write-TestText (Join-Path $sS 'Logs\MMOShutdownResult.json') ($shGood.Replace('10:00:00.123Z', '10:00:00.1234567Z'))
+    $r = Invoke-TestBackup $sS $rS @{ RequireCleanShutdown = $true; Timestamp = '20261027T130001Z'; Label = 'frac7' }
+    $prF = (Read-TestManifest (Join-Path $rS '20261027T130001Z-frac7')).shutdown_proof
+    Check 'bk_shutdown' 'seven_digit_fraction_normalized' (($r.Code -eq 0) -and ($null -ne $prF) -and ($prF.time_utc -ceq '2026-10-27T10:00:00Z'))
+    Write-TestText (Join-Path $sS 'Logs\MMOShutdownResult.json') ($shGood.Replace('.123Z', 'Z'))
+    $r = Invoke-TestBackup $sS $rS @{ RequireCleanShutdown = $true; Timestamp = '20261027T130002Z'; Label = 'nofrac' }
+    Check 'bk_shutdown' 'no_fraction_accepted' ($r.Code -eq 0)
+
+    $shBad = @(
+        @('exit2', $shGood.Replace('"exit_code":0', '"exit_code":2'), 'shutdown_not_clean'), @('exit1', $shGood.Replace('"exit_code":0', '"exit_code":1'), 'shutdown_not_clean'),
+        @('exit255', $shGood.Replace('"exit_code":0', '"exit_code":255'), 'shutdown_not_clean'),
+        @('garbage', 'not json at all', 'shutdown_result_invalid'), @('array', '[1,2]', 'shutdown_result_invalid'), @('empty', '', 'shutdown_result_invalid'),
+        @('runid_empty', $shGood.Replace('20261027T100000Z-1234', ''), 'shutdown_result_invalid'),
+        @('runid_chars', $shGood.Replace('20261027T100000Z-1234', 'abc'), 'shutdown_result_invalid'),
+        @('runid_41', $shGood.Replace('20261027T100000Z-1234', ('1' * 41)), 'shutdown_result_invalid'),
+        @('runid_missing', $shGood.Replace('"run_id":"20261027T100000Z-1234",', ''), 'shutdown_result_invalid'),
+        @('exit_string', $shGood.Replace('"exit_code":0', '"exit_code":"0"'), 'shutdown_result_invalid'),
+        @('exit_256', $shGood.Replace('"exit_code":0', '"exit_code":256'), 'shutdown_result_invalid'),
+        @('exit_neg', $shGood.Replace('"exit_code":0', '"exit_code":-1'), 'shutdown_result_invalid'),
+        @('exit_frac', $shGood.Replace('"exit_code":0', '"exit_code":0.5'), 'shutdown_result_invalid'),
+        @('exit_missing', $shGood.Replace('"exit_code":0,', ''), 'shutdown_result_invalid'),
+        @('time_missing', $shGood.Replace(',"time_utc":"2026-10-27T10:00:00.123Z"', ''), 'shutdown_result_invalid'),
+        @('time_text', $shGood.Replace('2026-10-27T10:00:00.123Z', 'yesterday'), 'shutdown_result_invalid'),
+        @('time_month13', $shGood.Replace('2026-10-27T10:00:00.123Z', '2026-13-45T10:00:00Z'), 'shutdown_result_invalid'),
+        @('time_no_z', $shGood.Replace('2026-10-27T10:00:00.123Z', '2026-10-27T10:00:00+02:00'), 'shutdown_result_invalid')
+    )
+    $sB = Join-Path $b1 'sB'
+    New-FakeSaved $sB
+    foreach ($c in $shBad) {
+        Write-TestText (Join-Path $sB 'Logs\MMOShutdownResult.json') $c[1]
+        $rSh = Join-Path $b1 ('rSh_' + $c[0])
+        $r = Invoke-TestBackup $sB $rSh @{ RequireCleanShutdown = $true }
+        Check 'bk_shutdown' ('rejected_' + $c[0]) (($r.Code -eq 3) -and ($r.Out -like ('*reason=' + $c[2] + '*')) -and -not (Test-Path -LiteralPath $rSh))
+    }
+    Write-TestBytes (Join-Path $sB 'Logs\MMOShutdownResult.json') ([byte[]]@(0x7B, 0xC3, 0x28, 0x7D))
+    $r = Invoke-TestBackup $sB (Join-Path $b1 'rSh_utf8') @{ RequireCleanShutdown = $true }
+    Check 'bk_shutdown' 'rejected_invalid_utf8' (($r.Code -eq 3) -and ($r.Out -like '*reason=shutdown_result_invalid*'))
+    Write-TestBytes (Join-Path $sB 'Logs\MMOShutdownResult.json') (New-Object byte[] 70000)
+    $r = Invoke-TestBackup $sB (Join-Path $b1 'rSh_big') @{ RequireCleanShutdown = $true }
+    Check 'bk_shutdown' 'rejected_oversized_file' (($r.Code -eq 3) -and ($r.Out -like '*reason=shutdown_result_invalid*'))
+    [IO.File]::Delete((Join-Path $sB 'Logs\MMOShutdownResult.json'))
+    $r = Invoke-TestBackup $sB (Join-Path $b1 'rSh_nofile') @{ RequireCleanShutdown = $true }
+    Check 'bk_shutdown' 'rejected_file_missing' (($r.Code -eq 3) -and ($r.Out -like '*reason=shutdown_result_missing*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rSh_nofile')))
+    $sN = Join-Path $b1 'sN'
+    New-FakeSaved $sN
+    [IO.Directory]::Delete((Join-Path $sN 'Logs'), $true)
+    $r = Invoke-TestBackup $sN (Join-Path $b1 'rSh_nologs') @{ RequireCleanShutdown = $true }
+    Check 'bk_shutdown' 'rejected_logs_dir_missing' (($r.Code -eq 3) -and ($r.Out -like '*reason=shutdown_result_missing*'))
+    $sJ = Join-Path $b1 'sJ'
+    New-FakeSaved $sJ
+    $logDecoy = Join-Path $b1 'logdecoy'
+    Write-TestText (Join-Path $logDecoy 'MMOShutdownResult.json') $shGood
+    [IO.Directory]::Delete((Join-Path $sJ 'Logs'), $true)
+    New-TestJunction (Join-Path $sJ 'Logs') $logDecoy
+    $r = Invoke-TestBackup $sJ (Join-Path $b1 'rSh_junction') @{ RequireCleanShutdown = $true }
+    Check 'bk_shutdown' 'rejected_logs_dir_junction' (($r.Code -eq 3) -and ($r.Out -like '*reason=shutdown_result_invalid*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rSh_junction')))
+    $sD = Join-Path $b1 'sD'
+    New-FakeSaved $sD
+    [void][IO.Directory]::CreateDirectory((Join-Path $sD 'Logs\MMOShutdownResult.json'))
+    $r = Invoke-TestBackup $sD (Join-Path $b1 'rSh_dir') @{ RequireCleanShutdown = $true }
+    Check 'bk_shutdown' 'rejected_result_path_is_directory' (($r.Code -eq 3) -and ($r.Out -like '*reason=shutdown_result_invalid*'))
+    # kanit dosyasi tek basina yetmez: surec denetimi hala kapidir
+    $r = Invoke-TestBackup $sS (Join-Path $b1 'rSh_proc') @{ RequireCleanShutdown = $true; ProcessProvider = $blocker }
+    Check 'bk_shutdown' 'clean_proof_does_not_bypass_process_gate' (($r.Code -eq 3) -and ($r.Out -like '*reason=process_running*'))
+    # bayrak yoksa dosya okunmaz: kotu dosya zararsiz, kanit null
+    $sK = Join-Path $b1 'sK'
+    New-FakeSaved $sK
+    Write-TestText (Join-Path $sK 'Logs\MMOShutdownResult.json') ($shGood.Replace('"exit_code":0', '"exit_code":2'))
+    $r = Invoke-TestBackup $sK (Join-Path $b1 'rK') @{ Timestamp = '20261027T140000Z'; Label = 'noflag' }
+    Check 'bk_shutdown' 'without_flag_result_file_ignored_proof_null' (($r.Code -eq 0) -and ($null -eq (Read-TestManifest (Join-Path $b1 'rK\20261027T140000Z-noflag')).shutdown_proof))
+
+    # 16g Yedek koku yapisi / ozyineleme korumasi
+    $sR = Join-Path $b1 'sR'
+    New-FakeSaved $sR
+    $treeR0 = Get-TreeOracle $sR
+    $stampR0 = Get-SavedStamp -SavedRoot $sR
+    $inSaved = Join-Path $sR 'backups_here'
+    $r = Invoke-TestBackup $sR $inSaved
+    Check 'bk_root' 'root_inside_saved_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_inside_saved*') -and -not (Test-Path -LiteralPath $inSaved))
+    $r = Invoke-TestBackup $sR $sR
+    Check 'bk_root' 'root_equals_saved_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_inside_saved*'))
+    $r = Invoke-TestBackup $sR (Join-Path $sR 'SaveGames')
+    Check 'bk_root' 'root_is_saved_subdir_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_inside_saved*'))
+    $r = Invoke-TestBackup $sR $b1
+    Check 'bk_root' 'saved_inside_root_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=saved_inside_backup_root*'))
+    $r = Invoke-TestBackup $sR $fx
+    Check 'bk_root' 'saved_deep_inside_root_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=saved_inside_backup_root*'))
+    Check 'bk_root' 'saved_unchanged_after_rejections' (((Get-TreeOracle $sR) -ceq $treeR0) -and ((Get-SavedStamp -SavedRoot $sR).Digest -ceq $stampR0.Digest))
+    $sibling = Join-Path $b1 'sR_backups'
+    $r = Invoke-TestBackup $sR $sibling @{ Timestamp = '20261027T150000Z' }
+    Check 'bk_root' 'sibling_with_common_prefix_is_allowed' (($r.Code -eq 0) -and (Test-Path -LiteralPath (Join-Path $sibling '20261027T150000Z-manual\manifest.json')))
+    $r = Invoke-TestBackup $sR $repoReject -RootOutsideFixture
+    Check 'bk_root' 'root_inside_repo_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_inside_repo*') -and -not (Test-Path -LiteralPath $repoReject))
+    $r = Invoke-TestBackup $sR (Join-Path $b1 'no_parent\deeper\root')
+    Check 'bk_root' 'missing_parent_not_created' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_parent_missing*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'no_parent')))
+    $r = Invoke-TestBackup (Join-Path $b1 'no_such_saved') (Join-Path $b1 'rNoSaved')
+    Check 'bk_root' 'missing_saved_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=saved_root_missing*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rNoSaved')))
+    $filePath = Join-Path $b1 'a_file'
+    Write-TestText $filePath 'x'
+    $r = Invoke-TestBackup $sR $filePath
+    Check 'bk_root' 'root_is_a_file_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_not_directory*'))
+    $r = Invoke-TestBackup $sR '\\?\C:\mmo_nope'  -RootOutsideFixture
+    Check 'bk_root' 'invalid_root_path_is_usage_error' (($r.Code -eq 2) -and ($r.Out -like '*reason=path_invalid*'))
+
+    # 16h Reparse point (junction) saldirilari: hicbir sey yazilmaz
+    $jTarget = Join-Path $b1 'jtarget'
+    [void][IO.Directory]::CreateDirectory($jTarget)
+    $jRoot = Join-Path $b1 'jroot'
+    New-TestJunction $jRoot $jTarget
+    $r = Invoke-TestBackup $sR $jRoot
+    Check 'bk_junction' 'root_junction_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_reparse_root*') -and (@(Get-ChildItem -LiteralPath $jTarget -Force).Count -eq 0))
+    $r = Invoke-TestBackup $sR (Join-Path $jRoot 'child')
+    Check 'bk_junction' 'root_under_junction_rejected' (($r.Code -eq 3) -and (@(Get-ChildItem -LiteralPath $jTarget -Force).Count -eq 0))
+    $sJs = Join-Path $b1 'sJs'
+    New-TestJunction $sJs $sR
+    $r = Invoke-TestBackup $sJs (Join-Path $b1 'rJs')
+    Check 'bk_junction' 'saved_junction_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=saved_reparse_root*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rJs')))
+    $sM = Join-Path $b1 'sM'
+    New-FakeSaved $sM
+    $mailDecoy = Join-Path $b1 'maildecoy'
+    [void][IO.Directory]::CreateDirectory($mailDecoy)
+    Copy-Item -Path (Join-Path $sM 'MMOMail\*') -Destination $mailDecoy
+    [IO.Directory]::Delete((Join-Path $sM 'MMOMail'), $true)
+    New-TestJunction (Join-Path $sM 'MMOMail') $mailDecoy
+    $r = Invoke-TestBackup $sM (Join-Path $b1 'rM')
+    Check 'bk_junction' 'source_subdir_junction_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=source_reparse*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rM')))
+    $sE = Join-Path $b1 'sE'
+    New-FakeSaved $sE
+    New-TestJunction (Join-Path $sE 'SaveGames\evil') $mailDecoy
+    $r = Invoke-TestBackup $sE (Join-Path $b1 'rE')
+    Check 'bk_junction' 'source_entry_junction_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=source_reparse_entry*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rE')))
+    Check 'bk_junction' 'junction_targets_untouched' (@(Get-ChildItem -LiteralPath $jTarget -Force).Count -eq 0)
+
+    # 16i Kullanim hatalari (2): hicbir sey yazilmaz
+    $rUse = Join-Path $b1 'rUse'
+    $lblCases = @(@('upper', 'Bad'), @('space', 'a b'), @('slash', 'a/b'), @('dots', '..'), @('long25', ('a' * 25)), @('turkish', ('x' + [char]0x0131)), @('backslash', 'a\b'), @('colon', 'a:b'))
+    foreach ($c in $lblCases) {
+        $r = Invoke-TestBackup $sR $rUse @{ Label = $c[1] }
+        Check 'bk_usage' ('bad_label_' + $c[0]) (($r.Code -eq 2) -and ($r.Out -like '*reason=bad_label*') -and -not (Test-Path -LiteralPath $rUse))
+    }
+    $r = Invoke-TestBackup $sR $rUse @{ Label = ('a' * 24); Timestamp = '20261027T160000Z' }
+    Check 'bk_usage' 'label_len24_accepted' ($r.Code -eq 0)
+    foreach ($c in @(@('date', '2026-10-27'), @('no_z', '20261027T100000'), @('lower', '20261027t100000z'), @('long', '20261027T100000Z9'), @('unicode_digits', (([string][char]0x0661) * 8 + 'T100000Z')))) {
+        $r = Invoke-TestBackup $sR (Join-Path $b1 'rUse2') @{ Timestamp = $c[1] }
+        Check 'bk_usage' ('bad_timestamp_' + $c[0]) (($r.Code -eq 2) -and ($r.Out -like '*reason=bad_timestamp*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rUse2')))
+    }
+
+    # 16j Kilit (ikinci arac ayni kokte ertelenir) ve bayat kilit dosyasi
+    $rLk = Join-Path $b1 'rLk'
+    [void][IO.Directory]::CreateDirectory($rLk)
+    $holder = New-Object IO.FileStream((Join-Path $rLk '.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $r = Invoke-TestBackup $sR $rLk @{ Timestamp = '20261027T170000Z' }
+        Check 'bk_lock' 'held_lock_defers' (($r.Code -eq 3) -and ($r.Out -like '*reason=lock_held*'))
+        $lkNames = @(Get-SnapDirs $rLk)
+        Check 'bk_lock' 'held_lock_wrote_no_snapshot' (($lkNames.Count -eq 1) -and ($lkNames[0] -ceq '.lock'))
+    } finally { $holder.Dispose() }
+    $r = Invoke-TestBackup $sR $rLk @{ Timestamp = '20261027T170001Z' }
+    Check 'bk_lock' 'free_after_release_exit_0' ($r.Code -eq 0)
+    $rSt = Join-Path $b1 'rSt'
+    [void][IO.Directory]::CreateDirectory($rSt)
+    [IO.File]::WriteAllText((Join-Path $rSt '.lock'), 'stale from a crashed run')
+    $r = Invoke-TestBackup $sR $rSt @{ Timestamp = '20261027T170002Z' }
+    Check 'bk_lock' 'stale_lock_file_does_not_block' (($r.Code -eq 0) -and -not (Test-Path -LiteralPath (Join-Path $rSt '.lock')))
+    $rLr = Join-Path $b1 'rLr'
+    [void][IO.Directory]::CreateDirectory($rLr)
+    $lockTarget = Join-Path $b1 'locktarget'
+    Write-TestText $lockTarget 'target'
+    $lockLink = Join-Path $rLr '.lock'
+    try {
+        [void](New-Item -ItemType SymbolicLink -Path $lockLink -Target $lockTarget -ErrorAction Stop)
+        $r = Invoke-TestBackup $sR $rLr
+        Check 'bk_lock' 'lock_symlink_rejected' (($r.Code -eq 3) -and ($r.Out -like '*reason=lock_reparse*') -and ((Get-Content -LiteralPath $lockTarget -Raw) -ceq 'target'))
+        [IO.File]::Delete($lockLink)
+    } catch {
+        # Sembolik baglanti ayricalik ister (bu makinede olusturulamazsa kapi test edilemez; B0'daki manifest symlink sinirinin aynisi)
+        Write-Host '[MMO_BACKUP_INFO] symlink could not be created (privilege): lock_symlink_rejected is VACUOUS on this machine'
+        Check 'bk_lock' 'lock_symlink_rejected' ($true)
+    }
+
+    # 16k Yarim goruntu: kopya hatasi manifestsiz birakir
+    $sI = Join-Path $b1 'sI'; $rI = Join-Path $b1 'rI'
+    New-FakeSaved $sI
+    $bigSav = New-Object byte[] 8388609
+    $bigSav[0] = 0x47; $bigSav[1] = 0x56; $bigSav[2] = 0x41; $bigSav[3] = 0x53
+    Write-TestBytes (Join-Path $sI 'SaveGames\MMOSave_Zed.sav') $bigSav
+    $treeI0 = Get-TreeOracle $sI
+    $r = Invoke-TestBackup $sI $rI @{ Timestamp = '20261027T180000Z'; Label = 'half' }
+    $snapI = Join-Path $rI '20261027T180000Z-half'
+    Check 'bk_incomplete' 'oversized_source_exit_1' (($r.Code -eq 1) -and ($r.Out -like '*reason=read_failed:too_large*'))
+    Check 'bk_incomplete' 'snapshot_dir_exists_without_manifest' ((Test-Path -LiteralPath $snapI -PathType Container) -and -not (Test-Path -LiteralPath (Join-Path $snapI 'manifest.json')) -and -not (Test-Path -LiteralPath (Join-Path $snapI 'manifest.json.tmp')))
+    Check 'bk_incomplete' 'earlier_files_were_copied_so_it_is_really_half' (Test-Path -LiteralPath (Join-Path $snapI 'files\MMOAchievements\MMOSave_Ali.json'))
+    $rdI = Read-MMOManifest -SnapshotDir $snapI
+    $tI = Test-MMOSnapshot -SnapshotDir $snapI
+    Check 'bk_incomplete' 'verifier_reports_incomplete' ($rdI.Incomplete -and (-not $rdI.Ok) -and $tI.Incomplete -and (-not $tI.Ok))
+    Check 'bk_incomplete' 'log_marks_incomplete' ([IO.File]::ReadAllText((Join-Path $snapI 'backup.log')) -like '*status=incomplete*')
+    Check 'bk_incomplete' 'failed_run_did_not_modify_source' ((Get-TreeOracle $sI) -ceq $treeI0)
+    [IO.File]::Delete((Join-Path $sI 'SaveGames\MMOSave_Zed.sav'))
+    $r = Invoke-TestBackup $sI $rI @{ Timestamp = '20261027T180001Z'; Label = 'retry' }
+    Check 'bk_incomplete' 'next_run_succeeds_and_half_snapshot_left_alone' (($r.Code -eq 0) -and (Test-Path -LiteralPath $snapI) -and -not (Test-Path -LiteralPath (Join-Path $snapI 'manifest.json')))
+    $sX = Join-Path $b1 'sX'; $rX = Join-Path $b1 'rX'
+    New-FakeSaved $sX
+    $lockedSrc = [IO.File]::Open((Join-Path $sX 'SaveGames\MMOSave_Ali.sav'), [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try {
+        $r = Invoke-TestBackup $sX $rX @{ Timestamp = '20261027T181000Z'; Label = 'locked' }
+        Check 'bk_incomplete' 'exclusively_locked_source_file_exit_1_no_manifest' (($r.Code -eq 1) -and ($r.Out -like '*reason=read_failed:*') -and -not (Test-Path -LiteralPath (Join-Path $rX '20261027T181000Z-locked\manifest.json')))
+    } finally { $lockedSrc.Dispose() }
+    $sEm = Join-Path $b1 'sEm'
+    [void][IO.Directory]::CreateDirectory((Join-Path $sEm 'Logs'))
+    Write-TestText (Join-Path $sEm 'Logs\a.log') 'x'
+    $r = Invoke-TestBackup $sEm (Join-Path $b1 'rEm')
+    Check 'bk_incomplete' 'nothing_to_back_up_exit_1_nothing_written' (($r.Code -eq 1) -and ($r.Out -like '*reason=no_files*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rEm')))
+    $sC = Join-Path $b1 'sC'
+    New-FakeSaved $sC
+    Write-TestBytes (Join-Path $sC 'SaveGames\MMOSave_Ali_Baba.sav') (New-SavBytes 150 5)
+    $r = Invoke-TestBackup $sC (Join-Path $b1 'rC')
+    Check 'bk_incomplete' 'name_collision_exit_1_nothing_written' (($r.Code -eq 1) -and ($r.Out -like '*reason=collision*') -and -not (Test-Path -LiteralPath (Join-Path $b1 'rC')))
+
+    # 16l Bozuk kaynak dosya yine yedege girer, sonuc 1
+    $sBad = Join-Path $b1 'sBad'; $rBad = Join-Path $b1 'rBad'
+    New-FakeSaved $sBad -KeepBad
+    $r = Invoke-TestBackup $sBad $rBad @{ Timestamp = '20261027T190000Z'; Label = 'bad' }
+    $snapBad = Join-Path $rBad '20261027T190000Z-bad'
+    $tBad = Test-MMOSnapshot -SnapshotDir $snapBad
+    Check 'bk_invalid' 'corrupt_source_exit_1_with_manifest' (($r.Code -eq 1) -and ($r.Out -like '*reason=invalid_files*') -and (Test-Path -LiteralPath (Join-Path $snapBad 'manifest.json')))
+    Check 'bk_invalid' 'corrupt_file_kept_as_evidence_and_listed' ($tBad.Ok -and (($tBad.InvalidEntries -join '|') -ceq 'SaveGames/MMOSave_Bad.sav') -and (Test-Path -LiteralPath (Join-Path $snapBad 'files\SaveGames\MMOSave_Bad.sav')))
+    Check 'bk_invalid' 'summary_counts' ($r.Out -like '*invalid=1*')
+    Check 'bk_invalid' 'log_status_complete_with_invalid' ([IO.File]::ReadAllText((Join-Path $snapBad 'backup.log')) -like '*status=complete_with_invalid_files*')
+
+    # 16m Kendi dogrulamasi: yazim sonrasi bozulan goruntunun manifesti kaldirilir
+    $sH = Join-Path $b1 'sH'; $rH = Join-Path $b1 'rH'
+    New-FakeSaved $sH
+    $treeH0 = Get-TreeOracle $sH
+    $hookCorrupt = { param($snap)
+        $f = Join-Path $snap 'files\SaveGames\MMOSave_Ali.sav'
+        $bb = [IO.File]::ReadAllBytes($f); $bb[10] = [byte]($bb[10] -bxor 0xFF); [IO.File]::WriteAllBytes($f, $bb)
+    }
+    $r = Invoke-TestBackup $sH $rH @{ Timestamp = '20261027T200000Z'; Label = 'selfcheck'; TestHooks = @{ AfterManifest = $hookCorrupt } }
+    $snapH = Join-Path $rH '20261027T200000Z-selfcheck'
+    Check 'bk_selfverify' 'corruption_after_manifest_exit_1' (($r.Code -eq 1) -and ($r.Out -like '*reason=verify_failed*'))
+    Check 'bk_selfverify' 'manifest_removed_snapshot_marked_incomplete' ((-not (Test-Path -LiteralPath (Join-Path $snapH 'manifest.json'))) -and (Read-MMOManifest -SnapshotDir $snapH).Incomplete)
+    Check 'bk_selfverify' 'rejected_manifest_kept_as_failed_evidence' (Test-Path -LiteralPath (Join-Path $snapH 'manifest.json.failed'))
+    Check 'bk_selfverify' 'log_marks_incomplete' ([IO.File]::ReadAllText((Join-Path $snapH 'backup.log')) -like '*status=incomplete*reason=verify_failed*')
+    $hookAdd = { param($snap) Write-TestText (Join-Path $snap 'files\SaveGames\MMOSave_Intruder.sav') 'extra' }
+    $r = Invoke-TestBackup $sH $rH @{ Timestamp = '20261027T200001Z'; Label = 'extra'; TestHooks = @{ AfterManifest = $hookAdd } }
+    Check 'bk_selfverify' 'unlisted_extra_file_after_manifest_fails_verification' (($r.Code -eq 1) -and -not (Test-Path -LiteralPath (Join-Path $rH '20261027T200001Z-extra\manifest.json')))
+    Check 'bk_selfverify' 'source_untouched_by_failed_selfverify' ((Get-TreeOracle $sH) -ceq $treeH0)
+
+    # 16m2 Yazilan kopya dogrulanir: .partial yazimdan sonra bozulursa goruntu yarim kalir
+    $sPv = Join-Path $b1 'sPv'; $rPv = Join-Path $b1 'rPv'
+    New-FakeSaved $sPv
+    $treePv0 = Get-TreeOracle $sPv
+    $hookPart = { param($rel, $part)
+        if ($rel -ceq 'MMODaily/MMOSave_Ali.json') { $bb = [IO.File]::ReadAllBytes($part); $bb[3] = [byte]($bb[3] -bxor 0x55); [IO.File]::WriteAllBytes($part, $bb) }
+    }
+    $r = Invoke-TestBackup $sPv $rPv @{ Timestamp = '20261027T210000Z'; Label = 'partial'; TestHooks = @{ AfterPartial = $hookPart } }
+    $snapPv = Join-Path $rPv '20261027T210000Z-partial'
+    Check 'bk_partial' 'corrupted_partial_detected_exit_1' (($r.Code -eq 1) -and ($r.Out -like '*reason=partial_verify_failed*'))
+    Check 'bk_partial' 'no_manifest_and_corrupt_partial_never_renamed' ((-not (Test-Path -LiteralPath (Join-Path $snapPv 'manifest.json'))) -and (-not (Test-Path -LiteralPath (Join-Path $snapPv 'files\MMODaily\MMOSave_Ali.json'))) -and (Test-Path -LiteralPath (Join-Path $snapPv 'files\MMODaily\MMOSave_Ali.json.partial')))
+    Check 'bk_partial' 'source_untouched' ((Get-TreeOracle $sPv) -ceq $treePv0)
+
+    # 16n Sentetik Saved'in tum B1 kosularinda degismedigi (yerel kanit; gercek Saved kaniti asagida)
+    Check 'bk_proof' 'fixture_saved_tree_unchanged_across_all_runs' (((Get-TreeOracle $sA) -ceq $treeA0) -and ((Get-TreeOracle $sR) -ceq $treeR0))
+
     # ---- 13. "Saved degismedi" kanitinin kendi testi (sentetik Saved, gercek degil) ----------------------------------------
     $fakeSaved = Join-Path $fx 'fake_saved'
     Write-TestBytes (Join-Path $fakeSaved 'SaveGames\MMOSave_A.sav') (New-SavBytes 100 1)
@@ -1116,6 +1638,10 @@ try {
 finally {
     # Yalniz bu betigin olusturdugu fikstur dizinini siler: ad kalibi + TEMP altinda olmali. Once junction'lar (hedef dosyalara dokunmasin).
     foreach ($j in $script:junctions) { try { Remove-TestJunction $j } catch { } }
+    # B1: reddedilmesi gereken repo-ici yedek koku yanlislikla olusturulduysa (regresyon) kaldirilir; yalniz bu betigin ad kalibi.
+    $rejName = '_mmo_bk_reject_' + $guard
+    $rejPath = Join-Path $RepoRoot $rejName
+    if ([IO.Directory]::Exists($rejPath)) { try { Remove-Item -LiteralPath $rejPath -Recurse -Force } catch { } }
     $root = $script:fixtureRoot
     if ($null -ne $root -and (Test-MMOPathUnder -Path $root -Root $tempFull) -and ([IO.Path]::GetFileName($root) -like 'mmo_backup_test_*') -and [IO.Directory]::Exists($root)) {
         try { Remove-Item -LiteralPath $root -Recurse -Force } catch { Write-Host ('[MMO_BACKUP_INFO] cleanup_failed ' + $root) }
