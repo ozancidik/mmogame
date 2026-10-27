@@ -198,3 +198,24 @@ Bildirimin metin cilasi icin `metin-yazari` cagirmaya gerek yok; sabit sozluk 4 
 Yeni 4 dosya (`MMOShutdownPlan.h/.cpp`, `MMOShutdownPlanSelfTest.cpp`, `TestShutdownPlan.ps1`), mevcut dosya degisikligi sifir, dunya/aktor/kayit
 bagimsiz, tek derleme + tek test; mutasyon 1-6 L0 kabulunun parcasi. L0 `mmo-developer` ile yazilir, `test-muhendisi` mutasyonlari kosar,
 `qa-kontrolcu` + `ag-guvenlik-denetcisi` paralel okur (L1'den itibaren guvenlik denetimi zorunlu: Exec yetkisi, PreLogin).
+
+## 11. Durum dosyasi ve run_id (guvenlik denetimi sonrasi)
+
+`Saved/Logs/MMOShutdownResult.json` onceki calismadan kalip yanlis guven vermesin diye: alt sistem **surec basina bir kez** (ilk sunucu
+`OnWorldBeginPlay`, bolge gecisi yeniden silmez) dosyayi ve `.tmp` yarimini siler; cikista yazilan dosyaya `run_id` eklenir
+(`<surec baslangic UTC yyyyMMddTHHmmssZ>-<PID>`, yalniz `[0-9TZ-]`, en cok 40 karakter). **Yalnizca yoneticinin kendi baslattigi calismanin
+run_id degeri gecerlidir; dosya yoksa cikis temiz bitmemistir** (cokme, TerminateProcess, planli kapanis hic bitmedi). Eslesmeyen run_id = bayat dosya, yok sayilir.
+Atma aninda yeniden yazim Failed donerse ve turdaki onceki kayit Saved idiyse oyuncu "Son degisiklikler kaydedilemeyebilir, onceki kayit gecerli"
+gorur (yalan "kaydedildi" yok), metrik `ev=shutdown_rewrite_failed`; cikis kodu yine 2.
+
+## 12. Bilinen sinirlar (slice 4 bekliyor)
+
+- **Kapisiz mutasyon yollari:** mob altin/XP/loot, ekipman kusanma, tuketilebilir kullanimi ve olum cezasi `IsFlushingOrLater` kapisindan gecmez.
+  Bu yollarla tur ile atma arasinda olan degisiklik yalnizca atma anindaki yeniden yazimla KISMEN kapanir (yazim basarisizsa 11'deki metin ve kod 2);
+  kapilar slice 4'te.
+- **Zorlanmis cikis async yazimlari keser:** Windows'ta kod 2 icin `OnPreExit` sonrasi `TerminateProcess` kullanilir; bekleyen asenkron magaza yazimlarini
+  (Supabase) kesebilir. Slice 4'te `FinishExit` oncesi tum async yazimlar beklenmeli (tamamlanma geri cagrimi) ve `OnPreExit` dinleyicisi mumkunse
+  son sirada olmali.
+- **Codex'in `MMORace*` yazimlari dogrulanmadi:** yaris bilesenleri/magazasi bu sistemin kapilarindan ve kayit turundan gecip gecmedigi kontrol edilmedi
+  (commit edilmemis, kapsam disi).
+- Basarim/gunluk/posta yan dosyalari kayit turunda cagrilmaz; `EndPlay` kaydina guvenilir (atma sonrasi yazim kod 2'yi degistirmez).

@@ -47,7 +47,7 @@
 // Her Check benzersiz case/check cifti basar. Anonim namespace adlari LifecycleTest onekli (unity-build tuzagi).
 namespace
 {
-	constexpr int32 LifecycleTestExpectedChecks = 280;
+	constexpr int32 LifecycleTestExpectedChecks = 290;
 
 	UWorld* LifecycleTestFindWorld(UWorld* Hint)
 	{
@@ -1322,8 +1322,14 @@ namespace
 			bool bKS = false;
 			Check(TEXT("l2_resave"), TEXT("resave_failure_demotes_saved_to_failed"),
 				VS.PC && Sub->GetFlushResultFor(VS.PC, RS, bKS) && RS == EMMOLifecycleSaveResult::Failed && bKS
-				&& KickTexts.FindRef(TEXT("LCTVS")) == TEXT("Sunucu bakima girdi. Ilerleme kaydedilemedi, yoneticiye bildir.") && !KickTexts.FindRef(TEXT("LCTVS")).Contains(TEXT("kaydedildi")));
-			Check(TEXT("l2_resave"), TEXT("metric_resave_failed_line"), ResaveLog.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_save_failed player=LCTVS stage=kick_resave")) == 1);
+				&& KickTexts.FindRef(TEXT("LCTVS")) == TEXT("Sunucu bakima girdi. Son degisiklikler kaydedilemeyebilir, onceki kayit gecerli.")
+				&& KickTexts.FindRef(TEXT("LCTVS")) == FString(L::KickTextRewriteFailed())
+				&& !KickTexts.FindRef(TEXT("LCTVS")).Contains(TEXT("kaydedildi")) && !KickTexts.FindRef(TEXT("LCTVS")).Contains(TEXT("Ilerleme kaydedilemedi")));
+			Check(TEXT("l2_resave"), TEXT("metric_resave_failed_line"), ResaveLog.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_rewrite_failed player=LCTVS")) == 1);
+			Check(TEXT("l2_resave"), TEXT("metric_old_stage_absent_for_rewrite"), ResaveLog.Count(ELogVerbosity::Warning, TEXT("stage=kick_resave")) == 0);
+			Check(TEXT("l2_resave"), TEXT("rewrite_text_is_distinct_and_honest"),
+				FString(L::KickTextRewriteFailed()) != FString(L::KickText(EMMOLifecycleSaveResult::Failed)) && FString(L::KickTextRewriteFailed()) != FString(L::KickText(EMMOLifecycleSaveResult::Saved))
+				&& !FString(L::KickTextRewriteFailed()).Contains(TEXT("kaydedildi")));
 			Sub->AdvanceSeconds(30.0);
 			Sub->StepExit(9950.0);
 			Sub->StepExit(9950.0 + L::ExitWaitMaxSeconds);
@@ -1340,8 +1346,8 @@ namespace
 			Check(TEXT("exit_file"), TEXT("forced_code_not_needed_for_zero"), !L::NeedsForcedExitCode(0));
 			Check(TEXT("exit_file"), TEXT("forced_code_for_nonzero_matches_platform"), L::NeedsForcedExitCode(2) == (PLATFORM_WINDOWS != 0));
 			const FDateTime FixedTime(2026, 10, 27, 12, 30, 45);
-			const FString Json = L::BuildResultJson(2, 5, 1, 3, 1, FixedTime);
-			Check(TEXT("exit_file"), TEXT("json_content_exact"), Json == TEXT("{\"exit_code\":2,\"failed\":5,\"gone\":1,\"still_connected\":3,\"kick_failed\":1,\"time_utc\":\"2026-10-27T12:30:45.000Z\"}\n"));
+			const FString Json = L::BuildResultJson(TEXT("20261027T123045Z-4242"), 2, 5, 1, 3, 1, FixedTime);
+			Check(TEXT("exit_file"), TEXT("json_content_exact"), Json == TEXT("{\"run_id\":\"20261027T123045Z-4242\",\"exit_code\":2,\"failed\":5,\"gone\":1,\"still_connected\":3,\"kick_failed\":1,\"time_utc\":\"2026-10-27T12:30:45.000Z\"}\n"));
 			const FString Dir = FPaths::ConvertRelativePathToFull(FPaths::ProjectLogDir() / TEXT("LCTResult"));
 			const FString File = Dir / TEXT("r.json");
 			IFileManager::Get().DeleteDirectory(*Dir, false, true);
@@ -1349,7 +1355,7 @@ namespace
 			const bool bFirst = L::WriteResultFile(File, Json);
 			FFileHelper::LoadFileToString(Loaded, *File);
 			Check(TEXT("exit_file"), TEXT("write_creates_dir_and_file_no_temp_left"), bFirst && Loaded == Json && !IFileManager::Get().FileExists(*(File + TEXT(".tmp"))));
-			const FString Json2 = L::BuildResultJson(0, 0, 0, 0, 0, FixedTime);
+			const FString Json2 = L::BuildResultJson(L::RunId(), 0, 0, 0, 0, 0, FixedTime);
 			const bool bSecond = L::WriteResultFile(File, Json2);
 			FFileHelper::LoadFileToString(Loaded, *File);
 			Check(TEXT("exit_file"), TEXT("write_overwrites_existing"), bSecond && Loaded == Json2);
@@ -1360,6 +1366,27 @@ namespace
 			Check(TEXT("exit_file"), TEXT("write_fails_cleanly_when_parent_is_a_file"), !L::WriteResultFile(Blocker / TEXT("child.json"), Json));
 			IFileManager::Get().DeleteDirectory(*Dir, false, true);
 			Check(TEXT("exit_file"), TEXT("temp_dir_cleaned"), !IFileManager::Get().DirectoryExists(*Dir));
+
+			// Bayat durum dosyasi + run_id (denetim: onceki calismadan kalan dosya yanlis guven vermesin).
+			Check(TEXT("exit_file"), TEXT("run_id_valid_charset"), L::IsValidRunId(L::RunId()) && L::RunId().Contains(TEXT("-")));
+			Check(TEXT("exit_file"), TEXT("run_id_validator_rejects_bad"),
+				!L::IsValidRunId(FString()) && !L::IsValidRunId(TEXT("2026 1027")) && !L::IsValidRunId(TEXT("a\"b")) && !L::IsValidRunId(TEXT("12/34"))
+				&& !L::IsValidRunId(TEXT("12\\34")) && !L::IsValidRunId(FString::ChrN(41, TEXT('1'))) && L::IsValidRunId(FString::ChrN(40, TEXT('1'))));
+			Check(TEXT("exit_file"), TEXT("run_id_stable_within_process"), L::RunId() == L::RunId() && &L::RunId() == &L::RunId());
+			const FString RunTag = FString::Printf(TEXT("\"run_id\":\"%s\""), *L::RunId());
+			Check(TEXT("exit_file"), TEXT("json_has_run_id_field"), Json2.Contains(RunTag) && Json2.StartsWith(TEXT("{") + RunTag) && L::BuildResultJson(TEXT("bad id\""), 0, 0, 0, 0, 0, FixedTime).StartsWith(TEXT("{\"run_id\":\"\",")));
+			const FString StaleDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectLogDir() / TEXT("LCTStale"));
+			const FString StaleFile = StaleDir / TEXT("MMOShutdownResult.json");
+			IFileManager::Get().DeleteDirectory(*StaleDir, false, true);
+			FFileHelper::SaveStringToFile(TEXT("{\"run_id\":\"20200101T000000Z-1\",\"exit_code\":0}"), *StaleFile);
+			FFileHelper::SaveStringToFile(TEXT("x"), *(StaleFile + TEXT(".tmp")));
+			const bool bStaleExisted = IFileManager::Get().FileExists(*StaleFile);
+			const bool bStaleDeleted = L::DeleteStaleResultFile(StaleFile);
+			Check(TEXT("exit_file"), TEXT("stale_file_deleted"), bStaleExisted && bStaleDeleted && !IFileManager::Get().FileExists(*StaleFile) && !IFileManager::Get().FileExists(*(StaleFile + TEXT(".tmp"))));
+			Check(TEXT("exit_file"), TEXT("stale_delete_missing_file_is_ok"), L::DeleteStaleResultFile(StaleFile));
+			IFileManager::Get().DeleteDirectory(*StaleDir, false, true);
+			Check(TEXT("exit_file"), TEXT("startup_cleanup_ran_at_world_begin"), L::StaleResultCleanupDone());
+			Check(TEXT("exit_file"), TEXT("startup_cleanup_is_once_per_process"), !L::ClearStaleResultOnce());
 		}
 
 		UMMOServerLifecycleSubsystem::SetSaveHookForTest(nullptr);

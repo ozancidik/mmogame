@@ -183,6 +183,8 @@ namespace MMOServerLifecycle
 	MYPROJECT_API const TCHAR* LoginRejectText();   // PreLogin ret metni
 	/** Atma nedeni: yalniz kayit GERCEKTEN basarili olduysa "kaydedildi" denir; digerlerinde yalan soylenmez. */
 	MYPROJECT_API const TCHAR* KickText(EMMOLifecycleSaveResult Result);
+	/** Tur kaydi Saved idi ama atma aninda yeniden yazim Failed oldu: onceki kayit gecerli, son degisiklikler kaybolmus olabilir ("kaydedildi" denmez). */
+	MYPROJECT_API const TCHAR* KickTextRewriteFailed();
 	MYPROJECT_API const TCHAR* SaveResultName(EMMOLifecycleSaveResult Result);
 	/**
 	 * L2 kopru: tek karakterin kapanis kaydi. Kapilar: pawn yok -> SkippedNoPawn; IsInitialLoadComplete degilse YAZMA -> SkippedUnloaded;
@@ -229,8 +231,21 @@ namespace MMOServerLifecycle
 	 * Saved/Logs/MMOShutdownResult.json yazilir (surec yoneticisi bunu da okuyabilir).
 	 */
 	MYPROJECT_API bool NeedsForcedExitCode(int32 ExitCode);
-	/** Durum dosyasi icerigi: {"exit_code":N,"failed":N,"gone":N,"still_connected":N,"kick_failed":N,"time_utc":"..."}. TimeUtc verilmezse simdi. */
-	MYPROJECT_API FString BuildResultJson(int32 ExitCode, int32 Failed, int32 Gone, int32 StillConnected, int32 KickFailed, const FDateTime& TimeUtc);
+	/** Durum dosyasi icerigi: {"run_id":"...","exit_code":N,"failed":N,"gone":N,"still_connected":N,"kick_failed":N,"time_utc":"..."}. */
+	MYPROJECT_API FString BuildResultJson(const FString& RunId, int32 ExitCode, int32 Failed, int32 Gone, int32 StillConnected, int32 KickFailed, const FDateTime& TimeUtc);
+	/**
+	 * Bu surecin kimligi: "<surec baslangic UTC yyyyMMddTHHmmssZ>-<PID>" (ilk cagrida bir kez uretilir, surec boyunca sabit).
+	 * Yalniz [0-9TZ-] karakterleri. Yonetici yalniz KENDI baslattigi calismanin run_id degerini gecerli sayar; dosya yoksa cikis temiz bitmemistir.
+	 */
+	MYPROJECT_API const FString& RunId();
+	/** run_id bicimi: bos olmayan, en cok 40 karakter, yalniz rakam, 'T', 'Z' ve '-'. */
+	MYPROJECT_API bool IsValidRunId(const FString& Id);
+	/** Bayat durum dosyasini (onceki calismadan kalan) ve .tmp yarimini siler; dosya sonunda yoksa true. */
+	MYPROJECT_API bool DeleteStaleResultFile(const FString& Path);
+	/** Surec basina bir kez (ilk sunucu OnWorldBeginPlay): ResultFilePath() bayat dosyasini siler. Ilk cagri true, sonrakiler no-op false. */
+	MYPROJECT_API bool ClearStaleResultOnce();
+	/** ClearStaleResultOnce bu surecte calisti mi? */
+	MYPROJECT_API bool StaleResultCleanupDone();
 	/** Saved/Logs/MMOShutdownResult.json (ProjectLogDir). */
 	MYPROJECT_API FString ResultFilePath();
 	/** Gecici dosya + tasima ile yazar (yarim dosya kalmaz). Basarisizsa false ve LogMMOLifecycle Warning. */
