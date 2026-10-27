@@ -5,6 +5,7 @@
 #include "Characters/MMOMob.h"
 #include "Components/MMOInventoryComponent.h"
 #include "Core/MMOMetrics.h"
+#include "Core/MMOServerLifecycle.h"
 #include "Core/MMONotify.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
@@ -128,6 +129,7 @@ FString UMMOMailComponent::ResultText(EMMOMailResult R)
 	case EMMOMailResult::Cooldown:      return TEXT("Cok hizli: iki posta arasinda 5 saniye bekle.");
 	case EMMOMailResult::BoxFull:       return TEXT("Alicinin posta kutusu dolu.");
 	case EMMOMailResult::StoreError:    return TEXT("Posta su an gonderilemedi; altinin iade edildi / alinmadi.");
+	case EMMOMailResult::Maintenance:   return TEXT("Sunucu bakima giriyor: posta gonderimi kapali.");
 	}
 	return FString();
 }
@@ -186,6 +188,11 @@ EMMOMailResult UMMOMailComponent::SendMail(const FString& ToName, int32 Gold, co
 		|| !IsValid(Inv) || Inv->IsBeingDestroyed() || Inv->GetOwner() != Owner || Owner->GetMailComponent() != this)
 	{
 		return EMMOMailResult::StoreError;
+	}
+	// Planli kapanis kayit turuna girdi: yeni gonderim yok (ucret dusulup kayit/kutu yazimi kapanisla yarismasin).
+	if (MMOServerLifecycle::IsFlushingOrLater())
+	{
+		return EMMOMailResult::Maintenance;
 	}
 	const FString Me = GetMyName();
 	if (!FMMOMailStore::IsDeliverableName(Me) || IsOwnerLocked(*Owner))

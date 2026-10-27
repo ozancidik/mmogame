@@ -22,7 +22,8 @@ enum class EMMOMailResult : uint8
 	Cooldown,
 	BoxFull,
 	StoreError,
-	NameChanged    // gonderen ad degistirdi ama karakter henuz yeni yuvaya yazilmadi (catallama/altin katlama riski)
+	NameChanged,   // gonderen ad degistirdi ama karakter henuz yeni yuvaya yazilmadi (catallama/altin katlama riski)
+	Maintenance    // planli kapanis Flushing'e girdi: yeni posta gonderimi kapali (MMOServerLifecycle::IsFlushingOrLater)
 };
 
 /**

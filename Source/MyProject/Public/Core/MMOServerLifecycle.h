@@ -23,7 +23,8 @@ enum class EMMOLifecycleSaveResult : uint8
 	Failed,                 // yazim basarisiz (dizin yazilamaz, ad cakismasi, gecis penceresinde ertelenen yazim basarisiz...)
 	SkippedUnloaded,        // IsInitialLoadComplete()==false: bos karakterle mevcut kaydi EZME korumasi
 	SkippedTravelCommitted, // bolge gecisi kaydi onayli: gecis kaydi zaten yazildi, altin/esya kalici olmaz
-	SkippedNoPawn           // pawn yok (olu/spectator/possess yok) ya da denetleyici gitti
+	SkippedNoPawn,          // pawn yok (olu/spectator/possess yok)
+	SkippedGone             // denetleyici kayit adimindan once yok oldu (oyuncu ayrildi; EndPlay kendi kaydini yazar)
 };
 
 /** L2: kayit turu / atma ozeti (test ve denetim). */
@@ -38,8 +39,9 @@ struct FMMOLifecycleFlushSummary
 	int32 SkippedUnloaded = 0;
 	int32 SkippedTravelCommitted = 0;
 	int32 SkippedNoPawn = 0;
+	int32 SkippedGone = 0;
 	int32 Kicked = 0;
-	int32 Skipped() const { return SkippedUnloaded + SkippedTravelCommitted + SkippedNoPawn; }
+	int32 Skipped() const { return SkippedUnloaded + SkippedTravelCommitted + SkippedNoPawn + SkippedGone; }
 };
 
 /**
@@ -49,12 +51,16 @@ struct FMMOLifecycleFlushSummary
  * (AMMOGameMode::PreLogin'e dokunulmaz).
  * L2: Flushing'e girince TEK SEFERLIK toplu kayit turu (oyuncu basina bir Tick: SaveCharacterForTravel / FlushDeferredSave),
  * tur bitince plana NotifyFlushDone; Kicking'de her oyuncu YALNIZ kendi kayit sonucu belli olduktan sonra atilir. Exiting'e
- * gelindiginde kalan is senkron tamamlanir (once kayit, sonra atma). Surec cikisi / cikis kodu L3'tur: burada yoktur.
+ * gelindiginde kalan is senkron tamamlanir (once kayit, sonra atma).
+ * L3: Exiting'de Drain'den sonra tum (listen ev sahibi disindaki) PlayerController'lar yok olana kadar en cok ExitWaitMaxSeconds
+ * beklenir, sonra FPlatformMisc::RequestExitWithStatus(false, kod): kod 0 = tum kayitlar tamam, 2 = en az bir oyuncunun kaydi
+ * atma aninda yeniden denemeden sonra da basarisiz (K3: surec yoneticisi kod 2'de OTOMATIK YENIDEN BASLATMAMALI). Flushing'e girince
+ * aktif ticaretler iptal edilir ve ticaret/posta/birlestirme reddedilir (IsFlushingOrLater).
+ * Yan dosyalar (basarim/gunluk/yaris): bilesenlerin SaveNow'u private, bu sistem onlari ayrica CAGIRMAZ; EndPlay kaydina guvenilir.
  * Yeni RPC / replike alan yok; yalniz sunucuda calisir.
  *
  * Tetikleyiciler (yetki: yalniz sunucu sahibi, uzak istemci DEGIL):
- *  - komut satiri -MMOShutdownAfterSeconds=N [-MMOMaintenanceReason=bakim|guncelleme|acil] (yalniz !UE_BUILD_SHIPPING: L1'de
- *    cikis kodu yok, plan Exiting'e varinca surec SONLANMAZ -> Shipping'de L3 gelene kadar kapali, bkz. IsCmdLineTriggerSupported),
+ *  - komut satiri -MMOShutdownAfterSeconds=N [-MMOMaintenanceReason=bakim|guncelleme|acil] (L3'ten beri Shipping dahil TUM yapilarda),
  *  - sunucu konsolu / -ExecCmds: "MMOShutdown <saniye> [neden]" ve "MMOShutdownCancel" (yalniz !UE_BUILD_SHIPPING).
  *    R1: uzak istemcinin ServerExec ile bu komuta ulasamadigi motor kaynaginda dogrulandi (bkz. cpp basindaki not);
  *    ek olarak komut IsExecAuthorized(NetMode) kapisindan gecer (yalniz Dedicated/Listen sunucu dunyasi).
@@ -86,11 +92,8 @@ public:
 	void AdvanceSeconds(double DeltaSeconds);
 	/** Tick'in cekirdegi: duvar saati NowSeconds. Ilk cagri (son tick zamani 0) yalniz saati kaydeder, bosta gecen sureyi saymaz. */
 	void TickWithWallClock(double NowSeconds);
-	/**
-	 * Komut satiri tetikleyicisi (surec basina bir kez; anahtar varsa gecersiz de olsa tuketilir). bTriggerSupported=false
-	 * (Shipping): plan kurulmaz, Warning loglanir. Gecersiz deger / reddedilen plan: log Error.
-	 */
-	void TryScheduleFromCommandLine(const TCHAR* CmdLine, bool bTriggerSupported);
+	/** Komut satiri tetikleyicisi (surec basina bir kez; anahtar varsa gecersiz de olsa tuketilir). Gecersiz deger / reddedilen plan: log Error. */
+	void TryScheduleFromCommandLine(const TCHAR* CmdLine);
 
 	bool IsLoginClosed() const;
 	EMMOShutdownPhase GetPhase() const;
@@ -109,10 +112,17 @@ public:
 	 * Kayit turu yalniz sunucuda; sunucu degilse false.
 	 */
 	bool BeginFlushRound();
-	/** L2: bir Tick'lik is: sirada bekleyen TEK oyuncuyu kaydeder + atma kapisi aciksa sonucu belli oyunculari atar. */
+	/** L2: bir Tick'lik is: sirada bekleyen TEK oyuncuyu kaydeder + atma kapisi aciksa sonucu belli en cok MaxKicksPerTick oyuncuyu atar. */
 	void StepShutdownWork();
-	/** L2: Exiting'de (zaman doldu) kalan tum isi senkron bitirir: once kalan kayitlar, sonra atmalar. */
+	/** L2: Exiting'de (zaman doldu) kalan tum isi senkron bitirir: once kalan kayitlar, sonra atmalar (Tick siniri yok). */
 	void DrainShutdownWork();
+	/**
+	 * L3: Exiting'de bir adim (Tick cagirir; testler sahte duvar saati verir). Gec gelenler icin Drain'i tekrarlar; listen ev sahibi
+	 * disindaki tum denetleyiciler yok olunca ya da bekleme (ilk adimdan ExitWaitMaxSeconds) dolunca sureci kapatir. Bir kez.
+	 */
+	void StepExit(double NowSeconds);
+	/** L3: cikis istendi mi (surec-geneli)? Istendikten sonra alt sistem tick etmez. */
+	static bool WasExitRequested();
 	FMMOLifecycleFlushSummary GetFlushSummary() const;
 
 #if !UE_BUILD_SHIPPING
@@ -122,6 +132,8 @@ public:
 	static void SetKickHookForTest(TFunction<bool(APlayerController*, const FText&)> Hook);
 	/** Test: kayit turu / atma yalniz filtreden gecen denetleyicileri kapsar (canli dunyadaki ev sahibi vb. disarida kalir). */
 	static void SetPlayerFilterForTest(TFunction<bool(const APlayerController*)> Filter);
+	/** Test: RequestExit YERINE cagrilir (kod, basarisiz oyuncu sayisi). Atanmamissa gercek cikis istenir. */
+	static void SetExitHookForTest(TFunction<void(int32 /*ExitCode*/, int32 /*Failed*/)> Hook);
 #endif
 	/** L2: bu denetleyicinin kayit sonucu ve atilip atilmadigi; tur onu henuz bilmiyorsa ya da sonucu belli degilse false. */
 	bool GetFlushResultFor(const APlayerController* PC, EMMOLifecycleSaveResult& OutResult, bool& bOutKicked) const;
@@ -143,7 +155,10 @@ private:
 	void GatherServerWorlds(TArray<UWorld*>& OutWorlds) const;
 	bool FlushNextPlayer();
 	void FinishFlushRound();
-	void KickResolvedPlayers();
+	void KickResolvedPlayers(int32 MaxKicks);
+	void FinishExit();
+	int32 CountExitWaitingPlayers() const;
+	void CancelActiveTrades();
 	void HandlePreLogin(AGameModeBase* GameMode, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage);
 
 	bool bServerActive = false;
@@ -181,6 +196,18 @@ namespace MMOServerLifecycle
 	/** R1 yetki kapisi: komut yalniz sunucu dunyasinda (Dedicated/Listen) calisir; Client/Standalone ret. */
 	MYPROJECT_API bool IsExecAuthorized(ENetMode NetMode);
 
+	// [PLACEHOLDER] L3 sayilari.
+	constexpr double ExitWaitMaxSeconds = 5.0;  // Exiting'de denetleyicilerin yok olmasi icin ust sinir
+	constexpr int32 MaxKicksPerTick = 4;        // Tick basina atma siniri (Drain haric)
+	constexpr int32 MaxKickAttempts = 3;        // uzak oyuncu icin KickPlayer false donerse en cok deneme
+	constexpr int32 ExitCodeOk = 0;
+	constexpr int32 ExitCodeSaveFailed = 2;     // K3: surec yoneticisi bu kodda otomatik yeniden baslatmamali
+
+	/** Kapanis plani Flushing ya da sonrasinda mi (surec-geneli)? Ticaret/posta/birlestirme RPC girisleri bunu okuyup reddeder. */
+	MYPROJECT_API bool IsFlushingOrLater();
+	/** Cikis kodu: kaydi atma anindaki yeniden denemeden sonra da basarisiz kalan oyuncu varsa 2, yoksa 0. */
+	MYPROJECT_API int32 ExitCodeForFailures(int32 FailedPlayers);
+
 	enum class ECmdLineShutdown : uint8
 	{
 		NotRequested,  // ne -MMOShutdownAfterSeconds= ne -MMOMaintenanceReason= var
@@ -192,8 +219,6 @@ namespace MMOServerLifecycle
 	 * ya da [MinDelaySeconds, MaxDelaySeconds] disi saniye -> Invalid. Hicbir anahtar yoksa NotRequested.
 	 */
 	MYPROJECT_API ECmdLineShutdown ParseCmdLineShutdown(const TCHAR* CmdLine, double& OutSeconds, EMMOShutdownReason& OutReason, FString& OutError);
-	/** Komut satiri tetikleyicisi bu surumde acik mi? Shipping'de false (L1'de cikis yok -> kapanmayan sunucu riski; L3 kaldirir). */
-	MYPROJECT_API bool IsCmdLineTriggerSupported();
 	/** Bu dunya turunde (PIE) plan durumu dunya omruyle sifirlanir; Game/Dedicated'de surec-geneli kalir (ServerTravel). */
 	MYPROJECT_API bool ResetsPlanWithWorldType(EWorldType::Type WorldType);
 }

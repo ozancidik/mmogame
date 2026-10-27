@@ -8,6 +8,7 @@
 #include "Items/MMOItemDatabase.h"
 #include "Core/MMOMetrics.h"
 #include "Core/MMONotify.h"
+#include "Core/MMOServerLifecycle.h"
 #include "GameFramework/Actor.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOFusion, Log, All);
@@ -47,7 +48,8 @@ EMMOFusionResult FMMOFusion::GateResult(const UMMOInventoryComponent& Inv)
 	}
 	// Posta deseni (UMMOMailComponent::IsOwnerLocked): yuklenmemis karakterin degisikligi kaydedilemez,
 	// gecis onayindan sonra da EndPlay kaydi atlanir; ikisinde de mutasyon kalici olmaz (F1).
-	if (!Char->IsInitialLoadComplete() || Char->IsTravelSaveCommitted())
+	// Planli kapanis Flushing'e girdi: kayit turundan sonra yapilan birlestirme kalici olmaz -> ayni kilit (F1).
+	if (!Char->IsInitialLoadComplete() || Char->IsTravelSaveCommitted() || MMOServerLifecycle::IsFlushingOrLater())
 	{
 		return EMMOFusionResult::Locked;
 	}

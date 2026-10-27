@@ -3,16 +3,19 @@
 #include "Core/MMOServerLifecycle.h"
 #include "Core/MMOMetrics.h"
 #include "Characters/MMOCharacter.h"
+#include "Components/MMOTradeComponent.h"
 #include "Player/MMOExecGuard.h"
 #include "Player/MMOPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
 #include "GameFramework/GameModeBase.h"
 #include "GameFramework/GameSession.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Internationalization/Text.h"
 #include "HAL/PlatformTime.h"
+#include "HAL/PlatformMisc.h"
 #include "Misc/CommandLine.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
@@ -48,14 +51,20 @@ namespace
 		FString Who;                 // MMOExecGuard::SanitizeToken ile temiz (log izin listesi)
 		bool bResolved = false;      // kayit sonucu belli (Saved/Failed/Skipped*)
 		EMMOLifecycleSaveResult Result = EMMOLifecycleSaveResult::Failed;
-		bool bKickDone = false;      // atma denendi (bir kez)
+		bool bRetried = false;       // atma aninda yeniden deneme/degerlendirme yapildi (bir kez)
+		int32 KickAttempts = 0;      // KickPlayer denemeleri (uzak oyuncu icin en cok MaxKickAttempts)
+		bool bKickDone = false;      // atma tamamlandi (basarili, ev sahibi ya da deneme hakki bitti)
 		bool bKicked = false;        // atma gercekten yapildi
 	};
 	TArray<FLifecycleFlushEntry> LifecycleEntries;
 	int32 LifecycleNextFlush = 0;
 	bool bLifecycleRoundStarted = false;
+	// L3 cikis durumu (surec-geneli): bekleme baslangici (<0 = henuz baslamadi) ve "cikis istendi" bayragi.
+	double LifecycleExitWaitStart = -1.0;
+	bool bLifecycleExitRequested = false;
 
 #if !UE_BUILD_SHIPPING
+	TFunction<void(int32, int32)> LifecycleExitHook;
 	TFunction<bool(AMMOCharacter*)> LifecycleSaveHook;
 	TFunction<bool(APlayerController*, const FText&)> LifecycleKickHook;
 	TFunction<bool(const APlayerController*)> LifecyclePlayerFilter;
@@ -77,6 +86,14 @@ namespace
 		LifecycleEntries.Reset();
 		LifecycleNextFlush = 0;
 		bLifecycleRoundStarted = false;
+		LifecycleExitWaitStart = -1.0;
+		bLifecycleExitRequested = false;
+	}
+
+	// Listen sunucunun kendi (yerel) oyuncusu: atilacak baglanti yok, cikista beklenmez.
+	bool LifecycleIsHost(const APlayerController* PC)
+	{
+		return PC && PC->Player && PC->Player->IsA<ULocalPlayer>();
 	}
 
 	FLifecycleFlushEntry* LifecycleFindEntry(const APlayerController* PC)
@@ -146,8 +163,11 @@ const TCHAR* MMOServerLifecycle::LoginRejectText() { return TEXT("Sunucu bakima 
 
 const TCHAR* MMOServerLifecycle::KickText(EMMOLifecycleSaveResult Result)
 {
-	// "Kaydedildi" yalnizca gercekten yazilmis kayit icin; atlanan/basarisiz kayitta yalan soylenmez.
-	return Result == EMMOLifecycleSaveResult::Saved ? TEXT("Sunucu bakima girdi. Ilerlemen kaydedildi.") : TEXT("Sunucu bakima girdi.");
+	// "Kaydedildi" yalnizca gercekten yazilmis KARAKTER kaydi (.sav) icin; basarim/gunluk yan dosyalari hakkinda bir sey denmez.
+	// Yeniden denemeden sonra da yazilamayan kayitta durust uyari; atlananlarda (kaydedilecek durum yok) yalnizca atma nedeni.
+	if (Result == EMMOLifecycleSaveResult::Saved) return TEXT("Sunucu bakima girdi. Ilerlemen kaydedildi.");
+	if (Result == EMMOLifecycleSaveResult::Failed) return TEXT("Sunucu bakima girdi. Ilerleme kaydedilemedi, yoneticiye bildir.");
+	return TEXT("Sunucu bakima girdi.");
 }
 
 const TCHAR* MMOServerLifecycle::SaveResultName(EMMOLifecycleSaveResult Result)
@@ -159,6 +179,7 @@ const TCHAR* MMOServerLifecycle::SaveResultName(EMMOLifecycleSaveResult Result)
 	case EMMOLifecycleSaveResult::SkippedUnloaded: return TEXT("skipped_unloaded");
 	case EMMOLifecycleSaveResult::SkippedTravelCommitted: return TEXT("skipped_travel");
 	case EMMOLifecycleSaveResult::SkippedNoPawn: return TEXT("skipped_nopawn");
+	case EMMOLifecycleSaveResult::SkippedGone: return TEXT("gone");
 	}
 	return TEXT("?");
 }
@@ -337,13 +358,14 @@ MMOServerLifecycle::ECmdLineShutdown MMOServerLifecycle::ParseCmdLineShutdown(co
 	return ECmdLineShutdown::Ok;
 }
 
-bool MMOServerLifecycle::IsCmdLineTriggerSupported()
+bool MMOServerLifecycle::IsFlushingOrLater()
 {
-#if UE_BUILD_SHIPPING
-	return false; // L3 (cikis kodu) gelene kadar: plan Exiting'e varsa surec sonlanmaz, giris sonsuza dek kapali kalir.
-#else
-	return true;
-#endif
+	return LifecyclePlan.GetPhase() >= EMMOShutdownPhase::Flushing;
+}
+
+int32 MMOServerLifecycle::ExitCodeForFailures(int32 FailedPlayers)
+{
+	return FailedPlayers > 0 ? ExitCodeSaveFailed : ExitCodeOk;
 }
 
 bool MMOServerLifecycle::ResetsPlanWithWorldType(EWorldType::Type WorldType)
@@ -388,7 +410,7 @@ void UMMOServerLifecycleSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	PreLoginHandle = FGameModeEvents::OnGameModePreLoginEvent().AddUObject(this, &UMMOServerLifecycleSubsystem::HandlePreLogin);
 	UE_LOG(LogMMOLifecycle, Display, TEXT("event=lifecycle_ready netmode=%d phase=%s"), static_cast<int32>(InWorld.GetNetMode()), LifecyclePhaseName(LifecyclePlan.GetPhase()));
-	TryScheduleFromCommandLine(FCommandLine::Get(), MMOServerLifecycle::IsCmdLineTriggerSupported());
+	TryScheduleFromCommandLine(FCommandLine::Get());
 }
 
 void UMMOServerLifecycleSubsystem::Deinitialize()
@@ -410,9 +432,8 @@ void UMMOServerLifecycleSubsystem::Deinitialize()
 
 bool UMMOServerLifecycleSubsystem::IsTickable() const
 {
-	// Exiting son durumdur ve L1'de cikis yoktur: bosuna tick etme (Exiting'e giriste Warning loglanir).
-	const EMMOShutdownPhase Phase = LifecyclePlan.GetPhase();
-	return bServerActive && Phase != EMMOShutdownPhase::Idle && Phase != EMMOShutdownPhase::Exiting;
+	// Exiting'de de tick eder (oyuncularin yok olmasini bekleyip sureci kapatir); cikis istendikten sonra durur.
+	return bServerActive && LifecyclePlan.GetPhase() != EMMOShutdownPhase::Idle && !bLifecycleExitRequested;
 }
 
 TStatId UMMOServerLifecycleSubsystem::GetStatId() const
@@ -426,6 +447,7 @@ void UMMOServerLifecycleSubsystem::Tick(float DeltaTime)
 	// Gercek (duvar) saati: oyun zamani dilation'i ya da dunya gecisi yukleme suresi geri sayimi bozmaz; buyuk fark plan'da olay atlatmaz.
 	TickWithWallClock(FPlatformTime::Seconds());
 	StepShutdownWork(); // L2: Flushing/Kicking'te Tick basina bir oyuncu kaydi + sonucu belli olanlarin atilmasi
+	StepExit(FPlatformTime::Seconds()); // L3: Exiting'de oyuncularin yok olmasini bekle, sonra sureci kapat
 }
 
 void UMMOServerLifecycleSubsystem::TickWithWallClock(double NowSeconds)
@@ -507,8 +529,8 @@ void UMMOServerLifecycleSubsystem::ProcessEvents(const TArray<FMMOShutdownEvent>
 			}
 			else if (E.Phase == EMMOShutdownPhase::Exiting)
 			{
-				UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_exiting_not_implemented note=cikis-kodu-L3-yok-surec-SONLANMAZ-giris-kapali-kalir players=%d"), Players);
-				DrainShutdownWork(); // zaman doldu: kalan kayitlar senkron biter, sonra atilir (kayitsiz atma yok)
+				UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_exiting players=%d"), Players);
+				DrainShutdownWork(); // zaman doldu: kalan kayitlar senkron biter, sonra atilir (kayitsiz atma yok); cikis StepExit'te
 			}
 		}
 		else if (E.Type == EMMOShutdownEventType::Cancelled)
@@ -544,6 +566,9 @@ bool UMMOServerLifecycleSubsystem::BeginFlushRound()
 	bLifecycleRoundStarted = true;
 	LifecycleEntries.Reset();
 	LifecycleNextFlush = 0;
+	// Aktif ticaretler kayittan ONCE iptal edilir: kayit turu ile takas tamamlanmasi yarismasin (yeni ticaret IsFlushingOrLater ile reddedilir).
+	CancelActiveTrades();
+	UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_sidefiles mode=endplay_trust note=basarim-gunluk-yaris-SaveNow-private-bu-sistem-cagirmaz"));
 	TArray<UWorld*> Worlds;
 	GatherServerWorlds(Worlds);
 	for (UWorld* World : Worlds)
@@ -572,12 +597,14 @@ bool UMMOServerLifecycleSubsystem::FlushNextPlayer()
 	FLifecycleFlushEntry& Entry = LifecycleEntries[LifecycleNextFlush];
 	const APlayerController* PC = Entry.PC.Get();
 	AMMOCharacter* Character = PC ? Cast<AMMOCharacter>(PC->GetPawn()) : nullptr;
-	Entry.Result = MMOServerLifecycle::SaveCharacterNow(Character);
+	// Denetleyici kayit adiminda yok olmus (oyuncu ayrildi): pawn'siz oyuncudan ayri neden; kendi EndPlay kaydini yazmistir.
+	Entry.Result = PC ? MMOServerLifecycle::SaveCharacterNow(Character) : EMMOLifecycleSaveResult::SkippedGone;
 	Entry.bResolved = true;
 	++LifecycleNextFlush;
 	UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_save player=%s result=%s"), *Entry.Who, MMOServerLifecycle::SaveResultName(Entry.Result));
 	if (Entry.Result == EMMOLifecycleSaveResult::Failed)
 	{
+		// Ilk deneme basarisiz; atma aninda bir kez daha denenir (event=shutdown_save_retry), son sonuc cikis kodunu belirler.
 		UE_LOG(LogMMOLifecycle, Warning, TEXT("[MMOMETRIC] t=%.1f ev=shutdown_save_failed player=%s"), MMOMetrics::Seconds(), *Entry.Who);
 	}
 	if (LifecycleNextFlush >= LifecycleEntries.Num() && !LifecyclePlan.IsFlushDone())
@@ -595,7 +622,7 @@ void UMMOServerLifecycleSubsystem::FinishFlushRound()
 		MMOMetrics::Seconds(), S.Players, S.Saved, S.Failed, S.Skipped());
 }
 
-void UMMOServerLifecycleSubsystem::KickResolvedPlayers()
+void UMMOServerLifecycleSubsystem::KickResolvedPlayers(int32 MaxKicks)
 {
 	// Atma kapisi: kayit turu bitmeden kimse atilmaz. Ek olarak her oyuncu kendi kayit sonucu belli olmadan atilmaz.
 	if (!LifecyclePlan.KickAllowed()) return;
@@ -625,9 +652,26 @@ void UMMOServerLifecycleSubsystem::KickResolvedPlayers()
 			continue;
 		}
 		if (!Entry->bResolved || Entry->bKickDone) continue;
-		Entry->bKickDone = true;
+		if (MaxKicks <= 0) break; // Tick basina sinir: kalanlar sonraki adimda (kayit/atma yuku tek karede yigilmasin)
+		// Atma aninda yeniden dene/degerlendir (bir kez): ilk kayit basarisizsa tekrar yaz; pawn yoktu / yuklenmemisti ise simdi
+		// olusmus olabilir. Sonuc (ve cikis kodu) bu son duruma gore belirlenir; atmadan sonraki EndPlay kaydi sayilmaz.
+		if (!Entry->bRetried)
+		{
+			Entry->bRetried = true;
+			if (Entry->Result == EMMOLifecycleSaveResult::Failed || Entry->Result == EMMOLifecycleSaveResult::SkippedUnloaded || Entry->Result == EMMOLifecycleSaveResult::SkippedNoPawn)
+			{
+				const EMMOLifecycleSaveResult Previous = Entry->Result;
+				Entry->Result = MMOServerLifecycle::SaveCharacterNow(Cast<AMMOCharacter>(PC->GetPawn()));
+				UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_save_retry player=%s previous=%s result=%s"), *Entry->Who, MMOServerLifecycle::SaveResultName(Previous), MMOServerLifecycle::SaveResultName(Entry->Result));
+			}
+		}
+		const bool bHost = LifecycleIsHost(PC);
+		++Entry->KickAttempts;
+		--MaxKicks;
 		Entry->bKicked = MMOServerLifecycle::KickPlayerNow(PC, FText::FromString(MMOServerLifecycle::KickText(Entry->Result)));
-		UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_kick player=%s result=%s kicked=%d"), *Entry->Who, MMOServerLifecycle::SaveResultName(Entry->Result), Entry->bKicked ? 1 : 0);
+		// Uzak oyuncuda KickPlayer false donerse sonraki adimda yeniden dene; ev sahibi atilamaz (yeniden deneme anlamsiz).
+		if (Entry->bKicked || bHost || Entry->KickAttempts >= MMOServerLifecycle::MaxKickAttempts) Entry->bKickDone = true;
+		UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_kick player=%s result=%s kicked=%d attempt=%d"), *Entry->Who, MMOServerLifecycle::SaveResultName(Entry->Result), Entry->bKicked ? 1 : 0, Entry->KickAttempts);
 	}
 }
 
@@ -635,22 +679,109 @@ void UMMOServerLifecycleSubsystem::StepShutdownWork()
 {
 	if (!bServerActive) return;
 	if (bLifecycleRoundStarted) FlushNextPlayer(); // oyuncu basina bir kare (hitch olmasin)
-	KickResolvedPlayers();
+	KickResolvedPlayers(MMOServerLifecycle::MaxKicksPerTick);
 }
 
 void UMMOServerLifecycleSubsystem::DrainShutdownWork()
 {
 	if (!bServerActive) return;
 	if (!bLifecycleRoundStarted) BeginFlushRound();
-	// Gec gelenler her gecis birkac yeni kayit ekleyebilir: sinirli sayida gecis.
-	for (int32 Pass = 0; Pass < 4; ++Pass)
+	// Gec gelenler her gecis birkac yeni kayit ekleyebilir; uzak oyuncunun atmasi en cok MaxKickAttempts gecis ister: sinirli sayida gecis.
+	for (int32 Pass = 0; Pass < 6; ++Pass)
 	{
 		while (FlushNextPlayer()) {}
-		KickResolvedPlayers();
+		KickResolvedPlayers(MAX_int32); // Drain'de Tick siniri yok (zaman doldu)
 		bool bPending = false;
-		for (const FLifecycleFlushEntry& E : LifecycleEntries) { if (!E.bResolved) { bPending = true; break; } }
+		for (const FLifecycleFlushEntry& E : LifecycleEntries)
+		{
+			if (!E.bResolved || (!E.bKickDone && E.PC.IsValid())) { bPending = true; break; }
+		}
 		if (!bPending) break;
 	}
+}
+
+int32 UMMOServerLifecycleSubsystem::CountExitWaitingPlayers() const
+{
+	TArray<UWorld*> Worlds;
+	GatherServerWorlds(Worlds);
+	TArray<const APlayerController*> Seen;
+	for (UWorld* World : Worlds)
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			if (PC && LifecycleIncludesPlayer(PC) && !LifecycleIsHost(PC)) Seen.AddUnique(PC);
+		}
+	}
+	return Seen.Num();
+}
+
+void UMMOServerLifecycleSubsystem::CancelActiveTrades()
+{
+	TArray<UWorld*> Worlds;
+	GatherServerWorlds(Worlds);
+	int32 Cancelled = 0;
+	for (UWorld* World : Worlds)
+	{
+		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		{
+			const APlayerController* PC = It->Get();
+			const AMMOCharacter* Character = PC ? Cast<AMMOCharacter>(PC->GetPawn()) : nullptr;
+			UMMOTradeComponent* Trade = Character ? Character->GetTradeComponent() : nullptr;
+			if (Trade && Trade->IsTrading())
+			{
+				Trade->RequestCancelSeen(Trade->TradeSessionId); // sunucuda ServerCancel_Implementation: iki tarafi da temizler
+				++Cancelled;
+			}
+		}
+	}
+	UE_LOG(LogMMOLifecycle, Display, TEXT("event=shutdown_trades_cancelled sides=%d"), Cancelled);
+}
+
+void UMMOServerLifecycleSubsystem::StepExit(double NowSeconds)
+{
+	if (!bServerActive || bLifecycleExitRequested || LifecyclePlan.GetPhase() != EMMOShutdownPhase::Exiting) return;
+	if (LifecycleExitWaitStart < 0.0) LifecycleExitWaitStart = NowSeconds;
+	DrainShutdownWork(); // Exiting'de gelen/kalan oyuncular: once kayit, sonra atma
+	const int32 Waiting = CountExitWaitingPlayers();
+	const bool bTimedOut = NowSeconds - LifecycleExitWaitStart >= MMOServerLifecycle::ExitWaitMaxSeconds;
+	if (Waiting > 0 && !bTimedOut) return;
+	if (Waiting > 0)
+	{
+		UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_exit_wait_timeout waiting=%d max_seconds=%.0f"), Waiting, MMOServerLifecycle::ExitWaitMaxSeconds);
+	}
+	FinishExit();
+}
+
+bool UMMOServerLifecycleSubsystem::WasExitRequested()
+{
+	return bLifecycleExitRequested;
+}
+
+void UMMOServerLifecycleSubsystem::FinishExit()
+{
+	if (bLifecycleExitRequested) return;
+	bLifecycleExitRequested = true; // bir kez; ayrica IsTickable'i kapatir
+	// Karar: yalniz tur + atma aninda yeniden deneme sonucu sayilir. Atmadan sonra karakterin EndPlay'inde yapilan kayit KATILMAZ
+	// (iyi niyetli ek yazim; basarisi/basarisizligi cikis kodunu degistirmez). Kararsiz (Pending) oyuncu da basarisiz sayilir.
+	const FMMOLifecycleFlushSummary S = GetFlushSummary();
+	const int32 Failed = S.Failed + S.Pending;
+	const int32 Code = MMOServerLifecycle::ExitCodeForFailures(Failed);
+	UE_LOG(LogMMOLifecycle, Display, TEXT("[MMOMETRIC] t=%.1f ev=shutdown_exit code=%d failed=%d"), MMOMetrics::Seconds(), Code, Failed);
+#if !UE_BUILD_SHIPPING
+	if (LifecycleExitHook)
+	{
+		LifecycleExitHook(Code, Failed);
+		return;
+	}
+	if (GIsEditor)
+	{
+		// Editor/PIE oturumunu kapatma: komut-konsolu denemelerinde editor surecini oldurmeyelim.
+		UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_exit_skipped_editor code=%d"), Code);
+		return;
+	}
+#endif
+	FPlatformMisc::RequestExitWithStatus(false, static_cast<uint8>(Code), TEXT("MMOServerLifecycle"));
 }
 
 FMMOLifecycleFlushSummary UMMOServerLifecycleSubsystem::GetFlushSummary() const
@@ -669,6 +800,7 @@ FMMOLifecycleFlushSummary UMMOServerLifecycleSubsystem::GetFlushSummary() const
 		case EMMOLifecycleSaveResult::SkippedUnloaded: ++S.SkippedUnloaded; break;
 		case EMMOLifecycleSaveResult::SkippedTravelCommitted: ++S.SkippedTravelCommitted; break;
 		case EMMOLifecycleSaveResult::SkippedNoPawn: ++S.SkippedNoPawn; break;
+		case EMMOLifecycleSaveResult::SkippedGone: ++S.SkippedGone; break;
 		}
 		if (E.bKicked) ++S.Kicked;
 	}
@@ -721,7 +853,7 @@ void UMMOServerLifecycleSubsystem::HandlePreLogin(AGameModeBase* GameMode, const
 	}
 }
 
-void UMMOServerLifecycleSubsystem::TryScheduleFromCommandLine(const TCHAR* CmdLine, bool bTriggerSupported)
+void UMMOServerLifecycleSubsystem::TryScheduleFromCommandLine(const TCHAR* CmdLine)
 {
 	if (bLifecycleCommandLineHandled) return; // surec basina bir kez (bolge gecisinde yeni dunya yeniden planlamaz)
 	double Seconds = 0.0;
@@ -730,11 +862,6 @@ void UMMOServerLifecycleSubsystem::TryScheduleFromCommandLine(const TCHAR* CmdLi
 	const MMOServerLifecycle::ECmdLineShutdown Parsed = MMOServerLifecycle::ParseCmdLineShutdown(CmdLine, Seconds, Reason, Error);
 	if (Parsed == MMOServerLifecycle::ECmdLineShutdown::NotRequested) return;
 	bLifecycleCommandLineHandled = true; // anahtar varsa gecersiz de olsa tuketilir (yeniden denenmez)
-	if (!bTriggerSupported)
-	{
-		UE_LOG(LogMMOLifecycle, Warning, TEXT("event=shutdown_cmdline_unsupported note=bu-surumde-desteklenmez-L3-bekleniyor"));
-		return;
-	}
 	if (Parsed == MMOServerLifecycle::ECmdLineShutdown::Invalid || !RequestShutdown(Seconds, Reason, Error))
 	{
 		UE_LOG(LogMMOLifecycle, Error, TEXT("event=shutdown_cmdline_rejected error=%s"), *Error);
@@ -751,6 +878,11 @@ void UMMOServerLifecycleSubsystem::SetSaveHookForTest(TFunction<bool(AMMOCharact
 void UMMOServerLifecycleSubsystem::SetKickHookForTest(TFunction<bool(APlayerController*, const FText&)> Hook)
 {
 	LifecycleKickHook = MoveTemp(Hook);
+}
+
+void UMMOServerLifecycleSubsystem::SetExitHookForTest(TFunction<void(int32, int32)> Hook)
+{
+	LifecycleExitHook = MoveTemp(Hook);
 }
 
 void UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(TFunction<bool(const APlayerController*)> Filter)

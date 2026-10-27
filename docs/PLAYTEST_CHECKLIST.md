@@ -5689,10 +5689,15 @@ Sifaci kup bedeli `100 + 0,09 x (Lv-1)^3` (`MMOHealerNPC.h:31-37`) + 7 yeni bagi
 - [ ] **Oynanis sonu olcum:** `py -3 Scripts/PlaytestMetrics.py` ile gercek sink/gelir. Kural [Tahmin]: medyan sink/gelir >= %60 ise P1 geri cekilir; < %30 ise C1 degerlendirilir.
 
 ## Sunucu yasam dongusu ve uzak Exec korumasi (PIE'de denenmedi) (2026-10-27; `82e906c`, `041e162`, `fe86275`)
-Tum adimlar yazildi, hicbiri calistirilmadi. L2 (kayit turu/atma) ve L3 (cikis) yok; tasarim `docs/DESIGN_SERVER_LIFECYCLE.md`.
+Tum adimlar yazildi, hicbiri calistirilmadi. L2 (kayit turu/atma) ve L3 (cikis kodu, ticaret/posta/birlestirme kapisi) kodda var ama yalniz native testle (kancali) denendi; tasarim `docs/DESIGN_SERVER_LIFECYCLE.md`.
 - [ ] **Duyuru ve giris kapanisi:** listen PIE'de konsola `MMOShutdown 60` -> sohbette "1 dakika" duyurusu ve "yeni girisler kapandi" gorulur; ikinci istemcinin girisi reddedilir.
 - [ ] **Iptal:** 40. saniyede `MMOShutdownCancel` -> "Bakim iptal edildi" duyurusu; giris yeniden acilir.
 - [ ] **PIE sizinti kontrolu:** `MMOShutdown 600` sonra PIE'yi durdur-baslat -> yeni PIE'de plan sifirlanmis, giris acik.
 - [ ] **Uzak Exec negatifi:** istemci penceresinin konsoluna `MMOShutdown 60`, `MMOGainXP 1000`, `MMOPvP 1`, `EnableCheats` yazilir -> komut CALISMAZ; sunucu logunda `LogMMOExecGuard` `[MMOMETRIC] ev=remote_exec_blocked` satiri gorulur.
 - [ ] **Pozitif kontrol:** host'un kendi konsolunda ayni komutlar calisir.
-- [ ] **Komut satiri:** `-MMOShutdownAfterSeconds=45` ile baslatinca (Shipping disinda) Closing, sonra Exiting'de "surec sonlanmaz" uyarisi cikar; L3 gelene kadar uretimde KULLANILMAZ.
+- [ ] **Komut satiri (L3, Shipping dahil):** `-MMOShutdownAfterSeconds=45` ile dedicated/listen baslat -> Closing, Flushing, Kicking, Exiting; surec KENDI kapanir (log `ev=shutdown_exit code=0 failed=0`, `echo %ERRORLEVEL%` 0). Editor/PIE'de cikis ATLANIR (`shutdown_exit_skipped_editor`).
+- [ ] **Gercek atma:** iki surec (dedicated + istemci); `MMOShutdown 35` -> 5 sn kala istemci ana menuye doner ve "Sunucu bakima girdi. Ilerlemen kaydedildi." gorur; sunucu logunda `shutdown_kick ... kicked=1`; yeniden acinca karakter son durumda.
+- [ ] **Kayit hatasi -> kod 2:** oyuncunun `Saved/SaveGames/MMOSave_<ad>.sav` yolunu dizinle engelle (ya da salt-okunur yap), `MMOShutdown 35` -> atilan oyuncu "Ilerleme kaydedilemedi, yoneticiye bildir." gorur; log `shutdown_save_retry ... result=failed`, `ev=shutdown_exit code=2 failed=1`, `%ERRORLEVEL%` 2. Surec yoneticisinde kod 2'de OTOMATIK YENIDEN BASLATMA kapali olmali.
+- [ ] **Takas acikken kapanis:** iki oyuncu takas penceresinde, `MMOShutdown 35` -> kayit turu basinca (20. sn) takas "Ticaret iptal edildi."; yeni davet/kabul "Sunucu bakima giriyor: ticaret kapali."; `/posta gonder` ve birlestirme reddedilir; esya/altin cogalmaz ya da kaybolmaz.
+- [ ] **Listen ev sahibi:** ev sahibi de kaydedilir (atilmaz), uzak oyuncular gidince 5 sn icinde surec kapanir.
+- [ ] **Yan dosyalar:** kapanistan once basarim/gunluk ilerlemesi yap; yeniden acinca `Saved/MMOAchievements|MMODaily` guncel mi (bu sistem onlari cagirmaz, `EndPlay` yazar; kanitlanmadi).

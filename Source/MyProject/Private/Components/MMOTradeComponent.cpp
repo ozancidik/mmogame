@@ -5,6 +5,7 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOStatsComponent.h"
 #include "Items/MMOItemDatabase.h"
+#include "Core/MMOServerLifecycle.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
@@ -285,6 +286,12 @@ void UMMOTradeComponent::ServerInviteNearest_Implementation()
 	{
 		return;
 	}
+	// Planli kapanis kayit turuna girdi: yeni ticaret teklifi yok (kayittan sonra esya/altin degisimi kalici olmaz).
+	if (MMOServerLifecycle::IsFlushingOrLater())
+	{
+		NotifyOwner(TEXT("Sunucu bakima giriyor: ticaret kapali."));
+		return;
+	}
 
 	// Davet spam korumasi (hedefin ekranini doldurmasin).
 	const float Now = World->GetTimeSeconds();
@@ -362,6 +369,11 @@ void UMMOTradeComponent::ServerAccept_Implementation(uint64 SeenInviteId)
 	const UWorld* World = GetWorld();
 	if (!Self || !World)
 	{
+		return;
+	}
+	if (MMOServerLifecycle::IsFlushingOrLater())
+	{
+		NotifyOwner(TEXT("Sunucu bakima giriyor: ticaret kapali."));
 		return;
 	}
 	if (!Inviter || Inviter == Self)
@@ -572,6 +584,7 @@ void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int3
 
 void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 {
+	if (MMOServerLifecycle::IsFlushingOrLater()) return; // planli kapanis: yeni oturum kurulmaz (aktif olanlar Flushing girisinde iptal edildi)
 	// Destruction/EndPlay callbacks can still retain an actor pointer. Admission
 	// must reject that endpoint before installing another session or timer.
 	if (!IsValid(A) || !IsValid(B) || A->IsActorBeingDestroyed() || B->IsActorBeingDestroyed()

@@ -1,4 +1,4 @@
-# Planli kapatma durum makinesi (UMMOServerLifecycleSubsystem) native testi (docs/DESIGN_SERVER_LIFECYCLE.md 7, L1-L2); canli listen sunucu dunyasi.
+# Planli kapatma durum makinesi (UMMOServerLifecycleSubsystem) native testi (docs/DESIGN_SERVER_LIFECYCLE.md 7, L1-L3); canli listen sunucu dunyasi.
 # Ev sahibinin kaydina DOKUNMAZ: kayit/atma kancali; yalniz l2_disk bolumu Saved/SaveGames altina gecici MMOSave_LCTDisk* yuvalarini yazar ve test sonunda siler.
 param([ValidatePattern('^[A-Za-z0-9_.-]+$')][string]$Label = 'lifecycle')
 $ErrorActionPreference = 'Stop'
@@ -51,7 +51,7 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
 # Beklenen = LifecycleTestExpectedChecks (MMOServerLifecycleSelfTest.cpp); CASE sayisi = benzersiz case/check etiketi.
-$expected = 180
+$expected = 224
 $consistent = ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_LIFECYCLE_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }
