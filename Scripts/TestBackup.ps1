@@ -1,5 +1,6 @@
-# Kayit dosyalari yedekleme kutuphanesi testi (docs/DESIGN_BACKUP.md, dilim B0 + B1): Scripts/MMOSaveFilesLib.ps1 saf mantik + fikstur;
+# Kayit dosyalari yedekleme kutuphanesi testi (docs/DESIGN_BACKUP.md, dilim B0 + B1 + B2): Scripts/MMOSaveFilesLib.ps1 saf mantik + fikstur;
 # B1 = Scripts/BackupSaves.ps1 fikstur Saved/yedek koku uzerinde (surec denetimi sahte saglayiciyla; gercek surec taramasi cagrilmaz).
+# B2 = Scripts/VerifySaves.ps1 (salt okuma dogrulama) B1 ile alinmis sahte goruntuler uzerinde; salt okunurluk kaniti = tam agac damgasi (icerik+zaman) oncesi/sonrasi.
 # Her sey gecici fikstur dizininde calisir (sentetik .sav/JSON); GERCEK Saved/ okunmaz ve yazilmaz. Tek istisna: "degismedi" kaniti
 # icin gercek Saved\{SaveGames,MMOAchievements,MMODaily,MMOMail,MMORace} altinin YALNIZ dosya adi + boyut + zaman damgasi listesi
 # (icerik okunmaz) testin basinda ve sonunda alinip karsilastirilir.
@@ -14,7 +15,7 @@ if ($RepoRoot -eq '') { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 . (Join-Path $PSScriptRoot 'MMOSaveFilesLib.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi (asagidaki bolumlerin toplami; degisirse burada guncelle).
-$expected = 955
+$expected = 1059
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -1592,6 +1593,398 @@ try {
 
     # 16n Sentetik Saved'in tum B1 kosularinda degismedigi (yerel kanit; gercek Saved kaniti asagida)
     Check 'bk_proof' 'fixture_saved_tree_unchanged_across_all_runs' (((Get-TreeOracle $sA) -ceq $treeA0) -and ((Get-TreeOracle $sR) -ceq $treeR0))
+
+    # ---- 17. B2: VerifySaves.ps1 (salt okuma; yalniz fikstur; goruntuler B1 ile alinmis) -----------------------------------------
+    $vfScript = Join-Path $PSScriptRoot 'VerifySaves.ps1'
+    $b2 = Join-Path $fx 'b2'
+    $b2work = Join-Path $b2 'work'
+    [void][IO.Directory]::CreateDirectory($b2work)
+
+    function Invoke-TestVerify {
+        param([hashtable]$P)
+        foreach ($k in 'Snapshot', 'BackupRoot', 'Against') {
+            if ($P.ContainsKey($k) -and -not (Test-MMOPathUnder -Path $P[$k] -Root $fx -AllowEqual)) { throw 'test_guard_verify_path_outside_fixture' }
+        }
+        if (($P.ContainsKey('All') -or $P.ContainsKey('Last')) -and -not $P.ContainsKey('BackupRoot')) { throw 'test_guard_verify_default_root' }
+        $global:LASTEXITCODE = -999
+        $lines = @(& $vfScript @P *>&1 | ForEach-Object { [string]$_ })
+        return [pscustomobject]@{ Code = $global:LASTEXITCODE; Out = ($lines -join "`n"); Lines = $lines }
+    }
+    function OutHas {
+        param($R, [string]$S)
+        return $R.Out.Contains($S)
+    }
+    function Get-VfTagLines {
+        param($R, [string]$Tag)
+        $found = @($R.Lines | Where-Object { $_.StartsWith('[MMO_VERIFY' + $Tag + ']') })
+        return , $found
+    }
+    function New-SnapCopy {
+        param([string]$Src, [string]$Name)
+        $dst = Join-Path $b2work $Name
+        Copy-Item -LiteralPath $Src -Destination $dst -Recurse
+        return $dst
+    }
+    function Get-FullStamp {
+        # Agacin TAM damgasi: her dizin/dosya (adi, boyutu, LastWriteTime, icerik SHA-256). Reparse point izlenmez (L| satiri).
+        param([string]$Root)
+        $lines = New-Object System.Collections.ArrayList
+        $base = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+        $stack = New-Object System.Collections.Stack
+        $stack.Push($base)
+        while ($stack.Count -gt 0) {
+            $d = [string]$stack.Pop()
+            foreach ($it in @(Get-ChildItem -LiteralPath $d -Force)) {
+                $rel = $it.FullName.Substring($base.Length)
+                # Zaman damgasi dizin dizininden (Get-ChildItem) DEGIL, dogrudan sorgudan alinir: NTFS ust dizindeki onbellekli girdiyi gec
+                # gunceller, numaralandirma bayat dizin zamani verebilir (bu makinede gozlendi); GetLastWriteTimeUtc dogrudur.
+                if (Test-MMOReparse $it.FullName) { [void]$lines.Add('L|' + $rel); continue }
+                if ($it.PSIsContainer) { [void]$lines.Add('D|' + $rel + '|' + [IO.Directory]::GetLastWriteTimeUtc($it.FullName).Ticks); $stack.Push($it.FullName) }
+                else { [void]$lines.Add('F|' + $rel + '|' + $it.Length + '|' + [IO.File]::GetLastWriteTimeUtc($it.FullName).Ticks + '|' + (Get-OracleSha $it.FullName)) }
+            }
+        }
+        $arr = [string[]]@($lines.ToArray()); [Array]::Sort($arr, [StringComparer]::Ordinal)
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $h = $sha.ComputeHash((New-Object System.Text.UTF8Encoding($false)).GetBytes(($arr -join "`n"))) } finally { $sha.Dispose() }
+        return [pscustomobject]@{ Count = $arr.Length; Digest = (($h | ForEach-Object { $_.ToString('x2') }) -join ''); Lines = $arr }
+    }
+
+    # 17a Betik yapisi: ayristirma, ASCII, varsayilanlar, YAZMA API'si yok (statik)
+    $vperr = $null
+    $vast = [System.Management.Automation.Language.Parser]::ParseFile($vfScript, [ref]$null, [ref]$vperr)
+    Check 'vf_static' 'script_parses' (($null -eq $vperr) -or ($vperr.Count -eq 0))
+    Check 'vf_static' 'script_is_ascii' (-not (([IO.File]::ReadAllBytes($vfScript)) | Where-Object { $_ -gt 127 }))
+    $vdef = @{}
+    foreach ($pp in $vast.ParamBlock.Parameters) { if ($null -ne $pp.DefaultValue) { $vdef[$pp.Name.VariablePath.UserPath] = $pp.DefaultValue.Extent.Text } }
+    Check 'vf_static' 'backup_root_default_matches_backup_script' ($vdef['BackupRoot'] -ceq $pdef['BackupRoot'])
+    $forbiddenCmds = @('Set-Content', 'Add-Content', 'Out-File', 'Remove-Item', 'Move-Item', 'Copy-Item', 'New-Item', 'Rename-Item', 'Clear-Content', 'Set-ItemProperty', 'Tee-Object', 'Export-Csv', 'Write-MMOManifest', 'New-MMOManifest')
+    $usedCmds = @($vast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object { $_.GetCommandName() } | Where-Object { $null -ne $_ })
+    Check 'vf_static' 'no_write_cmdlets_used' (@($usedCmds | Where-Object { $forbiddenCmds -contains $_ }).Count -eq 0)
+    $forbiddenMembers = @('WriteAllBytes', 'WriteAllText', 'AppendAllText', 'Move', 'Delete', 'Copy', 'CreateDirectory', 'Create', 'CreateText', 'AppendText', 'Open', 'OpenWrite', 'SetLastWriteTime', 'SetLastWriteTimeUtc', 'SetAttributes', 'WriteByte', 'Write', 'Flush')
+    $usedMembers = @($vast.FindAll({ param($n) $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] }, $true) | ForEach-Object { $_.Member.Extent.Text })
+    Check 'vf_static' 'no_write_methods_used' (@($usedMembers | Where-Object { $forbiddenMembers -contains $_ }).Count -eq 0)
+    Check 'vf_static' 'no_file_redirection' (@($vast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FileRedirectionAst] }, $true)).Count -eq 0)
+    Check 'vf_static' 'no_filestream_objects' (@($vast.FindAll({ param($n) ($n -is [System.Management.Automation.Language.CommandAst]) -and ($n.Extent.Text -match 'FileStream|StreamWriter') }, $true)).Count -eq 0)
+
+    # 17b Fiksturler: B1 ile alinmis goruntuler (iyi, canli, temiz kapanis kanitli, bozuk kaynakli, yetim yan dosyali)
+    $sG = Join-Path $b2 'sG'; $rG = Join-Path $b2 'rG'
+    New-FakeSaved $sG
+    $okG = Invoke-TestBackup $sG $rG @{ Timestamp = '20261027T150000Z'; Label = 'good' }
+    $snapG = Join-Path $rG '20261027T150000Z-good'
+    $okL = Invoke-TestBackup $sG $rG @{ AllowLive = $true; Timestamp = '20261027T150001Z'; Label = 'live' }
+    $snapLive = Join-Path $rG '20261027T150001Z-live'
+    $sP = Join-Path $b2 'sP'; $rP2 = Join-Path $b2 'rP'
+    New-FakeSaved $sP
+    Write-TestText (Join-Path $sP 'Logs\MMOShutdownResult.json') $shGood
+    $okP = Invoke-TestBackup $sP $rP2 @{ RequireCleanShutdown = $true; Timestamp = '20261027T150002Z'; Label = 'proof' }
+    $snapProof = Join-Path $rP2 '20261027T150002Z-proof'
+    $sBd = Join-Path $b2 'sBd'; $rBd = Join-Path $b2 'rBd'
+    New-FakeSaved $sBd -KeepBad
+    $okBd = Invoke-TestBackup $sBd $rBd @{ Timestamp = '20261027T150003Z'; Label = 'invalid' }
+    $snapBd = Join-Path $rBd '20261027T150003Z-invalid'
+    $sOr = Join-Path $b2 'sOr'; $rOr = Join-Path $b2 'rOr'
+    New-FakeSaved $sOr
+    Write-TestText (Join-Path $sOr 'MMOAchievements\MMOSave_Ghost.json') '{"version":1,"unlocked":[]}'
+    $okOr = Invoke-TestBackup $sOr $rOr @{ Timestamp = '20261027T150004Z'; Label = 'orphan' }
+    $snapOr = Join-Path $rOr '20261027T150004Z-orphan'
+    Check 'vf_setup' 'fixture_snapshots_taken_by_backup_tool' (($okG.Code -eq 0) -and ($okL.Code -eq 0) -and ($okP.Code -eq 0) -and ($okBd.Code -eq 1) -and ($okOr.Code -eq 0))
+    $shaG = Get-OracleSha (Join-Path $snapG 'manifest.json')
+
+    # 17c Kullanim hatalari (2): hicbir sey okunmadan reddedilir; ilk satir ozet
+    $r = Invoke-TestVerify @{}
+    Check 'vf_usage' 'no_target_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=no_target') -and (OutHas $r 'status=usage'))
+    Check 'vf_usage' 'summary_is_first_line' ($r.Lines[0].StartsWith('[MMO_VERIFY_SUMMARY] '))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; All = $true; BackupRoot = $rG }
+    Check 'vf_usage' 'snapshot_and_all_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=snapshot_and_root_selectors'))
+    $r = Invoke-TestVerify @{ All = $true; Last = 2; BackupRoot = $rG }
+    Check 'vf_usage' 'all_and_last_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=all_and_last'))
+    $r = Invoke-TestVerify @{ Last = -1; BackupRoot = $rG }
+    Check 'vf_usage' 'negative_last_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=bad_last'))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; ExpectedManifestSha256 = 'abc' }
+    Check 'vf_usage' 'bad_expected_format_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=bad_expected_sha256'))
+    $r = Invoke-TestVerify @{ All = $true; BackupRoot = $rG; ExpectedManifestSha256 = $shaG }
+    Check 'vf_usage' 'expected_needs_single_snapshot_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=expected_requires_snapshot'))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; ExpectedManifestSha256 = ($shaG + '0') }
+    Check 'vf_usage' 'expected_65_chars_exit_2' (($r.Code -eq 2) -and (OutHas $r 'reason=bad_expected_sha256'))
+
+    # 17d Erisilemiyor / ertelendi (3) ve bos kok (1)
+    $r = Invoke-TestVerify @{ Snapshot = (Join-Path $b2 'no_such_snapshot') }
+    Check 'vf_defer' 'snapshot_missing_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=snapshot_missing') -and (OutHas $r 'status=deferred'))
+    $aFile = Join-Path $b2 'a_file.txt'
+    Write-TestText $aFile 'x'
+    $r = Invoke-TestVerify @{ Snapshot = $aFile }
+    Check 'vf_defer' 'snapshot_is_a_file_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=snapshot_not_directory'))
+    $r = Invoke-TestVerify @{ All = $true; BackupRoot = (Join-Path $b2 'no_such_root') }
+    Check 'vf_defer' 'backup_root_missing_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=backup_root_missing'))
+    $rootLink = Join-Path $b2 'root_link'
+    New-TestJunction $rootLink $rG
+    $r = Invoke-TestVerify @{ All = $true; BackupRoot = $rootLink }
+    Check 'vf_defer' 'backup_root_junction_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=backup_reparse_root'))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = (Join-Path $b2 'no_such_saved') }
+    Check 'vf_defer' 'against_missing_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=against_root_missing'))
+    $savedLink = Join-Path $b2 'saved_link'
+    New-TestJunction $savedLink $sG
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = $savedLink }
+    Check 'vf_defer' 'against_junction_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=against_reparse_root'))
+    $rEmpty = Join-Path $b2 'rEmpty'
+    [void][IO.Directory]::CreateDirectory($rEmpty)
+    Write-TestText (Join-Path $rEmpty '.lock') 'stale'
+    Write-TestText (Join-Path $rEmpty 'notes.txt') 'x'
+    $r = Invoke-TestVerify @{ All = $true; BackupRoot = $rEmpty }
+    Check 'vf_defer' 'root_without_snapshots_exit_1' (($r.Code -eq 1) -and (OutHas $r 'reason=no_snapshots'))
+
+    # 17e Temiz goruntu
+    $logG = [IO.File]::ReadAllText((Join-Path $snapG 'backup.log'))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG }
+    Check 'vf_ok' 'clean_snapshot_exit_0' ($r.Code -eq 0)
+    Check 'vf_ok' 'summary_is_first_line_status_ok' ($r.Lines[0].StartsWith('[MMO_VERIFY_SUMMARY] status=ok reason=ok exit=0 snapshots=1 ok=1 bad=0 incomplete=0 with_invalid=0 invalid_entries=0 live=0 warnings='))
+    Check 'vf_ok' 'snapshot_line_status_ok_entries_11' (OutHas $r 'name=20261027T150000Z-good status=ok manifest_sha256=')
+    Check 'vf_ok' 'manifest_sha256_matches_independent_oracle' (OutHas $r ('manifest_sha256=' + $shaG + ' mode=quiesced shutdown_proof=none entries=11 errors=0 invalid=0'))
+    Check 'vf_ok' 'manifest_sha256_equals_backup_log_value' ($logG.Contains('manifest_sha256=' + $shaG))
+    Check 'vf_ok' 'no_error_or_invalid_lines' (((Get-VfTagLines $r '_ERROR').Count -eq 0) -and ((Get-VfTagLines $r '_INVALID').Count -eq 0) -and ((Get-VfTagLines $r '_INCOMPLETE').Count -eq 0))
+    Check 'vf_ok' 'trailing_backslash_accepted' ((Invoke-TestVerify @{ Snapshot = ($snapG + '\') }).Code -eq 0)
+
+    # 17f Bozulma: dosya, manifest, fazladan/eksik dosya, boyut siniri, reparse
+    $w = New-SnapCopy $snapG 'flip'
+    $f = Join-Path $w 'files\SaveGames\MMOSave_Ali.sav'; $bb = [IO.File]::ReadAllBytes($f); $bb[10] = [byte]($bb[10] -bxor 0xFF); [IO.File]::WriteAllBytes($f, $bb)
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_hash' 'flipped_byte_exit_1' ($r.Code -eq 1)
+    Check 'vf_hash' 'flipped_byte_named_in_error_line' ((Get-VfTagLines $r '_ERROR') -contains '[MMO_VERIFY_ERROR] snap=flip hash_mismatch:SaveGames/MMOSave_Ali.sav')
+    Check 'vf_hash' 'flipped_byte_status_bad_and_counted' ((OutHas $r 'name=flip status=bad ') -and (OutHas $r ' bad=1 '))
+    $w = New-SnapCopy $snapG 'trunc'
+    [IO.File]::WriteAllBytes((Join-Path $w 'files\SaveGames\MMOSave_Ali.sav'), (New-SavBytes 100 1))
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_hash' 'truncated_file_size_mismatch' (($r.Code -eq 1) -and (OutHas $r 'size_mismatch:SaveGames/MMOSave_Ali.sav'))
+    $w = New-SnapCopy $snapG 'missing'
+    [IO.File]::Delete((Join-Path $w 'files\SaveGames\MMOSave_Ali.sav'))
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_hash' 'missing_file_reported' (($r.Code -eq 1) -and (OutHas $r 'entry_unusable:SaveGames/MMOSave_Ali.sav'))
+    $w = New-SnapCopy $snapG 'extra'
+    Write-TestText (Join-Path $w 'files\SaveGames\MMOSave_Intruder.sav') 'extra file'
+    Write-TestText (Join-Path $w 'files\notes.txt') 'not whitelisted'
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_extra' 'extra_whitelisted_file_exit_1' (($r.Code -eq 1) -and (OutHas $r 'extra_file:SaveGames/MMOSave_Intruder.sav'))
+    Check 'vf_extra' 'extra_non_whitelisted_file_reported' (OutHas $r 'extra_file:notes.txt')
+    $w = New-SnapCopy $snapG 'extra_clean_control'
+    Check 'vf_extra' 'control_copy_without_extra_is_ok' ((Invoke-TestVerify @{ Snapshot = $w }).Code -eq 0)
+    $w = New-SnapCopy $snapG 'big'
+    [IO.File]::WriteAllBytes((Join-Path $w 'files\SaveGames\MMOSave_Ali Baba.sav'), (New-Object byte[] 8388609))
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_size_limit' 'oversize_declared_file_rejected' (($r.Code -eq 1) -and (OutHas $r 'entry_unusable:SaveGames/MMOSave_Ali Baba.sav:too_large'))
+    $w = New-SnapCopy $snapG 'bigmanifest'
+    [IO.File]::WriteAllBytes((Join-Path $w 'manifest.json'), (New-Object byte[] 8388609))
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_size_limit' 'oversize_manifest_rejected' (($r.Code -eq 1) -and (OutHas $r 'manifest_too_large'))
+    $w = New-SnapCopy $snapG 'tamper_digest'
+    Edit-TestManifest $w { param($m) $m.entries[0].sha256 = ('0' * 64) }
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_manifest' 'entry_sha_edit_without_digest_fix_rejected' (($r.Code -eq 1) -and (OutHas $r 'digest_mismatch'))
+    $w = New-SnapCopy $snapG 'tamper_sha_fixed'
+    Edit-TestManifest $w { param($m) $m.entries[0].sha256 = ('0' * 64) } -FixDigest
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_manifest' 'entry_sha_edit_with_digest_fixed_hash_mismatch' (($r.Code -eq 1) -and (OutHas $r 'hash_mismatch:'))
+    $w = New-SnapCopy $snapG 'tamper_valid'
+    Edit-TestManifest $w { param($m) ($m.entries | Where-Object { $_.path -ceq 'MMODaily/MMOSave_Ali.json' }).valid = $false } -FixDigest
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_manifest' 'valid_false_tamper_on_good_file_rejected' (($r.Code -eq 1) -and (OutHas $r 'valid_mismatch:MMODaily/MMOSave_Ali.json'))
+    $w = New-SnapCopy $snapBd 'tamper_valid_true'
+    Edit-TestManifest $w { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Bad.sav' }).valid = $true } -FixDigest
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_manifest' 'valid_true_tamper_on_corrupt_file_rejected' (($r.Code -eq 1) -and (OutHas $r 'valid_mismatch:SaveGames/MMOSave_Bad.sav'))
+    $w = New-SnapCopy $snapG 'tamper_header'
+    Edit-TestManifest $w { param($m) $m.mode = 'live' }
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_manifest' 'header_edit_rejected' (($r.Code -eq 1) -and (OutHas $r 'header_digest_mismatch'))
+    $w = New-SnapCopy $snapG 'garbage_manifest'
+    Write-TestText (Join-Path $w 'manifest.json') 'this is not json'
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_manifest' 'garbage_manifest_is_bad_not_incomplete' (($r.Code -eq 1) -and (OutHas $r 'manifest_unreadable') -and (OutHas $r 'name=garbage_manifest status=bad '))
+    $w = New-SnapCopy $snapG 'junction_inside'
+    $decoy = Join-Path $b2 'decoy'
+    Write-TestText (Join-Path $decoy 'secret.txt') 'must stay untouched'
+    $decoyHash = Get-TreeOracle $decoy
+    New-TestJunction (Join-Path $w 'files\MMODaily\evil') $decoy
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_reparse' 'junction_inside_files_fails_closed' (($r.Code -eq 1) -and (OutHas $r 'tree_unusable:'))
+    Check 'vf_reparse' 'junction_target_untouched' ((Get-TreeOracle $decoy) -ceq $decoyHash)
+    $snapLink = Join-Path $b2 'snap_link'
+    New-TestJunction $snapLink $snapG
+    $r = Invoke-TestVerify @{ Snapshot = $snapLink }
+    Check 'vf_reparse' 'snapshot_dir_is_junction_fails_closed' (($r.Code -eq 1) -and (OutHas $r 'reparse_snapshot'))
+
+    # 17g -ExpectedManifestSha256 (disaridan beklenen ozet)
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; ExpectedManifestSha256 = $shaG }
+    Check 'vf_expected' 'matching_digest_exit_0' ($r.Code -eq 0)
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; ExpectedManifestSha256 = $shaG.ToUpperInvariant() }
+    Check 'vf_expected' 'upper_case_digest_accepted' ($r.Code -eq 0)
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; ExpectedManifestSha256 = ('1' * 64) }
+    Check 'vf_expected' 'wrong_digest_exit_1' (($r.Code -eq 1) -and ((Get-VfTagLines $r '_ERROR') -contains ('[MMO_VERIFY_ERROR] snap=20261027T150000Z-good expected_digest_mismatch:expected=' + ('1' * 64) + ':actual=' + $shaG)))
+    Check 'vf_expected' 'wrong_digest_snapshot_marked_bad' (OutHas $r 'name=20261027T150000Z-good status=bad ')
+    $w = New-SnapCopy $snapG 'rewritten_consistent'
+    Edit-TestManifest $w { param($m) $m.source_saved_dir = 'C:\elsewhere\Saved' } -FixDigest
+    $r0 = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_expected' 'consistent_rewrite_passes_without_expected_digest_known_limit' ($r0.Code -eq 0)
+    $r = Invoke-TestVerify @{ Snapshot = $w; ExpectedManifestSha256 = $shaG }
+    Check 'vf_expected' 'consistent_rewrite_caught_by_expected_digest' (($r.Code -eq 1) -and (OutHas $r 'expected_digest_mismatch:'))
+    $w = New-SnapCopy $snapG 'expected_on_incomplete'
+    [IO.File]::Delete((Join-Path $w 'manifest.json'))
+    $r = Invoke-TestVerify @{ Snapshot = $w; ExpectedManifestSha256 = $shaG }
+    Check 'vf_expected' 'expected_on_incomplete_snapshot_mismatch' (($r.Code -eq 1) -and (OutHas $r 'expected_digest_mismatch:') -and (OutHas $r 'manifest_sha256=none'))
+
+    $w = New-SnapCopy $snapG 'changed_during'
+    $hookMan = { param($d) Edit-TestManifest $d { param($m) $m.source_saved_dir = 'C:\other\Saved' } -FixDigest }
+    $r = Invoke-TestVerify @{ Snapshot = $w; TestHooks = @{ AfterVerify = $hookMan } }
+    Check 'vf_manifest' 'manifest_changed_during_verification_rejected' (($r.Code -eq 1) -and (OutHas $r 'manifest_changed_during_verify'))
+    Check 'vf_manifest' 'changed_during_reports_digest_seen_at_start' (OutHas $r ('manifest_sha256=' + $shaG + ' '))
+
+    # 17h Yarim goruntu: 'incomplete' acikca raporlanir
+    $w = New-SnapCopy $snapG 'no_manifest'
+    [IO.File]::Delete((Join-Path $w 'manifest.json'))
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_incomplete' 'missing_manifest_reported_incomplete_exit_1' (($r.Code -eq 1) -and (OutHas $r 'name=no_manifest status=incomplete ') -and (OutHas $r ' incomplete=1 '))
+    Check 'vf_incomplete' 'incomplete_line_has_reason' ((Get-VfTagLines $r '_INCOMPLETE') -contains '[MMO_VERIFY_INCOMPLETE] snap=no_manifest reasons=manifest_missing')
+    Check 'vf_incomplete' 'incomplete_is_not_counted_as_ok_or_bad' ((OutHas $r ' ok=0 bad=0 incomplete=1 '))
+    $w = New-SnapCopy $snapG 'failed_manifest'
+    [IO.File]::Move((Join-Path $w 'manifest.json'), (Join-Path $w 'manifest.json.failed'))
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_incomplete' 'failed_manifest_reported' (($r.Code -eq 1) -and (OutHas $r 'status=incomplete') -and (OutHas $r 'reasons=manifest_missing,manifest_failed'))
+    $sI2 = Join-Path $b2 'sI2'; $rI2 = Join-Path $b2 'rI2'
+    New-FakeSaved $sI2
+    $hookPart2 = { param($rel, $part)
+        if ($rel -ceq 'MMODaily/MMOSave_Ali.json') { $b3 = [IO.File]::ReadAllBytes($part); $b3[3] = [byte]($b3[3] -bxor 0x55); [IO.File]::WriteAllBytes($part, $b3) }
+    }
+    $rb = Invoke-TestBackup $sI2 $rI2 @{ Timestamp = '20261027T160000Z'; Label = 'partial'; TestHooks = @{ AfterPartial = $hookPart2 } }
+    $r = Invoke-TestVerify @{ Snapshot = (Join-Path $rI2 '20261027T160000Z-partial') }
+    Check 'vf_incomplete' 'real_interrupted_backup_reported_incomplete' (($rb.Code -eq 1) -and ($r.Code -eq 1) -and (OutHas $r 'status=incomplete'))
+    Check 'vf_incomplete' 'partial_files_counted_in_reasons' (OutHas $r 'partial_files=1')
+    $hookCorrupt2 = { param($snap)
+        $f2 = Join-Path $snap 'files\SaveGames\MMOSave_Ali.sav'
+        $b4 = [IO.File]::ReadAllBytes($f2); $b4[10] = [byte]($b4[10] -bxor 0xFF); [IO.File]::WriteAllBytes($f2, $b4)
+    }
+    $rb = Invoke-TestBackup $sI2 $rI2 @{ Timestamp = '20261027T160001Z'; Label = 'selfcheck'; TestHooks = @{ AfterManifest = $hookCorrupt2 } }
+    $r = Invoke-TestVerify @{ Snapshot = (Join-Path $rI2 '20261027T160001Z-selfcheck') }
+    Check 'vf_incomplete' 'real_failed_selfverify_reported_incomplete_with_failed_manifest' (($rb.Code -eq 1) -and ($r.Code -eq 1) -and (OutHas $r 'status=incomplete') -and (OutHas $r 'manifest_failed'))
+    $w = New-SnapCopy $snapG 'partial_leftover'
+    Write-TestText (Join-Path $w 'files\SaveGames\MMOSave_Ali.sav.partial') 'leftover'
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_incomplete' 'partial_leftover_next_to_manifest_is_bad' (($r.Code -eq 1) -and (OutHas $r 'partial_leftover:1') -and (OutHas $r 'name=partial_leftover status=bad '))
+    $w = Join-Path $b2work 'empty_dir'
+    [void][IO.Directory]::CreateDirectory($w)
+    $r = Invoke-TestVerify @{ Snapshot = $w }
+    Check 'vf_incomplete' 'empty_directory_reported_incomplete' (($r.Code -eq 1) -and (OutHas $r 'status=incomplete'))
+
+    # 17i mode=live, shutdown_proof, valid=false girisler, uyarilar
+    $r = Invoke-TestVerify @{ Snapshot = $snapLive }
+    Check 'vf_modes' 'live_snapshot_exit_0_with_warning' (($r.Code -eq 0) -and (OutHas $r 'mode=live') -and (OutHas $r '[MMO_VERIFY_WARN] snap=20261027T150001Z-live mode=live') -and (OutHas $r ' live=1 '))
+    $r = Invoke-TestVerify @{ Snapshot = $snapProof }
+    Check 'vf_modes' 'shutdown_proof_recorded_reported' (($r.Code -eq 0) -and (OutHas $r 'shutdown_proof=recorded') -and (OutHas $r '[MMO_VERIFY_PROOF] snap=20261027T150002Z-proof run_id=20261027T100000Z-1234 exit_code=0 time_utc=2026-10-27T10:00:00Z'))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG }
+    Check 'vf_modes' 'quiesced_snapshot_has_no_live_warning_or_proof_line' ((-not (OutHas $r 'mode=live')) -and ((Get-VfTagLines $r '_PROOF').Count -eq 0))
+    $r = Invoke-TestVerify @{ Snapshot = $snapBd }
+    Check 'vf_invalid' 'invalid_entry_exit_1' ($r.Code -eq 1)
+    Check 'vf_invalid' 'invalid_entry_listed_by_path' ((Get-VfTagLines $r '_INVALID') -contains '[MMO_VERIFY_INVALID] snap=20261027T150003Z-invalid path=SaveGames/MMOSave_Bad.sav (geri yuklenmeyecek)')
+    Check 'vf_invalid' 'invalid_snapshot_status_and_counts' ((OutHas $r 'status=complete_with_invalid_files') -and (OutHas $r ' with_invalid=1 invalid_entries=1 ') -and (OutHas $r ' errors=0 invalid=1'))
+    $r = Invoke-TestVerify @{ Snapshot = $snapG }
+    $wl = Get-VfTagLines $r '_WARN'
+    Check 'vf_warn' 'bad_lock_files_warned' (($wl -contains '[MMO_VERIFY_WARN] snap=20261027T150000Z-good lock_file=MMOAchievements/MMOSave_Ali.json.bad') -and ($wl -contains '[MMO_VERIFY_WARN] snap=20261027T150000Z-good lock_file=MMORace/MMORace_mmosave_ali.json.bad'))
+    Check 'vf_warn' 'tmp_and_bak_side_files_warned' (($wl -contains '[MMO_VERIFY_WARN] snap=20261027T150000Z-good side_file=MMODaily/MMOSave_Ali.json.tmp') -and ($wl -contains '[MMO_VERIFY_WARN] snap=20261027T150000Z-good side_file=MMOMail/MMOMail_ali.json.bak'))
+    Check 'vf_warn' 'warnings_do_not_fail_and_are_counted' (($r.Code -eq 0) -and (OutHas $r ' warnings=4 '))
+    Check 'vf_warn' 'no_orphan_warning_for_complete_groups' (-not (OutHas $r 'orphan_group='))
+    $r = Invoke-TestVerify @{ Snapshot = $snapOr }
+    Check 'vf_warn' 'orphan_side_file_group_warned' (($r.Code -eq 0) -and (OutHas $r 'orphan_group=ghost'))
+
+    # 17j Kok secimi: -All, -Last N (zaman damgasina gore, ada gore degil), yabanci girdiler, bozuk/junction/dosya girdisi
+    $rSel = Join-Path $b2 'sel'
+    [void][IO.Directory]::CreateDirectory($rSel)
+    foreach ($nm in '20261101T000001Z-a', '20261101T000002Z-b', 'pre-restore-20261101T000000Z-p', '20261101T000004Z-c') {
+        Copy-Item -LiteralPath $snapG -Destination (Join-Path $rSel $nm) -Recurse
+    }
+    Write-TestText (Join-Path $rSel 'notes.txt') 'foreign file'
+    [void][IO.Directory]::CreateDirectory((Join-Path $rSel 'random'))
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; All = $true }
+    Check 'vf_select' 'all_verifies_every_snapshot' (($r.Code -eq 0) -and (OutHas $r ' snapshots=4 ok=4 ') -and ((Get-VfTagLines $r '_SNAPSHOT').Count -eq 4))
+    Check 'vf_select' 'foreign_entries_counted_not_verified' (OutHas $r ' foreign=2')
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; Last = 2 }
+    Check 'vf_select' 'last_2_picks_two_newest_by_timestamp' (($r.Code -eq 0) -and (OutHas $r ' snapshots=2 ') -and (OutHas $r 'name=20261101T000002Z-b ') -and (OutHas $r 'name=20261101T000004Z-c ') -and -not (OutHas $r 'name=pre-restore') -and -not (OutHas $r 'name=20261101T000001Z-a '))
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; Last = 1 }
+    Check 'vf_select' 'last_1_is_newest' (($r.Code -eq 0) -and (OutHas $r ' snapshots=1 ') -and (OutHas $r 'name=20261101T000004Z-c '))
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; Last = 10 }
+    Check 'vf_select' 'last_larger_than_count_takes_all' (OutHas $r ' snapshots=4 ')
+    $fb = Join-Path $rSel '20261101T000002Z-b\files\SaveGames\MMOSave_Ali.sav'
+    $bb = [IO.File]::ReadAllBytes($fb); $bb[20] = [byte]($bb[20] -bxor 0xFF); [IO.File]::WriteAllBytes($fb, $bb)
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; All = $true }
+    Check 'vf_select' 'one_bad_among_four_fails_run' (($r.Code -eq 1) -and (OutHas $r ' snapshots=4 ok=3 bad=1 ') -and (OutHas $r 'snap=20261101T000002Z-b hash_mismatch:SaveGames/MMOSave_Ali.sav'))
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; Last = 1 }
+    Check 'vf_select' 'bad_snapshot_outside_window_not_examined' ($r.Code -eq 0)
+    $rSel2 = Join-Path $b2 'sel2'
+    [void][IO.Directory]::CreateDirectory($rSel2)
+    Copy-Item -LiteralPath $snapG -Destination (Join-Path $rSel2 '20261102T000001Z-ok') -Recurse
+    New-TestJunction (Join-Path $rSel2 '20261102T000002Z-link') $snapG
+    Write-TestText (Join-Path $rSel2 '20261102T000003Z-file') 'a file with a snapshot-like name'
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel2; All = $true }
+    Check 'vf_select' 'junction_and_file_entries_fail_closed' (($r.Code -eq 1) -and (OutHas $r ' snapshots=3 ok=1 bad=2 ') -and (OutHas $r 'snap=20261102T000002Z-link reparse_snapshot') -and (OutHas $r 'snap=20261102T000003Z-file not_a_directory'))
+    Check 'vf_select' 'junction_target_snapshot_untouched' ((Invoke-TestVerify @{ Snapshot = $snapG }).Code -eq 0)
+
+    # 17k -Against: goruntu ile canli agac farki (yalniz ad/boyut/hash; canli agaca yazilmaz)
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = $sG }
+    Check 'vf_against' 'identical_saved_all_same' (($r.Code -eq 0) -and ((Get-VfTagLines $r '_AGAINST') -contains '[MMO_VERIFY_AGAINST] snap=20261027T150000Z-good same=11 changed=0 only_in_snapshot=0 only_in_saved=0') -and ((Get-VfTagLines $r '_DIFF').Count -eq 0))
+    $sAg2 = Join-Path $b2 'sAg2'
+    New-FakeSaved $sAg2
+    Write-TestBytes (Join-Path $sAg2 'SaveGames\MMOSave_Ali.sav') (New-SavBytes 222 9)
+    Write-TestBytes (Join-Path $sAg2 'SaveGames\MMOSave_New.sav') (New-SavBytes 90 4)
+    [IO.File]::Delete((Join-Path $sAg2 'MMOMail\MMOMail_ali.json.bak'))
+    Write-TestText (Join-Path $sAg2 'SaveGames\notes.txt') 'not whitelisted, must not be diffed'
+    $treeAg0 = Get-TreeOracle $sAg2
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = $sAg2 }
+    $dl = Get-VfTagLines $r '_DIFF'
+    Check 'vf_against' 'differences_are_reported_not_failures_exit_0' (($r.Code -eq 0) -and ((Get-VfTagLines $r '_AGAINST') -contains '[MMO_VERIFY_AGAINST] snap=20261027T150000Z-good same=9 changed=1 only_in_snapshot=1 only_in_saved=1'))
+    Check 'vf_against' 'changed_file_with_both_sizes' ($dl -contains '[MMO_VERIFY_DIFF] snap=20261027T150000Z-good kind=changed path=SaveGames/MMOSave_Ali.sav size_snapshot=200 size_saved=222')
+    Check 'vf_against' 'only_in_snapshot_and_only_in_saved' (($dl -contains '[MMO_VERIFY_DIFF] snap=20261027T150000Z-good kind=only_in_snapshot path=MMOMail/MMOMail_ali.json.bak') -and ($dl -contains '[MMO_VERIFY_DIFF] snap=20261027T150000Z-good kind=only_in_saved path=SaveGames/MMOSave_New.sav'))
+    Check 'vf_against' 'non_whitelisted_saved_file_not_diffed' (-not (OutHas $r 'notes.txt'))
+    Check 'vf_against' 'saved_tree_unchanged_after_against' ((Get-TreeOracle $sAg2) -ceq $treeAg0)
+    $wBadMan = New-SnapCopy $snapG 'against_bad_manifest'
+    Write-TestText (Join-Path $wBadMan 'manifest.json') 'garbage'
+    $sAg4 = Join-Path $b2 'sAg4'
+    New-FakeSaved $sAg4
+    $fAg4 = Join-Path $sAg4 'MMOMail\MMOMail_ali.json'
+    $bAg4 = [IO.File]::ReadAllBytes($fAg4); $bAg4[5] = [byte]($bAg4[5] -bxor 0x01); [IO.File]::WriteAllBytes($fAg4, $bAg4)
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = $sAg4 }
+    Check 'vf_against' 'same_size_different_content_is_changed' (($r.Code -eq 0) -and ((Get-VfTagLines $r '_DIFF') -contains ('[MMO_VERIFY_DIFF] snap=20261027T150000Z-good kind=changed path=MMOMail/MMOMail_ali.json size_snapshot=' + $bAg4.Length + ' size_saved=' + $bAg4.Length)) -and (OutHas $r ' same=10 changed=1 '))
+    $r = Invoke-TestVerify @{ Snapshot = $wBadMan; Against = $sAg2 }
+    Check 'vf_against' 'unusable_manifest_skips_diff' (($r.Code -eq 1) -and (OutHas $r '[MMO_VERIFY_AGAINST] snap=against_bad_manifest skipped=manifest_not_usable'))
+    $r = Invoke-TestVerify @{ BackupRoot = $rSel; All = $true; Against = $sG }
+    Check 'vf_against' 'one_against_line_per_snapshot' ((Get-VfTagLines $r '_AGAINST').Count -eq 4)
+    $sAg3 = Join-Path $b2 'sAg3'
+    New-FakeSaved $sAg3
+    New-TestJunction (Join-Path $sAg3 'MMOMail\jx') $decoy
+    $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = $sAg3 }
+    Check 'vf_against' 'junction_entry_in_saved_exit_3' (($r.Code -eq 3) -and (OutHas $r 'reason=against_reparse_entry'))
+    Check 'vf_against' 'junction_target_still_untouched' ((Get-TreeOracle $decoy) -ceq $decoyHash)
+    $lockPathLive = Join-Path $sAg2 'SaveGames\MMOSave_Ali Baba.sav'
+    $lockFsV = New-Object IO.FileStream($lockPathLive, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+    try { $r = Invoke-TestVerify @{ Snapshot = $snapG; Against = $sAg2 } } finally { $lockFsV.Dispose() }
+    Check 'vf_against' 'unreadable_live_file_fails_exit_1' (($r.Code -eq 1) -and (OutHas $r 'kind=saved_unreadable path=SaveGames/MMOSave_Ali Baba.sav') -and (OutHas $r 'reason=against_unreadable'))
+
+    # 17l SALT OKUNURLUK KANITI: tum goruntu/yedek koku/Saved fiksturleri uzerinde dogrulama bataryasi; oncesi/sonrasi tam damga (icerik hash + zaman)
+    $stB2a = Get-FullStamp $b2
+    $treeSG0 = Get-TreeOracle $sG
+    $battery = @(
+        @{ Snapshot = $snapG }, @{ Snapshot = $snapLive }, @{ Snapshot = $snapProof }, @{ Snapshot = $snapBd }, @{ Snapshot = $snapOr },
+        @{ Snapshot = $snapG; ExpectedManifestSha256 = $shaG }, @{ Snapshot = $snapG; ExpectedManifestSha256 = ('2' * 64) },
+        @{ Snapshot = $snapG; Against = $sAg2 }, @{ Snapshot = $snapG; Against = $sG },
+        @{ BackupRoot = $rSel; All = $true }, @{ BackupRoot = $rSel; Last = 2; Against = $sG }, @{ BackupRoot = $rSel2; All = $true },
+        @{ BackupRoot = $rG; All = $true }, @{ BackupRoot = $rI2; All = $true }, @{ BackupRoot = $rEmpty; All = $true },
+        @{ Snapshot = (Join-Path $b2work 'no_manifest') }, @{ Snapshot = (Join-Path $b2work 'junction_inside') }, @{ Snapshot = (Join-Path $b2work 'big') },
+        @{ Snapshot = (Join-Path $b2work 'flip') }, @{ Snapshot = $snapLink }, @{ Snapshot = (Join-Path $b2 'no_such_snapshot') }, @{}
+    )
+    $battCodes = New-Object System.Collections.ArrayList
+    foreach ($bp in $battery) { [void]$battCodes.Add((Invoke-TestVerify $bp).Code) }
+    $stB2b = Get-FullStamp $b2
+    Check 'vf_readonly' 'battery_ran_with_expected_mixed_exit_codes' (($battCodes.ToArray() -join ',') -ceq '0,0,0,1,0,0,1,0,0,1,1,1,0,1,1,1,1,1,1,1,3,2')
+    Check 'vf_readonly' 'battery_covered_22_runs' ($battCodes.Count -eq 22)
+    Check 'vf_readonly' 'whole_fixture_tree_byte_and_time_identical_after_verification' (($stB2a.Digest -ceq $stB2b.Digest) -and ($stB2a.Count -eq $stB2b.Count) -and ($stB2a.Count -gt 100))
+    Check 'vf_readonly' 'no_lock_log_or_temp_files_created_in_backup_roots' ((-not (Test-Path -LiteralPath (Join-Path $rG '.lock'))) -and (@(Get-ChildItem -LiteralPath $b2 -Recurse -Force -File | Where-Object { ($_.Directory.Name -cne 'rEmpty') -and ($_.Name -like '*.lock' -or $_.Name -like 'verify*' -or $_.Name -like '*.restore.tmp') }).Count -eq 0))
+    Check 'vf_readonly' 'source_saved_fixtures_unchanged' (((Get-TreeOracle $sG) -ceq $treeSG0) -and ((Get-TreeOracle $sAg2) -ceq $treeAg0))
 
     # ---- 13. "Saved degismedi" kanitinin kendi testi (sentetik Saved, gercek degil) ----------------------------------------
     $fakeSaved = Join-Path $fx 'fake_saved'
