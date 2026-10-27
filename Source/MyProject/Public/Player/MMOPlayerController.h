@@ -25,6 +25,12 @@ class MYPROJECT_API AMMOPlayerController : public APlayerController
 public:
 	AMMOPlayerController();
 
+	// Y-xx: sunucudaki UZAK istemci denetleyicisi hicbir konsol komutu calistiramaz (ServerExec RPC / ConsoleCommand yolu);
+	// yerel denetleyici (host, standalone) ve sunucu-yerel konsol etkilenmez. Tanim: Player/MMOPlayerControllerExecGuard.cpp.
+	virtual bool ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override;
+	virtual void ServerExecRPC_Implementation(const FString& Msg) override;
+	virtual void ServerPause_Implementation() override;
+
 	// Yalniz listen server hostu: butun oturumu Summer/Winter arasinda tasir.
 	UFUNCTION(Exec)
 	void MMOTravel();
