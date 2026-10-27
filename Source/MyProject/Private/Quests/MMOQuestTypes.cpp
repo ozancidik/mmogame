@@ -535,6 +535,25 @@ namespace
 		Table.Add(MakeQuest(TEXT("Q_Gold50000"), TEXT("Altin Cagin Efendisi"), TEXT("50000 altin bagisla (teslimde altin dusulur)."),
 			T::HaveGold, TEXT(""), 50000, 45000, 0, 40, TEXT("Q_Gold30000")));
 
+		// Karar 3 = P1 / B1 (DECISIONS_NEEDED.md): seviye bandi basina TEK bagis satiri, hedef = bandin ~0,5 saatlik geliri
+		// (Lv25 bandi atlandi: Q_Gold15000 + Q_Gold30000 = 45000 zaten bandi karsiliyor, modelde o bant EK 0).
+		// Onkosul YOK (istege bagli, onceki bagis zincirine kilitlenmez). Ham XP ~0,2 seviye (Q_Gold50000 ile ayni agirlik);
+		// altin odulu yok. Hedefler/XP PLACEHOLDER, PIE'de olculmedi.
+		Table.Add(MakeQuest(TEXT("Q_Gold41000"), TEXT("Pazar Bagiscisi"), TEXT("41000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 41000, 4000, 0, 16));
+		Table.Add(MakeQuest(TEXT("Q_Gold160000"), TEXT("Sehir Bagiscisi"), TEXT("160000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 160000, 20000, 0, 33));
+		Table.Add(MakeQuest(TEXT("Q_Gold310000"), TEXT("Kale Bagiscisi"), TEXT("310000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 310000, 55000, 0, 42));
+		Table.Add(MakeQuest(TEXT("Q_Gold440000"), TEXT("Krallik Bagiscisi"), TEXT("440000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 440000, 105000, 0, 51));
+		Table.Add(MakeQuest(TEXT("Q_Gold710000"), TEXT("Tac Bagiscisi"), TEXT("710000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 710000, 160000, 0, 58));
+		Table.Add(MakeQuest(TEXT("Q_Gold1100000"), TEXT("Hazine Bagiscisi"), TEXT("1100000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 1100000, 240000, 0, 66));
+		Table.Add(MakeQuest(TEXT("Q_Gold1500000"), TEXT("Efsane Bagiscisi"), TEXT("1500000 altin bagisla (teslimde altin dusulur)."),
+			T::HaveGold, TEXT(""), 1500000, 300000, 0, 72));
+
 		return Table;
 	}
 }

@@ -28,12 +28,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MMO|Healer")
 	int32 HealCost = 100;
 
-	// Seviyeye gore sifa bedeli: taban + 0,4 x (Level-1)^2 (Lv1 100, Lv30 436, Lv60 1492, Lv80 2596).
-	// PLACEHOLDER, PIE'de olculmedi: sabit 100 altin Lv58+ bantlarinda (EconomyModel gelir/gider ~30x) fiilen bedavaydi.
+	// Seviyeye gore sifa bedeli: taban + 0,09 x (Level-1)^3 (Lv1 100, Lv30 2295, Lv60 18584, Lv80 44473).
+	// PLACEHOLDER, PIE'de olculmedi (karar 3 = P1, A1: DECISIONS_NEEDED.md): kare egri (0,4 x L^2) Lv58+ bantlarinda hala bedavaydi.
 	static int32 ComputeHealCost(int32 BaseCost, int32 Level)
 	{
 		const int64 L = FMath::Max(0, Level - 1);
-		return FMath::Max(0, BaseCost) + static_cast<int32>((L * L * 2) / 5);
+		return FMath::Max(0, BaseCost) + static_cast<int32>((L * L * L * 9) / 100);
 	}
 
 	// Altin yetersizken gosterilecek kibar reddetme repligi (balon).

@@ -1,8 +1,8 @@
 # Güncel durum, açık sorunlar ve ilk oyun içi test sırası
 
-**2026-10-09:** Lv46–80 içerik, 12 yeni beceri, DoT/ekonomi/spawner değişiklikleri ve güncel sayılar (59 mob, 97 görev (2026-10-10: 7 ara seviye yan görev eklendi), 57 ekipman,
+**2026-10-09:** Lv46–80 içerik, 12 yeni beceri, DoT/ekonomi/spawner değişiklikleri ve güncel sayılar (59 mob, 104 görev (2026-10-10: 7 ara seviye yan görev eklendi; 2026-10-27: +7 Q_Gold bağış satırı, karar 3 P1), 57 ekipman,
 93 beceri, 35 spawner) için [GUNLUK_OZET_2026-10-09.md](GUNLUK_OZET_2026-10-09.md); yeni içeriğin ilk oyun testi
-[PLAYTEST_LV46_80.md](PLAYTEST_LV46_80.md) (`MMOTeleport` ile cepleri gezme). 97 görev tanımı var. **Son doğrulanan aggregate paket (O41, a1897b8+O41+port): 41/41 kontrol geçti**;
+[PLAYTEST_LV46_80.md](PLAYTEST_LV46_80.md) (`MMOTeleport` ile cepleri gezme). 104 görev tanımı var. **Son doğrulanan aggregate paket (O41, a1897b8+O41+port): 41/41 kontrol geçti**;
 Son NetSmoke çalışma değişkeni düzeltmesi ardından iki mod ek smoke geçti (§79).
 19 CPP NoPCH /W4 derlendi, takas230, DoT46 ve parti185 native kontrolü geçti. Summer/Winter ve NetSmoke başarılı;
 gerçek PIE hâlâ açık. O41 ana master entegrasyonu, actual build ve native185/vendor18

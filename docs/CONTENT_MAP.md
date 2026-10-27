@@ -2,7 +2,7 @@
 
 `Scripts/ContentMap.py --write` ile uretilir (elle duzenleme). Kaynak: kod tablolari; oynanis olcumu degildir.
 
-Toplam: 59 mob (13 elit), 97 gorev, 57 ekipman, 93 beceri.
+Toplam: 59 mob (13 elit), 104 gorev, 57 ekipman, 93 beceri.
 
 | Lv | Mob (normal) | Elit | Gorev kapisi | Ekipman | Beceri |
 |---:|---|---|---|---|---|
@@ -21,7 +21,7 @@ Toplam: 59 mob (13 elit), 97 gorev, 57 ekipman, 93 beceri.
 | 13 | ThawStalker | FrostLich | Q_FrostLich, Q_ThawStalkers |  | War_CrushingBlow, Arc_Volley, Mag_IceLance, Pri_Judgement |
 | 14 | CrustWarden |  | Q_CrustWardens |  |  |
 | 15 | ScorchedRaider |  | Q_ScorchedRaiders |  |  |
-| 16 | EmberHound |  | Q_EmberHounds, Q_Level20, Q_Gold5000 | AdamantineBlade, AdamantinePlate, AdamantineHelm, AdamantineBoots | War_LifeReap, Arc_ShadowStep, Mag_IceChain, Pri_HolyRain |
+| 16 | EmberHound |  | Q_EmberHounds, Q_Level20, Q_Gold5000, Q_Gold41000 | AdamantineBlade, AdamantinePlate, AdamantineHelm, AdamantineBoots | War_LifeReap, Arc_ShadowStep, Mag_IceChain, Pri_HolyRain |
 | 17 |  |  | Q_EmberPack |  |  |
 | 18 | MagmaGolem |  | Q_MagmaGolems |  |  |
 | 19 |  |  | Q_GolemQuarry |  |  |
@@ -38,14 +38,14 @@ Toplam: 59 mob (13 elit), 97 gorev, 57 ekipman, 93 beceri.
 | 30 |  | ObsidianWarlord | Q_ObsidianWarlord, Q_Level40 |  |  |
 | 31 | DuskProwler |  | Q_DuskProwlers |  | War_Earthshaker, Arc_ThornVolley, Mag_Inferno, Pri_RadiantNova |
 | 32 |  |  | Q_DuskPack |  |  |
-| 33 | DuskGuardian |  | Q_DuskGuardians | DuskBlade, DuskPlate, DuskHelm, DuskBoots | War_BloodLord, Arc_WindsBreath, Mag_FreezingTempest, Pri_LifeBond |
+| 33 | DuskGuardian |  | Q_DuskGuardians, Q_Gold160000 | DuskBlade, DuskPlate, DuskHelm, DuskBoots | War_BloodLord, Arc_WindsBreath, Mag_FreezingTempest, Pri_LifeBond |
 | 34-35 | _yeni icerik yok_ | | | | |
 | 36 | DuskReaver |  | Q_DuskReavers |  |  |
 | 37-38 | _yeni icerik yok_ | | | | |
 | 39 | DuskWraith |  | Q_DuskWraiths |  | War_Skullsplitter, Arc_Impaler, Mag_Starfall, Pri_SalvationLight |
 | 40 |  | DuskOverlord | Q_DuskOverlord, Q_Level50, Q_Gold50000 |  |  |
 | 41 |  |  | Q_DuskHaunt |  |  |
-| 42 | WinterStalker |  | Q_WinterStalkers | WinterBlade, WinterPlate, WinterHelm, WinterBoots |  |
+| 42 | WinterStalker |  | Q_WinterStalkers, Q_Gold310000 | WinterBlade, WinterPlate, WinterHelm, WinterBoots |  |
 | 43 |  |  | Q_WinterScouts |  |  |
 | 44 | WinterGuardian |  | Q_WinterGuardians |  |  |
 | 45 |  |  | Q_WinterBulwark |  | War_WarCyclone, War_SteelArmor, Arc_SpikeTrap, Mag_ArcaneBurst (+2) |
@@ -54,14 +54,14 @@ Toplam: 59 mob (13 elit), 97 gorev, 57 ekipman, 93 beceri.
 | 48 | WinterWraith |  | Q_WinterWraiths |  |  |
 | 49 | WinterBehemoth |  | Q_WinterColossus |  |  |
 | 50 |  | WinterSovereign | Q_WinterSovereign, Q_Level65 |  |  |
-| 51 | FrostboundScout |  | Q_FrostboundScouts | FrostboundBlade, FrostboundPlate, FrostboundHelm, FrostboundBoots |  |
+| 51 | FrostboundScout |  | Q_FrostboundScouts, Q_Gold440000 | FrostboundBlade, FrostboundPlate, FrostboundHelm, FrostboundBoots |  |
 | 52 |  |  | Q_FrostboundSworn |  | War_BladeStorm, Arc_ShatterShot, Mag_Combustion, Pri_SmitingLight |
 | 53 | FrostboundSworn |  | Q_FrostboundSentinels |  |  |
 | 54 |  |  | Q_FrostboundLine |  |  |
 | 55 | FrostboundSentinel |  | Q_FrostboundWatch |  |  |
 | 56 |  |  | Q_FrostboundOath |  |  |
 | 57 |  | FrostboundWarden | Q_FrostboundWarden |  |  |
-| 58 | RiftSeeker |  | Q_RiftSeekers | RiftBlade, RiftPlate, RiftHelm, RiftBoots | War_WarDeluge, War_Unbreakable, Arc_PoisonCloud, Mag_ManaStorm (+2) |
+| 58 | RiftSeeker |  | Q_RiftSeekers, Q_Gold710000 | RiftBlade, RiftPlate, RiftHelm, RiftBoots | War_WarDeluge, War_Unbreakable, Arc_PoisonCloud, Mag_ManaStorm (+2) |
 | 59 |  |  | Q_RiftWhispers |  |  |
 | 60 | RiftWhisperer |  | Q_RiftKeepers |  |  |
 | 61 |  |  | Q_RiftWatch, Q_RiftPurge |  |  |
@@ -69,13 +69,13 @@ Toplam: 59 mob (13 elit), 97 gorev, 57 ekipman, 93 beceri.
 | 63 |  |  | Q_RiftDepths |  |  |
 | 64 | RiftWalker |  | Q_RiftWalkers |  | War_Obliterate, Arc_Multishot, Mag_GlacialSpike, Pri_HealingSurge |
 | 65 |  | RiftHerald | Q_RiftHerald, Q_Level80 |  |  |
-| 66 | AshVanguard |  | Q_AshVanguard | AshenBlade, AshenPlate, AshenHelm, AshenBoots |  |
+| 66 | AshVanguard |  | Q_AshVanguard, Q_Gold1100000 | AshenBlade, AshenPlate, AshenHelm, AshenBoots |  |
 | 67 |  |  | Q_AshBinders |  |  |
 | 68 | AshBinder |  | Q_AshLine |  |  |
 | 69 | AshMarcher |  | Q_AshMarchers |  |  |
 | 70 |  | AshTyrant | Q_AshTyrant |  | War_TitanWrath, Arc_ArrowTempest, Mag_MeteorShower, Pri_DivineJudgment |
 | 71 |  |  | Q_AbyssStriders, Q_AbyssPatrol |  |  |
-| 72 | AbyssStrider |  | Q_AbyssEchoes | AbyssBlade, AbyssPlate, AbyssHelm, AbyssBoots |  |
+| 72 | AbyssStrider |  | Q_AbyssEchoes, Q_Gold1500000 | AbyssBlade, AbyssPlate, AbyssHelm, AbyssBoots |  |
 | 73 |  |  | Q_AbyssEdge |  |  |
 | 74 | AbyssEcho |  | Q_AbyssGuardians |  |  |
 | 75 |  |  | Q_AbyssLine, Q_AbyssVigil |  | War_WorldBreaker, Arc_SunderingArrow, Mag_CosmicBlast, Pri_Sanctify |

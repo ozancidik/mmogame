@@ -201,8 +201,9 @@ def load_new_items():
 
     c = {}
     c["heal_base"] = int(_must(r"int32\s+HealCost\s*=\s*(\d+)\s*;", healer, "HealCost tabani").group(1))
-    m = _must(r"ComputeHealCost.*?\(\s*L\s*\*\s*L\s*\*\s*(\d+)\s*\)\s*/\s*(\d+)", healer, "ComputeHealCost katsayisi")
-    c["heal_num"], c["heal_den"] = int(m.group(1)), int(m.group(2))
+    # (L * L * N) / D (kare) veya (L * L * L * N) / D (kup, karar 3 P1 A1): "L *" sayisi = us.
+    m = _must(r"ComputeHealCost.*?\(\s*((?:L\s*\*\s*)+)(\d+)\s*\)\s*/\s*(\d+)", healer, "ComputeHealCost katsayisi")
+    c["heal_pow"], c["heal_num"], c["heal_den"] = m.group(1).count("L"), int(m.group(2)), int(m.group(3))
 
     body = _must(r"void UMMODailyComponent::BuildBounties\((.*?)\n\}", daily, "BuildBounties govdesi").group(1)
     c["daily_gold_k"] = int(_must(r"RewardGold\s*=\s*(\d+)\s*\*\s*L\s*\*\s*Mult", body, "gunluk altin katsayisi").group(1))
@@ -228,7 +229,7 @@ def new_items_report(income_by_level, kills_by_level, bands):
 
     def heal_cost(lv):  # AMMOHealerNPC::ComputeHealCost(HealCost, Level)
         l1 = max(0, lv - 1)
-        return max(0, c["heal_base"]) + (l1 * l1 * c["heal_num"]) // c["heal_den"]
+        return max(0, c["heal_base"]) + (l1 ** c["heal_pow"] * c["heal_num"]) // c["heal_den"]
 
     def daily_target(expr, lv):
         expr = expr.strip()
@@ -282,7 +283,7 @@ def new_items_report(income_by_level, kills_by_level, bands):
         return sum(f(lv) for lv in levels if a <= lv <= b)
 
     print("\n=== Yeni kalemler (2026-10-11): sifaci / basarim / gunluk gorev / posta ===")
-    print(f"Koddan [Kesin]: sifaci {c['heal_base']} + {c['heal_num']}/{c['heal_den']} x (Lv-1)^2 (Lv1 {heal_cost(1)}, Lv30 {heal_cost(30)}, "
+    print(f"Koddan [Kesin]: sifaci {c['heal_base']} + {c['heal_num']}/{c['heal_den']} x (Lv-1)^{c['heal_pow']} (Lv1 {heal_cost(1)}, Lv30 {heal_cost(30)}, "
           f"Lv60 {heal_cost(60)}, Lv80 {heal_cost(80)}); gunluk {len(c['daily_rows'])} gorev, altin {c['daily_gold_k']} x L x carpan "
           f"({'/'.join(m for *_x, m in c['daily_rows'])}), XP esigin %{c['daily_xp_pct']}'si x carpan; posta {c['mail_flat']} + eke "
           f"%{c['mail_pct']} (tavan {c['mail_max']}); basarim {len(c['ach'])} satir, altin toplami {ach_total}.")
@@ -831,7 +832,7 @@ def sink_report(income_by_level, kills_by_level, bands, tiers, upg_to):
             don_at[req] += cnt
     bsum = lambda f, a, b: sum(f(lv) for lv in levels if a <= lv <= b)
     hl = lambda lv: max(0, lv - 1)
-    heal_cur = lambda lv: max(0, c["heal_base"]) + (hl(lv) ** 2 * c["heal_num"]) // c["heal_den"]
+    heal_cur = lambda lv: max(0, c["heal_base"]) + (hl(lv) ** c["heal_pow"] * c["heal_num"]) // c["heal_den"]
     heal_cube = lambda lv: max(0, c["heal_base"]) + int(SINK_HEAL_CUBE * hl(lv) ** 3)
     heal_kill = lambda lv: round(SINK_HEAL_KILLS * avg_gold(lv))
     fus_ok = fr["fee_mult"] is not None and fr["cap"] is not None
@@ -859,7 +860,7 @@ def sink_report(income_by_level, kills_by_level, bands, tiers, upg_to):
     print("=== Altin sink senaryolari (karar 3, 2026-10-17) [MODEL]; oynanis olcumu YOK ===")
     print(f"Koddan [Kesin]: yukseltme maliyeti 50 x (+N) x (100 + Lv^2) / 100 HER denemede odenir; basari %{'/'.join(map(str, r['chance']))}, "
           f"basarisizlikta yanma %{'/'.join(map(str, r['burn']))} (MaxPlus {r['max_plus']}); yanan parca saticidan yeniden alinir. "
-          f"Sifaci {c['heal_base']} + {c['heal_num']}/{c['heal_den']} x (Lv-1)^2; iksir {r['potion']} / Buyuk Can Iksiri {r['gpotion']}; "
+          f"Sifaci {c['heal_base']} + {c['heal_num']}/{c['heal_den']} x (Lv-1)^{c['heal_pow']}; iksir {r['potion']} / Buyuk Can Iksiri {r['gpotion']}; "
           f"Q_Gold bagisi >= {r['don_min']} altin teslimde dusulur; birlestirme {'okundu' if fus_ok else 'YOK (D/S = 0)'}.")
     print(f"Varsayim [Tahmin]: {SINK_DEATHS:g} olum/sa x (1 - {SINK_HEAL_BYPASS:g} bypass) sifa; {SINK_POTIONS_PER_HOUR} Buyuk Can Iksiri/sa; "
           f"oldurme {KILL_SEC:g} sn, gorev {QUEST_SEC:g} sn; her bantta 4 parcalik tek kademe. Gelir = ana tablodaki (Q_Gold bagisi dusulmus); "
