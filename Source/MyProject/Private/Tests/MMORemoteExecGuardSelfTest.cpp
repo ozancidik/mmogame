@@ -25,7 +25,7 @@
 // Her Check benzersiz case/check cifti basar. Anonim namespace adlari ExecGuardTest onekli (unity-build tuzagi).
 namespace
 {
-	constexpr int32 ExecGuardTestExpectedChecks = 49;
+	constexpr int32 ExecGuardTestExpectedChecks = 82;
 
 	// LogMMOExecGuard satirlarini yakalar. Okumadan once Sync().
 	class FExecGuardTestLogCapture final : public FOutputDevice
@@ -50,6 +50,18 @@ namespace
 	private:
 		TArray<FString> Lines;
 	};
+
+	// Log alani izin listesi [A-Za-z0-9_.-] disinda karakter var mi (ya da '=')?
+	bool ExecGuardTestOnlyAllowed(const FString& S)
+	{
+		for (const TCHAR C : S)
+		{
+			const bool bOK = (C >= TEXT('A') && C <= TEXT('Z')) || (C >= TEXT('a') && C <= TEXT('z')) || (C >= TEXT('0') && C <= TEXT('9'))
+				|| C == TEXT('_') || C == TEXT('.') || C == TEXT('-') || C == TEXT('?');
+			if (!bOK) return false;
+		}
+		return true;
+	}
 
 	UWorld* ExecGuardTestFindWorld(UWorld* Hint)
 	{
@@ -91,10 +103,44 @@ namespace
 			Check(TEXT("token"), TEXT("skips_leading_space"), MMOExecGuard::FirstCommandToken(TEXT("  \t MMOPvP 1")) == TEXT("MMOPvP"));
 			Check(TEXT("token"), TEXT("stops_at_space"), MMOExecGuard::FirstCommandToken(TEXT("MMOGiveItem ScrollHaste 3")) == TEXT("MMOGiveItem"));
 			Check(TEXT("token"), TEXT("truncates_32"), MMOExecGuard::FirstCommandToken(*FString::ChrN(100, TEXT('A'))) == FString::ChrN(32, TEXT('A')));
-			Check(TEXT("token"), TEXT("strips_control"), MMOExecGuard::FirstCommandToken(TEXT("MMO\x01Load\x7f")) == TEXT("MMOLoad"));
+			Check(TEXT("token"), TEXT("strips_control"), MMOExecGuard::FirstCommandToken(TEXT("MMO\x01Load\x7f")) == TEXT("MMO?Load?"));
 			Check(TEXT("token"), TEXT("empty_and_null"), MMOExecGuard::FirstCommandToken(TEXT("   ")) == TEXT("(bos)") && MMOExecGuard::FirstCommandToken(nullptr) == TEXT("(bos)"));
-			Check(TEXT("token"), TEXT("sanitize_spaces_control"), MMOExecGuard::SanitizeToken(TEXT("Ali Veli\n\x02x"), 32) == TEXT("Ali_Velix"));
+			Check(TEXT("token"), TEXT("sanitize_spaces_control"), MMOExecGuard::SanitizeToken(TEXT("Ali Veli\n\x02x"), 32) == TEXT("Ali?Veli??x"));
 			Check(TEXT("token"), TEXT("sanitize_max_len"), MMOExecGuard::SanitizeToken(*FString::ChrN(50, TEXT('B')), 10).Len() == 10);
+			// Log enjeksiyonu: izin listesi [A-Za-z0-9_.-], gerisi '?', '=' atilir (Unicode bosluklar ve satir ayiricilari dahil).
+			const FString Nbsp = FString::Chr((TCHAR)0x00A0);
+			const FString LineSep = FString::Chr((TCHAR)0x2028);
+			Check(TEXT("inject"), TEXT("sanitize_nbsp"), MMOExecGuard::SanitizeToken(TEXT("a") + Nbsp + TEXT("b"), 32) == TEXT("a?b"));
+			Check(TEXT("inject"), TEXT("sanitize_u2028"), MMOExecGuard::SanitizeToken(TEXT("a") + LineSep + TEXT("b"), 32) == TEXT("a?b"));
+			Check(TEXT("inject"), TEXT("sanitize_forged_field"),
+				MMOExecGuard::SanitizeToken(TEXT("x ev=gold_lost player=evil"), 64) == TEXT("x?evgold_lost?playerevil"));
+			Check(TEXT("inject"), TEXT("sanitize_equals_dropped"), MMOExecGuard::SanitizeToken(TEXT("a=b==c"), 32) == TEXT("abc"));
+			Check(TEXT("inject"), TEXT("sanitize_allowed_kept"), MMOExecGuard::SanitizeToken(TEXT("Aa09_.-Zz"), 32) == TEXT("Aa09_.-Zz"));
+			Check(TEXT("inject"), TEXT("sanitize_long_capped"), MMOExecGuard::SanitizeToken(*FString::ChrN(500, TEXT('Z')), 32) == FString::ChrN(32, TEXT('Z')));
+			FString Controls;
+			for (int32 Code = 0; Code < 32; ++Code) { Controls.AppendChar((TCHAR)Code); }
+			Controls.AppendChar((TCHAR)127);
+			Controls.AppendChar((TCHAR)0x85);
+			Check(TEXT("inject"), TEXT("sanitize_all_controls"), MMOExecGuard::SanitizeToken(Controls, 64) == FString::ChrN(Controls.Len(), TEXT('?')));
+			Check(TEXT("inject"), TEXT("token_nbsp_only_allowed"),
+				ExecGuardTestOnlyAllowed(MMOExecGuard::FirstCommandToken(*(FString(TEXT("MMOLoad")) + Nbsp + TEXT("ev=gold_lost")))));
+			Check(TEXT("inject"), TEXT("token_u2028_only_allowed"),
+				ExecGuardTestOnlyAllowed(MMOExecGuard::FirstCommandToken(*(FString(TEXT("MMOLoad")) + LineSep + TEXT("ev=gold_lost")))));
+			Check(TEXT("inject"), TEXT("token_forged_event"), MMOExecGuard::FirstCommandToken(TEXT("ev=gold_lost")) == TEXT("evgold_lost"));
+			{
+				const FString Hostile = FString::ChrN(10, (TCHAR)1) + FString::ChrN(100, TEXT('A')) + TEXT("=");
+				const FString Tok = MMOExecGuard::FirstCommandToken(*Hostile);
+				Check(TEXT("inject"), TEXT("token_control_long"), Tok.Len() == 32 && ExecGuardTestOnlyAllowed(Tok));
+			}
+			// Fail-closed karar tablosu: yalniz (Player yerel) ya da (Player yok + standalone) izinli.
+			Check(TEXT("decide"), TEXT("local_player_allowed"), MMOExecGuard::IsConsoleExecAllowedFor(true, true, NM_ListenServer));
+			Check(TEXT("decide"), TEXT("remote_player_denied"),
+				!MMOExecGuard::IsConsoleExecAllowedFor(true, false, NM_DedicatedServer) && !MMOExecGuard::IsConsoleExecAllowedFor(true, false, NM_Standalone));
+			Check(TEXT("decide"), TEXT("no_player_standalone_allowed"), MMOExecGuard::IsConsoleExecAllowedFor(false, false, NM_Standalone));
+			Check(TEXT("decide"), TEXT("no_player_listen_denied"), !MMOExecGuard::IsConsoleExecAllowedFor(false, false, NM_ListenServer));
+			Check(TEXT("decide"), TEXT("no_player_dedicated_denied"), !MMOExecGuard::IsConsoleExecAllowedFor(false, false, NM_DedicatedServer));
+			Check(TEXT("decide"), TEXT("no_player_client_denied"), !MMOExecGuard::IsConsoleExecAllowedFor(false, false, NM_Client));
+			Check(TEXT("decide"), TEXT("null_pc_denied"), !MMOExecGuard::IsConsoleExecAllowed(nullptr));
 		}
 
 		// 2) Kurulum: tek pawn, uzak (UPlayer) ve yerel (ULocalPlayer) denetleyici. Pawn yuklu degil (MMOSave/ayrilma kaydi yazilmaz).
@@ -103,14 +149,16 @@ namespace
 		AMMOCharacter* Pawn = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
 		AMMOPlayerController* RemotePC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
 		AMMOPlayerController* LocalPC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
+		AMMOPlayerController* NoPlayerPC = World->SpawnActor<AMMOPlayerController>(AMMOPlayerController::StaticClass(), FVector(0, 0, 5000), FRotator::ZeroRotator, Params);
 		UPlayer* FakeRemote = NewObject<UPlayer>(World);
 		ULocalPlayer* FakeLocal = GEngine ? NewObject<ULocalPlayer>(GEngine) : nullptr;
-		const bool bSetup = Pawn && RemotePC && LocalPC && FakeRemote && FakeLocal && Pawn->GetStats() && Pawn->GetInventory();
+		const bool bSetup = Pawn && RemotePC && LocalPC && NoPlayerPC && FakeRemote && FakeLocal && Pawn->GetStats() && Pawn->GetInventory();
 		Check(TEXT("setup"), TEXT("spawned"), bSetup);
 		if (!bSetup)
 		{
 			if (RemotePC) RemotePC->Destroy();
 			if (LocalPC) LocalPC->Destroy();
+			if (NoPlayerPC) NoPlayerPC->Destroy();
 			if (Pawn) Pawn->Destroy();
 			OutError = TEXT("setup_failed");
 			return false;
@@ -121,8 +169,11 @@ namespace
 		FakeLocal->PlayerController = LocalPC;
 		RemotePC->SetPawn(Pawn);
 		LocalPC->SetPawn(Pawn);
-		Check(TEXT("setup"), TEXT("remote_is_remote"), MMOExecGuard::IsRemoteClientController(RemotePC));
-		Check(TEXT("setup"), TEXT("local_is_not_remote"), !MMOExecGuard::IsRemoteClientController(LocalPC));
+		NoPlayerPC->SetPawn(Pawn);
+		Check(TEXT("setup"), TEXT("remote_is_remote"), !MMOExecGuard::IsConsoleExecAllowed(RemotePC));
+		Check(TEXT("setup"), TEXT("local_is_not_remote"), MMOExecGuard::IsConsoleExecAllowed(LocalPC));
+		// Player'i olmayan PC (dedicated/listen) fail-closed: reddedilir (eski surumde "uzak degil" sayilirdi).
+		Check(TEXT("setup"), TEXT("noplayer_denied_in_listen_world"), NoPlayerPC->Player == nullptr && NoPlayerPC->GetNetMode() != NM_Standalone && !MMOExecGuard::IsConsoleExecAllowed(NoPlayerPC));
 
 		UMMOStatsComponent* Stats = Pawn->GetStats();
 		UMMOInventoryComponent* Inv = Pawn->GetInventory();
@@ -182,10 +233,33 @@ namespace
 			RemotePC->ServerExecRPC_Implementation(TEXT("  \x01MMO\x02Gain\nevil=1 ek"));
 			RemotePC->ServerExecRPC_Implementation(*FString::ChrN(100, TEXT('A')));
 			Log.Sync();
-			Check(TEXT("rpc"), TEXT("log_control_stripped"), Log.Count(TEXT("cmd=MMOGain ")) == 1);
+			Check(TEXT("rpc"), TEXT("log_control_stripped"), Log.Count(TEXT("cmd=?MMO?Gain ")) == 1);
 			Check(TEXT("rpc"), TEXT("log_no_forged_field"), Log.Count(TEXT("evil=1")) == 0);
 			Check(TEXT("rpc"), TEXT("log_token_truncated_32"),
 				Log.Count(TEXT("cmd=") + FString::ChrN(32, TEXT('A')) + TEXT(" player=")) == 1 && Log.Count(TEXT("cmd=") + FString::ChrN(33, TEXT('A'))) == 0);
+		}
+
+		// 4b) Player'siz PC (dedicated/listen) ServerExecRPC: fail-closed, log+etkisiz.
+		{
+			NoPlayerPC->ServerExecRPC_Implementation(TEXT("NoPlayerProbe 1"));
+			Log.Sync();
+			Check(TEXT("noplayer"), TEXT("rpc_blocked_logged"), Log.Count(TEXT("ev=remote_exec_blocked cmd=NoPlayerProbe ")) == 1);
+			NoPlayerPC->ServerExecRPC_Implementation(TEXT("MMOGainXP 2000000000"));
+			Check(TEXT("noplayer"), TEXT("rpc_no_effect"), Stats->Experience == Xp0 && Stats->Level == Level0);
+		}
+
+		// 4c) Validate ezmesi: uzak istemcide false (motor baglantiyi keser), PC basina yalniz bir log; yerelde true.
+		{
+			const bool bV1 = RemotePC->ServerExecRPC_Validate(TEXT("ValidateProbe 1"));
+			const bool bV2 = RemotePC->ServerExecRPC_Validate(TEXT("ValidateProbe 2"));
+			Log.Sync();
+			Check(TEXT("validate"), TEXT("remote_exec_false"), !bV1 && !bV2);
+			Check(TEXT("validate"), TEXT("remote_logged_once"), Log.Count(TEXT("ev=remote_exec_blocked cmd=ValidateProbe ")) == 1);
+			Check(TEXT("validate"), TEXT("remote_oversize_false"), !RemotePC->ServerExecRPC_Validate(*FString::ChrN(300, TEXT('A'))));
+			Check(TEXT("validate"), TEXT("remote_pause_false"), !RemotePC->ServerPause_Validate());
+			Check(TEXT("validate"), TEXT("noplayer_exec_false"), !NoPlayerPC->ServerExecRPC_Validate(TEXT("MMOGainXP 1")));
+			Check(TEXT("validate"), TEXT("local_exec_true"), LocalPC->ServerExecRPC_Validate(TEXT("MMOGainXP 1")));
+			Check(TEXT("validate"), TEXT("local_pause_true"), LocalPC->ServerPause_Validate());
 		}
 
 		// 5) Bilinen kalan risk (belgelenir, korunmus sayilmaz): UPlayer::Exec'te UWorld::Exec, PC'den ONCE sorgulanir; ConsoleCommand
@@ -212,6 +286,27 @@ namespace
 			Check(TEXT("local"), TEXT("pause_not_blocked"), Log.Count(TEXT("cmd=ServerPause ")) == 1);
 		}
 
+		// 6b) ServerExecRPC uzunluk siniri: yerel PC bile 256 karakteri asan komutu calistirmaz.
+		{
+			Log.Sync();
+			const int32 TooLongBefore = Log.Count(TEXT("ev=exec_too_long"));
+			const int32 XpBeforeLong = Stats->Experience;
+			LocalPC->ServerExecRPC_Implementation(*(FString(TEXT("MMOGainXP 5 ")) + FString::ChrN(MMOExecGuard::MaxServerExecLength, TEXT(' '))));
+			Log.Sync();
+			Check(TEXT("length"), TEXT("local_oversize_rejected"), Stats->Experience == XpBeforeLong);
+			Check(TEXT("length"), TEXT("local_oversize_logged"), Log.Count(TEXT("ev=exec_too_long")) == TooLongBefore + 1);
+		}
+
+		// 6c) AddCheats ezmesi (EnableCheats'in yolu): uzak / Player'siz PC icin CheatManager olusmaz, yerel olusur.
+		{
+			RemotePC->AddCheats(true);
+			NoPlayerPC->AddCheats(true);
+			LocalPC->AddCheats(true);
+			Check(TEXT("cheats"), TEXT("remote_no_manager"), RemotePC->CheatManager == nullptr);
+			Check(TEXT("cheats"), TEXT("noplayer_no_manager"), NoPlayerPC->CheatManager == nullptr);
+			Check(TEXT("cheats"), TEXT("local_manager_created"), LocalPC->CheatManager != nullptr);
+		}
+
 		// 7) Temizlik.
 		GM->SetPvPAllowed(bPvPBefore);
 		RemotePC->Player = nullptr;
@@ -220,8 +315,10 @@ namespace
 		FakeLocal->PlayerController = nullptr;
 		RemotePC->SetPawn(nullptr);
 		LocalPC->SetPawn(nullptr);
+		NoPlayerPC->SetPawn(nullptr);
 		RemotePC->Destroy();
 		LocalPC->Destroy();
+		NoPlayerPC->Destroy();
 		Pawn->Destroy();
 		UMMOServerLifecycleSubsystem::ResetPlanForTest();
 		Check(TEXT("end"), TEXT("pvp_restored"), GM->bAllowPvP == bPvPBefore);

@@ -20,6 +20,11 @@ public:
 
 	virtual void StartPlay() override;
 
+	// Y-9 (SECURITY_AUDIT bolum 10): yeni oyuncunun PC'si AMMOPlayerController degilse uzak Exec korumasi yoktur; yalniz Error loglar
+	// (ev=exec_guard_missing), baglantiyi KESMEZ (Blueprint PC atamalari dogrulanamadi). Mevcut giris akisini degistirmez.
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
+
 	// Y-5 (SECURITY_AUDIT): baslangic adi "<isletim sistemi kullanici adi>-<hex>" kalibindaysa (Null OSS
 	// varsayilani) herkese gorunmesin diye rastgele "Gezgin######" ile degistirilir. Tur 5: izinsiz karakterli (temizleme adi
 	// degistiriyor), ayrilmis (Default, motorun misafir adi Player<Id>) ya da bos ad da Gezgin adi alir. Gecerli adlar

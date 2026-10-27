@@ -28,6 +28,7 @@
 #include "Misc/Parse.h"
 #include "Components/MMOStatsComponent.h"
 #include "Player/MMOPlayerController.h"
+#include "Player/MMOExecGuard.h"
 #include "TimerManager.h"
 
 AMMOGameMode::AMMOGameMode()
@@ -616,6 +617,31 @@ void AMMOGameMode::PreLogin(const FString& Options, const FString& Address, cons
 			return;
 		}
 	}
+}
+
+namespace
+{
+	// Y-9: PC sinifi AMMOPlayerController degilse uzak ServerExec korumasi yok (yalniz log; bkz. MMOGameMode.h PostLogin).
+	void GameModeWarnIfExecGuardMissing(const AController* C)
+	{
+		const APlayerController* PC = Cast<APlayerController>(C);
+		if (PC && !PC->IsA<AMMOPlayerController>())
+		{
+			UE_LOG(LogMMOExecGuard, Error, TEXT("[MMOMETRIC] ev=exec_guard_missing pc_class=%s"), *PC->GetClass()->GetName());
+		}
+	}
+}
+
+void AMMOGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+	GameModeWarnIfExecGuardMissing(NewPlayer);
+}
+
+void AMMOGameMode::HandleSeamlessTravelPlayer(AController*& C)
+{
+	Super::HandleSeamlessTravelPlayer(C);
+	GameModeWarnIfExecGuardMissing(C);
 }
 
 void AMMOGameMode::StartPlay()

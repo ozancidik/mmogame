@@ -25,11 +25,14 @@ class MYPROJECT_API AMMOPlayerController : public APlayerController
 public:
 	AMMOPlayerController();
 
-	// Y-xx: sunucudaki UZAK istemci denetleyicisi hicbir konsol komutu calistiramaz (ServerExec RPC / ConsoleCommand yolu);
-	// yerel denetleyici (host, standalone) ve sunucu-yerel konsol etkilenmez. Tanim: Player/MMOPlayerControllerExecGuard.cpp.
+	// Y-xx (fail-closed): yalniz yerel (ULocalPlayer) ya da Player'siz standalone denetleyici konsol komutu calistirir; sunucudaki UZAK
+	// istemci (ve Player'i olmayan dedicated/listen PC) calistiramaz; Validate false = baglanti kesilir. Sunucu-yerel konsol etkilenmez. Tanim: Player/MMOPlayerControllerExecGuard.cpp.
 	virtual bool ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override;
+	virtual bool ServerExecRPC_Validate(const FString& Msg) override;
 	virtual void ServerExecRPC_Implementation(const FString& Msg) override;
+	virtual bool ServerPause_Validate() override;
 	virtual void ServerPause_Implementation() override;
+	virtual void AddCheats(bool bForce = false) override;
 
 	// Yalniz listen server hostu: butun oturumu Summer/Winter arasinda tasir.
 	UFUNCTION(Exec)
@@ -237,4 +240,8 @@ protected:
 
 	// Navmesh yol bulmayi cok sik yeniden hesaplamamak icin son istek zamani.
 	float LastPlayerRepathTime = -100.f;
+
+private:
+	// ServerExecRPC/ServerPause_Validate engelini PC basina bir kez loglamak icin (bkz. Player/MMOPlayerControllerExecGuard.cpp).
+	bool bExecValidateBlockLogged = false;
 };
