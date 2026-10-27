@@ -3,19 +3,22 @@
 # icin gercek Saved\{SaveGames,MMOAchievements,MMODaily,MMOMail,MMORace} altinin YALNIZ dosya adi + boyut + zaman damgasi listesi
 # (icerik okunmaz) testin basinda ve sonunda alinip karsilastirilir.
 # Windows PowerShell 5.1 ve PowerShell 7. Dosya yalniz ASCII; ASCII disi karakterler [char] ile uretilir.
-# Cikis: 0 PASS, 1 FAIL. Kalip: TestServerLifecycle.ps1 / TestFusion.ps1 (reported = case_lines = unique_labels = $expected).
-param([string]$RepoRoot = '')
+# Cikis: 0 PASS, 1 FAIL. Kalip: TestServerLifecycle.ps1 / TestFusion.ps1 (reported = case_lines = unique_labels = $expected);
+# reported ve unique_labels basilan CASE satirlarinin METNINDEN yeniden sayilir, case_lines Check sayacidir (capraz kontrol).
+# "Saved degismedi" kaniti hedef dizinler yoksa FAIL verir (-AllowVacuousSavedProof ile uyariya duser).
+param([string]$RepoRoot = '', [switch]$AllowVacuousSavedProof)
 Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
 if ($RepoRoot -eq '') { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 . (Join-Path $PSScriptRoot 'MMOSaveFilesLib.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi (asagidaki bolumlerin toplami; degisirse burada guncelle).
-$expected = 447
+$expected = 759
 
 $script:labels = @{}
 $script:caseLines = 0
 $script:failures = 0
+$script:emitted = New-Object System.Collections.ArrayList     # basilan CASE satirlari (rapor sayimi bundan, bagimsiz)
 $script:fixtureRoot = $null
 $script:junctions = New-Object System.Collections.ArrayList
 
@@ -31,14 +34,22 @@ function Check {
     if (-not $ok) { $tag = 'FAIL' }
     $note = ''
     if ($dup) { $note = ' duplicate_label' }
-    Write-Host ('[MMO_BACKUP_CASE] ' + $tag + ' case=' + $Case + ' check=' + $Check + $note)
+    $line = '[MMO_BACKUP_CASE] ' + $tag + ' case=' + $Case + ' check=' + $Check + $note
+    [void]$script:emitted.Add($line)
+    Write-Host $line
+}
+
+function Get-ThrowsResult {
+    # Bos on ek YASAK (her atma "gecer" olurdu); karsilastirma ordinal.
+    param([scriptblock]$Block, [string]$Prefix)
+    $msg = $null
+    try { & $Block | Out-Null } catch { $msg = $_.Exception.Message }
+    return (($Prefix.Length -gt 0) -and ($null -ne $msg) -and $msg.StartsWith($Prefix, [StringComparison]::Ordinal))
 }
 
 function CheckThrows {
     param([string]$Case, [string]$Check, [scriptblock]$Block, [string]$Prefix)
-    $msg = $null
-    try { & $Block | Out-Null } catch { $msg = $_.Exception.Message }
-    Check $Case $Check (($null -ne $msg) -and $msg.StartsWith($Prefix))
+    Check $Case $Check (Get-ThrowsResult $Block $Prefix)
 }
 
 function HasErr {
@@ -52,21 +63,29 @@ $sCed = [string][char]0x015F
 $trWord = ([string][char]0x00C7) + 'a' + [char]0x011F + 'r' + [char]0x0131      # "Cagri" Turkce harflerle
 
 function Get-SavedStamp {
-    $saved = Join-Path $RepoRoot 'Saved'
+    # Yalniz METADATA: her hedef dizinin var/yok bilgisi + altindaki dosya VE alt dizinlerin yolu, boyutu, zaman damgasi (icerik OKUNMAZ).
+    # Yeni/silinen dosya, yeni/silinen dizin, boyut ya da zaman farki digest'i degistirir. DirsPresent = var olan hedef dizin sayisi.
+    param([string]$SavedRoot = (Join-Path $RepoRoot 'Saved'))
     $lines = New-Object System.Collections.ArrayList
+    $present = 0
     foreach ($d in 'SaveGames', 'MMOAchievements', 'MMODaily', 'MMOMail', 'MMORace') {
-        $p = Join-Path $saved $d
+        $p = Join-Path $SavedRoot $d
         if (Test-Path -LiteralPath $p -PathType Container) {
-            foreach ($f in (Get-ChildItem -LiteralPath $p -Recurse -Force -File)) {
-                [void]$lines.Add($f.FullName + '|' + $f.Length + '|' + $f.LastWriteTimeUtc.Ticks)
+            $present++
+            [void]$lines.Add('E|' + $d + '|1')
+            foreach ($f in (Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction Stop)) {
+                if ($f.PSIsContainer) { [void]$lines.Add('D|' + $f.FullName + '|' + $f.LastWriteTimeUtc.Ticks) }
+                else { [void]$lines.Add('F|' + $f.FullName + '|' + $f.Length + '|' + $f.LastWriteTimeUtc.Ticks) }
             }
+        } else {
+            [void]$lines.Add('E|' + $d + '|0')
         }
     }
     $arr = [string[]]@($lines.ToArray())
     [Array]::Sort($arr, [StringComparer]::Ordinal)
     $sha = [Security.Cryptography.SHA256]::Create()
     try { $h = $sha.ComputeHash((New-Object System.Text.UTF8Encoding($false)).GetBytes(($arr -join "`n"))) } finally { $sha.Dispose() }
-    return [pscustomobject]@{ Count = $arr.Length; Digest = (($h | ForEach-Object { $_.ToString('x2') }) -join '') }
+    return [pscustomobject]@{ Count = $arr.Length; DirsPresent = $present; Digest = (($h | ForEach-Object { $_.ToString('x2') }) -join '') }
 }
 
 function New-TestBytes {
@@ -113,14 +132,17 @@ function Get-OracleDigest {
         $list.Insert($idx, $e)
     }
     $text = ''
-    foreach ($e in $list) { $text += ([string]$e.path + [char]0 + [string]$e.sha256 + [char]0 + [string]$e.size + "`n") }
+    foreach ($e in $list) {
+        $vs = [string]([bool]$e.valid).ToString().ToLowerInvariant()
+        $text += ([string]$e.path + [char]0 + [string]$e.class + [char]0 + [string]$e.sha256 + [char]0 + [string]$e.size + [char]0 + $vs + [char]0 + [string]$e.notes + "`n")
+    }
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return (($sha.ComputeHash((New-Object System.Text.UTF8Encoding($false)).GetBytes($text)) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $sha.Dispose() }
 }
 
 function New-BaseFiles {
     param([string]$FilesRoot)
-    $j = '{"version":1,"name":"Ali","note":"' + $trWord + '"}'
+    $j = '{"version":1,"day":20261027,"bounties":[],"note":"' + $trWord + '"}'
     Write-TestBytes (Join-Path $FilesRoot 'SaveGames\MMOSave_Ali.sav') (New-SavBytes 200 1)
     Write-TestBytes (Join-Path $FilesRoot 'SaveGames\MMOSave_Ali Baba.sav') (New-SavBytes 150 2)
     Write-TestBytes (Join-Path $FilesRoot 'SaveGames\MMOSave_Bad.sav') (New-TestBytes 100 3)
@@ -131,8 +153,9 @@ function New-BaseFiles {
     Write-TestText (Join-Path $FilesRoot 'MMOMail\MMOMail_ali.json') '{"version":2,"mails":[]}'
     Write-TestText (Join-Path $FilesRoot 'MMOMail\MMOMail_ali.json.bak') '{"version":2,"mails":[]}'
     Write-TestText (Join-Path $FilesRoot 'MMOMail\MMOMail_ali_baba.json') '{"version":2,"mails":[]}'
-    Write-TestText (Join-Path $FilesRoot 'MMORace\MMORace_ali.json') '{"version":1,"race":2}'
-    Write-TestText (Join-Path $FilesRoot 'MMORace\MMORace_ali.json.bad') 'lock'
+    # Gercek irk dosya adi: MMORace_<SlotKey("MMOSave_<ad>",64).ToLower()> (MMORaceStore.cpp:42)
+    Write-TestText (Join-Path $FilesRoot 'MMORace\MMORace_mmosave_ali.json') '{"version":1,"race":2}'
+    Write-TestText (Join-Path $FilesRoot 'MMORace\MMORace_mmosave_ali.json.bad') 'lock'
 }
 
 function New-TestSnapshot {
@@ -151,7 +174,10 @@ function Edit-TestManifest {
     $p = Join-Path $Snap 'manifest.json'
     $m = (Read-MMOUtf8Text $p).Text | ConvertFrom-Json
     & $Edit $m
-    if ($FixDigest) { $m.entries_digest = Get-MMOEntriesDigest $m.entries }
+    if ($FixDigest) {
+        $m.entries_digest = Get-MMOEntriesDigest $m.entries
+        $m.header_digest = Get-MMOHeaderDigest $m
+    }
     $json = $m | ConvertTo-Json -Depth 8
     [IO.File]::WriteAllBytes($p, (New-Object System.Text.UTF8Encoding($false)).GetBytes($json))
 }
@@ -178,6 +204,13 @@ try {
     }
     [void][IO.Directory]::CreateDirectory($script:fixtureRoot)
     $fx = $script:fixtureRoot
+
+    # ---- 0. Test altyapisinin kendi kapilari -------------------------------------------------------------------------
+    Check 'harness' 'throws_empty_prefix_never_passes' (-not (Get-ThrowsResult { throw 'anything' } ''))
+    Check 'harness' 'throws_no_throw_fails' (-not (Get-ThrowsResult { 1 } 'x'))
+    Check 'harness' 'throws_prefix_match_passes' (Get-ThrowsResult { throw 'abc:def' } 'abc:')
+    Check 'harness' 'throws_prefix_is_case_sensitive' (-not (Get-ThrowsResult { throw 'abc:def' } 'ABC:'))
+    Check 'harness' 'throws_prefix_mismatch_fails' (-not (Get-ThrowsResult { throw 'abc:def' } 'def'))
 
     # ---- 1. Oyuncu adi kurali + kanonik anahtar ----------------------------------------------------------------------
     $nameCases = @(
@@ -211,8 +244,16 @@ try {
         @('trail_dot', 'SaveGames/a.', 'trailing_dot_space'), @('trail_space', 'SaveGames/a ', 'trailing_dot_space'),
         @('ctrl_tab', "SaveGames/a`tb", 'control_char'), @('ctrl_del', ('SaveGames/a' + [char]127), 'control_char'),
         @('star', 'SaveGames/a*', 'invalid_char'), @('quest', 'SaveGames/a?', 'invalid_char'), @('pipe', 'a|b', 'invalid_char'),
-        @('lt', 'a<b', 'invalid_char'), @('empty', '', 'empty'), @('long', ('a' * 201), 'too_long')
+        @('lt', 'a<b', 'invalid_char'), @('empty', '', 'empty'), @('long', ('a' * 201), 'too_long'),
+        @('conin', 'SaveGames/CONIN$', 'device_name'), @('conout_ext', 'SaveGames/conout$.sav', 'device_name'),
+        @('clock', 'SaveGames/CLOCK$.json', 'device_name'), @('prn', 'SaveGames/PRN.sav', 'device_name'),
+        @('com_sup1', ('SaveGames/COM' + [char]0x00B9 + '.sav'), 'device_name'), @('com_sup3', ('SaveGames/com' + [char]0x00B3), 'device_name'),
+        @('lpt_sup2', ('SaveGames/LPT' + [char]0x00B2 + '.json'), 'device_name'), @('com0', 'SaveGames/COM0.sav', 'device_name'),
+        @('device_in_dir', 'NUL/MMOSave_a.sav', 'device_name')
     )
+    $goodDev = @('SaveGames/CONIN.sav', 'SaveGames/CLOCK.sav', 'SaveGames/COM.sav', 'SaveGames/COM11.sav', 'SaveGames/LPT10', 'SaveGames/MyCON.sav')
+    $gdi = 0
+    foreach ($g in $goodDev) { $gdi++; Check 'relpath' ('device_lookalike_ok_' + $gdi) (Test-MMOSafeRelPath $g) }
     foreach ($c in $badRel) {
         $reason = Get-MMORelPathProblem $c[1]
         Check 'relpath' ('bad_' + $c[0]) (($null -ne $reason) -and ($reason -ceq $c[2]))
@@ -252,8 +293,22 @@ try {
         @('mail_json', 'MMOMail/MMOMail_ali_baba.json', 'side', 'mail', 'ali_baba', '', ''),
         @('mail_bak', 'MMOMail/MMOMail_ali.json.bak', 'side', 'mail', 'ali', '.bak', ''),
         @('mail_tmpbad', 'MMOMail/MMOMail_ali.json.tmp.bad', 'side-lock', 'mail', 'ali', '.tmp.bad', ''),
-        @('race_json', 'MMORace/MMORace_ali.json', 'side', 'race', 'ali', '', ''),
-        @('race_bad', 'MMORace/MMORace_ali.json.bad', 'side-lock', 'race', 'ali', '.bad', ''),
+        @('race_json', 'MMORace/MMORace_mmosave_ali.json', 'side', 'race', 'ali', '', ''),
+        @('race_bad', 'MMORace/MMORace_mmosave_ali.json.bad', 'side-lock', 'race', 'ali', '.bad', ''),
+        @('race_tmp', 'MMORace/MMORace_mmosave_ali.json.tmp', 'side', 'race', 'ali', '.tmp', ''),
+        @('race_tmpbad', 'MMORace/MMORace_mmosave_ali.json.tmp.bad', 'side-lock', 'race', 'ali', '.tmp.bad', ''),
+        @('race_space_name', 'MMORace/MMORace_mmosave_ali_baba.json', 'side', 'race', 'ali_baba', '', ''),
+        @('race_len25', ('MMORace/MMORace_mmosave_' + ('a' * 25) + '.json'), 'side', 'race', ('a' * 25), '', ''),
+        @('race_len32', ('MMORace/MMORace_mmosave_' + ('a' * 32) + '.json'), 'side', 'race', ('a' * 32), '', ''),
+        @('race_len32_bad', ('MMORace/MMORace_mmosave_' + ('a' * 32) + '.json.bad'), 'side-lock', 'race', ('a' * 32), '.bad', ''),
+        @('race_default_slot', 'MMORace/MMORace_mmosave_default.json', 'side', 'race', 'default', '', ''),
+        @('race_legacy_json', 'MMORace/MMORace_ali.json', 'side', 'race', 'ali', '', ''),
+        @('race_legacy_bad', 'MMORace/MMORace_ali.json.bad', 'side-lock', 'race', 'ali', '.bad', ''),
+        @('race_key64', ('MMORace/MMORace_' + ('b' * 64) + '.json'), 'side', 'race', ('b' * 64), '', ''),
+        @('race_key65', ('MMORace/MMORace_' + ('b' * 65) + '.json'), 'ignored', '', '', '', 'name_rule'),
+        @('race_prefix_only', 'MMORace/MMORace_mmosave_.json', 'ignored', '', '', '', 'name_rule'),
+        @('race_upper_prefix', 'MMORace/MMORace_MMOSave_ali.json', 'ignored', '', '', '', 'name_rule'),
+        @('race_space', 'MMORace/MMORace_mmosave_ali baba.json', 'ignored', '', '', '', 'name_rule'),
         @('sg_len33', ('SaveGames/MMOSave_' + ('a' * 33) + '.sav'), 'ignored', '', '', '', 'name_rule'),
         @('sg_nonmmo', 'SaveGames/Other.sav', 'ignored', '', '', '', 'not_whitelisted_name'),
         @('sg_lower_prefix', 'SaveGames/mmosave_ali.sav', 'ignored', '', '', '', 'not_whitelisted_name'),
@@ -296,7 +351,7 @@ try {
     # ---- 5. Slot gruplari ve harf cakismalari ------------------------------------------------------------------------
     $slotPaths = @(
         'SaveGames/MMOSave_Ali Baba.sav', 'MMOAchievements/MMOSave_Ali Baba.json', 'MMODaily/MMOSave_Ali Baba.json.tmp',
-        'MMOMail/MMOMail_ali_baba.json.bak', 'MMORace/MMORace_ali_baba.json.bad', 'SaveGames/MMOSave_Veli.sav',
+        'MMOMail/MMOMail_ali_baba.json.bak', 'MMORace/MMORace_mmosave_ali_baba.json.bad', 'SaveGames/MMOSave_Veli.sav',
         'MMOMail/MMOMail_veli.json', 'SaveGames/Other.sav', 'Logs/x.log', ('SaveGames/MMOSave_' + $oUml + 'mer.sav')
     )
     $groups = Get-MMOSlotGroups $slotPaths
@@ -336,7 +391,22 @@ try {
     $w = [IO.File]::Open($wpath, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
     try { $shaOpen = Get-MMOFileSha256 $wpath } finally { $w.Dispose() }
     Check 'sha' 'readable_while_writer_open' ($shaOpen -ceq (Get-OracleSha $wpath))
-    CheckThrows 'sha' 'missing_file_throws' { Get-MMOFileSha256 (Join-Path $shaDir 'nope.bin') } ''
+    CheckThrows 'sha' 'missing_file_throws' { Get-MMOFileSha256 (Join-Path $shaDir 'nope.bin') } 'file_missing'
+    $snapInfo = Get-MMOFileSnapshotInfo -Path (Join-Path $shaDir 'abc.bin') -ClassInfo (Get-MMOSaveFileClass 'MMOMail/MMOMail_ali.json.tmp.bad')
+    Check 'sha' 'snapshot_info_single_read_consistent' (($snapInfo.Size -eq 3) -and ($snapInfo.Bytes.Length -eq 3) -and ($snapInfo.Sha256 -ceq (Get-MMOBytesSha256 $snapInfo.Bytes)) -and ($snapInfo.Sha256 -ceq 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'))
+    Check 'sha' 'bytes_hash_empty' ((Get-MMOBytesSha256 ([byte[]]@())) -ceq 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+    # Boyut ust siniri (8 MB): tam sinirda okunur, 1 bayt fazlasi reddedilir
+    $capDir = Join-Path $fx 'cap'
+    Write-TestBytes (Join-Path $capDir 'exact.bin') (New-Object byte[] 8388608)
+    Write-TestBytes (Join-Path $capDir 'over.bin') (New-Object byte[] 8388609)
+    Check 'cap' 'exact_limit_read' ((Read-MMOFileBytes (Join-Path $capDir 'exact.bin')).Length -eq 8388608)
+    CheckThrows 'cap' 'over_limit_rejected' { Read-MMOFileBytes (Join-Path $capDir 'over.bin') } 'too_large'
+    CheckThrows 'cap' 'custom_limit_rejected' { Read-MMOFileBytes -Path (Join-Path $shaDir 'abc.bin') -MaxBytes 2 } 'too_large'
+    Check 'cap' 'sav_over_limit_invalid' (-not (Test-MMOSavFile -Path (Join-Path $capDir 'over.bin')).Valid -and (Test-MMOSavFile -Path (Join-Path $capDir 'over.bin')).Reason -ceq 'too_large')
+    Check 'cap' 'json_over_limit_invalid' (-not (Test-MMOJsonFile -Path (Join-Path $capDir 'over.bin')).Valid -and (Test-MMOJsonFile -Path (Join-Path $capDir 'over.bin')).Reason -ceq 'too_large')
+    $ovr = Get-MMOFileIntegrity -Path (Join-Path $capDir 'over.bin') -ClassInfo (Get-MMOSaveFileClass 'MMODaily/MMOSave_Ali.json')
+    Check 'cap' 'integrity_over_limit_invalid' ((-not $ovr.Valid) -and $ovr.Notes -ceq 'too_large')
+    Check 'cap' 'bytes_over_limit_invalid' (-not (Test-MMOJsonBytes -Bytes (New-Object byte[] 8388609)).Valid)
 
     # ---- 7. .sav (GVAS) butunlugu ------------------------------------------------------------------------------------
     $savDir = Join-Path $fx 'sav'
@@ -349,7 +419,11 @@ try {
         @('wrong_magic', (New-TestBytes 100 4), $false, 'bad_magic'),
         @('lowercase_magic', ([byte[]](@(0x67, 0x76, 0x61, 0x73) + (New-TestBytes 96 5))), $false, 'bad_magic'),
         @('magic_at_offset', ([byte[]](@(0, 0, 0, 0x47, 0x56, 0x41, 0x53) + (New-TestBytes 96 6))), $false, 'bad_magic'),
-        @('gvat', ([byte[]](@(0x47, 0x56, 0x41, 0x54) + (New-TestBytes 96 7))), $false, 'bad_magic')
+        @('gvat', ([byte[]](@(0x47, 0x56, 0x41, 0x54) + (New-TestBytes 96 7))), $false, 'bad_magic'),
+        @('only_byte0_wrong', ([byte[]](@(0x48, 0x56, 0x41, 0x53) + (New-TestBytes 96 8))), $false, 'bad_magic'),
+        @('only_byte1_wrong', ([byte[]](@(0x47, 0x57, 0x41, 0x53) + (New-TestBytes 96 9))), $false, 'bad_magic'),
+        @('only_byte2_wrong', ([byte[]](@(0x47, 0x56, 0x42, 0x53) + (New-TestBytes 96 10))), $false, 'bad_magic'),
+        @('exactly_64_bytes_wrong_magic', ([byte[]](@(0x00, 0x00, 0x00, 0x00) + (New-TestBytes 60 11))), $false, 'bad_magic')
     )
     foreach ($c in $savCases) {
         $p = Join-Path $savDir ($c[0] + '.sav')
@@ -396,11 +470,42 @@ try {
     }
     Check 'json' 'bom_warning_name' ((@((Test-MMOJsonFile -Path (Join-Path $jsonDir 'bom_warn.json')).Warnings) -join ',') -ceq 'utf8_bom')
     Check 'json' 'missing_file_read_error' ((Test-MMOJsonFile -Path (Join-Path $jsonDir 'nope.json')).Reason -ceq 'read_error')
+    # version araligi 1..1000
+    $verCases = @(
+        @('v0', '{"version":0}', $false, 'version_out_of_range'), @('v1', '{"version":1}', $true, ''), @('v1000', '{"version":1000}', $true, ''),
+        @('v1001', '{"version":1001}', $false, 'version_out_of_range'), @('vneg', '{"version":-1}', $false, 'version_out_of_range'),
+        @('vhuge', '{"version":1e300}', $false, 'version_out_of_range'), @('v2_0', '{"version":2.0}', $true, '')
+    )
+    foreach ($c in $verCases) {
+        $r = Test-MMOJsonBytes -Bytes ([byte[]][char[]]$c[1])
+        Check 'jsonver' ($c[0] + '.valid') ($r.Valid -eq $c[2])
+        Check 'jsonver' ($c[0] + '.reason') ($r.Reason -ceq $c[3])
+    }
+    # dizin (tur) basina sema
+    $schemaCases = @(
+        @('ach_ok', 'achievement', '{"version":1,"unlocked":[]}', $true, ''), @('ach_missing', 'achievement', '{"version":1}', $false, 'missing_field:unlocked'),
+        @('ach_type', 'achievement', '{"version":1,"unlocked":5}', $false, 'bad_field_type:unlocked'),
+        @('daily_ok', 'daily', '{"version":1,"day":20261027,"bounties":[1]}', $true, ''), @('daily_no_day', 'daily', '{"version":1,"bounties":[]}', $false, 'missing_field:day'),
+        @('daily_day_str', 'daily', '{"version":1,"day":"x","bounties":[]}', $false, 'bad_field_type:day'),
+        @('daily_no_bounties', 'daily', '{"version":1,"day":20261027}', $false, 'missing_field:bounties'),
+        @('mail_ok', 'mail', '{"version":1,"mails":[]}', $true, ''), @('mail_missing', 'mail', '{"version":1}', $false, 'missing_field:mails'),
+        @('mail_obj', 'mail', '{"version":1,"mails":{}}', $false, 'bad_field_type:mails'),
+        @('race_ok', 'race', '{"version":1,"race":3}', $true, ''), @('race_missing', 'race', '{"version":1}', $false, 'missing_field:race'),
+        @('race_str', 'race', '{"version":1,"race":"3"}', $false, 'bad_field_type:race'),
+        @('unknown_kind_only_version', 'weird', '{"version":1}', $true, '')
+    )
+    foreach ($c in $schemaCases) {
+        $r = Test-MMOJsonBytes -Bytes ([byte[]][char[]]$c[2]) -Kind $c[1]
+        Check 'jsonschema' ($c[0] + '.valid') ($r.Valid -eq $c[3])
+        Check 'jsonschema' ($c[0] + '.reason') ($r.Reason -ceq $c[4])
+    }
+    Check 'jsonschema' 'class_info_kind_is_used' (-not (Get-MMOBytesIntegrity -Bytes ([byte[]][char[]]'{"version":1}') -ClassInfo (Get-MMOSaveFileClass 'MMOMail/MMOMail_ali.json')).Valid)
+    Check 'jsonschema' 'tmp_schema_failure_is_tmp_unparsable' ((Get-MMOBytesIntegrity -Bytes ([byte[]][char[]]'{"version":1}') -ClassInfo (Get-MMOSaveFileClass 'MMOMail/MMOMail_ali.json.tmp')).Notes -ceq 'tmp_unparsable')
 
     # Sinif bilgisine gore butunluk karari
     $intDir = Join-Path $fx 'integrity'
     Write-TestText (Join-Path $intDir 'garbage.txt') 'not json at all'
-    Write-TestText (Join-Path $intDir 'good.txt') '{"version":1}'
+    Write-TestText (Join-Path $intDir 'good.txt') '{"version":1,"day":20261027,"bounties":[]}'
     $iLock = Get-MMOFileIntegrity -Path (Join-Path $intDir 'garbage.txt') -ClassInfo (Get-MMOSaveFileClass 'MMORace/MMORace_ali.json.bad')
     Check 'integrity' 'lock_valid_even_if_garbage' ($iLock.Valid -and $iLock.Notes -ceq 'lock_file')
     $iTmp = Get-MMOFileIntegrity -Path (Join-Path $intDir 'garbage.txt') -ClassInfo (Get-MMOSaveFileClass 'MMODaily/MMOSave_Ali.json.tmp')
@@ -427,7 +532,12 @@ try {
     CheckThrows 'resolve' 'backslash' { Resolve-MMOSafePath -Root $resRoot -RelPath 'SaveGames\x' } 'unsafe_relpath:backslash'
     CheckThrows 'resolve' 'device' { Resolve-MMOSafePath -Root $resRoot -RelPath 'SaveGames/NUL' } 'unsafe_relpath:device_name'
     CheckThrows 'resolve' 'missing_mustexist' { Resolve-MMOSafePath -Root $resRoot -RelPath 'SaveGames/MMOSave_No.sav' -MustExist } 'missing'
-    CheckThrows 'resolve' 'root_missing' { Resolve-MMOSafePath -Root (Join-Path $fx 'no_such_root') -RelPath 'a/b' } 'root_missing'
+    CheckThrows 'resolve' 'root_missing' { Resolve-MMOSafePath -Root (Join-Path $fx 'no_such_root') -RelPath 'SaveGames/MMOSave_A.sav' } 'root_missing'
+    CheckThrows 'resolve' 'whitelist_required_dir' { Resolve-MMOSafePath -Root $resRoot -RelPath 'Logs/x.log' } 'not_whitelisted:not_whitelisted_dir'
+    CheckThrows 'resolve' 'whitelist_required_name' { Resolve-MMOSafePath -Root $resRoot -RelPath 'SaveGames/Other.sav' } 'not_whitelisted:not_whitelisted_name'
+    CheckThrows 'resolve' 'whitelist_required_name_rule' { Resolve-MMOSafePath -Root $resRoot -RelPath ('SaveGames/MMOSave_' + $oUml + 'mer.sav') } 'not_whitelisted:name_rule'
+    CheckThrows 'resolve' 'whitelist_before_root_check' { Resolve-MMOSafePath -Root (Join-Path $fx 'no_such_root') -RelPath 'a/b' } 'not_whitelisted:'
+    CheckThrows 'resolve' 'empty_root_invalid' { Resolve-MMOSafePath -Root '' -RelPath 'SaveGames/MMOSave_A.sav' } 'root_invalid'
 
     $outside = Join-Path $fx 'outside'
     Write-TestBytes (Join-Path $outside 'MMOSave_Ali.sav') (New-SavBytes 100 8)
@@ -442,6 +552,7 @@ try {
     Check 'reparse' 'missing_not_reparse' (-not (Test-MMOReparse (Join-Path $fx 'definitely_missing')))
     CheckThrows 'reparse' 'resolve_junction_component' { Resolve-MMOSafePath -Root $jSub -RelPath 'SaveGames/MMOSave_Ali.sav' -MustExist } 'reparse_component:SaveGames'
     CheckThrows 'reparse' 'resolve_junction_root' { Resolve-MMOSafePath -Root $jRoot -RelPath 'SaveGames/MMOSave_Ali.sav' } 'reparse_root'
+    CheckThrows 'reparse' 'read_bytes_junction_rejected' { Read-MMOFileBytes (Join-Path $jSub 'SaveGames') } 'reparse_file'
     CheckThrows 'reparse' 'tree_junction_entry' { Get-MMOTreeFiles -Root $jSub } 'reparse_entry:SaveGames'
     CheckThrows 'reparse' 'tree_junction_root' { Get-MMOTreeFiles -Root $jRoot } 'reparse_root'
     $symTarget = Join-Path $outside 'MMOSave_Ali.sav'
@@ -453,6 +564,85 @@ try {
         [IO.File]::Delete($symLink)
     } catch { $symInfo = 'not_created(privilege)' }
     Write-Host ('[MMO_BACKUP_INFO] symlink_file ' + $symInfo + ' (counted checks use junctions only)')
+
+    # Kok atasinda reparse point: varsayilan ret, bilincli izin parametresiyle kabul
+    $ancReal = Join-Path $fx 'anc_real'
+    Write-TestBytes (Join-Path $ancReal 'inner\SaveGames\MMOSave_Ali.sav') (New-SavBytes 100 1)
+    $ancLink = Join-Path $fx 'anc_link'
+    New-TestJunction $ancLink $ancReal
+    $ancRoot = Join-Path $ancLink 'inner'
+    Check 'ancestor' 'detects_junction_ancestor' ((Get-MMOReparseAncestor $ancRoot) -ceq [IO.Path]::GetFullPath($ancLink))
+    Check 'ancestor' 'none_for_plain_tree' ($null -eq (Get-MMOReparseAncestor $resRoot))
+    CheckThrows 'ancestor' 'resolve_rejects_by_default' { Resolve-MMOSafePath -Root $ancRoot -RelPath 'SaveGames/MMOSave_Ali.sav' -MustExist } 'reparse_root_ancestor:'
+    Check 'ancestor' 'resolve_allowed_with_flag' ((Resolve-MMOSafePath -Root $ancRoot -RelPath 'SaveGames/MMOSave_Ali.sav' -MustExist -AllowRootAncestorReparse) -like '*MMOSave_Ali.sav')
+    CheckThrows 'ancestor' 'tree_rejects_by_default' { Get-MMOTreeFiles -Root $ancRoot } 'reparse_root_ancestor:'
+    Check 'ancestor' 'tree_allowed_with_flag' ((Get-MMOTreeFiles -Root $ancRoot -AllowRootAncestorReparse).Count -eq 1)
+    CheckThrows 'ancestor' 'manifest_create_rejects_by_default' { New-MMOManifest -FilesRoot $ancRoot -SourceSavedDir 'x' } 'reparse_root_ancestor:'
+    Check 'ancestor' 'manifest_create_allowed_with_flag' (@((New-MMOManifest -FilesRoot $ancRoot -SourceSavedDir 'x' -AllowRootAncestorReparse).entries).Count -eq 1)
+
+    # Fail-closed: erisilemeyen / gecersiz yol "reparse degil" SAYILMAZ
+    $stMissing = Get-MMOAttributes (Join-Path $fx 'definitely_missing')
+    $stOk = Get-MMOAttributes $resRoot
+    $stBad = Get-MMOAttributes (Join-Path $fx 'bad|name')
+    Check 'failclosed' 'missing_state' ($stMissing.State -ceq 'missing')
+    Check 'failclosed' 'ok_state' (($stOk.State -ceq 'ok') -and ($null -ne $stOk.Attributes))
+    Check 'failclosed' 'invalid_char_state_inaccessible' ($stBad.State -ceq 'inaccessible')
+    Check 'failclosed' 'reparse_true_for_inaccessible' (Test-MMOReparse (Join-Path $fx 'bad|name'))
+    Check 'failclosed' 'reparse_true_for_empty_path' (Test-MMOReparse '')
+    Check 'failclosed' 'reparse_true_for_device_prefix' (Test-MMOReparse '\\.\C:')
+    Check 'failclosed' 'reparse_false_for_missing' (-not (Test-MMOReparse (Join-Path $fx 'definitely_missing')))
+    CheckThrows 'failclosed' 'resolve_rejects_invalid_root' { Resolve-MMOSafePath -Root (Join-Path $fx 'bad|root') -RelPath 'SaveGames/MMOSave_A.sav' } 'root_invalid'
+    CheckThrows 'failclosed' 'read_bytes_rejects_invalid_path' { Read-MMOFileBytes (Join-Path $fx 'bad|file') } 'path_invalid'
+    CheckThrows 'failclosed' 'tree_rejects_invalid_root' { Get-MMOTreeFiles -Root (Join-Path $fx 'bad|root') } 'root_invalid'
+    CheckThrows 'failclosed' 'tree_missing_root_throws' { Get-MMOTreeFiles -Root (Join-Path $fx 'definitely_missing') } 'root_missing'
+    # Listelenemeyen dizin (gercek ACL: kendi hesabina RD reddi, test bitince geri alinir) sessizce atlanmaz
+    $aclRoot = Join-Path $fx 'acl_tree'
+    Write-TestBytes (Join-Path $aclRoot 'SaveGames\MMOSave_A.sav') (New-SavBytes 100 1)
+    $aclDir = Join-Path $aclRoot 'SaveGames'
+    $aclMe = $env:USERDOMAIN + '\' + $env:USERNAME
+    $aclDenied = $false
+    try {
+        & icacls.exe $aclDir /deny ($aclMe + ':(RD)') | Out-Null
+        $aclDenied = ($LASTEXITCODE -eq 0)
+        CheckThrows 'failclosed' 'tree_unreadable_dir_not_skipped' { Get-MMOTreeFiles -Root $aclRoot } 'tree_unreadable'
+    } finally {
+        & icacls.exe $aclDir /remove:d $aclMe | Out-Null
+    }
+    Check 'failclosed' 'acl_deny_applied' $aclDenied
+    Check 'failclosed' 'tree_readable_after_acl_restore' ((Get-MMOTreeFiles -Root $aclRoot) -join '|' -ceq 'SaveGames/MMOSave_A.sav')
+    CheckThrows 'failclosed' 'path_drive_relative_rejected' { ConvertTo-MMOFullPath 'C:foo' } 'path_invalid'
+    CheckThrows 'failclosed' 'path_device_prefix_rejected' { ConvertTo-MMOFullPath '\\?\C:\foo' } 'path_invalid'
+    CheckThrows 'failclosed' 'path_empty_rejected' { ConvertTo-MMOFullPath '' } 'path_empty'
+    CheckThrows 'failclosed' 'path_nul_rejected' { ConvertTo-MMOFullPath ("a" + [char]0 + "b") } 'path_invalid'
+
+    # Goreli yol: PowerShell konumuna gore cozulur, [Environment]::CurrentDirectory'ye degil (ikisi farkli olsa bile ayni dosya)
+    $relA = Join-Path $fx 'rel_a'
+    $relB = Join-Path $fx 'rel_b'
+    Write-TestBytes (Join-Path $relA 'f.bin') ([byte[]][char[]]'AAAA')
+    Write-TestBytes (Join-Path $relB 'f.bin') ([byte[]][char[]]'BBBB')
+    Write-TestBytes (Join-Path $relA 'root\SaveGames\MMOSave_Rel.sav') (New-SavBytes 100 1)
+    $savedCwd = [Environment]::CurrentDirectory
+    $savedLoc = Get-Location
+    try {
+        Set-Location -LiteralPath $relA
+        $relAL = (Get-Location -PSProvider FileSystem).ProviderPath      # TEMP 8.3 kisa adi Get-Location'da uzun ad olur
+        [Environment]::CurrentDirectory = $relB
+        $shaA = Get-OracleSha (Join-Path $relA 'f.bin')
+        Check 'relative' 'ps_location_differs_from_process_cwd' ((Get-Location).ProviderPath -ne [Environment]::CurrentDirectory)
+        Check 'relative' 'full_path_uses_ps_location' ((ConvertTo-MMOFullPath 'f.bin') -ceq (Join-Path $relAL 'f.bin'))
+        Check 'relative' 'sha_uses_ps_location' ((Get-MMOFileSha256 'f.bin') -ceq $shaA)
+        Check 'relative' 'read_bytes_uses_ps_location' ([Text.Encoding]::ASCII.GetString((Read-MMOFileBytes 'f.bin')) -ceq 'AAAA')
+        Check 'relative' 'attributes_use_ps_location' ((Get-MMOAttributes 'f.bin').State -ceq 'ok')
+        Check 'relative' 'tree_relative_root' ((Get-MMOTreeFiles -Root 'root') -join '|' -ceq 'SaveGames/MMOSave_Rel.sav')
+        Check 'relative' 'resolve_relative_root' ((Resolve-MMOSafePath -Root 'root' -RelPath 'SaveGames/MMOSave_Rel.sav' -MustExist) -ceq (Join-Path $relAL 'root\SaveGames\MMOSave_Rel.sav'))
+        Check 'relative' 'manifest_relative_root' (@((New-MMOManifest -FilesRoot 'root' -SourceSavedDir 'x').entries).Count -eq 1)
+        Check 'relative' 'path_under_relative' (Test-MMOPathUnder -Path 'root\SaveGames' -Root 'root')
+        Check 'relative' 'relative_dotdot_resolved' ((ConvertTo-MMOFullPath 'root\..\f.bin') -ceq (Join-Path $relAL 'f.bin'))
+    }
+    finally {
+        [Environment]::CurrentDirectory = $savedCwd
+        Set-Location -LiteralPath $savedLoc.Path
+    }
 
     # Agac listesi: ordinal sira (bosluk '.' den once)
     $treeRoot = Join-Path $fx 'tree'
@@ -489,7 +679,7 @@ try {
     Check 'manifest' 'invalid_is_bad_sav' (($validFalse.Count -eq 1) -and $validFalse[0].path -ceq 'SaveGames/MMOSave_Bad.sav' -and $validFalse[0].notes -ceq 'bad_magic')
     $tmpEntry = @($mf.entries | Where-Object { $_.path -ceq 'MMODaily/MMOSave_Ali.json.tmp' })
     Check 'manifest' 'tmp_entry_note' (($tmpEntry.Count -eq 1) -and $tmpEntry[0].valid -and $tmpEntry[0].notes -ceq 'tmp_unparsable')
-    $lockEntry = @($mf.entries | Where-Object { $_.path -ceq 'MMORace/MMORace_ali.json.bad' })
+    $lockEntry = @($mf.entries | Where-Object { $_.path -ceq 'MMORace/MMORace_mmosave_ali.json.bad' })
     Check 'manifest' 'race_bad_kept_as_lock' (($lockEntry.Count -eq 1) -and $lockEntry[0].class -ceq 'side-lock' -and $lockEntry[0].notes -ceq 'lock_file')
     $shaOk = $true
     $sizeOk = $true
@@ -514,6 +704,75 @@ try {
     $ts = Test-MMOSnapshot -SnapshotDir $snap
     Check 'snapshot' 'base_ok' ($ts.Ok -and -not $ts.Incomplete -and @($ts.Errors).Count -eq 0 -and @($ts.Extra).Count -eq 0)
     Check 'snapshot' 'base_invalid_entries' ((@($ts.InvalidEntries) -join '|') -ceq 'SaveGames/MMOSave_Bad.sav')
+    Check 'manifest' 'header_digest_present' (($mf.header_digest -is [string]) -and ($mf.header_digest -cmatch '^[0-9a-f]{64}\z') -and ($mf.header_digest -ceq (Get-MMOHeaderDigest $mf)))
+    Check 'manifest' 'header_digest_independent_of_entries' ((Get-MMOHeaderDigest $mf) -cne $mf.entries_digest)
+
+    # Manifest yazimi: CreateNew .tmp, reparse/eksik goruntu dizini, boyut siniri
+    $wDir = Join-Path $fx 'write_tmp_exists'
+    [void][IO.Directory]::CreateDirectory($wDir)
+    Write-TestText (Join-Path $wDir 'manifest.json.tmp') 'stale'
+    CheckThrows 'write' 'stale_tmp_not_overwritten' { Write-MMOManifest -Manifest $fresh -SnapshotDir $wDir } 'manifest_tmp_exists'
+    Check 'write' 'stale_tmp_content_untouched' ((Get-Content -LiteralPath (Join-Path $wDir 'manifest.json.tmp') -Raw) -ceq 'stale')
+    Check 'write' 'stale_tmp_no_manifest_created' (-not [IO.File]::Exists((Join-Path $wDir 'manifest.json')))
+    CheckThrows 'write' 'missing_snapshot_dir' { Write-MMOManifest -Manifest $fresh -SnapshotDir (Join-Path $fx 'write_no_such_dir') } 'snapshot_missing'
+    $wReal = Join-Path $fx 'write_real'
+    [void][IO.Directory]::CreateDirectory($wReal)
+    $wLink = Join-Path $fx 'write_link'
+    New-TestJunction $wLink $wReal
+    CheckThrows 'write' 'junction_snapshot_dir_rejected' { Write-MMOManifest -Manifest $fresh -SnapshotDir $wLink } 'reparse_snapshot'
+    Check 'write' 'junction_target_untouched' (@(Get-ChildItem -LiteralPath $wReal -Force).Count -eq 0)
+    $wAnc = Join-Path $wLink 'sub'
+    [void][IO.Directory]::CreateDirectory((Join-Path $wReal 'sub'))
+    CheckThrows 'write' 'junction_ancestor_rejected' { Write-MMOManifest -Manifest $fresh -SnapshotDir $wAnc } 'reparse_snapshot_ancestor:'
+    Write-MMOManifest -Manifest $fresh -SnapshotDir $wAnc -AllowRootAncestorReparse
+    Check 'write' 'junction_ancestor_allowed_with_flag' ([IO.File]::Exists((Join-Path $wReal 'sub\manifest.json')) -and -not [IO.File]::Exists((Join-Path $wReal 'sub\manifest.json.tmp')))
+    $wRelDir = Join-Path $fx 'write_rel'
+    [void][IO.Directory]::CreateDirectory($wRelDir)
+    $bigM = [ordered]@{ a = ('x' * 8400000) }
+    CheckThrows 'write' 'oversize_manifest_rejected' { Write-MMOManifest -Manifest $bigM -SnapshotDir $wRelDir } 'manifest_too_large'
+    Check 'write' 'oversize_leaves_no_files' (@(Get-ChildItem -LiteralPath $wRelDir -Force).Count -eq 0)
+    $wOk = Join-Path $fx 'write_ok'
+    [void][IO.Directory]::CreateDirectory($wOk)
+    Write-MMOManifest -Manifest $fresh -SnapshotDir $wOk
+    Check 'write' 'normal_write_roundtrip' ((Read-MMOManifest -SnapshotDir $wOk).Ok -and (@(Get-ChildItem -LiteralPath $wOk -Force).Count -eq 1))
+    $sMan = New-TestSnapshot 'manifest_oversize'
+    [IO.File]::WriteAllBytes((Join-Path $sMan 'manifest.json'), (New-Object byte[] 8388609))
+    $rdBig = Read-MMOManifest -SnapshotDir $sMan
+    Check 'write' 'read_oversize_manifest_rejected' ((-not $rdBig.Ok) -and (-not $rdBig.Incomplete) -and (HasErr $rdBig.Errors 'manifest_too_large'))
+    Check 'write' 'snapshot_oversize_manifest_rejected' (-not (Test-MMOSnapshot -SnapshotDir $sMan).Ok)
+
+    # Cakisma kapisi: Ali Baba / Ali_Baba ayni kanonik dosya
+    $colDir = Join-Path $fx 'collide_files'
+    Write-TestBytes (Join-Path $colDir 'SaveGames\MMOSave_Ali Baba.sav') (New-SavBytes 100 1)
+    Write-TestBytes (Join-Path $colDir 'SaveGames\MMOSave_Ali_Baba.sav') (New-SavBytes 100 2)
+    CheckThrows 'collision' 'create_rejects_ali_baba_pair' { New-MMOManifest -FilesRoot $colDir -SourceSavedDir 'x' } 'collision:'
+    $colDir2 = Join-Path $fx 'collide_case'
+    Write-TestBytes (Join-Path $colDir2 'MMOMail\MMOMail_ali.json') ([byte[]][char[]]'{"version":1,"mails":[]}')
+    Write-TestBytes (Join-Path $colDir2 'MMOMail\MMOMail_ali.json.bak') ([byte[]][char[]]'{"version":1,"mails":[]}')
+    Check 'collision' 'different_suffix_not_collision' (@((New-MMOManifest -FilesRoot $colDir2 -SourceSavedDir 'x').entries).Count -eq 2)
+    $colDir3 = Join-Path $fx 'collide_race_forms'
+    Write-TestBytes (Join-Path $colDir3 'MMORace\MMORace_ali.json') ([byte[]][char[]]'{"version":1,"race":1}')
+    Write-TestBytes (Join-Path $colDir3 'MMORace\MMORace_mmosave_ali.json') ([byte[]][char[]]'{"version":1,"race":1}')
+    CheckThrows 'collision' 'create_rejects_race_legacy_and_real_form' { New-MMOManifest -FilesRoot $colDir3 -SourceSavedDir 'x' } 'collision:'
+
+    # 32 karakterlik ad: butun turler kabul (ignored/name_rule olmaz)
+    $n32 = 'a' * 32
+    $longDir = Join-Path $fx 'long_name_files'
+    Write-TestBytes (Join-Path $longDir ('SaveGames\MMOSave_' + $n32 + '.sav')) (New-SavBytes 100 1)
+    Write-TestText (Join-Path $longDir ('MMOAchievements\MMOSave_' + $n32 + '.json')) '{"version":1,"unlocked":[]}'
+    Write-TestText (Join-Path $longDir ('MMODaily\MMOSave_' + $n32 + '.json')) '{"version":1,"day":20261027,"bounties":[]}'
+    Write-TestText (Join-Path $longDir ('MMOMail\MMOMail_' + $n32 + '.json')) '{"version":1,"mails":[]}'
+    Write-TestText (Join-Path $longDir ('MMORace\MMORace_mmosave_' + $n32 + '.json')) '{"version":1,"race":2}'
+    Write-TestText (Join-Path $longDir ('MMORace\MMORace_mmosave_' + $n32 + '.json.bad')) 'lock'
+    $longM = New-MMOManifest -FilesRoot $longDir -SourceSavedDir 'x'
+    Check 'longname' 'six_entries_accepted' (@($longM.entries).Count -eq 6)
+    Check 'longname' 'all_valid' (@($longM.entries | Where-Object { -not $_.valid }).Count -eq 0)
+    Check 'longname' 'race_classified' (@($longM.entries | Where-Object { $_.path -like 'MMORace/*' }).Count -eq 2)
+    $longSnap = Join-Path $fx 'long_name_snap'
+    [void][IO.Directory]::CreateDirectory($longSnap)
+    Copy-Item -LiteralPath $longDir -Destination (Join-Path $longSnap 'files') -Recurse
+    Write-MMOManifest -Manifest $longM -SnapshotDir $longSnap
+    Check 'longname' 'snapshot_ok' ((Test-MMOSnapshot -SnapshotDir $longSnap).Ok)
 
     $proof = [ordered]@{ run_id = '20261027T101010Z'; exit_code = 0; time_utc = '2026-10-27T10:10:10Z' }
     $snapLive = New-TestSnapshot 'live_proof' $proof 'live'
@@ -607,26 +866,139 @@ try {
         @('size_string', { param($m) $m.entries[0].size = '10' }, 'entry1:bad_size'),
         @('valid_string', { param($m) $m.entries[0].valid = 'yes' }, 'entry1:bad_valid'),
         @('dup_path', { param($m) $m.entries[1].path = $m.entries[0].path }, 'entry2:duplicate_path'),
-        @('dup_path_case', { param($m) $m.entries[1].path = $m.entries[0].path.ToUpperInvariant() }, 'entry2:'),
+        @('dup_path_case', { param($m) $m.entries[1].path = $m.entries[0].path.ToUpperInvariant() }, 'entry2:duplicate_path'),
         @('missing_field', { param($m) $m.entries[0].PSObject.Properties.Remove('sha256') }, 'entry1:missing_field:sha256'),
         @('version_2', { param($m) $m.format_version = 2 }, 'bad_format_version'),
         @('mode_unknown', { param($m) $m.mode = 'weird' }, 'bad_mode'),
         @('mode_case', { param($m) $m.mode = 'Live' }, 'bad_mode'),
-        @('run_id_bad', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = 'bad id!'; exit_code = 0 } }, 'bad_shutdown_proof'),
-        @('run_id_missing', { param($m) $m.shutdown_proof = [pscustomobject]@{ exit_code = 0 } }, 'bad_shutdown_proof'),
+        @('run_id_bad', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = 'bad id!'; exit_code = 0; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('run_id_missing', { param($m) $m.shutdown_proof = [pscustomobject]@{ exit_code = 0; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('run_id_too_long', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = ('1' * 41); exit_code = 0; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('run_id_not_string', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = 5; exit_code = 0; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('proof_exit_code_missing', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('proof_exit_code_string', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = '0'; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('proof_exit_code_negative', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = -1; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('proof_exit_code_256', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = 256; time_utc = '2026-10-27T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('proof_time_missing', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = 0 } }, 'bad_shutdown_proof'),
+        @('proof_time_garbage', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = 0; time_utc = 'yesterday' } }, 'bad_shutdown_proof'),
+        @('proof_time_bad_date', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = 0; time_utc = '2026-13-45T10:10:10Z' } }, 'bad_shutdown_proof'),
+        @('proof_not_object', { param($m) $m.shutdown_proof = 'ok' }, 'bad_shutdown_proof'),
+        @('created_utc_garbage', { param($m) $m.created_utc = 'today' }, 'bad_created_utc'),
+        @('created_utc_no_z', { param($m) $m.created_utc = '2026-10-27T10:00:00' }, 'bad_created_utc'),
+        @('tool_empty', { param($m) $m.tool = '' }, 'bad_tool'),
+        @('notes_not_string', { param($m) $m.entries[0].notes = 5 }, 'entry1:bad_notes'),
+        @('notes_missing', { param($m) $m.entries[0].PSObject.Properties.Remove('notes') }, 'entry1:missing_field:notes'),
+        @('size_over_cap', { param($m) $m.entries[0].size = 8388609 }, 'entry1:bad_size'),
+        @('header_digest_removed', { param($m) $m.PSObject.Properties.Remove('header_digest') }, 'missing_field:header_digest'),
+        @('collision_ali_baba', { param($m) $e2 = ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali Baba.sav' } | ConvertTo-Json | ConvertFrom-Json); $e2.path = 'SaveGames/MMOSave_Ali_Baba.sav'; $m.entries = @($m.entries) + $e2 }, 'collision:'),
+        @('collision_race_forms', { param($m) $e2 = ($m.entries | Where-Object { $_.path -ceq 'MMORace/MMORace_mmosave_ali.json' } | ConvertTo-Json | ConvertFrom-Json); $e2.path = 'MMORace/MMORace_ali.json'; $m.entries = @($m.entries) + $e2 }, 'collision:'),
         @('entries_object', { param($m) $m.entries = [pscustomobject]@{ a = 1 } }, 'entries_not_array'),
         @('field_removed', { param($m) $m.PSObject.Properties.Remove('entries_digest') }, 'missing_field:entries_digest'),
         @('source_dir_empty', { param($m) $m.source_saved_dir = '' }, 'bad_source_saved_dir')
     )
     foreach ($c in $contract) {
         $s = New-TestSnapshot ('c_' + $c[0])
-        if (@('missing_field', 'entries_object', 'field_removed') -contains $c[0]) { Edit-TestManifest $s $c[1] }
+        if (@('missing_field', 'entries_object', 'field_removed', 'notes_missing', 'header_digest_removed') -contains $c[0]) { Edit-TestManifest $s $c[1] }
         else { Edit-TestManifest $s $c[1] -FixDigest }
         $rdc = Read-MMOManifest -SnapshotDir $s
         Check 'contract' ($c[0] + '.rejected') (-not $rdc.Ok)
         Check 'contract' ($c[0] + '.reason') (HasErr $rdc.Errors $c[2])
         Check 'contract' ($c[0] + '.snapshot_rejected') (-not (Test-MMOSnapshot -SnapshotDir $s).Ok)
     }
+    # 11h2 valid/notes korumasi: tutarli yalan (digest yeniden hesaplanmis) yalniz Test-MMOSnapshot'in yeniden hesabiyla yakalanir
+    $s = New-TestSnapshot 'valid_flip_nodigest'
+    Edit-TestManifest $s { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Bad.sav' }).valid = $true }
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'flip_valid_without_digest_fix_caught_by_digest' ((-not $t.Ok) -and (HasErr $t.Errors 'digest_mismatch'))
+    $s = New-TestSnapshot 'valid_flip_consistent'
+    Edit-TestManifest $s { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Bad.sav' }).valid = $true } -FixDigest
+    Check 'validtamper' 'consistent_valid_lie_manifest_reads_ok' ((Read-MMOManifest -SnapshotDir $s).Ok)
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'flip_valid_false_to_true_caught' ((-not $t.Ok) -and (HasErr $t.Errors 'valid_mismatch:SaveGames/MMOSave_Bad.sav'))
+    $s = New-TestSnapshot 'valid_flip_true_to_false'
+    Edit-TestManifest $s { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' }).valid = $false } -FixDigest
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'flip_valid_true_to_false_caught' ((-not $t.Ok) -and (HasErr $t.Errors 'valid_mismatch:SaveGames/MMOSave_Ali.sav'))
+    $s = New-TestSnapshot 'notes_tamper_nodigest'
+    Edit-TestManifest $s { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Bad.sav' }).notes = 'fine' }
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'notes_without_digest_fix_caught_by_digest' ((-not $t.Ok) -and (HasErr $t.Errors 'digest_mismatch'))
+    $s = New-TestSnapshot 'notes_tamper_consistent'
+    Edit-TestManifest $s { param($m) ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Bad.sav' }).notes = 'fine' } -FixDigest
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'notes_consistent_lie_caught' ((-not $t.Ok) -and (HasErr $t.Errors 'notes_mismatch:SaveGames/MMOSave_Bad.sav'))
+    $s = New-TestSnapshot 'class_tamper_consistent'
+    Edit-TestManifest $s { param($m) ($m.entries | Where-Object { $_.path -ceq 'MMODaily/MMOSave_Ali.json' }).class = 'character' } -FixDigest
+    Check 'validtamper' 'class_swap_rejected_by_contract' (HasErr (Read-MMOManifest -SnapshotDir $s).Errors 'entry')
+    # sifir bayt dosya: manifest boyut+hash+valid=true uyduruldu, digest tutarli
+    $s = New-TestSnapshot 'zero_byte_lie'
+    $zp = Join-Path $s 'files\SaveGames\MMOSave_Ali.sav'
+    [IO.File]::WriteAllBytes($zp, [byte[]]@())
+    Edit-TestManifest $s { param($m) $e = ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' }); $e.size = 0; $e.sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' } -FixDigest
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'zero_byte_size_and_hash_consistent' (-not (HasErr $t.Errors 'size_mismatch:') -and -not (HasErr $t.Errors 'hash_mismatch:'))
+    Check 'validtamper' 'zero_byte_claimed_valid_caught' ((-not $t.Ok) -and (HasErr $t.Errors 'valid_mismatch:SaveGames/MMOSave_Ali.sav'))
+    # GVAS olmayan icerik, manifest valid=true koruyor
+    $s = New-TestSnapshot 'bad_gvas_lie'
+    $gp = Join-Path $s 'files\SaveGames\MMOSave_Ali.sav'
+    $gb = New-TestBytes 100 9
+    [IO.File]::WriteAllBytes($gp, $gb)
+    $gsha = Get-OracleSha $gp
+    Edit-TestManifest $s { param($m) $e = ($m.entries | Where-Object { $_.path -ceq 'SaveGames/MMOSave_Ali.sav' }); $e.size = 100; $e.sha256 = $gsha } -FixDigest
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'bad_gvas_claimed_valid_caught' ((-not $t.Ok) -and (HasErr $t.Errors 'valid_mismatch:SaveGames/MMOSave_Ali.sav') -and -not (HasErr $t.Errors 'hash_mismatch:'))
+    Check 'validtamper' 'bad_gvas_listed_invalid' (@($t.InvalidEntries) -contains 'SaveGames/MMOSave_Ali.sav')
+    # JSON yan dosya bozuldu (gecerli -> semasiz), manifest valid=true koruyor
+    $s = New-TestSnapshot 'schema_lie'
+    $jp = Join-Path $s 'files\MMOMail\MMOMail_ali.json'
+    Write-TestText $jp '{"version":1}'
+    $jsha = Get-OracleSha $jp
+    $jsz = (New-Object IO.FileInfo $jp).Length
+    Edit-TestManifest $s { param($m) $e = ($m.entries | Where-Object { $_.path -ceq 'MMOMail/MMOMail_ali.json' }); $e.size = $jsz; $e.sha256 = $jsha } -FixDigest
+    $t = Test-MMOSnapshot -SnapshotDir $s
+    Check 'validtamper' 'schema_violation_claimed_valid_caught' ((-not $t.Ok) -and (HasErr $t.Errors 'valid_mismatch:MMOMail/MMOMail_ali.json'))
+
+    # 11h3 ust duzey alan (header) korumasi: digest yeniden hesaplanMADAN degistirilen alan header_digest_mismatch verir
+    $hdr = @(
+        @('mode', { param($m) $m.mode = 'live' }), @('source_dir', { param($m) $m.source_saved_dir = 'D:\elsewhere' }),
+        @('created_utc', { param($m) $m.created_utc = '2020-01-01T00:00:00Z' }), @('tool', { param($m) $m.tool = 'other/1' }),
+        @('proof_added', { param($m) $m.shutdown_proof = [pscustomobject]@{ run_id = '20261027T101010Z'; exit_code = 0; time_utc = '2026-10-27T10:10:10Z' } })
+    )
+    foreach ($c in $hdr) {
+        $s = New-TestSnapshot ('h_' + $c[0])
+        Edit-TestManifest $s $c[1]
+        $rdh = Read-MMOManifest -SnapshotDir $s
+        Check 'headertamper' ($c[0] + '.rejected') ((-not $rdh.Ok) -and (HasErr $rdh.Errors 'header_digest_mismatch'))
+        Check 'headertamper' ($c[0] + '.entries_digest_still_ok') (-not (HasErr $rdh.Errors 'digest_mismatch'))
+        Check 'headertamper' ($c[0] + '.snapshot_rejected') (-not (Test-MMOSnapshot -SnapshotDir $s).Ok)
+    }
+    $s = New-TestSnapshot 'h_proof_edit' $proof 'live'
+    Edit-TestManifest $s { param($m) $m.shutdown_proof.exit_code = 1 }
+    Check 'headertamper' 'proof_exit_code_change.rejected' (HasErr (Read-MMOManifest -SnapshotDir $s).Errors 'header_digest_mismatch')
+    $s = New-TestSnapshot 'h_proof_removed' $proof 'live'
+    Edit-TestManifest $s { param($m) $m.shutdown_proof = $null }
+    Check 'headertamper' 'proof_removed.rejected' (HasErr (Read-MMOManifest -SnapshotDir $s).Errors 'header_digest_mismatch')
+    $s = New-TestSnapshot 'h_digest_value'
+    Edit-TestManifest $s { param($m) $m.header_digest = ('c' * 64) }
+    Check 'headertamper' 'header_digest_value_rejected' (HasErr (Read-MMOManifest -SnapshotDir $s).Errors 'header_digest_mismatch')
+    $s = New-TestSnapshot 'h_fixed_consistent'
+    Edit-TestManifest $s { param($m) $m.mode = 'live' } -FixDigest
+    Check 'headertamper' 'consistent_header_edit_reads_ok' ((Read-MMOManifest -SnapshotDir $s).Ok)
+
+    # 11h4 geri yukleme politikasi: yan kilit/.tmp/.bak/.bad varsayilan kapali, -IncludeSideFiles ile acik
+    $selAll = (Read-MMOManifest -SnapshotDir $snap).Manifest.entries
+    $selDef = Get-MMORestoreSelection -Entries $selAll
+    $selOn = Get-MMORestoreSelection -Entries $selAll -IncludeSideFiles
+    Check 'policy' 'default_restores_main_files_only' ($selDef.Restore.Count -eq 8)
+    Check 'policy' 'default_skips_side_files' ($selDef.Skipped.Count -eq 4)
+    Check 'policy' 'default_skip_reason' ((@($selDef.Skipped | Where-Object { $_.Reason -ceq 'side_file_requires_flag' }).Count -eq 4))
+    Check 'policy' 'default_skipped_names' ((@($selDef.Skipped | ForEach-Object { $_.Path } | Sort-Object) -join '|') -ceq 'MMOAchievements/MMOSave_Ali.json.bad|MMODaily/MMOSave_Ali.json.tmp|MMOMail/MMOMail_ali.json.bak|MMORace/MMORace_mmosave_ali.json.bad')
+    Check 'policy' 'default_no_suffix_in_restore' (@($selDef.Restore | Where-Object { $_ -match '\.(tmp|bak|bad)$' }).Count -eq 0)
+    Check 'policy' 'default_keeps_all_sav' (@($selDef.Restore | Where-Object { $_ -like 'SaveGames/*' }).Count -eq 3)
+    Check 'policy' 'flag_restores_everything' (($selOn.Restore.Count -eq 12) -and ($selOn.Skipped.Count -eq 0))
+    $selBad = Get-MMORestoreSelection -Entries @([pscustomobject]@{ path = 'Logs/x.log' }, [pscustomobject]@{ path = '../x' }) -IncludeSideFiles
+    Check 'policy' 'non_whitelisted_always_skipped' (($selBad.Restore.Count -eq 0) -and ($selBad.Skipped.Count -eq 2) -and ($selBad.Skipped[0].Reason -ceq 'not_whitelisted'))
+
     # 11i manifest dosyasi bozuk
     $manifestBad = @(
         @('empty', ([byte[]]@())), @('garbage', ([byte[]][char[]]'not json')), @('truncated', ([byte[]][char[]]'{"format_version":1,')),
@@ -661,10 +1033,83 @@ try {
     $t = Test-MMOSnapshot -SnapshotDir $s
     Check 'junction' 'snapshot_dir_junction_rejected' ((-not $t.Ok) -and (HasErr $t.Errors 'reparse_snapshot'))
 
-    # ---- 12. Gercek Saved degismedi kaniti ---------------------------------------------------------------------------
+    # ---- 12. Digest kapsami ve olcek ---------------------------------------------------------------------------------
+    $dg = @()
+    for ($k = 0; $k -lt 200; $k++) {
+        $dg += [pscustomobject]@{ path = ('SaveGames/MMOSave_P' + ($k * 7919 % 1000).ToString('0000') + '.sav'); class = 'character'; size = (100 + $k); sha256 = ('{0:x64}' -f $k); valid = ($k % 3 -ne 0); notes = ('n' + ($k % 5)) }
+    }
+    # Ordinal ile kultur siralamasinin AYRILDIGI yollar (buyuk/kucuk harf, '-' / '_' / bosluk / '.')
+    foreach ($odd in @('SaveGames/MMOSave_a.sav', 'SaveGames/MMOSave_B.sav', 'SaveGames/MMOSave_a-b.sav', 'SaveGames/MMOSave_ab.sav', 'SaveGames/MMOSave_A_b.sav', 'MMOMail/MMOMail_ali-x.json', 'MMOMail/MMOMail_ali_baba.json', 'MMOMail/MMOMail_ali.json', 'MMOMail/MMOMail_alix.json')) {
+        $dg += [pscustomobject]@{ path = $odd; class = 'side'; size = 10; sha256 = ('e' * 64); valid = $true; notes = '' }
+    }
+    $dgBase = Get-MMOEntriesDigest $dg
+    Check 'digest' 'matches_oracle_200' ($dgBase -ceq (Get-OracleDigest $dg))
+    $dgRev = @($dg); [Array]::Reverse($dgRev)
+    Check 'digest' 'order_independent_200' ((Get-MMOEntriesDigest $dgRev) -ceq $dgBase)
+    $dgCopy = $dg | ForEach-Object { $_.PSObject.Copy() }
+    Check 'digest' 'copy_same' ((Get-MMOEntriesDigest $dgCopy) -ceq $dgBase)
+    $dgCopy[5].valid = (-not $dgCopy[5].valid)
+    Check 'digest' 'valid_flip_changes_digest' ((Get-MMOEntriesDigest $dgCopy) -cne $dgBase)
+    $dgCopy = $dg | ForEach-Object { $_.PSObject.Copy() }; $dgCopy[5].notes = 'tampered'
+    Check 'digest' 'notes_change_changes_digest' ((Get-MMOEntriesDigest $dgCopy) -cne $dgBase)
+    $dgCopy = $dg | ForEach-Object { $_.PSObject.Copy() }; $dgCopy[5].class = 'side'
+    Check 'digest' 'class_change_changes_digest' ((Get-MMOEntriesDigest $dgCopy) -cne $dgBase)
+    $dgCopy = $dg | ForEach-Object { $_.PSObject.Copy() }; $dgCopy[5].size = $dgCopy[5].size + 1
+    Check 'digest' 'size_change_changes_digest' ((Get-MMOEntriesDigest $dgCopy) -cne $dgBase)
+    $dgCopy = $dg | ForEach-Object { $_.PSObject.Copy() }; $dgCopy[5].sha256 = ('f' * 64)
+    Check 'digest' 'sha_change_changes_digest' ((Get-MMOEntriesDigest $dgCopy) -cne $dgBase)
+    Check 'digest' 'empty_input_defined' ((Get-MMOEntriesDigest @()) -ceq 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+    $big = New-Object System.Collections.ArrayList
+    for ($k = 0; $k -lt 10000; $k++) {
+        [void]$big.Add([pscustomobject]@{ path = ('SaveGames/MMOSave_Q' + (($k * 7919) % 10007).ToString('00000') + '.sav'); class = 'character'; size = (100 + $k); sha256 = ('{0:x64}' -f $k); valid = ($k % 7 -ne 0); notes = '' })
+    }
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $bigDigest = Get-MMOEntriesDigest $big
+    $sw.Stop()
+    Write-Host ('[MMO_BACKUP_INFO] digest_10000_entries_ms=' + $sw.ElapsedMilliseconds)
+    Check 'digest' 'ten_thousand_entries_under_5s' (($sw.ElapsedMilliseconds -lt 5000) -and ($bigDigest -cmatch '^[0-9a-f]{64}\z'))
+    $bigRev = $big.ToArray(); [Array]::Reverse($bigRev)
+    Check 'digest' 'ten_thousand_order_independent' ((Get-MMOEntriesDigest $bigRev) -ceq $bigDigest)
+
+    # ---- 13. "Saved degismedi" kanitinin kendi testi (sentetik Saved, gercek degil) ----------------------------------------
+    $fakeSaved = Join-Path $fx 'fake_saved'
+    Write-TestBytes (Join-Path $fakeSaved 'SaveGames\MMOSave_A.sav') (New-SavBytes 100 1)
+    [void][IO.Directory]::CreateDirectory((Join-Path $fakeSaved 'MMOMail'))
+    $st0 = Get-SavedStamp -SavedRoot $fakeSaved
+    Check 'stampself' 'present_dirs_counted' ($st0.DirsPresent -eq 2)
+    Check 'stampself' 'stable_when_untouched' ((Get-SavedStamp -SavedRoot $fakeSaved).Digest -ceq $st0.Digest)
+    Write-TestBytes (Join-Path $fakeSaved 'SaveGames\MMOSave_B.sav') (New-SavBytes 100 2)
+    $st1 = Get-SavedStamp -SavedRoot $fakeSaved
+    Check 'stampself' 'new_file_detected' ($st1.Digest -cne $st0.Digest)
+    [IO.File]::Delete((Join-Path $fakeSaved 'SaveGames\MMOSave_B.sav'))
+    Check 'stampself' 'deleted_file_restores_digest' ((Get-SavedStamp -SavedRoot $fakeSaved).Digest -ceq $st0.Digest)
+    [IO.File]::Delete((Join-Path $fakeSaved 'SaveGames\MMOSave_A.sav'))
+    Check 'stampself' 'removed_file_detected' ((Get-SavedStamp -SavedRoot $fakeSaved).Digest -cne $st0.Digest)
+    Write-TestBytes (Join-Path $fakeSaved 'SaveGames\MMOSave_A.sav') (New-SavBytes 100 1)
+    # Her degisiklik, ondan HEMEN once alinan damgayla karsilastirilir (onceki adimlarin farki sonucu gizlemesin)
+    $stBeforeSub = Get-SavedStamp -SavedRoot $fakeSaved
+    [void][IO.Directory]::CreateDirectory((Join-Path $fakeSaved 'SaveGames\emptysub'))
+    Check 'stampself' 'new_empty_subdir_detected' ((Get-SavedStamp -SavedRoot $fakeSaved).Digest -cne $stBeforeSub.Digest)
+    [IO.Directory]::Delete((Join-Path $fakeSaved 'SaveGames\emptysub'))
+    Check 'stampself' 'removed_subdir_restores_digest' ((Get-SavedStamp -SavedRoot $fakeSaved).Digest -ceq $stBeforeSub.Digest)
+    [IO.File]::SetLastWriteTimeUtc((Join-Path $fakeSaved 'SaveGames\MMOSave_A.sav'), [datetime]'2001-01-01')
+    $stBeforeTs = Get-SavedStamp -SavedRoot $fakeSaved
+    [IO.File]::SetLastWriteTimeUtc((Join-Path $fakeSaved 'SaveGames\MMOSave_A.sav'), [datetime]'2002-02-02')
+    Check 'stampself' 'timestamp_change_detected' ((Get-SavedStamp -SavedRoot $fakeSaved).Digest -cne $stBeforeTs.Digest)
+    $stPre = Get-SavedStamp -SavedRoot $fakeSaved
+    [void][IO.Directory]::CreateDirectory((Join-Path $fakeSaved 'MMODaily'))
+    $stPost = Get-SavedStamp -SavedRoot $fakeSaved
+    Check 'stampself' 'new_target_dir_detected' (($stPost.DirsPresent -eq 3) -and ($stPost.Digest -cne $stPre.Digest))
+    $stNone = Get-SavedStamp -SavedRoot (Join-Path $fx 'no_such_saved')
+    Check 'stampself' 'absent_targets_reported_vacuous' ($stNone.DirsPresent -eq 0)
+
+    # ---- 14. Gercek Saved degismedi kaniti ---------------------------------------------------------------------------
     $savedAfter = Get-SavedStamp
-    Write-Host ('[MMO_BACKUP_INFO] real_saved files=' + $savedBefore.Count + ' digest_before=' + $savedBefore.Digest.Substring(0, 16) + ' digest_after=' + $savedAfter.Digest.Substring(0, 16))
-    Check 'realsaved' 'file_count_unchanged' ($savedBefore.Count -eq $savedAfter.Count)
+    Write-Host ('[MMO_BACKUP_INFO] real_saved dirs_present=' + $savedBefore.DirsPresent + ' entries=' + $savedBefore.Count + ' digest_before=' + $savedBefore.Digest.Substring(0, 16) + ' digest_after=' + $savedAfter.Digest.Substring(0, 16))
+    if ($savedBefore.DirsPresent -eq 0) { Write-Host '[MMO_BACKUP_WARN] real Saved target dirs absent: the unchanged proof below is VACUOUS (pass -AllowVacuousSavedProof to accept)' }
+    Check 'realsaved' 'proof_not_vacuous' (($savedBefore.DirsPresent -gt 0) -or $AllowVacuousSavedProof)
+    Check 'realsaved' 'dirs_present_unchanged' ($savedBefore.DirsPresent -eq $savedAfter.DirsPresent)
+    Check 'realsaved' 'entry_count_unchanged' ($savedBefore.Count -eq $savedAfter.Count)
     Check 'realsaved' 'name_size_timestamp_digest_unchanged' ($savedBefore.Digest -ceq $savedAfter.Digest)
     Check 'realsaved' 'fixture_isolated' (-not (Test-MMOPathUnder -Path $fx -Root (Join-Path $RepoRoot 'Saved') -AllowEqual))
 }
@@ -677,9 +1122,20 @@ finally {
     }
 }
 
-$unique = $script:labels.Count
-$reported = $script:caseLines
-$consistent = ($reported -eq $expected) -and ($script:caseLines -eq $reported) -and ($unique -eq $reported)
+# Sayim BAGIMSIZ: basilan CASE satirlari metin olarak yeniden ayristirilir (Check sayaclarina bakilmaz); sayaclar yalniz capraz kontrol.
+$parsedLabels = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+$parsedLines = 0
+$parsedFail = 0
+foreach ($ln in $script:emitted) {
+    if ($ln -cmatch '^\[MMO_BACKUP_CASE\] (?<t>PASS|FAIL) case=(?<c>\S+) check=(?<k>\S+)( duplicate_label)?\z') {
+        $parsedLines++
+        if ($Matches['t'] -ceq 'FAIL') { $parsedFail++ }
+        [void]$parsedLabels.Add($Matches['c'] + '/' + $Matches['k'])
+    } else { $parsedFail++ }
+}
+$unique = $parsedLabels.Count
+$reported = $parsedLines
+$consistent = ($reported -eq $expected) -and ($script:caseLines -eq $reported) -and ($unique -eq $reported) -and ($parsedFail -eq $script:failures)
 if ($script:failures -eq 0) { Write-Host ('[MMO_BACKUP_TEST] PASS checks=' + $reported + ' reason=ok') }
 else { Write-Host ('[MMO_BACKUP_TEST] FAIL checks=' + $reported + ' failures=' + $script:failures) }
 Write-Host ('[MMO_BACKUP_RUNNER] reported=' + $reported + ' case_lines=' + $script:caseLines + ' unique_labels=' + $unique + ' expected=' + $expected + ' consistent=' + $consistent)
