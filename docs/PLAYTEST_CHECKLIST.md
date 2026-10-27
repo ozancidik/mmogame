@@ -5687,3 +5687,12 @@ Sifaci kup bedeli `100 + 0,09 x (Lv-1)^3` (`MMOHealerNPC.h:31-37`) + 7 yeni bagi
 - [ ] **Lv72 GOREVLER paneli:** satirlar sigar ve "odul al" satiri tiklanabilir kalir (`MMOHUD.cpp` commit'siz/Codex'te; bu madde ona dokunmaz).
 - [ ] **Ikinci istemciden bagis:** OnRep ile bakiye guncellenir ve bildirim gorunur.
 - [ ] **Oynanis sonu olcum:** `py -3 Scripts/PlaytestMetrics.py` ile gercek sink/gelir. Kural [Tahmin]: medyan sink/gelir >= %60 ise P1 geri cekilir; < %30 ise C1 degerlendirilir.
+
+## Sunucu yasam dongusu ve uzak Exec korumasi (PIE'de denenmedi) (2026-10-27; `82e906c`, `041e162`, `fe86275`)
+Tum adimlar yazildi, hicbiri calistirilmadi. L2 (kayit turu/atma) ve L3 (cikis) yok; tasarim `docs/DESIGN_SERVER_LIFECYCLE.md`.
+- [ ] **Duyuru ve giris kapanisi:** listen PIE'de konsola `MMOShutdown 60` -> sohbette "1 dakika" duyurusu ve "yeni girisler kapandi" gorulur; ikinci istemcinin girisi reddedilir.
+- [ ] **Iptal:** 40. saniyede `MMOShutdownCancel` -> "Bakim iptal edildi" duyurusu; giris yeniden acilir.
+- [ ] **PIE sizinti kontrolu:** `MMOShutdown 600` sonra PIE'yi durdur-baslat -> yeni PIE'de plan sifirlanmis, giris acik.
+- [ ] **Uzak Exec negatifi:** istemci penceresinin konsoluna `MMOShutdown 60`, `MMOGainXP 1000`, `MMOPvP 1`, `EnableCheats` yazilir -> komut CALISMAZ; sunucu logunda `LogMMOExecGuard` `[MMOMETRIC] ev=remote_exec_blocked` satiri gorulur.
+- [ ] **Pozitif kontrol:** host'un kendi konsolunda ayni komutlar calisir.
+- [ ] **Komut satiri:** `-MMOShutdownAfterSeconds=45` ile baslatinca (Shipping disinda) Closing, sonra Exiting'de "surec sonlanmaz" uyarisi cikar; L3 gelene kadar uretimde KULLANILMAZ.
