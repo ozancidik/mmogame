@@ -30,7 +30,9 @@ enum class EMMOFusionResult : uint8
 	// QA/guvenlik turu (D1): sona eklendi, mevcut degerler kaymaz.
 	NotPlayer,   // sahip oyuncu kontrollu AMMOCharacter degil (mob/NPC/AI)
 	Locked,      // kayit yuklenmedi ya da bolge gecisi kaydi onaylandi (degisiklik kalici olmaz)
-	TradeLocked  // girdi esya aktif takas teklifinde
+	TradeLocked, // girdi esya aktif takas teklifinde
+	// Sunucu yasam dongusu L3 QA: sona eklendi, mevcut degerler kaymaz.
+	Maintenance  // planli kapanis Flushing'e girdi (MMOServerLifecycle::IsFlushingOrLater); Locked'tan ayri neden
 };
 
 /** Check/FindFromSlot sonucu: sunucunun hesapladigi esya, nadirlik gecisi ve ucret. */

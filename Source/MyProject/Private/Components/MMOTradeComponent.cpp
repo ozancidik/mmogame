@@ -287,7 +287,7 @@ void UMMOTradeComponent::ServerInviteNearest_Implementation()
 		return;
 	}
 	// Planli kapanis kayit turuna girdi: yeni ticaret teklifi yok (kayittan sonra esya/altin degisimi kalici olmaz).
-	if (MMOServerLifecycle::IsFlushingOrLater())
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("trade_invite")))
 	{
 		NotifyOwner(TEXT("Sunucu bakima giriyor: ticaret kapali."));
 		return;
@@ -371,7 +371,7 @@ void UMMOTradeComponent::ServerAccept_Implementation(uint64 SeenInviteId)
 	{
 		return;
 	}
-	if (MMOServerLifecycle::IsFlushingOrLater())
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("trade_accept")))
 	{
 		NotifyOwner(TEXT("Sunucu bakima giriyor: ticaret kapali."));
 		return;
@@ -424,6 +424,7 @@ void UMMOTradeComponent::ServerDeclineInvite_Implementation(uint64 SeenInviteId)
 
 void UMMOTradeComponent::ServerAddItem_Implementation(uint64 SeenSessionId, int32 SeenRevision, int32 InstanceId)
 {
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("trade_additem"))) return; // teklif degisikligi kayittan sonra kalici olmaz (oturumlar zaten iptal edildi; savunma)
 	if (!IsSeenOfferCurrent(SeenSessionId, SeenRevision)) return;
 	UMMOTradeComponent* PC = GetValidPartnerComp();
 	AMMOCharacter* Self = GetOwnerCharacter();
@@ -488,6 +489,7 @@ void UMMOTradeComponent::ServerRemoveItem_Implementation(uint64 SeenSessionId, i
 
 void UMMOTradeComponent::ServerSetGold_Implementation(uint64 SeenSessionId, int32 SeenRevision, int32 NewGold)
 {
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("trade_setgold"))) return;
 	if (!IsSeenOfferCurrent(SeenSessionId, SeenRevision)) return;
 	AMMOCharacter* Self = GetOwnerCharacter();
 	const UMMOInventoryComponent* Inv = Self ? Self->GetInventory() : nullptr;
@@ -514,6 +516,7 @@ void UMMOTradeComponent::ServerSetGold_Implementation(uint64 SeenSessionId, int3
 void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int32 SeenRevision)
 {
 	if (!HasAuthorityInternal()) return;
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("trade_confirm"))) return; // onay takasi tamamlayabilir: kayit turundan sonra kalici olmaz
 	UMMOTradeComponent* PC = GetValidPartnerComp();
 	if (!PC || MyOffer.bConfirmed)
 	{
@@ -584,7 +587,7 @@ void UMMOTradeComponent::ServerConfirm_Implementation(uint64 SeenSessionId, int3
 
 void UMMOTradeComponent::StartTradeServer(AMMOCharacter* A, AMMOCharacter* B)
 {
-	if (MMOServerLifecycle::IsFlushingOrLater()) return; // planli kapanis: yeni oturum kurulmaz (aktif olanlar Flushing girisinde iptal edildi)
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("trade_start"))) return; // planli kapanis: yeni oturum kurulmaz (aktif olanlar Flushing girisinde iptal edildi)
 	// Destruction/EndPlay callbacks can still retain an actor pointer. Admission
 	// must reject that endpoint before installing another session or timer.
 	if (!IsValid(A) || !IsValid(B) || A->IsActorBeingDestroyed() || B->IsActorBeingDestroyed()

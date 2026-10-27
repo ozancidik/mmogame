@@ -12,6 +12,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerState.h"
 #include "Core/MMONotify.h"
+#include "Core/MMOServerLifecycle.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -26,6 +27,18 @@
 #endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogMMOInventoryAudit, Log, All);
+
+namespace
+{
+	// Planli kapanis kayit turuna girdi (MMOServerLifecycle::IsFlushingOrLater): bundan sonraki altin/esya degisimi kayit turunun
+	// snapshot'ina girmez, kalici olmaz. Islem reddedilir, oyuncuya bakim bilgisi gider, log "event=maintenance_refused gate=...".
+	bool InventoryMaintenanceRefused(const UMMOInventoryComponent* Component, const TCHAR* Gate)
+	{
+		if (!MMOServerLifecycle::RefuseWhenFlushing(Gate)) return false;
+		MMONotify::ToOwner(Component->GetOwner(), TEXT("Sunucu bakima giriyor: bu islem kapali"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
+		return true;
+	}
+}
 
 #if !UE_BUILD_SHIPPING
 bool UMMOInventoryComponent::RunFirstEquipSelfTest(UWorld* World, FString& OutError, int32& OutChecks)
@@ -797,6 +810,7 @@ void UMMOInventoryComponent::UpgradeByInstanceId(int32 InstanceId, int32 Expecte
 		ServerUpgradeByInstanceId(InstanceId, ExpectedPlus);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_upgrade"))) return;
 
 	const int32 BagIndex = FindBagIndexByInstanceId(InstanceId);
 	if (BagIndex == INDEX_NONE)
@@ -939,6 +953,7 @@ void UMMOInventoryComponent::BuyEquipment(FName ItemId)
 		ServerBuyEquipment(ItemId);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_buy_equipment"))) return;
 
 	// Sunucu-otoriter dogrulama: alisveris ancak bir saticinin yakininda yapilabilir
 	// (hileli istemci satici olmadan her yerden alisveris RPC'si atmasin).
@@ -1012,6 +1027,7 @@ void UMMOInventoryComponent::BuyPotion(int32 Count)
 		ServerBuyPotion(Count);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_buy_potion"))) return;
 
 	if (!IsOwnerNearVendor())
 	{
@@ -1064,6 +1080,7 @@ void UMMOInventoryComponent::BuyConsumable(FName ItemId, int32 Count)
 		ServerBuyConsumable(ItemId, Count);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_buy_consumable"))) return;
 
 	if (!IsOwnerNearVendor())
 	{
@@ -1131,6 +1148,7 @@ void UMMOInventoryComponent::SellByInstanceId(int32 InstanceId)
 		ServerSellByInstanceId(InstanceId);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_sell"))) return;
 
 	if (!IsOwnerNearVendor())
 	{
@@ -1204,6 +1222,7 @@ void UMMOInventoryComponent::DepositEquipment(int32 InstanceId)
 		ServerDepositEquipment(InstanceId);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_deposit"))) return;
 
 	auto Notify = [this](const TCHAR* Msg)
 	{
@@ -1251,6 +1270,7 @@ void UMMOInventoryComponent::WithdrawEquipment(int32 InstanceId)
 		ServerWithdrawEquipment(InstanceId);
 		return;
 	}
+	if (InventoryMaintenanceRefused(this, TEXT("inv_withdraw"))) return;
 
 	auto Notify = [this](const TCHAR* Msg)
 	{

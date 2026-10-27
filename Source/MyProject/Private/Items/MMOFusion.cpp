@@ -48,10 +48,14 @@ EMMOFusionResult FMMOFusion::GateResult(const UMMOInventoryComponent& Inv)
 	}
 	// Posta deseni (UMMOMailComponent::IsOwnerLocked): yuklenmemis karakterin degisikligi kaydedilemez,
 	// gecis onayindan sonra da EndPlay kaydi atlanir; ikisinde de mutasyon kalici olmaz (F1).
-	// Planli kapanis Flushing'e girdi: kayit turundan sonra yapilan birlestirme kalici olmaz -> ayni kilit (F1).
-	if (!Char->IsInitialLoadComplete() || Char->IsTravelSaveCommitted() || MMOServerLifecycle::IsFlushingOrLater())
+	if (!Char->IsInitialLoadComplete() || Char->IsTravelSaveCommitted())
 	{
 		return EMMOFusionResult::Locked;
+	}
+	// Planli kapanis Flushing'e girdi: kayit turundan sonra yapilan birlestirme kalici olmaz (F1). Oyuncuya "yukleniyor" degil "bakim" denir.
+	if (MMOServerLifecycle::IsFlushingOrLater())
+	{
+		return EMMOFusionResult::Maintenance;
 	}
 	// Olu karakteri de reddeder (IsOwnerNearVendor). Esya kontrollerinden once (D-4).
 	if (!Inv.IsOwnerNearVendor())
@@ -373,6 +377,7 @@ const TCHAR* FMMOFusion::ResultText(EMMOFusionResult R)
 	case EMMOFusionResult::NotPlayer:      return TEXT("Birlestirme yalniz oyuncu karakteri icindir");
 	case EMMOFusionResult::Locked:         return TEXT("Karakter yukleniyor ya da bolge degistiriyor; birlestirme su an yapilamaz");
 	case EMMOFusionResult::TradeLocked:    return TEXT("Takasa konan esya birlestirilemez");
+	case EMMOFusionResult::Maintenance:    return TEXT("Sunucu bakima giriyor");
 	}
 	return TEXT("Birlestirme basarisiz");
 }

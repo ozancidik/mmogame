@@ -12,6 +12,7 @@
 #include "GameFramework/Pawn.h"
 #include "Core/MMONotify.h"
 #include "Core/MMOMetrics.h"
+#include "Core/MMOServerLifecycle.h"
 #include "Player/MMOPlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -583,6 +584,12 @@ void UMMOQuestComponent::ClaimReward(FName QuestId)
 	if (!HasAuthorityInternal())
 	{
 		ServerClaimReward(QuestId);
+		return;
+	}
+	// Planli kapanis kayit turuna girdi: XP/altin/esya odulu kayit turunun snapshot'ina girmez, kalici olmaz.
+	if (MMOServerLifecycle::RefuseWhenFlushing(TEXT("quest_claim")))
+	{
+		MMONotify::ToOwner(GetOwner(), TEXT("Sunucu bakima giriyor: gorev odulu su an alinamaz"), FColor::Silver, 2.f, MMONotify::EMMONotifyKind::Hint);
 		return;
 	}
 	// XP/gold/inventory delegates run before the quest is completed. Reject all

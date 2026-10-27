@@ -107,6 +107,8 @@ Malzeme/tarif sistemi, şanslı birleştirme, +N taşıma, Efsanevi üretimi, to
 > (yetki → oyuncu kontrollü `AMMOCharacter` → `IsInitialLoadComplete` / `!IsTravelSaveCommitted` → satıcı yakınlığı, eşya kontrollerinden önce);
 > `FindFromSlot`'ta seçilen slotun eşyası **her zaman ilk girdi**, kalan ikisi en küçük `InstanceId`'li eşdeğerler (aşağıdaki taslak yorumu
 > "en küçük id'ler önce" eskidi; açık semantik soruları §11.4).
+> **Sunucu yaşam döngüsü L3 QA turu 2:** enum'un sonuna `Maintenance` eklendi (planlı kapanış `Flushing`'e girdi; `MMOServerLifecycle::IsFlushingOrLater()`).
+> Kapı sırası `Locked` (yükleme/geçiş) sonra `Maintenance`, sonra satıcı yakınlığı; oyuncu mesajı "Sunucu bakima giriyor" ("yukleniyor" değil).
 
 ```cpp
 // Public/Items/MMOFusion.h

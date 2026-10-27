@@ -53,9 +53,13 @@ struct FMMOLifecycleFlushSummary
  * tur bitince plana NotifyFlushDone; Kicking'de her oyuncu YALNIZ kendi kayit sonucu belli olduktan sonra atilir. Exiting'e
  * gelindiginde kalan is senkron tamamlanir (once kayit, sonra atma).
  * L3: Exiting'de Drain'den sonra tum (listen ev sahibi disindaki) PlayerController'lar yok olana kadar en cok ExitWaitMaxSeconds
- * beklenir, sonra FPlatformMisc::RequestExitWithStatus(false, kod): kod 0 = tum kayitlar tamam, 2 = en az bir oyuncunun kaydi
- * atma aninda yeniden denemeden sonra da basarisiz (K3: surec yoneticisi kod 2'de OTOMATIK YENIDEN BASLATMAMALI). Flushing'e girince
- * aktif ticaretler iptal edilir ve ticaret/posta/birlestirme reddedilir (IsFlushingOrLater).
+ * beklenir, sonra FPlatformMisc::RequestExitWithStatus: kod 0 = kayip yok, 2 = en az bir kayip: atma aninda yeniden denemeden sonra da
+ * kaydi basarisiz oyuncu, kayit turu bitmedigi icin kararsiz kalan, 3 atma denemesinden sonra atilamayan ya da 5 sn sonunda hala bagli
+ * oyuncu (K3: surec yoneticisi kod 2'de OTOMATIK YENIDEN BASLATMAMALI). Atma aninda Saved sonuclu oyuncu da bir kez daha yazilir
+ * (tur ile atma arasindaki degisiklik kaybolmasin); "kaydedildi" metni SON yazima gore. Kayip sayilarinin dokumu ev=shutdown_exit satirinda
+ * ve Saved/Logs/MMOShutdownResult.json'da (Windows kod notu: MMOServerLifecycle::NeedsForcedExitCode). Flushing'e girince aktif ticaretler
+ * iptal edilir; ticaret (davet/kabul/baslatma/onay/esya/altin), envanter (satin alma, satis, depo, yukseltme/yakma), gorev odulu, posta
+ * ve birlestirme reddedilir (IsFlushingOrLater / RefuseWhenFlushing).
  * Yan dosyalar (basarim/gunluk/yaris): bilesenlerin SaveNow'u private, bu sistem onlari ayrica CAGIRMAZ; EndPlay kaydina guvenilir.
  * Yeni RPC / replike alan yok; yalniz sunucuda calisir.
  *
@@ -155,8 +159,10 @@ private:
 	void GatherServerWorlds(TArray<UWorld*>& OutWorlds) const;
 	bool FlushNextPlayer();
 	void FinishFlushRound();
-	void KickResolvedPlayers(int32 MaxKicks);
-	void FinishExit();
+	/** Serial: ayni Serial ile bir oyuncuya en cok BIR atma denemesi (Drain'in gecisleri ayni Serial'i kullanir; yeniden denemeler Tick'lere yayilir). */
+	void KickResolvedPlayers(int32 MaxKicks, uint32 Serial);
+	void FinishExit(bool bTimedOut);
+	void GatherExitWaitingPlayers(TArray<const APlayerController*>& OutPlayers) const;
 	int32 CountExitWaitingPlayers() const;
 	void CancelActiveTrades();
 	void HandlePreLogin(AGameModeBase* GameMode, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage);
@@ -205,8 +211,30 @@ namespace MMOServerLifecycle
 
 	/** Kapanis plani Flushing ya da sonrasinda mi (surec-geneli)? Ticaret/posta/birlestirme RPC girisleri bunu okuyup reddeder. */
 	MYPROJECT_API bool IsFlushingOrLater();
+	/**
+	 * Altin/esya/XP degistiren RPC girislerinin ortak kapisi: IsFlushingOrLater() ise true (cagiran reddeder) ve
+	 * "event=maintenance_refused gate=<Gate>" satiri LogMMOLifecycle'a yazilir (ilk MaxRefusedLogLines satir; RPC dolduran istemci logu sisirmesin).
+	 * Gate yalniz kod sabiti olmali (kullanici girdisi degil).
+	 */
+	MYPROJECT_API bool RefuseWhenFlushing(const TCHAR* Gate);
+	constexpr int32 MaxRefusedLogLines = 200;
 	/** Cikis kodu: kaydi atma anindaki yeniden denemeden sonra da basarisiz kalan oyuncu varsa 2, yoksa 0. */
 	MYPROJECT_API int32 ExitCodeForFailures(int32 FailedPlayers);
+
+	/**
+	 * Cikis kodu platform notu (UE 5.7 kaynagi): FPlatformMisc::RequestExitWithStatus(false, kod) Windows'ta kodu ISLETIM SISTEMINE
+	 * TASIMAZ (yalniz PostQuitMessage; ana dongu IsEngineExitRequested ile biter, WinMain 0 doner). Linux'ta GOverriddenReturnCode ile tasinir.
+	 * Cozum: kod != 0 ise Windows'ta motor kapanis zinciri (dunya yikimi, EndPlay kayitlari) normal calissin, FCoreDelegates::OnPreExit'te
+	 * (GEngine->PreExit SONRASI) log yazilip RequestExitWithStatus(true, kod) -> TerminateProcess(kod) cagrilir. Her durumda
+	 * Saved/Logs/MMOShutdownResult.json yazilir (surec yoneticisi bunu da okuyabilir).
+	 */
+	MYPROJECT_API bool NeedsForcedExitCode(int32 ExitCode);
+	/** Durum dosyasi icerigi: {"exit_code":N,"failed":N,"gone":N,"still_connected":N,"kick_failed":N,"time_utc":"..."}. TimeUtc verilmezse simdi. */
+	MYPROJECT_API FString BuildResultJson(int32 ExitCode, int32 Failed, int32 Gone, int32 StillConnected, int32 KickFailed, const FDateTime& TimeUtc);
+	/** Saved/Logs/MMOShutdownResult.json (ProjectLogDir). */
+	MYPROJECT_API FString ResultFilePath();
+	/** Gecici dosya + tasima ile yazar (yarim dosya kalmaz). Basarisizsa false ve LogMMOLifecycle Warning. */
+	MYPROJECT_API bool WriteResultFile(const FString& Path, const FString& Json);
 
 	enum class ECmdLineShutdown : uint8
 	{

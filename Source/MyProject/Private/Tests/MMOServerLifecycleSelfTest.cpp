@@ -13,10 +13,20 @@
 #include "Components/MMOInventoryComponent.h"
 #include "Components/MMOMailComponent.h"
 #include "Components/MMOTradeComponent.h"
+#include "Components/MMOQuestComponent.h"
+#include "Components/MMOStatsComponent.h"
 #include "Core/MMOGameMode.h"
 #include "Items/MMOFusion.h"
+#include "Items/MMOItemDatabase.h"
+#include "Items/MMOConsumableTypes.h"
+#include "World/MMOVendorNPC.h"
+#include "World/MMOWarehouseNPC.h"
+#include "World/MMOQuestGiverNPC.h"
+#include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerState.h"
 #include "HAL/FileManager.h"
+#include "Misc/DateTime.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
@@ -31,10 +41,13 @@
 // L3: Exiting'de cikis (kanca ile, gercek RequestExit CAGRILMAZ): kod 0/2, denetleyiciler yok olana kadar bekleme + 5 sn sinir, tek cikis;
 // atma aninda yeniden deneme / yeniden degerlendirme, KickPlayer yeniden denemesi, Tick basina atma siniri, kayit turunda 'gone',
 // ZoneTravel ucusunda kayit (GameMode korumali alanlarina turetilmis erisimci ile), Flushing'de ticaret/posta/birlestirme kapisi.
+// L3 QA turu 2: cikis durum dosyasi + Windows kod notu (saf), cikis kodu dokumu (hala bagli / atilamayan / gone), atma aninda Saved icin
+// yeniden yazim, Drain'de atma yeniden denemelerinin Tick'lere yayilmasi, listen ev sahibi dallari (filtre disinda birakilmaz), Flushing'de
+// envanter/depo/yukseltme/gorev kapilari + 6 ticaret kapisi (her biri kendi log etiketiyle), birlestirme icin ayri Maintenance sonucu.
 // Her Check benzersiz case/check cifti basar. Anonim namespace adlari LifecycleTest onekli (unity-build tuzagi).
 namespace
 {
-	constexpr int32 LifecycleTestExpectedChecks = 224;
+	constexpr int32 LifecycleTestExpectedChecks = 280;
 
 	UWorld* LifecycleTestFindWorld(UWorld* Hint)
 	{
@@ -166,10 +179,23 @@ namespace
 	void LifecycleTestDestroyPlayer(FLifecycleTestPlayer& P)
 	{
 		// EndPlay/UnPossessed yuklenmis karakteri kaydeder: once "yuklenmemis" yap ki test yok ederken diske yazmasin.
-		if (P.Pawn) P.Pawn->SetSaveIdentityForTest(false, FString(), 0);
-		if (P.PC) { P.PC->UnPossess(); P.PC->Destroy(); }
-		if (P.Pawn) P.Pawn->Destroy();
+		// IsValid: atma kancasi (HookKickDestroyNames) ya da test onceden yok etmis olabilir.
+		if (IsValid(P.Pawn)) P.Pawn->SetSaveIdentityForTest(false, FString(), 0);
+		if (IsValid(P.PC)) { P.PC->UnPossess(); P.PC->Destroy(); }
+		if (IsValid(P.Pawn)) P.Pawn->Destroy();
 		P = FLifecycleTestPlayer();
+	}
+
+	// Birlestirme / ticaret / envanter vakalari icin yardimcilar.
+	struct FLifecycleTestTradeAccess : public UMMOTradeComponent
+	{
+		static void StartTrade(AMMOCharacter* A, AMMOCharacter* B) { StartTradeServer(A, B); }
+	};
+
+	FString LifecycleTestNormalizedSlashes(FString Path)
+	{
+		Path.ReplaceInline(TEXT("\\"), TEXT("/"));
+		return Path;
 	}
 
 	FString LifecycleTestSlotPath(const FString& Slot)
@@ -297,6 +323,8 @@ namespace
 		TSet<FString> HookFailNames;
 		TMap<FString, int32> HookSaveFailBudget; // ilk N yazim basarisiz, sonra basarili
 		TMap<FString, int32> HookKickFailBudget; // ilk N atma denemesi false ("KF:" kaydi), sonra basarili
+		TMap<FString, int32> HookSaveOkBudget;   // ilk N yazim basarili, sonra hep basarisiz (atma aninda yeniden yazim hatasi benzetimi)
+		TSet<FString> HookKickDestroyNames;      // basarili atma denetleyiciyi gercekten yok eder (gercek KickPlayer gibi); bu adlar icin
 		TArray<TPair<int32, int32>> ExitCalls;   // kancaya gelen (cikis kodu, basarisiz oyuncu sayisi); gercek RequestExit CAGRILMAZ
 		const auto HookName = [](const APlayerController* PC) { return PC && PC->PlayerState ? PC->PlayerState->GetPlayerName() : FString(); };
 		const TFunction<bool(AMMOCharacter*)> SaveHookFn = [&](AMMOCharacter* Character)
@@ -309,6 +337,10 @@ namespace
 			{
 				if (*Budget > 0) { --*Budget; bFail = true; }
 			}
+			if (int32* OkBudget = HookSaveOkBudget.Find(Name))
+			{
+				if (*OkBudget > 0) --*OkBudget; else bFail = true;
+			}
 			return !bFail;
 		};
 		const TFunction<bool(APlayerController*, const FText&)> KickHookFn = [&](APlayerController* PC, const FText& Reason)
@@ -320,6 +352,12 @@ namespace
 			}
 			HookLog.Add(TEXT("K:") + Name);
 			KickTexts.Add(Name, Reason.ToString());
+			if (HookKickDestroyNames.Contains(Name))
+			{
+				// Gercek KickPlayer baglantiyi kapatir ve denetleyici yok olur; yuklenmis karakterin EndPlay kaydi diske yazmasin diye once kimlik kapatilir.
+				if (AMMOCharacter* Pawn = Cast<AMMOCharacter>(PC->GetPawn())) Pawn->SetSaveIdentityForTest(false, FString(), 0);
+				PC->Destroy();
+			}
 			return true;
 		};
 		UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
@@ -649,7 +687,7 @@ namespace
 			S = Sub->GetFlushSummary();
 			Check(TEXT("l2_round"), TEXT("all_kicked_after_flush"), S.Kicked == 7 && CountPrefix(TEXT("K:")) == 7);
 			// Basarisiz kayit atma aninda BIR kez yeniden denenir (2 yazim); digerleri bir kez.
-			Check(TEXT("l2_round"), TEXT("saved_once_each_failed_retried_once"), CountLog(TEXT("S:LCTA")) == 1 && CountLog(TEXT("S:LCTB")) == 1 && CountLog(TEXT("S:LCTC")) == 1 && CountLog(TEXT("S:") + FailName) == 2);
+			Check(TEXT("l2_round"), TEXT("saved_again_at_kick_failed_retried_once"), CountLog(TEXT("S:LCTA")) == 2 && CountLog(TEXT("S:LCTB")) == 2 && CountLog(TEXT("S:LCTC")) == 2 && CountLog(TEXT("S:") + FailName) == 2);
 			Check(TEXT("l2_round"), TEXT("unloaded_never_written"), CountLog(TEXT("S:LCTU")) == 0);
 			Check(TEXT("l2_round"), TEXT("travel_committed_never_written"), CountLog(TEXT("S:LCTT")) == 0 && CountLog(TEXT("S:LCTN")) == 0);
 			Check(TEXT("l2_round"), TEXT("save_before_kick_each"), SavedBeforeKick(TEXT("LCTA")) && SavedBeforeKick(TEXT("LCTB")) && SavedBeforeKick(TEXT("LCTC")) && SavedBeforeKick(FailName));
@@ -665,15 +703,16 @@ namespace
 			StepN(3);
 			Sub->DrainShutdownWork();
 			Check(TEXT("l2_round"), TEXT("second_round_refused"), !bAgain);
-			Check(TEXT("l2_round"), TEXT("no_double_write"), CountPrefix(TEXT("S:")) == 5 && CountLog(TEXT("S:LCTA")) == 1 && CountPrefix(TEXT("K:")) == 7);
+			Check(TEXT("l2_round"), TEXT("no_double_write"), CountPrefix(TEXT("S:")) == 8 && CountLog(TEXT("S:LCTA")) == 2 && CountPrefix(TEXT("K:")) == 7);
 			Capture.Sync();
 			Check(TEXT("l2_round"), TEXT("metric_failed_line_once_sanitized"),
 				Capture.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_save_failed player=LCTF?evbad?x")) == 1 && Capture.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_save_failed")) == 1);
 			Check(TEXT("l2_round"), TEXT("metric_flush_done_line"), Capture.Count(ELogVerbosity::Display, TEXT("ev=shutdown phase=flush_done players=7 saved=3 failed=1 skipped=3")) == 1);
-			Check(TEXT("l2_round"), TEXT("retry_logged_for_failed_and_skipped"),
+			Check(TEXT("l2_round"), TEXT("retry_logged_for_failed_saved_and_skipped"),
 				Capture.Count(ELogVerbosity::Display, TEXT("event=shutdown_save_retry player=LCTF?evbad?x previous=failed result=failed")) == 1
 				&& Capture.Count(ELogVerbosity::Display, TEXT("event=shutdown_save_retry player=LCTU previous=skipped_unloaded result=skipped_unloaded")) == 1
-				&& Capture.Count(ELogVerbosity::Display, TEXT("event=shutdown_save_retry player=LCTA")) == 0);
+				&& Capture.Count(ELogVerbosity::Display, TEXT("event=shutdown_save_retry player=LCTA previous=saved result=saved")) == 1
+					&& Capture.Count(ELogVerbosity::Display, TEXT("event=shutdown_save_retry player=LCTT")) == 0);
 			Check(TEXT("l2_round"), TEXT("raw_name_not_in_log"), Capture.Count(ELogVerbosity::Display, TEXT("ev=bad")) == 0 && Capture.Count(ELogVerbosity::Warning, TEXT("ev=bad")) == 0);
 
 			// 19) Tur kurulduktan sonra gelen 2 oyuncu: once kayit sirasina girer; kaydi belli olmayan atilmaz.
@@ -683,7 +722,7 @@ namespace
 			Check(TEXT("l2_late"), TEXT("late_not_kicked_first_step"), CountLog(TEXT("K:LCTL1")) == 0 && CountLog(TEXT("K:LCTL2")) == 0 && Sub->GetFlushSummary().Pending == 2);
 			Sub->StepShutdownWork();
 			const int32 K1 = CountLog(TEXT("K:LCTL1")), K2 = CountLog(TEXT("K:LCTL2")), S1 = CountLog(TEXT("S:LCTL1")), S2 = CountLog(TEXT("S:LCTL2"));
-			Check(TEXT("l2_late"), TEXT("one_resolved_one_kicked_second_step"), K1 + K2 == 1 && S1 + S2 == 1);
+			Check(TEXT("l2_late"), TEXT("one_resolved_one_kicked_second_step"), K1 + K2 == 1 && S1 + S2 == 2); // yazilan oyuncu kick aninda bir kez daha yazilir
 			Check(TEXT("l2_late"), TEXT("kicked_one_was_saved_first"), (K1 == 1 && SavedBeforeKick(TEXT("LCTL1"))) || (K2 == 1 && SavedBeforeKick(TEXT("LCTL2"))));
 			Sub->StepShutdownWork();
 			Check(TEXT("l2_late"), TEXT("both_kicked_third_step"), CountLog(TEXT("K:LCTL1")) == 1 && CountLog(TEXT("K:LCTL2")) == 1 && SavedBeforeKick(TEXT("LCTL1")) && SavedBeforeKick(TEXT("LCTL2")));
@@ -705,14 +744,22 @@ namespace
 			{
 				FLifecycleTestLogCapture ExitCapture;
 				const double T0 = 5000.0;
+				// Kanca atmasi PC'leri yok etmez; gercek KickPlayer'da atilanlar kapanir. Burada B,C,U,T,N "ayrildi"; A (atildi ama hala bagli)
+				// ve F (kaydi basarisiz) kalir: 5 sn sonunda A "hala bagli" (+1), F zaten Failed (iki kez sayilmaz).
+				for (FLifecycleTestPlayer* Leaver : { &B, &C, &U, &T, &N }) LifecycleTestDestroyPlayer(*Leaver);
+				IFileManager::Get().Delete(*L::ResultFilePath(), false, true, true);
 				Sub->StepExit(T0);
 				Check(TEXT("l3_exit"), TEXT("waits_while_players_remain"), ExitCalls.Num() == 0 && !UMMOServerLifecycleSubsystem::WasExitRequested());
 				Sub->StepExit(T0 + 4.0);
 				Check(TEXT("l3_exit"), TEXT("still_waiting_before_limit"), ExitCalls.Num() == 0);
 				Sub->StepExit(T0 + L::ExitWaitMaxSeconds);
 				ExitCapture.Sync();
-				Check(TEXT("l3_exit"), TEXT("limit_exits_with_failed_code"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeSaveFailed && ExitCalls[0].Value == 1 && UMMOServerLifecycleSubsystem::WasExitRequested());
-				Check(TEXT("l3_exit"), TEXT("exit_metric_line_logged"), ExitCapture.Count(ELogVerbosity::Display, TEXT("ev=shutdown_exit code=2 failed=1")) == 1 && ExitCapture.Count(ELogVerbosity::Warning, TEXT("event=shutdown_exit_wait_timeout")) == 1);
+				Check(TEXT("l3_exit"), TEXT("limit_exits_with_failed_code"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeSaveFailed && ExitCalls[0].Value == 2 && UMMOServerLifecycleSubsystem::WasExitRequested());
+				Check(TEXT("l3_exit"), TEXT("exit_metric_line_logged"), ExitCapture.Count(ELogVerbosity::Display, TEXT("ev=shutdown_exit code=2 failed=2 gone=0 still_connected=1 kick_failed=0")) == 1 && ExitCapture.Count(ELogVerbosity::Warning, TEXT("event=shutdown_exit_wait_timeout")) == 1);
+				FString ResultJson;
+				FFileHelper::LoadFileToString(ResultJson, *L::ResultFilePath());
+				Check(TEXT("l3_exit"), TEXT("result_file_written_with_breakdown"),
+					ResultJson.Contains(TEXT("\"exit_code\":2")) && ResultJson.Contains(TEXT("\"failed\":2")) && ResultJson.Contains(TEXT("\"still_connected\":1")) && ResultJson.Contains(TEXT("\"time_utc\":\"")));
 				Check(TEXT("l3_exit"), TEXT("not_tickable_after_exit"), !Sub->IsTickable());
 				Sub->StepExit(T0 + 60.0);
 				Check(TEXT("l3_exit"), TEXT("exit_requested_only_once"), ExitCalls.Num() == 1);
@@ -858,12 +905,19 @@ namespace
 			Sub->GetFlushResultFor(XB.PC, RB, bKB);
 			Check(TEXT("l3_retry"), TEXT("kick_retried_until_success"), bKK && CountLog(TEXT("KF:LCTXK")) == 2 && CountLog(TEXT("K:LCTXK")) == 1);
 			Check(TEXT("l3_retry"), TEXT("kick_attempts_bounded_by_max"), !bKB && CountLog(TEXT("KF:LCTXB")) == L::MaxKickAttempts && CountLog(TEXT("K:LCTXB")) == 0);
-			// Cikis: kanca atmasi PC'leri yok etmedi -> 5 sn sonra cikis; basarisiz kalan yok (yeniden deneme kurtardi, gone sayilmaz) -> kod 0.
+			// Cikis (L3 QA2): kanca atmasi PC'leri yok etmez; bkz. asagidaki yorum.
 			Sub->AdvanceSeconds(30.0);
+			FLifecycleTestLogCapture ExitCapture;
 			Sub->StepExit(7000.0);
 			Check(TEXT("l3_retry"), TEXT("waits_for_remaining_controllers"), ExitCalls.Num() == 0);
+			// XR ve XK atildi (gercek KickPlayer'da kapanirlar): "ayrildi". XB 3 denemede de atilamadi (bagli kaldi): hem atma hakki bitmis hem hala
+			// bagli ama IKI KEZ sayilmaz; XG gone sayilir, kayip degil.
+			LifecycleTestDestroyPlayer(XR);
+			LifecycleTestDestroyPlayer(XK);
 			Sub->StepExit(7000.0 + L::ExitWaitMaxSeconds);
-			Check(TEXT("l3_retry"), TEXT("recovered_retry_and_gone_do_not_fail_exit"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeOk && ExitCalls[0].Value == 0);
+			ExitCapture.Sync();
+			Check(TEXT("l3_retry"), TEXT("only_unkickable_player_fails_exit"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeSaveFailed && ExitCalls[0].Value == 1);
+			Check(TEXT("l3_retry"), TEXT("kick_failed_breakdown_logged"), ExitCapture.Count(ELogVerbosity::Display, TEXT("ev=shutdown_exit code=2 failed=1 gone=1 still_connected=0 kick_failed=1")) == 1);
 			UMMOServerLifecycleSubsystem::ResetPlanForTest();
 			LifecycleTestDestroyPlayer(XR);
 			LifecycleTestDestroyPlayer(XK);
@@ -913,6 +967,7 @@ namespace
 				// Cikis kodu: yalniz tur + yeniden deneme sonucu sayilir (ZB basarisiz); atmadan sonraki EndPlay kaydi KATILMAZ -> 2.
 				ExitCalls.Reset();
 				Sub->AdvanceSeconds(30.0);
+				UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTDiskZB"))); // ZA atildi ve kapandi (kapsam disi); ZB bagli + Failed (bir kez sayilir)
 				Sub->StepExit(8000.0);
 				Sub->StepExit(8000.0 + L::ExitWaitMaxSeconds);
 				Check(TEXT("l3_zone"), TEXT("flight_failure_exit_code_two"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeSaveFailed && ExitCalls[0].Value == 1);
@@ -930,48 +985,381 @@ namespace
 			Check(TEXT("l3_zone"), TEXT("temp_slots_cleaned"), !LifecycleTestSlotPresent(SlotA) && !LifecycleTestSlotPresent(SlotB));
 		}
 
-		// 27) L3 Flushing'de ticaret / posta / birlestirme kapisi + aktif ticaretin iptali (gercek bilesenler).
+		// 27) L3 Flushing'de ticaret / posta / birlestirme kapisi + aktif ticaretin iptali (gercek bilesenler). QA2: her ticaret kapisi KENDI
+		// log etiketiyle (event=maintenance_refused gate=...) ayri sinanir; biri silinirse bir digeri onu maskelemez (davet/kabul/baslatma/onay/esya/altin).
 		{
 			UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
 			UMMOServerLifecycleSubsystem::SetKickHookForTest(KickHookFn);
 			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTG")));
 			UMMOServerLifecycleSubsystem::ResetPlanForTest();
 			HookLog.Reset();
+			FLifecycleTestLogCapture GateLog;
+			const auto GateCount = [&](const TCHAR* Gate)
+			{
+				GateLog.Sync();
+				return GateLog.Count(ELogVerbosity::Display, *(FString(TEXT("event=maintenance_refused gate=")) + Gate));
+			};
 			FLifecycleTestPlayer G1 = LifecycleTestMakePlayer(World, TEXT("LCTG1"), true, true, 60);
 			FLifecycleTestPlayer G2 = LifecycleTestMakePlayer(World, TEXT("LCTG2"), true, true, 61);
+			FLifecycleTestPlayer G3 = LifecycleTestMakePlayer(World, TEXT("LCTG3"), true, true, 62);
+			FLifecycleTestPlayer G4 = LifecycleTestMakePlayer(World, TEXT("LCTG4"), true, true, 63);
+			FLifecycleTestPlayer GU = LifecycleTestMakePlayer(World, TEXT("LCTGU"), true, false, 64);
 			UMMOTradeComponent* T1 = G1.Pawn ? G1.Pawn->GetTradeComponent() : nullptr;
 			UMMOTradeComponent* T2 = G2.Pawn ? G2.Pawn->GetTradeComponent() : nullptr;
+			UMMOTradeComponent* T3 = G3.Pawn ? G3.Pawn->GetTradeComponent() : nullptr;
+			UMMOTradeComponent* T4 = G4.Pawn ? G4.Pawn->GetTradeComponent() : nullptr;
 			UMMOMailComponent* M1 = G1.Pawn ? G1.Pawn->GetMailComponent() : nullptr;
 			UMMOInventoryComponent* I1 = G1.Pawn ? G1.Pawn->GetInventory() : nullptr;
-			Check(TEXT("l3_gate"), TEXT("setup_components"), T1 && T2 && M1 && I1);
-			if (T1 && T2 && M1 && I1)
+			UMMOInventoryComponent* IU = GU.Pawn ? GU.Pawn->GetInventory() : nullptr;
+			Check(TEXT("l3_gate"), TEXT("setup_components"), T1 && T2 && T3 && T4 && M1 && I1 && IU);
+			if (T1 && T2 && T3 && T4 && M1 && I1 && IU)
 			{
 				G2.Pawn->SetActorLocation(G1.Pawn->GetActorLocation() + FVector(100.0, 0.0, 0.0));
+				G4.Pawn->SetActorLocation(G3.Pawn->GetActorLocation() + FVector(100.0, 0.0, 0.0));
 				Check(TEXT("l3_gate"), TEXT("idle_is_not_flushing_or_later"), !L::IsFlushingOrLater());
 				// Idle: ticaret kurulabilir (on kosul), posta/birlestirme kapi disi nedenlerle reddedilir (bakim nedeniyle DEGIL).
 				T1->RequestInviteNearest();
 				T2->RequestAccept();
 				Check(TEXT("l3_gate"), TEXT("idle_trade_starts_precondition"), T1->IsTrading() && T2->IsTrading());
+				// Kabul edilmemis bekleyen davet (G3 -> G4): kabul kapisi Flushing'de bunu reddetmeli.
+				T3->RequestInviteNearest();
+				Check(TEXT("l3_gate"), TEXT("idle_pending_invite_precondition"), T4->PendingInviteId != 0 && !T4->IsTrading());
 				Check(TEXT("l3_gate"), TEXT("idle_mail_not_maintenance"), M1->SendMail(TEXT("LCTGNobody"), 0, TEXT("x"), false) != EMMOMailResult::Maintenance);
 				Check(TEXT("l3_gate"), TEXT("idle_fusion_not_locked"), FMMOFusion::Check(*I1, 1, 2, 3).Result != EMMOFusionResult::Locked);
+				Check(TEXT("l3_gate"), TEXT("idle_unloaded_fusion_locked"), FMMOFusion::Check(*IU, 1, 2, 3).Result == EMMOFusionResult::Locked);
 				FString Err;
 				Sub->RequestShutdown(600.0, R::Maintenance, Err);
 				Sub->AdvanceSeconds(581.0); // Flushing: tur kurulur, aktif ticaret iptal edilir
 				Check(TEXT("l3_gate"), TEXT("flushing_reached"), Sub->GetPhase() == P::Flushing && L::IsFlushingOrLater());
 				Check(TEXT("l3_gate"), TEXT("flushing_cancels_active_trade_both_sides"), !T1->IsTrading() && !T2->IsTrading());
-				// Yeni ticaret: T2 davet eder (T2'nin davet bekleme suresi dolmamis), T1 kabul eder -> kurulmaz.
+				// Davet kapisi: T2 davet eder (nearest = T1); T1'in davet numarasi ARTMAMALI (kabul kapisi bunu maskelemez: numara dogrudan okunur).
+				const uint64 InviteIdBefore = T1->PendingInviteId;
 				T2->RequestInviteNearest();
+				Check(TEXT("l3_gate"), TEXT("flushing_trade_invite_refused_logged"), GateCount(TEXT("trade_invite")) == 1);
+				Check(TEXT("l3_gate"), TEXT("flushing_invite_creates_no_pending_id"), T1->PendingInviteId == InviteIdBefore);
 				T1->RequestAccept();
 				Check(TEXT("l3_gate"), TEXT("flushing_refuses_new_trade"), !T1->IsTrading() && !T2->IsTrading());
+				// Kabul kapisi: Idle'da kurulmus bekleyen davet (G3 -> G4) Flushing'de kabul edilemez; kendi etiketi.
+				T4->RequestAccept();
+				Check(TEXT("l3_gate"), TEXT("flushing_trade_accept_refused_logged"), GateCount(TEXT("trade_accept")) == 1 && !T4->IsTrading() && !T3->IsTrading());
+				// Baslatma kapisi: kabul/davet yolundan BAGIMSIZ, dogrudan baslatma.
+				FLifecycleTestTradeAccess::StartTrade(G3.Pawn, G4.Pawn);
+				Check(TEXT("l3_gate"), TEXT("flushing_trade_start_refused_logged"), GateCount(TEXT("trade_start")) == 1 && !T3->IsTrading() && !T4->IsTrading());
+				// Teklif degisikligi / onay kapilari: oturum numarasi gecersiz olsa da kapi ilk satirda log basar.
+				T1->RequestAddItemSeen(1, 0, 1);
+				Check(TEXT("l3_gate"), TEXT("flushing_trade_additem_refused_logged"), GateCount(TEXT("trade_additem")) == 1);
+				T1->RequestSetGoldSeen(1, 0, 5);
+				Check(TEXT("l3_gate"), TEXT("flushing_trade_setgold_refused_logged"), GateCount(TEXT("trade_setgold")) == 1);
+				T1->RequestConfirmSeen(1, 0);
+				Check(TEXT("l3_gate"), TEXT("flushing_trade_confirm_refused_logged"), GateCount(TEXT("trade_confirm")) == 1);
 				Check(TEXT("l3_gate"), TEXT("flushing_refuses_mail"), M1->SendMail(TEXT("LCTGNobody"), 0, TEXT("x"), false) == EMMOMailResult::Maintenance);
-				Check(TEXT("l3_gate"), TEXT("flushing_refuses_fusion"), FMMOFusion::Check(*I1, 1, 2, 3).Result == EMMOFusionResult::Locked);
+				// Birlestirme: bakim icin AYRI sonuc (Locked'a dusmez); yuklenmemis karakter hala Locked (siralama: once yukleme kilidi).
+				Check(TEXT("l3_gate"), TEXT("flushing_refuses_fusion"), FMMOFusion::Check(*I1, 1, 2, 3).Result == EMMOFusionResult::Maintenance);
+				Check(TEXT("l3_gate"), TEXT("flushing_unloaded_fusion_still_locked"), FMMOFusion::Check(*IU, 1, 2, 3).Result == EMMOFusionResult::Locked);
+				Check(TEXT("l3_gate"), TEXT("fusion_maintenance_text_is_maintenance"), FString(FMMOFusion::ResultText(EMMOFusionResult::Maintenance)).Contains(TEXT("bakim"))
+					&& !FString(FMMOFusion::ResultText(EMMOFusionResult::Maintenance)).Contains(TEXT("yukleniyor")));
 				// Iptal edilemeyen faz (Flushing) sonrasi plan sifirlaninca kapi acilir.
 				UMMOServerLifecycleSubsystem::ResetPlanForTest();
-				Check(TEXT("l3_gate"), TEXT("reset_reopens_gates"), !L::IsFlushingOrLater() && FMMOFusion::Check(*I1, 1, 2, 3).Result != EMMOFusionResult::Locked);
+				Check(TEXT("l3_gate"), TEXT("reset_reopens_gates"), !L::IsFlushingOrLater() && FMMOFusion::Check(*I1, 1, 2, 3).Result != EMMOFusionResult::Maintenance);
 			}
 			UMMOServerLifecycleSubsystem::ResetPlanForTest();
 			LifecycleTestDestroyPlayer(G1);
 			LifecycleTestDestroyPlayer(G2);
+			LifecycleTestDestroyPlayer(G3);
+			LifecycleTestDestroyPlayer(G4);
+			LifecycleTestDestroyPlayer(GU);
+		}
+
+		// 28) L3 QA2: Flushing'de envanter (satin alma/satis/depo/yukseltme-yakma) ve gorev odulu kapilari. Ayni islemler Idle'da calisir (kontrol).
+		// Once Flushing'de (yukseltme beklemesi/cooldown hicbir kapiyi maskelemesin), sonra Idle'da; her islem icin durum imzasi + kendi log etiketi.
+		{
+			UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
+			UMMOServerLifecycleSubsystem::SetKickHookForTest(KickHookFn);
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTE")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			FLifecycleTestLogCapture EconLog;
+			const auto GateCount = [&](const TCHAR* Gate)
+			{
+				EconLog.Sync();
+				return EconLog.Count(ELogVerbosity::Display, *(FString(TEXT("event=maintenance_refused gate=")) + Gate));
+			};
+			FLifecycleTestPlayer E1 = LifecycleTestMakePlayer(World, TEXT("LCTE1"), true, true, 70);
+			UMMOInventoryComponent* Inv = E1.Pawn ? E1.Pawn->GetInventory() : nullptr;
+			UMMOQuestComponent* Quests = E1.Pawn ? E1.Pawn->GetQuestComponent() : nullptr;
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			const FVector Spot = E1.Pawn ? E1.Pawn->GetActorLocation() + FVector(100.0, 0.0, 0.0) : FVector::ZeroVector;
+			AMMOVendorNPC* Vendor = World->SpawnActor<AMMOVendorNPC>(AMMOVendorNPC::StaticClass(), Spot, FRotator::ZeroRotator, SpawnParams);
+			AMMOWarehouseNPC* Warehouse = World->SpawnActor<AMMOWarehouseNPC>(AMMOWarehouseNPC::StaticClass(), Spot, FRotator::ZeroRotator, SpawnParams);
+			AMMOQuestGiverNPC* Giver = World->SpawnActor<AMMOQuestGiverNPC>(AMMOQuestGiverNPC::StaticClass(), Spot, FRotator::ZeroRotator, SpawnParams);
+			if (Vendor) Vendor->SetActorEnableCollision(false);
+			if (Warehouse) Warehouse->SetActorEnableCollision(false);
+			if (Giver) Giver->SetActorEnableCollision(false);
+			const FName QuestId(TEXT("Q_Gold5000"));
+			const bool bEconSetup = Inv && Quests && Vendor && Warehouse && Giver && FMMOItemDatabase::Find(TEXT("ShortSword"))
+				&& FMMOConsumableDatabase::Find(TEXT("ManaPotion")) && FMMOQuestDatabase::Find(QuestId);
+			Check(TEXT("l3_econ"), TEXT("setup_fixtures"), bEconSetup);
+			// 18 etiket her durumda basilir (kurulum bozuksa hepsi basarisiz): sayi sabit kalir.
+			const TCHAR* const EconOps[] = { TEXT("buy_potion"), TEXT("buy_consumable"), TEXT("buy_equipment"), TEXT("sell"), TEXT("deposit"), TEXT("withdraw"), TEXT("upgrade"), TEXT("quest_claim") };
+			if (bEconSetup)
+			{
+				const auto Seed = [&]()
+				{
+					Inv->Items.Reset(); Inv->EquipmentBag.Reset(); Inv->Warehouse.Reset();
+					Inv->Gold = 1000000;
+					Inv->AddEquipmentInstance(TEXT("ShortSword"));
+					Inv->AddEquipmentInstance(TEXT("ShortSword"));
+					const FMMOEquipmentInstance Moved = Inv->EquipmentBag.Pop();
+					Inv->Warehouse.Add(Moved);
+					Quests->ActiveQuests.Reset();
+					Quests->CompletedQuests.Reset();
+					FMMOQuestProgress Ready;
+					Ready.QuestId = QuestId;
+					Quests->ActiveQuests.Add(Ready);
+				};
+				const auto Sig = [&]()
+				{
+					FString S = FString::Printf(TEXT("g%d|b%d|w%d|i%d|a%d|c%d"), Inv->Gold, Inv->EquipmentBag.Num(), Inv->Warehouse.Num(), Inv->GetTotalItemCount(), Quests->ActiveQuests.Num(), Quests->CompletedQuests.Num());
+					for (const FMMOEquipmentInstance& I : Inv->EquipmentBag) S += FString::Printf(TEXT("|%d:%d"), I.InstanceId, I.Plus);
+					for (const FMMOEquipmentInstance& I : Inv->Warehouse) S += FString::Printf(TEXT("|w%d"), I.InstanceId);
+					return S;
+				};
+				const auto RunOp = [&](int32 Op)
+				{
+					switch (Op)
+					{
+					case 0: Inv->BuyPotion(1); break;
+					case 1: Inv->BuyConsumable(TEXT("ManaPotion"), 1); break;
+					case 2: Inv->BuyEquipment(TEXT("ShortSword")); break;
+					case 3: Inv->SellByInstanceId(Inv->EquipmentBag[0].InstanceId); break;
+					case 4: Inv->DepositEquipment(Inv->EquipmentBag[0].InstanceId); break;
+					case 5: Inv->WithdrawEquipment(Inv->Warehouse[0].InstanceId); break;
+					case 6: Inv->UpgradeByInstanceId(Inv->EquipmentBag[0].InstanceId, Inv->EquipmentBag[0].Plus); break;
+					default: Quests->ClaimReward(QuestId); break;
+					}
+				};
+				FString Err;
+				Seed();
+				Sub->RequestShutdown(600.0, R::Maintenance, Err);
+				Sub->AdvanceSeconds(581.0); // Flushing
+				const bool bFlushingNow = Sub->GetPhase() == P::Flushing && L::IsFlushingOrLater();
+				Check(TEXT("l3_econ"), TEXT("flushing_reached"), bFlushingNow);
+				for (int32 Op = 0; Op < 8; ++Op)
+				{
+					Seed();
+					const FString Before = Sig();
+					RunOp(Op);
+					const bool bUnchanged = Sig() == Before;
+					const int32 Logged = GateCount(*((Op < 7 ? FString(TEXT("inv_")) : FString()) + EconOps[Op]));
+					Check(TEXT("l3_econ"), *(FString(TEXT("flushing_refuses_")) + EconOps[Op]), bFlushingNow && bUnchanged && Logged == 1);
+				}
+				UMMOServerLifecycleSubsystem::ResetPlanForTest();
+				Check(TEXT("l3_econ"), TEXT("idle_after_reset"), !L::IsFlushingOrLater());
+				for (int32 Op = 0; Op < 8; ++Op)
+				{
+					Seed();
+					const FString Before = Sig();
+					RunOp(Op);
+					Check(TEXT("l3_econ"), *(FString(TEXT("idle_works_")) + EconOps[Op]), Sig() != Before);
+				}
+			}
+			else
+			{
+				for (int32 Op = 0; Op < 8; ++Op)
+				{
+					Check(TEXT("l3_econ"), *(FString(TEXT("flushing_refuses_")) + EconOps[Op]), false);
+				}
+				Check(TEXT("l3_econ"), TEXT("flushing_reached"), false);
+				Check(TEXT("l3_econ"), TEXT("idle_after_reset"), false);
+				for (int32 Op = 0; Op < 8; ++Op)
+				{
+					Check(TEXT("l3_econ"), *(FString(TEXT("idle_works_")) + EconOps[Op]), false);
+				}
+			}
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			if (Vendor) Vendor->Destroy();
+			if (Warehouse) Warehouse->Destroy();
+			if (Giver) Giver->Destroy();
+			LifecycleTestDestroyPlayer(E1);
+		}
+
+		// 29) L3 QA2: listen ev sahibi dallari. Oyuncu filtresi ev sahibini KAPSAR (filtre disinda birakmaz): cikista beklenmez, atma bir kez denenir.
+		{
+			APlayerController* HostPC = nullptr;
+			for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+			{
+				APlayerController* Candidate = It->Get();
+				if (Candidate && Candidate->Player && Candidate->Player->IsA<ULocalPlayer>()) { HostPC = Candidate; break; }
+			}
+			Check(TEXT("l3_host"), TEXT("host_controller_precondition"), HostPC != nullptr);
+			bool bScope = false, bSingleAttempt = false, bNotWaiting = false;
+			if (HostPC)
+			{
+				UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
+				UMMOServerLifecycleSubsystem::SetKickHookForTest(KickHookFn);
+				UMMOServerLifecycleSubsystem::SetPlayerFilterForTest([](const APlayerController* PC) { return PC && PC->Player && PC->Player->IsA<ULocalPlayer>(); });
+				UMMOServerLifecycleSubsystem::ResetPlanForTest();
+				HookLog.Reset();
+				ExitCalls.Reset();
+				const FString HostName = HookName(HostPC);
+				HookKickFailBudget.Add(HostName, 5); // ev sahibine atma hep "false": yeniden deneme anlamsiz, bir kez denenir
+				FString Err;
+				Sub->RequestShutdown(600.0, R::Maintenance, Err);
+				Sub->AdvanceSeconds(700.0); // Exiting: Drain
+				bScope = Sub->GetFlushSummary().Players == 1;
+				Sub->StepExit(9500.0); // ev sahibi beklenmez: 5 sn gecmeden hemen cikis, kayip yok (StepExit de Drain'i bir kez calistirir)
+				bSingleAttempt = CountLog(TEXT("KF:") + HostName) == 1 && CountLog(TEXT("K:") + HostName) == 0;
+				bNotWaiting = ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeOk && ExitCalls[0].Value == 0;
+				HookKickFailBudget.Remove(HostName);
+				UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			}
+			Check(TEXT("l3_host"), TEXT("host_in_round_scope"), bScope);
+			Check(TEXT("l3_host"), TEXT("host_kick_attempted_once_not_retried"), bSingleAttempt);
+			Check(TEXT("l3_host"), TEXT("exit_does_not_wait_for_host"), bNotWaiting);
+		}
+
+		// 30) L3 QA2: Drain'deki KickPlayer yeniden denemeleri ayni cagri icinde degil, StepExit'in Tick'lerine yayilir.
+		{
+			UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
+			UMMOServerLifecycleSubsystem::SetKickHookForTest(KickHookFn);
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTW")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			HookLog.Reset();
+			ExitCalls.Reset();
+			HookKickFailBudget.Add(TEXT("LCTW1"), 2);
+			HookKickDestroyNames.Add(TEXT("LCTW1"));
+			FLifecycleTestPlayer W1 = LifecycleTestMakePlayer(World, TEXT("LCTW1"), true, true, 80);
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(700.0); // Exiting: Drain (tek cagri)
+			Check(TEXT("l3_drain"), TEXT("first_drain_single_attempt"), W1.PC && CountLog(TEXT("KF:LCTW1")) == 1 && CountLog(TEXT("K:LCTW1")) == 0);
+			Sub->StepExit(9800.0);
+			Check(TEXT("l3_drain"), TEXT("retry_spread_next_tick_second_attempt"), CountLog(TEXT("KF:LCTW1")) == 2 && CountLog(TEXT("K:LCTW1")) == 0 && ExitCalls.Num() == 0);
+			Sub->StepExit(9801.0);
+			Check(TEXT("l3_drain"), TEXT("third_attempt_succeeds_and_player_gone"), CountLog(TEXT("KF:LCTW1")) == 2 && CountLog(TEXT("K:LCTW1")) == 1 && !IsValid(W1.PC));
+			Check(TEXT("l3_drain"), TEXT("exit_clean_after_spread_retries"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeOk && ExitCalls[0].Value == 0);
+			HookKickFailBudget.Remove(TEXT("LCTW1"));
+			HookKickDestroyNames.Remove(TEXT("LCTW1"));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			LifecycleTestDestroyPlayer(W1);
+		}
+
+		// 31) L3 QA2: temiz cikis. Yeniden denemeyle kurtulan, atma yeniden denemesi basarili, kayit adimindan once ayrilan (gone) ve tur sonrasi
+		// kendi istegiyle ayrilan (Failed kalmis ama atma aninda denetleyici yok -> gone) oyuncular kayip SAYILMAZ: kod 0, gone=2.
+		{
+			UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
+			UMMOServerLifecycleSubsystem::SetKickHookForTest(KickHookFn);
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTY")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			HookLog.Reset();
+			KickTexts.Reset();
+			ExitCalls.Reset();
+			HookSaveFailBudget.Add(TEXT("LCTYR"), 1);
+			HookFailNames.Add(TEXT("LCTYL"));
+			HookKickFailBudget.Add(TEXT("LCTYK"), 2);
+			HookKickDestroyNames.Add(TEXT("LCTYR"));
+			HookKickDestroyNames.Add(TEXT("LCTYK"));
+			FLifecycleTestPlayer YR = LifecycleTestMakePlayer(World, TEXT("LCTYR"), true, true, 90);
+			FLifecycleTestPlayer YL = LifecycleTestMakePlayer(World, TEXT("LCTYL"), true, true, 91);
+			FLifecycleTestPlayer YK = LifecycleTestMakePlayer(World, TEXT("LCTYK"), true, true, 92);
+			FLifecycleTestPlayer YG = LifecycleTestMakePlayer(World, TEXT("LCTYG"), true, true, 93);
+			FLifecycleTestLogCapture CleanLog;
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(596.0); // Kicking, tur kurulu: 4 oyuncu bekliyor (sira: R, L, K, G)
+			LifecycleTestDestroyPlayer(YG); // kayit adimindan ONCE ayrildi
+			StepN(2);                       // R ve L kaydedilir (ikisi de ilk yazimda Failed)
+			LifecycleTestDestroyPlayer(YL); // L tur bitmeden, kendi istegiyle ayrildi (atilmadi)
+			StepN(1);                       // K
+			StepN(1);                       // G gone, tur biter; atma gecisi: R yeniden yazilir + atilir, L gone, K ilk atma false
+			StepN(3);                       // K yeniden denemeleri
+			FMMOLifecycleFlushSummary CS = Sub->GetFlushSummary();
+			Check(TEXT("l3_clean"), TEXT("gone_counts_two_failed_zero"), CS.SkippedGone == 2 && CS.Failed == 0 && CS.Pending == 0 && CS.Saved == 2);
+			Check(TEXT("l3_clean"), TEXT("leaver_never_kicked_or_resaved"), CountLog(TEXT("S:LCTYL")) == 1 && CountPrefix(TEXT("K:LCTYL")) == 0 && CountLog(TEXT("KF:LCTYL")) == 0);
+			Sub->AdvanceSeconds(30.0);
+			Sub->StepExit(9900.0);
+			CleanLog.Sync();
+			Check(TEXT("l3_clean"), TEXT("exit_code_zero_with_gone_players"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeOk && ExitCalls[0].Value == 0);
+			Check(TEXT("l3_clean"), TEXT("exit_line_reports_gone"), CleanLog.Count(ELogVerbosity::Display, TEXT("ev=shutdown_exit code=0 failed=0 gone=2 still_connected=0 kick_failed=0")) == 1);
+			HookSaveFailBudget.Remove(TEXT("LCTYR"));
+			HookFailNames.Remove(TEXT("LCTYL"));
+			HookKickFailBudget.Remove(TEXT("LCTYK"));
+			HookKickDestroyNames.Reset();
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			LifecycleTestDestroyPlayer(YR);
+			LifecycleTestDestroyPlayer(YL);
+			LifecycleTestDestroyPlayer(YK);
+			LifecycleTestDestroyPlayer(YG);
+		}
+
+		// 32) L3 QA2: atma aninda Saved sonuclu oyuncu bir kez daha yazilir (bayat snapshot); o yazim basarisizsa Failed + durust metin + kod 2.
+		{
+			UMMOServerLifecycleSubsystem::SetSaveHookForTest(SaveHookFn);
+			UMMOServerLifecycleSubsystem::SetKickHookForTest(KickHookFn);
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTV")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			HookLog.Reset();
+			KickTexts.Reset();
+			ExitCalls.Reset();
+			HookSaveOkBudget.Add(TEXT("LCTVS"), 1); // tur yazimi basarili, atma aninda yeniden yazim basarisiz
+			HookKickDestroyNames.Add(TEXT("LCTVM"));
+			FLifecycleTestPlayer VM = LifecycleTestMakePlayer(World, TEXT("LCTVM"), true, true, 100);
+			FLifecycleTestPlayer VS = LifecycleTestMakePlayer(World, TEXT("LCTVS"), true, true, 101);
+			FLifecycleTestLogCapture ResaveLog;
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(596.0);
+			StepN(3);
+			ResaveLog.Sync();
+			int32 SavesBeforeKick = 0;
+			for (const FString& Entry : HookLog)
+			{
+				if (Entry == TEXT("K:LCTVM")) break;
+				if (Entry == TEXT("S:LCTVM")) ++SavesBeforeKick;
+			}
+			Check(TEXT("l2_resave"), TEXT("saved_player_written_again_before_kick"), CountLog(TEXT("S:LCTVM")) == 2 && SavesBeforeKick == 2 && CountLog(TEXT("K:LCTVM")) == 1);
+			EMMOLifecycleSaveResult RS = EMMOLifecycleSaveResult::Saved;
+			bool bKS = false;
+			Check(TEXT("l2_resave"), TEXT("resave_failure_demotes_saved_to_failed"),
+				VS.PC && Sub->GetFlushResultFor(VS.PC, RS, bKS) && RS == EMMOLifecycleSaveResult::Failed && bKS
+				&& KickTexts.FindRef(TEXT("LCTVS")) == TEXT("Sunucu bakima girdi. Ilerleme kaydedilemedi, yoneticiye bildir.") && !KickTexts.FindRef(TEXT("LCTVS")).Contains(TEXT("kaydedildi")));
+			Check(TEXT("l2_resave"), TEXT("metric_resave_failed_line"), ResaveLog.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_save_failed player=LCTVS stage=kick_resave")) == 1);
+			Sub->AdvanceSeconds(30.0);
+			Sub->StepExit(9950.0);
+			Sub->StepExit(9950.0 + L::ExitWaitMaxSeconds);
+			Check(TEXT("l2_resave"), TEXT("exit_code_two_when_resave_fails"), ExitCalls.Num() == 1 && ExitCalls[0].Key == L::ExitCodeSaveFailed && ExitCalls[0].Value == 1);
+			HookSaveOkBudget.Reset();
+			HookKickDestroyNames.Reset();
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			LifecycleTestDestroyPlayer(VM);
+			LifecycleTestDestroyPlayer(VS);
+		}
+
+		// 33) L3 QA2: cikis durum dosyasi + Windows kod tasima notu (saf yardimcilar; gercek TerminateProcess CAGRILMAZ).
+		{
+			Check(TEXT("exit_file"), TEXT("forced_code_not_needed_for_zero"), !L::NeedsForcedExitCode(0));
+			Check(TEXT("exit_file"), TEXT("forced_code_for_nonzero_matches_platform"), L::NeedsForcedExitCode(2) == (PLATFORM_WINDOWS != 0));
+			const FDateTime FixedTime(2026, 10, 27, 12, 30, 45);
+			const FString Json = L::BuildResultJson(2, 5, 1, 3, 1, FixedTime);
+			Check(TEXT("exit_file"), TEXT("json_content_exact"), Json == TEXT("{\"exit_code\":2,\"failed\":5,\"gone\":1,\"still_connected\":3,\"kick_failed\":1,\"time_utc\":\"2026-10-27T12:30:45.000Z\"}\n"));
+			const FString Dir = FPaths::ConvertRelativePathToFull(FPaths::ProjectLogDir() / TEXT("LCTResult"));
+			const FString File = Dir / TEXT("r.json");
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			FString Loaded;
+			const bool bFirst = L::WriteResultFile(File, Json);
+			FFileHelper::LoadFileToString(Loaded, *File);
+			Check(TEXT("exit_file"), TEXT("write_creates_dir_and_file_no_temp_left"), bFirst && Loaded == Json && !IFileManager::Get().FileExists(*(File + TEXT(".tmp"))));
+			const FString Json2 = L::BuildResultJson(0, 0, 0, 0, 0, FixedTime);
+			const bool bSecond = L::WriteResultFile(File, Json2);
+			FFileHelper::LoadFileToString(Loaded, *File);
+			Check(TEXT("exit_file"), TEXT("write_overwrites_existing"), bSecond && Loaded == Json2);
+			const FString Normalized = LifecycleTestNormalizedSlashes(L::ResultFilePath());
+			Check(TEXT("exit_file"), TEXT("path_is_saved_logs_result_json"), Normalized.EndsWith(TEXT("/Logs/MMOShutdownResult.json")) && !FPaths::IsRelative(L::ResultFilePath()));
+			const FString Blocker = Dir / TEXT("blocker.txt");
+			FFileHelper::SaveStringToFile(TEXT("x"), *Blocker);
+			Check(TEXT("exit_file"), TEXT("write_fails_cleanly_when_parent_is_a_file"), !L::WriteResultFile(Blocker / TEXT("child.json"), Json));
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			Check(TEXT("exit_file"), TEXT("temp_dir_cleaned"), !IFileManager::Get().DirectoryExists(*Dir));
 		}
 
 		UMMOServerLifecycleSubsystem::SetSaveHookForTest(nullptr);
@@ -1001,6 +1389,6 @@ namespace
 }
 #endif
 
-// Kapsam notu (L1-L3): duyuru metni/sirasi, komut ayristirma, PreLogin reddi, R1 kapisi, uzak-ServerExec benzetimi, kayit turu/atma/cikis kodu
+// Kapsam notu (L1-L3 + QA turu 2): duyuru metni/sirasi, komut ayristirma, PreLogin reddi, R1 kapisi, uzak-ServerExec benzetimi, kayit turu/atma/cikis kodu
 // (cikis KANCAYLA yakalanir: gercek RequestExit ve gercek UNetConnection atmasi burada kanitlanmaz) ve Flushing kapilari. Iki surecli gercek
 // dedicated dogrulama (TestShutdownSmoke) L4'tur.
