@@ -283,7 +283,9 @@ Her biri tek başına geri alınınca `TestFusion.ps1` **FAIL** vermeli (geri y�
 | A3 | Ücret satıcı alış fiyatına mı bağlı, yoksa seviyeye bağlı ayrı tablo mu? | Alış fiyatı (tek formül, `GetBuyPrice` zaten seviyeyle büyür). **D0 modeli (2026-10-17, `[MODEL]`) destekliyor:** `{0,5; 1; 2}` korunsun; arbitraj yok, Lv1–15 fiilen kapalı, Lv16–32'de satıcı yolu bant fazlasının %83–155'i. `{1,2,4}` bu bantları ödenemez yapar (%105–196). Yüksek seviye zayıflığı (Lv72+ D %3,9) çarpanla değil karar 3 ile çözülür. Ayrıntı §6.1, `DECISIONS_NEEDED.md` A3 modeli |
 | A4 | Satıcı yerine ayrı bir "Demirci" NPC'si? | Sonra; NPC yerleşimi S02'nin dosyalarında |
 
-**Durum (2026-10-17):** dördü de **açık**; D1 kodu önerilen varsayılanlarla yazıldı (A1: `MaxOutputRarity = Epic`, A2: `PlusNotZero`, A3: `GetBuyPrice × FeeMult`, A4: satıcı yakınlığı). Karar bloğu `DECISIONS_NEEDED.md` "Ekipman birleştirme A1-A4".
+**KARAR (2026-10-27, otomatik, model verisiyle):** A1 Hayır, A2 Hayır, A3 alış fiyatı × `{0,5; 1; 2}` değişmesin, A4 Demirci NPC'si sonra: varsayılan öneriler onaylandı, kod değişmez. Model (`EconomyModel.py --check-fusion` temiz; `--sink-scenarios`): arbitraj dört çarpanda da yok; kod çarpanında toplam fazla payı D %6,9 / S %25,7, `{1,2,4}` %13,8 / %32,6 ile Lv16–32 satıcı yolunu bant fazlasının %105–196'sına çıkarır (ödenemez). Yüksek seviye sink açığı birleştirmeyle değil karar 3 P1 ile ele alınır (`DECISIONS_NEEDED.md`). Oynanışta ölçülmedi; `ev=fusion` verisi gelince gözden geçirilir.
+
+**Durum (2026-10-17, A1-A4 kararı 2026-10-27 yukarıda):** dördü de **açık**; D1 kodu önerilen varsayılanlarla yazıldı (A1: `MaxOutputRarity = Epic`, A2: `PlusNotZero`, A3: `GetBuyPrice × FeeMult`, A4: satıcı yakınlığı). Karar bloğu `DECISIONS_NEEDED.md` "Ekipman birleştirme A1-A4".
 
 ## 11. D1 sonrası gereksinimler ve açık maddeler (QA + güvenlik denetimi, 2026-10-17)
 

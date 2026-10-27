@@ -166,11 +166,75 @@ bool UMMOTradeComponent::RunTradeTransferSelfTest(UWorld* World, FString& OutErr
 			Check(Case,TEXT("timers_cleared"),!World->GetTimerManager().IsTimerActive(T[0]->ValidateTimerHandle) && !World->GetTimerManager().IsTimerActive(T[1]->ValidateTimerHandle));
 			for(int32 I=0;I<2;++I) { Inv[I]->OnInventoryChanged.RemoveDynamic(Probe.Get(),&UMMOPurchaseCallbackProbe::OnInventory); Inv[I]->OnGoldChanged.RemoveDynamic(Probe.Get(),&UMMOPurchaseCallbackProbe::OnGold); P[I]->Destroy(); }
 		}
+		// Native inventory retirement during either approval publication must reject
+		// the whole mixed trade. Strong references retain snapshots without forcing GC.
+		// RetiredSide=-1 supplies the same asymmetric trade with both inventories live.
+		for(int32 RetiredSide=-1;RetiredSide<2;++RetiredSide) for(int32 Issuer=0;Issuer<2;++Issuer) for(int32 Publication=0;Publication<(RetiredSide<0?1:2);++Publication)
+		{
+			const bool Retire=RetiredSide>=0;
+			const FString Case=FString::Printf(TEXT("eligibility_retired%d_issuer%d_publication%d"),RetiredSide,Issuer,Publication);
+			AMMOCharacter* P[2]={Spawn(0),Spawn(1)}; UMMOTradeComponent* T[2]={}; UMMOInventoryComponent* Inv[2]={}; FMMOCharacterSaveData Expected[2];
+			for(int32 I=0;I<2;++I)
+			{
+				if(!P[I] || !P[I]->GetInventory() || !P[I]->GetTradeComponent()) { OutError=TEXT("eligibility fixture spawn"); return false; }
+				Inv[I]=P[I]->GetInventory(); T[I]=P[I]->GetTradeComponent();
+				FMMOCharacterSaveData Seed; Seed.Gold=1000+I*100; Seed.NextInstanceId=50+I*10;
+				FMMOEquipmentInstance Item; Item.ItemId=I==0?TEXT("ShortSword"):TEXT("LeatherArmor"); Item.InstanceId=40; Item.Plus=2; Item.Rarity=EMMOItemRarity::Rare;
+				Seed.EquipmentBag.Add(Item); Inv[I]->ApplySaveData(Seed); Expected[I]=Snapshot(Inv[I]);
+			}
+			TStrongObjectPtr<UMMOInventoryComponent> KeepInventory[2]={TStrongObjectPtr<UMMOInventoryComponent>(Inv[0]),TStrongObjectPtr<UMMOInventoryComponent>(Inv[1])};
+			StartTradeServer(P[Issuer],P[1-Issuer]);
+			for(int32 I=0;I<2;++I)
+			{
+				T[I]->MyOffer.Gold=10+I*10; T[I]->MyOffer.Items.Add(Inv[I]->EquipmentBag[0]);
+				T[I]->MyOffer.bConfirmed=I!=Issuer; T[I]->LastTradeChangeTime=-100.f; T[I]->LastConfirmTime=-100.f;
+			}
+			T[0]->TheirOffer=T[1]->MyOffer; T[1]->TheirOffer=T[0]->MyOffer;
+			const uint64 Session=T[Issuer]->TradeSessionId; const int32 Revision=T[Issuer]->OfferRevision;
+			if(!Retire)
+			{
+				const auto A=Expected[0].EquipmentBag[0], B=Expected[1].EquipmentBag[0];
+				Expected[0].EquipmentBag={B}; Expected[1].EquipmentBag={A};
+				Expected[0].Gold+=10; Expected[1].Gold-=10;
+				for(int32 I=0;I<2;++I) Expected[I].EquipmentBag[0].InstanceId=Expected[I].NextInstanceId++;
+			}
+			TStrongObjectPtr<UMMOPurchaseCallbackProbe> IP[2]={TStrongObjectPtr<UMMOPurchaseCallbackProbe>(NewObject<UMMOPurchaseCallbackProbe>()),TStrongObjectPtr<UMMOPurchaseCallbackProbe>(NewObject<UMMOPurchaseCallbackProbe>())};
+			TStrongObjectPtr<UMMOGoldMetricProbe> GP[2]={TStrongObjectPtr<UMMOGoldMetricProbe>(NewObject<UMMOGoldMetricProbe>()),TStrongObjectPtr<UMMOGoldMetricProbe>(NewObject<UMMOGoldMetricProbe>())};
+			TStrongObjectPtr<UMMOTradeTeardownProbe> TP(NewObject<UMMOTradeTeardownProbe>());
+			bool Retired=false, SeamOK=!Retire;
+			TP->Callback=[&](int32)
+			{
+				if(!Retire || Retired) return;
+				Retired=true;
+				SeamOK=T[0]->bTradeActive && T[1]->bTradeActive && T[0]->MyOffer.bConfirmed && T[1]->MyOffer.bConfirmed;
+				Inv[RetiredSide]->DestroyComponent();
+				SeamOK &= Inv[RetiredSide]->IsBeingDestroyed() && Alive(P[0]) && Alive(P[1])
+					&& P[0]->HasAuthority() && P[1]->HasAuthority() && P[0]->GetInventory()==Inv[0] && P[1]->GetInventory()==Inv[1];
+			};
+			const int32 Observer=Publication==0?Issuer:1-Issuer;
+			if(Retire) T[Observer]->OnTradeChanged.AddDynamic(TP.Get(),&UMMOTradeTeardownProbe::OnTrade);
+			for(int32 I=0;I<2;++I) { Inv[I]->OnInventoryChanged.AddDynamic(IP[I].Get(),&UMMOPurchaseCallbackProbe::OnInventory); Inv[I]->OnGoldChanged.AddDynamic(GP[I].Get(),&UMMOGoldMetricProbe::OnGold); }
+			T[Issuer]->RequestConfirmSeen(Session,Revision);
+			TP->Callback=nullptr;
+			if(Retire) T[Observer]->OnTradeChanged.RemoveDynamic(TP.Get(),&UMMOTradeTeardownProbe::OnTrade);
+			Check(Case,TEXT("live_owners_and_retirement_seam"),SeamOK && Retired==Retire && Alive(P[0]) && Alive(P[1]));
+			Check(Case,TEXT("exact_wallets_bags_and_ids"),Equal(Expected[0],Snapshot(Inv[0])) && Equal(Expected[1],Snapshot(Inv[1])));
+			Check(Case,TEXT("exact_economy_notifications"),IP[0]->Calls==(Retire?0:1) && IP[1]->Calls==(Retire?0:1)
+				&& (Retire?(GP[0]->Values.IsEmpty() && GP[1]->Values.IsEmpty()):(GP[0]->Values==TArray<int32>{1010} && GP[1]->Values==TArray<int32>{1090})));
+			Check(Case,TEXT("pair_closed"),!T[0]->bTradeActive && !T[1]->bTradeActive && !T[0]->Partner.IsValid() && !T[1]->Partner.IsValid());
+			Check(Case,TEXT("timers_cleared"),!World->GetTimerManager().IsTimerActive(T[0]->ValidateTimerHandle) && !World->GetTimerManager().IsTimerActive(T[1]->ValidateTimerHandle));
+			const FString Final[2]={State(T[0]),State(T[1])}; const int32 Calls[2]={IP[0]->Calls+GP[0]->Values.Num(),IP[1]->Calls+GP[1]->Values.Num()};
+			for(int32 I=0;I<2;++I) { T[I]->RequestConfirmSeen(Session,Revision); T[I]->RequestCancelSeen(Session); }
+			Check(Case,TEXT("stale_requests_no_effect"),State(T[0])==Final[0] && State(T[1])==Final[1]
+				&& Calls[0]==IP[0]->Calls+GP[0]->Values.Num() && Calls[1]==IP[1]->Calls+GP[1]->Values.Num()
+				&& Equal(Expected[0],Snapshot(Inv[0])) && Equal(Expected[1],Snapshot(Inv[1])));
+			for(int32 I=0;I<2;++I) { Inv[I]->OnInventoryChanged.RemoveDynamic(IP[I].Get(),&UMMOPurchaseCallbackProbe::OnInventory); Inv[I]->OnGoldChanged.RemoveDynamic(GP[I].Get(),&UMMOGoldMetricProbe::OnGold); P[I]->Destroy(); }
+		}
 		return true;
 	}();
 	for(auto* P:Actors) if(IsValid(P)) { P->SetTravelSaveCommitted(true); P->Destroy(); }
 	if(!Complete) return false;
-	if(OutChecks!=2584) { ++Failures; OutError+=TEXT(" count_mismatch"); }
+	if(OutChecks!=2644) { ++Failures; OutError+=TEXT(" count_mismatch"); }
 	if(Failures) OutError=FString::Printf(TEXT("failures=%d first=%s"),Failures,*OutError);
 	return Failures==0;
 }

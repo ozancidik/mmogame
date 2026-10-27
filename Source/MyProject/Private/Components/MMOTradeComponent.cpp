@@ -797,7 +797,16 @@ void UMMOTradeComponent::TryExecuteTrade()
 
 	UMMOInventoryComponent* IA = A->GetInventory();
 	UMMOInventoryComponent* IB = B->GetInventory();
-	if (!IA || !IB)
+	// Approval observers may retire an inventory while both character actors stay live.
+	// Match gold mutation eligibility before writing either bag, ID counter or wallet;
+	// keep the path through all four silent gold mutations free of callouts.
+	const auto CanSettleInventory = [](const UMMOInventoryComponent* Inv, const AMMOCharacter* Owner)
+	{
+		return IsValid(Inv) && !Inv->IsBeingDestroyed() && IsValid(Owner)
+			&& !Owner->IsActorBeingDestroyed() && Owner->HasAuthority() && Owner->HasActorBegunPlay()
+			&& !Owner->HasStartedEndPlay() && Inv->GetOwner() == Owner && Owner->GetInventory() == Inv;
+	};
+	if (!CanSettleInventory(IA, A) || !CanSettleInventory(IB, B))
 	{
 		EndTradeServer(TEXT("Ticaret iptal edildi."));
 		return;

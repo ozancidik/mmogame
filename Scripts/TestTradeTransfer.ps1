@@ -33,13 +33,13 @@ if (-not (Test-Path -LiteralPath $log -PathType Leaf)) { Write-Output 'FAIL log_
 $lines = Get-Content -LiteralPath $log
 $cases = @($lines | Select-String '\[MMO_TRADE_TRANSFER_CASE\] (PASS|FAIL) case=')
 $summaries = @($lines | Select-String '\[MMO_TRADE_TRANSFER_TEST\] (PASS|FAIL) checks=')
-$passes = @($lines | Select-String '\[MMO_TRADE_TRANSFER_TEST\] PASS checks=2584\b reason=')
+$passes = @($lines | Select-String '\[MMO_TRADE_TRANSFER_TEST\] PASS checks=2644\b reason=')
 $errors = @($lines | Select-String '\[MMO_TRADE_TRANSFER_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation')
 $summaries | ForEach-Object { Write-Output $_.Line }
 $errors | ForEach-Object { Write-Output $_.Line }
 if ($timedOut) { Write-Output 'FAIL watchdog_60s'; exit 2 }
-if ($nativeExit -eq 0 -and $cases.Count -eq 2584 -and $summaries.Count -eq 1 -and $passes.Count -eq 1 -and $errors.Count -eq 0) {
-    Write-Output '[MMO_TRADE_TRANSFER_RUNNER] PASS checks=2584 cases=326'; exit 0
+if ($nativeExit -eq 0 -and $cases.Count -eq 2644 -and $summaries.Count -eq 1 -and $passes.Count -eq 1 -and $errors.Count -eq 0) {
+    Write-Output '[MMO_TRADE_TRANSFER_RUNNER] PASS checks=2644 cases=336'; exit 0
 }
 Write-Output "[MMO_TRADE_TRANSFER_RUNNER] FAIL observed_checks=$($cases.Count) errors=$($errors.Count)"
 exit 1
