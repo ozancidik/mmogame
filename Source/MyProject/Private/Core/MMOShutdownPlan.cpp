@@ -74,6 +74,7 @@ EMMOShutdownScheduleResult FMMOShutdownPlan::Schedule(double Seconds, EMMOShutdo
 	if (!FMath::IsFinite(Seconds) || Seconds < MinDelaySeconds || Seconds > MaxDelaySeconds) return EMMOShutdownScheduleResult::OutOfRange;
 
 	Phase = EMMOShutdownPhase::Counting;
+	bFlushDone = false;
 	Reason = InReason;
 	Remaining = Seconds;
 	// Gercek kalan sureye esit ya da ondan buyuk esikler zaten gecmis sayilir; ilk duyuru gercek sureyi soyler.
@@ -98,6 +99,13 @@ void FMMOShutdownPlan::Advance(double DeltaSeconds, TArray<FMMOShutdownEvent>& O
 	if (!FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.0) return;
 	Remaining = FMath::Max(0.0, Remaining - DeltaSeconds);
 	ProcessMarks(OutEvents);
+}
+
+bool FMMOShutdownPlan::NotifyFlushDone()
+{
+	if (Phase < EMMOShutdownPhase::Flushing || bFlushDone) return false;
+	bFlushDone = true;
+	return true;
 }
 
 bool FMMOShutdownPlan::Cancel(TArray<FMMOShutdownEvent>& OutEvents)

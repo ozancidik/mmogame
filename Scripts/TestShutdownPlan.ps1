@@ -43,8 +43,8 @@ $errors | ForEach-Object { Write-Output $_.Line }
 $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
-# Beklenen = 74: 5 esik125 + 2 esik3600 + 3 esik30 + 2 kesirli + 5 bir_kez + 6 buyuk_delta + 18 limit_disi + 5 ikinci + 16 iptal + 3 kotu_delta + 7 login + 2 son.
-$expected = 74
+# Beklenen = 82: 5 esik125 + 2 esik3600 + 3 esik30 + 2 kesirli + 5 bir_kez + 6 buyuk_delta + 18 limit_disi + 5 ikinci + 16 iptal + 3 kotu_delta + 7 login + 2 son + 8 flush_done (L2).
+$expected = 82
 $consistent = ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_SHUTDOWNPLAN_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }

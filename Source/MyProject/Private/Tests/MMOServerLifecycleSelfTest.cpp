@@ -9,19 +9,25 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/OnlineReplStructs.h"
 #include "Player/MMOPlayerController.h"
+#include "Characters/MMOCharacter.h"
+#include "GameFramework/PlayerState.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 #include "Misc/CoreMisc.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/OutputDeviceRedirector.h"
 #include "Misc/Parse.h"
 #include "Misc/StringOutputDevice.h"
 
-// Sunucu yasam dongusu L1 native testi (docs/DESIGN_SERVER_LIFECYCLE.md 7, dilim L1). CANLI dunya ister: listen sunucu
+// Sunucu yasam dongusu L1-L2 native testi (docs/DESIGN_SERVER_LIFECYCLE.md 7, dilim L1-L2). CANLI dunya ister: listen sunucu
 // (Map?listen -game; Scripts/TestServerLifecycle.ps1). Kapsam: duyuru metinleri, komut ayristirma, PreLogin reddi (gercek
-// AGameModeBase::PreLogin -> motor olayi), R1 yetki kapisi ve uzak istemci ServerExec benzetimi. Kayit turu/atma/cikis L2/L3.
+// AGameModeBase::PreLogin -> motor olayi), R1 yetki kapisi ve uzak istemci ServerExec benzetimi; L2: toplu kayit turu (oyuncu basina
+// bir adim), atma kapisi, idempotans, yuklenmemis/gecis-onayli/pawn'siz atlama, kayit hatasi, gercek disk (gecici LCTDisk* yuvalari).
+// Cikis kodu L3.
 // Her Check benzersiz case/check cifti basar. Anonim namespace adlari LifecycleTest onekli (unity-build tuzagi).
 namespace
 {
-	constexpr int32 LifecycleTestExpectedChecks = 137;
+	constexpr int32 LifecycleTestExpectedChecks = 180;
 
 	UWorld* LifecycleTestFindWorld(UWorld* Hint)
 	{
@@ -100,6 +106,58 @@ namespace
 		FString Error;
 		GameMode->PreLogin(TEXT("?Name=LifecycleProbe"), TEXT("127.0.0.1"), FUniqueNetIdRepl(), Error);
 		return Error;
+	}
+
+	// L2 sahte oyuncu: gercek AMMOPlayerController + (istege bagli) possess edilmis AMMOCharacter. Kayit kimligi diskten bagimsiz kurulur.
+	struct FLifecycleTestPlayer
+	{
+		AMMOPlayerController* PC = nullptr;
+		AMMOCharacter* Pawn = nullptr;
+	};
+
+	FLifecycleTestPlayer LifecycleTestMakePlayer(UWorld* World, const FString& Name, bool bWithPawn, bool bLoaded, int32 Index)
+	{
+		FLifecycleTestPlayer P;
+		P.PC = World->SpawnActor<AMMOPlayerController>();
+		if (P.PC && P.PC->PlayerState) P.PC->PlayerState->SetPlayerName(Name);
+		if (bWithPawn && P.PC)
+		{
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			P.Pawn = World->SpawnActor<AMMOCharacter>(AMMOCharacter::StaticClass(), FVector(1900000.0 + Index * 3000.0, 1900000.0, 5000.0), FRotator::ZeroRotator, Params);
+			if (P.Pawn)
+			{
+				P.PC->Possess(P.Pawn);
+				P.Pawn->SetSaveIdentityForTest(bLoaded, P.Pawn->GetSaveSlotName(), 1);
+			}
+		}
+		return P;
+	}
+
+	void LifecycleTestDestroyPlayer(FLifecycleTestPlayer& P)
+	{
+		// EndPlay/UnPossessed yuklenmis karakteri kaydeder: once "yuklenmemis" yap ki test yok ederken diske yazmasin.
+		if (P.Pawn) P.Pawn->SetSaveIdentityForTest(false, FString(), 0);
+		if (P.PC) { P.PC->UnPossess(); P.PC->Destroy(); }
+		if (P.Pawn) P.Pawn->Destroy();
+		P = FLifecycleTestPlayer();
+	}
+
+	FString LifecycleTestSlotPath(const FString& Slot)
+	{
+		return FPaths::ProjectSavedDir() / TEXT("SaveGames") / (Slot + TEXT(".sav"));
+	}
+
+	void LifecycleTestCleanSlot(const FString& Slot)
+	{
+		const FString Path = LifecycleTestSlotPath(Slot);
+		IFileManager::Get().DeleteDirectory(*Path, false, true); // engelleyici dizin benzetimi
+		IFileManager::Get().Delete(*Path, false, true);
+	}
+
+	bool LifecycleTestSlotPresent(const FString& Slot)
+	{
+		return IFileManager::Get().FileExists(*LifecycleTestSlotPath(Slot)) || IFileManager::Get().DirectoryExists(*LifecycleTestSlotPath(Slot));
 	}
 
 	bool LifecycleTestRun(UWorld* InWorld, FString& OutError, int32& OutChecks)
@@ -203,6 +261,26 @@ namespace
 		{
 			TestMMOPC = World->SpawnActor<AMMOPlayerController>();
 		}
+		// L2 kuyrugu: kayit ve atma tum calisma boyunca kancali (Exiting'e varan eski vakalar ev sahibinin gercek kaydini DISKE YAZMASIN);
+		// gercek disk vakalari kendi bolumunde kancayi gecici olarak kaldirir ve yalniz gecici LCTDisk* yuvalarina yazar.
+		TArray<FString> HookLog; // "S:<ad>" kayit, "K:<ad>" atma (sirayla)
+		TMap<FString, FString> KickTexts;
+		TSet<FString> HookFailNames;
+		const auto HookName = [](const APlayerController* PC) { return PC && PC->PlayerState ? PC->PlayerState->GetPlayerName() : FString(); };
+		UMMOServerLifecycleSubsystem::SetSaveHookForTest([&](AMMOCharacter* Character)
+		{
+			const APlayerState* PS = Character ? Character->GetPlayerState() : nullptr;
+			const FString Name = PS ? PS->GetPlayerName() : FString();
+			HookLog.Add(TEXT("S:") + Name);
+			return !HookFailNames.Contains(Name);
+		});
+		UMMOServerLifecycleSubsystem::SetKickHookForTest([&](APlayerController* PC, const FText& Reason)
+		{
+			const FString Name = HookName(PC);
+			HookLog.Add(TEXT("K:") + Name);
+			KickTexts.Add(Name, Reason.ToString());
+			return true;
+		});
 
 		// 6) Konsol komutu ile 60 sn: duyuru + Closing + PreLogin reddi (gercek GameMode->PreLogin -> motor olayi).
 		{
@@ -467,6 +545,198 @@ namespace
 			UMMOServerLifecycleSubsystem::ResetPlanForTest();
 		}
 
+		// ---- L2: toplu kayit turu + atma. Kayit/atma kancali; yalniz "LCT" onekli sahte oyuncular kapsama girer (ev sahibi disarida). ----
+		const auto CountLog = [&](const FString& Entry) { int32 N = 0; for (const FString& S : HookLog) { if (S == Entry) ++N; } return N; };
+		const auto CountPrefix = [&](const TCHAR* Prefix) { int32 N = 0; for (const FString& S : HookLog) { if (S.StartsWith(Prefix)) ++N; } return N; };
+		const auto SavedBeforeKick = [&](const FString& Name) { const int32 S = HookLog.IndexOfByKey(TEXT("S:") + Name); const int32 K = HookLog.IndexOfByKey(TEXT("K:") + Name); return S != INDEX_NONE && K != INDEX_NONE && S < K; };
+		const auto StepN = [&](int32 N) { for (int32 i = 0; i < N; ++i) Sub->StepShutdownWork(); };
+		const auto NameFilter = [](const TCHAR* Prefix)
+		{
+			const FString P(Prefix);
+			return [P](const APlayerController* PC) { return PC && PC->PlayerState && PC->PlayerState->GetPlayerName().StartsWith(P); };
+		};
+
+		// 18) Tam tur: 3 kayitli + 1 kayit-hatali + 1 yuklenmemis + 1 gecis-onayli + 1 pawn'siz. Kayit oyuncu basina bir adim, atma ancak tur bitince.
+		{
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCT")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			const FString FailName = TEXT("LCTF ev=bad\"x");
+			HookFailNames.Add(FailName);
+			HookLog.Reset();
+			KickTexts.Reset();
+			FLifecycleTestPlayer A = LifecycleTestMakePlayer(World, TEXT("LCTA"), true, true, 0);
+			FLifecycleTestPlayer B = LifecycleTestMakePlayer(World, TEXT("LCTB"), true, true, 1);
+			FLifecycleTestPlayer C = LifecycleTestMakePlayer(World, TEXT("LCTC"), true, true, 2);
+			FLifecycleTestPlayer F = LifecycleTestMakePlayer(World, FailName, true, true, 3);
+			FLifecycleTestPlayer U = LifecycleTestMakePlayer(World, TEXT("LCTU"), true, false, 4);
+			FLifecycleTestPlayer T = LifecycleTestMakePlayer(World, TEXT("LCTT"), true, true, 5);
+			FLifecycleTestPlayer N = LifecycleTestMakePlayer(World, TEXT("LCTN"), false, false, 6);
+			if (T.Pawn) T.Pawn->SetTravelSaveCommitted(true);
+			FLifecycleTestPlayer* All[] = { &A, &B, &C, &F, &U, &T, &N };
+			bool bSetup = true;
+			for (const FLifecycleTestPlayer* P : All) { bSetup &= P->PC && P->PC->PlayerState; }
+			bSetup &= A.Pawn && B.Pawn && C.Pawn && F.Pawn && U.Pawn && T.Pawn && !N.Pawn;
+			Check(TEXT("l2_round"), TEXT("setup_players"), bSetup);
+
+			FLifecycleTestLogCapture Capture;
+			FString Err;
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(596.0); // kalan 4: Closing, Flushing (tur kurulur), Kicking
+			FMMOLifecycleFlushSummary S = Sub->GetFlushSummary();
+			Check(TEXT("l2_round"), TEXT("round_begun_at_flushing"), Sub->GetPhase() == P::Kicking && S.bRoundStarted && S.Players == 7 && S.Pending == 7 && !S.bFlushDone);
+			Check(TEXT("l2_round"), TEXT("no_kick_before_any_step"), CountPrefix(TEXT("K:")) == 0 && CountPrefix(TEXT("S:")) == 0);
+			Sub->StepShutdownWork();
+			S = Sub->GetFlushSummary();
+			Check(TEXT("l2_round"), TEXT("one_player_per_step"), S.Players == 7 && S.Pending == 6);
+			Check(TEXT("l2_round"), TEXT("no_kick_while_flush_pending"), CountPrefix(TEXT("K:")) == 0);
+			StepN(5);
+			S = Sub->GetFlushSummary();
+			Check(TEXT("l2_round"), TEXT("pending_until_last_step"), S.Pending == 1 && !S.bFlushDone && CountPrefix(TEXT("K:")) == 0);
+			Sub->StepShutdownWork();
+			S = Sub->GetFlushSummary();
+			Check(TEXT("l2_round"), TEXT("flush_done_after_seventh"), S.Pending == 0 && S.bFlushDone);
+			Check(TEXT("l2_round"), TEXT("result_counts"), S.Saved == 3 && S.Failed == 1 && S.SkippedUnloaded == 1 && S.SkippedTravelCommitted == 1 && S.SkippedNoPawn == 1);
+			Check(TEXT("l2_round"), TEXT("all_kicked_after_flush"), S.Kicked == 7 && CountPrefix(TEXT("K:")) == 7);
+			Check(TEXT("l2_round"), TEXT("saved_once_each"), CountLog(TEXT("S:LCTA")) == 1 && CountLog(TEXT("S:LCTB")) == 1 && CountLog(TEXT("S:LCTC")) == 1 && CountLog(TEXT("S:") + FailName) == 1);
+			Check(TEXT("l2_round"), TEXT("unloaded_never_written"), CountLog(TEXT("S:LCTU")) == 0);
+			Check(TEXT("l2_round"), TEXT("travel_committed_never_written"), CountLog(TEXT("S:LCTT")) == 0 && CountLog(TEXT("S:LCTN")) == 0);
+			Check(TEXT("l2_round"), TEXT("save_before_kick_each"), SavedBeforeKick(TEXT("LCTA")) && SavedBeforeKick(TEXT("LCTB")) && SavedBeforeKick(TEXT("LCTC")) && SavedBeforeKick(FailName));
+			Check(TEXT("l2_round"), TEXT("kick_text_claims_saved_only_when_saved"),
+				KickTexts.FindRef(TEXT("LCTA")).Contains(TEXT("kaydedildi")) && KickTexts.FindRef(TEXT("LCTB")).Contains(TEXT("kaydedildi")) && KickTexts.FindRef(TEXT("LCTC")).Contains(TEXT("kaydedildi")));
+			Check(TEXT("l2_round"), TEXT("kick_text_no_lie_when_not_saved"),
+				KickTexts.FindRef(FailName) == TEXT("Sunucu bakima girdi.") && KickTexts.FindRef(TEXT("LCTU")) == TEXT("Sunucu bakima girdi.")
+				&& KickTexts.FindRef(TEXT("LCTT")) == TEXT("Sunucu bakima girdi.") && KickTexts.FindRef(TEXT("LCTN")) == TEXT("Sunucu bakima girdi."));
+			// Idempotent: tur bir kez; ikinci baslatma reddedilir ve sonraki adimlar/bosaltma kimseye ikinci yazim yapmaz.
+			const bool bAgain = Sub->BeginFlushRound();
+			StepN(3);
+			Sub->DrainShutdownWork();
+			Check(TEXT("l2_round"), TEXT("second_round_refused"), !bAgain);
+			Check(TEXT("l2_round"), TEXT("no_double_write"), CountPrefix(TEXT("S:")) == 4 && CountLog(TEXT("S:LCTA")) == 1 && CountPrefix(TEXT("K:")) == 7);
+			Capture.Sync();
+			Check(TEXT("l2_round"), TEXT("metric_failed_line_once_sanitized"),
+				Capture.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_save_failed player=LCTF?evbad?x")) == 1 && Capture.Count(ELogVerbosity::Warning, TEXT("ev=shutdown_save_failed")) == 1);
+			Check(TEXT("l2_round"), TEXT("metric_flush_done_line"), Capture.Count(ELogVerbosity::Display, TEXT("ev=shutdown phase=flush_done players=7 saved=3 failed=1 skipped=3")) == 1);
+			Check(TEXT("l2_round"), TEXT("raw_name_not_in_log"), Capture.Count(ELogVerbosity::Display, TEXT("ev=bad")) == 0 && Capture.Count(ELogVerbosity::Warning, TEXT("ev=bad")) == 0);
+
+			// 19) Tur kurulduktan sonra gelen 2 oyuncu: once kayit sirasina girer; kaydi belli olmayan atilmaz.
+			FLifecycleTestPlayer L1 = LifecycleTestMakePlayer(World, TEXT("LCTL1"), true, true, 10);
+			FLifecycleTestPlayer L2 = LifecycleTestMakePlayer(World, TEXT("LCTL2"), true, true, 11);
+			Sub->StepShutdownWork();
+			Check(TEXT("l2_late"), TEXT("late_not_kicked_first_step"), CountLog(TEXT("K:LCTL1")) == 0 && CountLog(TEXT("K:LCTL2")) == 0 && Sub->GetFlushSummary().Pending == 2);
+			Sub->StepShutdownWork();
+			const int32 K1 = CountLog(TEXT("K:LCTL1")), K2 = CountLog(TEXT("K:LCTL2")), S1 = CountLog(TEXT("S:LCTL1")), S2 = CountLog(TEXT("S:LCTL2"));
+			Check(TEXT("l2_late"), TEXT("one_resolved_one_kicked_second_step"), K1 + K2 == 1 && S1 + S2 == 1);
+			Check(TEXT("l2_late"), TEXT("kicked_one_was_saved_first"), (K1 == 1 && SavedBeforeKick(TEXT("LCTL1"))) || (K2 == 1 && SavedBeforeKick(TEXT("LCTL2"))));
+			Sub->StepShutdownWork();
+			Check(TEXT("l2_late"), TEXT("both_kicked_third_step"), CountLog(TEXT("K:LCTL1")) == 1 && CountLog(TEXT("K:LCTL2")) == 1 && SavedBeforeKick(TEXT("LCTL1")) && SavedBeforeKick(TEXT("LCTL2")));
+			LifecycleTestDestroyPlayer(L1);
+			LifecycleTestDestroyPlayer(L2);
+
+			// 20) Zaman doldu (tek buyuk adim Exiting'e kadar): Flushing'de kurulan tur Exiting'de senkron bitirilir, sonra atilir.
+			HookLog.Reset();
+			KickTexts.Reset();
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(700.0);
+			S = Sub->GetFlushSummary();
+			Check(TEXT("l2_drain"), TEXT("jump_to_exiting_flushes_all"), Sub->GetPhase() == P::Exiting && S.bFlushDone && S.Pending == 0 && S.Saved == 3 && S.Failed == 1 && S.Skipped() == 3);
+			Check(TEXT("l2_drain"), TEXT("jump_to_exiting_kicks_all_after_save"), S.Kicked == 7 && SavedBeforeKick(TEXT("LCTA")) && SavedBeforeKick(TEXT("LCTB")) && SavedBeforeKick(TEXT("LCTC")) && SavedBeforeKick(FailName));
+			Check(TEXT("l2_drain"), TEXT("exiting_nothing_left_not_tickable"), !Sub->IsTickable());
+
+			// 21) Hic oyuncu yok: tur kurulur kurulmaz biter (Flushing erken biter).
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTNobodyMatchesThis")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(581.0); // kalan 19 = Flushing
+			S = Sub->GetFlushSummary();
+			Check(TEXT("l2_empty"), TEXT("flush_finishes_early_without_players"), Sub->GetPhase() == P::Flushing && S.bRoundStarted && S.Players == 0 && S.bFlushDone);
+
+			// 22) Gercek Tick yolu bir oyuncuyu kaydeder (StepShutdownWork'u Tick cagirir).
+			HookLog.Reset();
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTA")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			Sub->RequestShutdown(600.0, R::Maintenance, Err);
+			Sub->AdvanceSeconds(581.0);
+			Check(TEXT("l2_tick"), TEXT("before_tick_one_pending"), Sub->GetFlushSummary().Pending == 1 && CountPrefix(TEXT("S:")) == 0);
+			Sub->Tick(0.016f);
+			S = Sub->GetFlushSummary();
+			Check(TEXT("l2_tick"), TEXT("tick_runs_flush_step"), S.Saved == 1 && S.bFlushDone && CountLog(TEXT("S:LCTA")) == 1);
+
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			for (FLifecycleTestPlayer* P : All) LifecycleTestDestroyPlayer(*P);
+			HookFailNames.Reset();
+		}
+
+		// 23) Gercek disk (kancasiz): yalniz gecici LCTDisk* yuvalari; engelleyici dizin = yazilamaz kayit dizini benzetimi.
+		{
+			UMMOServerLifecycleSubsystem::SetSaveHookForTest(nullptr);
+			UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(NameFilter(TEXT("LCTDisk")));
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			HookLog.Reset();
+			KickTexts.Reset();
+			const FString SlotOk = TEXT("MMOSave_LCTDiskA"), SlotBlocked = TEXT("MMOSave_LCTDiskF"), SlotUnloaded = TEXT("MMOSave_LCTDiskU"), SlotDeferred = TEXT("MMOSave_LCTDiskD");
+			for (const FString& Slot : { SlotOk, SlotBlocked, SlotUnloaded, SlotDeferred }) LifecycleTestCleanSlot(Slot);
+			FLifecycleTestPlayer D1 = LifecycleTestMakePlayer(World, TEXT("LCTDiskA"), true, true, 20);
+			FLifecycleTestPlayer DF = LifecycleTestMakePlayer(World, TEXT("LCTDiskF"), true, true, 21);
+			FLifecycleTestPlayer DU = LifecycleTestMakePlayer(World, TEXT("LCTDiskU"), true, false, 22);
+			FLifecycleTestPlayer DD = LifecycleTestMakePlayer(World, TEXT("LCTDiskD"), true, true, 23);
+			const bool bTempSlots = D1.Pawn && DF.Pawn && DU.Pawn && DD.Pawn
+				&& D1.Pawn->GetSaveSlotName() == SlotOk && DF.Pawn->GetSaveSlotName() == SlotBlocked
+				&& DU.Pawn->GetSaveSlotName() == SlotUnloaded && DD.Pawn->GetSaveSlotName() == SlotDeferred;
+			Check(TEXT("l2_disk"), TEXT("slots_are_temp"), bTempSlots);
+			if (bTempSlots)
+			{
+				IFileManager::Get().MakeDirectory(*LifecycleTestSlotPath(SlotBlocked), true); // dizin dosyanin yerini tutar -> yazim basarisiz
+				DD.Pawn->FailDeferredSavesForTest(2);
+				const bool bDeferredOpen = !DD.Pawn->FlushDeferredSave(true); // basarisiz, ertelenmis isaret kalir (R7)
+				Check(TEXT("l2_disk"), TEXT("deferred_flag_set_by_failed_flush"), bDeferredOpen && DD.Pawn->IsSaveDeferredByTravel());
+				FString Err;
+				Sub->RequestShutdown(600.0, R::Maintenance, Err);
+				Sub->AdvanceSeconds(596.0);
+				StepN(4);
+				EMMOLifecycleSaveResult R1 = EMMOLifecycleSaveResult::Saved, R2 = R1, R3 = R1, R4 = R1;
+				bool K1b = false, K2b = false, K3b = false, K4b = false;
+				const bool bAllKnown = Sub->GetFlushResultFor(D1.PC, R1, K1b) && Sub->GetFlushResultFor(DF.PC, R2, K2b) && Sub->GetFlushResultFor(DU.PC, R3, K3b) && Sub->GetFlushResultFor(DD.PC, R4, K4b);
+				Check(TEXT("l2_disk"), TEXT("all_results_known"), bAllKnown);
+				Check(TEXT("l2_disk"), TEXT("saved_file_written"), R1 == EMMOLifecycleSaveResult::Saved && LifecycleTestSlotPresent(SlotOk) && IFileManager::Get().FileExists(*LifecycleTestSlotPath(SlotOk)));
+				Check(TEXT("l2_disk"), TEXT("unwritable_dir_counts_failed"), R2 == EMMOLifecycleSaveResult::Failed && !IFileManager::Get().FileExists(*LifecycleTestSlotPath(SlotBlocked)));
+				Check(TEXT("l2_disk"), TEXT("unloaded_skipped_and_no_file"), R3 == EMMOLifecycleSaveResult::SkippedUnloaded && !LifecycleTestSlotPresent(SlotUnloaded));
+				Check(TEXT("l2_disk"), TEXT("deferred_save_failure_counts_failed"), R4 == EMMOLifecycleSaveResult::Failed && !LifecycleTestSlotPresent(SlotDeferred) && DD.Pawn->IsSaveDeferredByTravel());
+				Check(TEXT("l2_disk"), TEXT("failed_players_kicked_without_saved_claim"),
+					K1b && K2b && K3b && K4b && KickTexts.FindRef(TEXT("LCTDiskF")) == TEXT("Sunucu bakima girdi.") && KickTexts.FindRef(TEXT("LCTDiskD")) == TEXT("Sunucu bakima girdi.")
+					&& KickTexts.FindRef(TEXT("LCTDiskA")).Contains(TEXT("kaydedildi")));
+				// Hata enjeksiyonu bitti: ayni oyuncu bu kez kaydedilir ve ertelenmis isaret kalkar.
+				Check(TEXT("l2_disk"), TEXT("deferred_recovers_after_failures"),
+					L::SaveCharacterNow(DD.Pawn) == EMMOLifecycleSaveResult::Saved && IFileManager::Get().FileExists(*LifecycleTestSlotPath(SlotDeferred)) && !DD.Pawn->IsSaveDeferredByTravel());
+			}
+			UMMOServerLifecycleSubsystem::ResetPlanForTest();
+			LifecycleTestDestroyPlayer(D1);
+			LifecycleTestDestroyPlayer(DF);
+			LifecycleTestDestroyPlayer(DU);
+			LifecycleTestDestroyPlayer(DD);
+			for (const FString& Slot : { SlotOk, SlotBlocked, SlotUnloaded, SlotDeferred }) LifecycleTestCleanSlot(Slot);
+			Check(TEXT("l2_disk"), TEXT("temp_slots_cleaned"), !LifecycleTestSlotPresent(SlotOk) && !LifecycleTestSlotPresent(SlotBlocked) && !LifecycleTestSlotPresent(SlotUnloaded) && !LifecycleTestSlotPresent(SlotDeferred));
+		}
+
+		// 24) Saf kopru kapilari + gercek atma yolu (ag baglantisi olmayan denetleyici atilamaz ama cokmez).
+		{
+			Check(TEXT("l2_bridge"), TEXT("null_pawn_skipped_nopawn"), L::SaveCharacterNow(nullptr) == EMMOLifecycleSaveResult::SkippedNoPawn);
+			Check(TEXT("l2_bridge"), TEXT("kick_text_only_saved_claims_saved"),
+				FString(L::KickText(EMMOLifecycleSaveResult::Saved)).Contains(TEXT("kaydedildi"))
+				&& !FString(L::KickText(EMMOLifecycleSaveResult::Failed)).Contains(TEXT("kaydedildi"))
+				&& !FString(L::KickText(EMMOLifecycleSaveResult::SkippedUnloaded)).Contains(TEXT("kaydedildi"))
+				&& !FString(L::KickText(EMMOLifecycleSaveResult::SkippedTravelCommitted)).Contains(TEXT("kaydedildi"))
+				&& !FString(L::KickText(EMMOLifecycleSaveResult::SkippedNoPawn)).Contains(TEXT("kaydedildi")));
+			UMMOServerLifecycleSubsystem::SetKickHookForTest(nullptr);
+			AMMOPlayerController* Plain = World->SpawnActor<AMMOPlayerController>();
+			const bool bKicked = L::KickPlayerNow(Plain, FText::FromString(TEXT("test")));
+			Check(TEXT("l2_bridge"), TEXT("real_kick_without_connection_false_and_alive"), Plain && !bKicked && IsValid(Plain));
+			if (Plain) Plain->Destroy();
+		}
+
+		UMMOServerLifecycleSubsystem::SetSaveHookForTest(nullptr);
+		UMMOServerLifecycleSubsystem::SetKickHookForTest(nullptr);
+		UMMOServerLifecycleSubsystem::SetPlayerFilterForTest(nullptr);
 		if (TestMMOPC) TestMMOPC->Destroy();
 		UMMOServerLifecycleSubsystem::ResetPlanForTest();
 		Check(TEXT("end"), TEXT("plan_reset"), Sub->GetPhase() == P::Idle && !Sub->IsLoginClosed());

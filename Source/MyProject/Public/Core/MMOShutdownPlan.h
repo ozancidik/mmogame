@@ -74,6 +74,15 @@ public:
 	/** Yalniz Counting/Closing'de gecer (Idle'a doner, Cancelled olayi ekler); Flushing/Kicking/Exiting/Idle'da false, durum ayni. */
 	bool Cancel(TArray<FMMOShutdownEvent>& OutEvents);
 
+	/**
+	 * L2: toplu kayit turu bitti bilgisi. Yalniz Flushing ve sonrasinda kabul edilir (onceki fazlarda false); ilk cagri true,
+	 * tekrar false. Schedule bayragi sifirlar. Plan zamani bundan etkilenmez; atma kapisi (KickAllowed) bunu okur.
+	 */
+	bool NotifyFlushDone();
+	bool IsFlushDone() const { return bFlushDone; }
+	/** Oyuncular yalniz Kicking (ya da sonrasi) VE kayit turu bitmisse atilabilir ("kaydedildigi dogrulanmadan atilmaz"). */
+	bool KickAllowed() const { return Phase >= EMMOShutdownPhase::Kicking && bFlushDone; }
+
 	EMMOShutdownPhase GetPhase() const { return Phase; }
 	/** Yalniz Idle disinda anlamlidir; Cancel sonrasi varsayilana (Maintenance) doner. */
 	EMMOShutdownReason GetReason() const { return Reason; }
@@ -87,5 +96,6 @@ private:
 	EMMOShutdownPhase Phase = EMMOShutdownPhase::Idle;
 	EMMOShutdownReason Reason = EMMOShutdownReason::Maintenance;
 	double Remaining = 0.0;
+	bool bFlushDone = false;
 	bool bAnnounced[NumAnnounceThresholds] = {};
 };

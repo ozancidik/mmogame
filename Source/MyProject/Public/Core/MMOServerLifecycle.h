@@ -12,13 +12,44 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogMMOLifecycle, Log, All);
 
 class AGameModeBase;
+class AMMOCharacter;
+class APlayerController;
 class FOutputDevice;
 
+/** L2: tek oyuncunun kapanis kaydi sonucu. Yalniz Saved "kaydedildi"dir; Skipped* kayit YAZILMADI demektir (kasitli). */
+enum class EMMOLifecycleSaveResult : uint8
+{
+	Saved,
+	Failed,                 // yazim basarisiz (dizin yazilamaz, ad cakismasi, gecis penceresinde ertelenen yazim basarisiz...)
+	SkippedUnloaded,        // IsInitialLoadComplete()==false: bos karakterle mevcut kaydi EZME korumasi
+	SkippedTravelCommitted, // bolge gecisi kaydi onayli: gecis kaydi zaten yazildi, altin/esya kalici olmaz
+	SkippedNoPawn           // pawn yok (olu/spectator/possess yok) ya da denetleyici gitti
+};
+
+/** L2: kayit turu / atma ozeti (test ve denetim). */
+struct FMMOLifecycleFlushSummary
+{
+	bool bRoundStarted = false;
+	bool bFlushDone = false;
+	int32 Players = 0;
+	int32 Pending = 0;
+	int32 Saved = 0;
+	int32 Failed = 0;
+	int32 SkippedUnloaded = 0;
+	int32 SkippedTravelCommitted = 0;
+	int32 SkippedNoPawn = 0;
+	int32 Kicked = 0;
+	int32 Skipped() const { return SkippedUnloaded + SkippedTravelCommitted + SkippedNoPawn; }
+};
+
 /**
- * Planli kapatma / bakim modu, dilim L1 (docs/DESIGN_SERVER_LIFECYCLE.md 4-5): FMMOShutdownPlan'i (saf durum makinesi)
+ * Planli kapatma / bakim modu, dilim L1-L2 (docs/DESIGN_SERVER_LIFECYCLE.md 4-5): FMMOShutdownPlan'i (saf durum makinesi)
  * gercek zamanla surer, olaylari oyunculara sohbet sistem satiri (ClientReceiveChat, kanal 2) olarak duyurur ve
  * Closing/sonrasinda yeni girisi motorun FGameModeEvents::OnGameModePreLoginEvent() olayindan reddeder
- * (AMMOGameMode::PreLogin'e dokunulmaz). Kayit turu, atma ve cikis L2/L3'tur: burada yoktur.
+ * (AMMOGameMode::PreLogin'e dokunulmaz).
+ * L2: Flushing'e girince TEK SEFERLIK toplu kayit turu (oyuncu basina bir Tick: SaveCharacterForTravel / FlushDeferredSave),
+ * tur bitince plana NotifyFlushDone; Kicking'de her oyuncu YALNIZ kendi kayit sonucu belli olduktan sonra atilir. Exiting'e
+ * gelindiginde kalan is senkron tamamlanir (once kayit, sonra atma). Surec cikisi / cikis kodu L3'tur: burada yoktur.
  * Yeni RPC / replike alan yok; yalniz sunucuda calisir.
  *
  * Tetikleyiciler (yetki: yalniz sunucu sahibi, uzak istemci DEGIL):
@@ -73,6 +104,28 @@ public:
 	const TArray<FString>& GetSentMessages() const { return SentMessages; }
 	int32 GetLastRecipientCount() const { return LastRecipientCount; }
 
+	/**
+	 * L2: Flushing'e giriste Tick yolundan baslar. Tur bir kez calisir (ikinci cagri false, kimseye ikinci yazim yok).
+	 * Kayit turu yalniz sunucuda; sunucu degilse false.
+	 */
+	bool BeginFlushRound();
+	/** L2: bir Tick'lik is: sirada bekleyen TEK oyuncuyu kaydeder + atma kapisi aciksa sonucu belli oyunculari atar. */
+	void StepShutdownWork();
+	/** L2: Exiting'de (zaman doldu) kalan tum isi senkron bitirir: once kalan kayitlar, sonra atmalar. */
+	void DrainShutdownWork();
+	FMMOLifecycleFlushSummary GetFlushSummary() const;
+
+#if !UE_BUILD_SHIPPING
+	/** Test: kayit yazimini (SaveCharacterForTravel yerine) degistirir; false/bos = gercek yazim. true donerse "Saved". */
+	static void SetSaveHookForTest(TFunction<bool(AMMOCharacter*)> Hook);
+	/** Test: atmayi (AGameSession::KickPlayer yerine) degistirir; true donerse atildi sayilir. */
+	static void SetKickHookForTest(TFunction<bool(APlayerController*, const FText&)> Hook);
+	/** Test: kayit turu / atma yalniz filtreden gecen denetleyicileri kapsar (canli dunyadaki ev sahibi vb. disarida kalir). */
+	static void SetPlayerFilterForTest(TFunction<bool(const APlayerController*)> Filter);
+#endif
+	/** L2: bu denetleyicinin kayit sonucu ve atilip atilmadigi; tur onu henuz bilmiyorsa ya da sonucu belli degilse false. */
+	bool GetFlushResultFor(const APlayerController* PC, EMMOLifecycleSaveResult& OutResult, bool& bOutKicked) const;
+
 #if !UE_BUILD_SHIPPING
 	/** Sunucu konsolu komutlari. NetMode dunyadan okunur. true = komut bu sinifindi (tuketildi). */
 	static bool HandleExecCommand(UWorld* World, const TCHAR* Cmd, FOutputDevice& Ar);
@@ -87,6 +140,10 @@ public:
 private:
 	void ProcessEvents(const TArray<FMMOShutdownEvent>& Events);
 	void BroadcastToPlayers(const FString& Message);
+	void GatherServerWorlds(TArray<UWorld*>& OutWorlds) const;
+	bool FlushNextPlayer();
+	void FinishFlushRound();
+	void KickResolvedPlayers();
 	void HandlePreLogin(AGameModeBase* GameMode, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage);
 
 	bool bServerActive = false;
@@ -103,6 +160,17 @@ namespace MMOServerLifecycle
 	MYPROJECT_API const TCHAR* LoginClosedText();   // "Bakim: yeni girisler kapandi."
 	MYPROJECT_API const TCHAR* CancelledText();     // "Bakim iptal edildi."
 	MYPROJECT_API const TCHAR* LoginRejectText();   // PreLogin ret metni
+	/** Atma nedeni: yalniz kayit GERCEKTEN basarili olduysa "kaydedildi" denir; digerlerinde yalan soylenmez. */
+	MYPROJECT_API const TCHAR* KickText(EMMOLifecycleSaveResult Result);
+	MYPROJECT_API const TCHAR* SaveResultName(EMMOLifecycleSaveResult Result);
+	/**
+	 * L2 kopru: tek karakterin kapanis kaydi. Kapilar: pawn yok -> SkippedNoPawn; IsInitialLoadComplete degilse YAZMA -> SkippedUnloaded;
+	 * IsTravelSaveCommitted ise YAZMA -> SkippedTravelCommitted; ertelenmis kayit varsa FlushDeferredSave(true); yoksa
+	 * SaveCharacterForTravel(false), o gecis penceresinde ertelerse FlushDeferredSave(true) bir kez; basarisiz -> Failed.
+	 */
+	MYPROJECT_API EMMOLifecycleSaveResult SaveCharacterNow(AMMOCharacter* Character);
+	/** L2: nazik atma (AGameSession::KickPlayer -> istemci ana menuye doner). Sunucunun yerel oyuncusu (listen ev sahibi) ya da ag baglantisi olmayan denetleyici atilmaz: false. */
+	MYPROJECT_API bool KickPlayerNow(APlayerController* PC, const FText& Reason);
 	/** Plan olayi -> oyuncuya gosterilecek metin; gosterilmeyen olay (Flushing/Kicking/Exiting: L2/L3) icin false. */
 	MYPROJECT_API bool EventText(const FMMOShutdownEvent& Event, FString& OutText);
 	/** bakim | guncelleme | acil (buyuk/kucuk harf farksiz); baska bir sey false. */

@@ -12,7 +12,7 @@
 // FMMOShutdownPlan; olaylar metne cevrilip beklenen dizilerle karsilastirilir. Her Check benzersiz case/check cifti basar.
 namespace
 {
-	constexpr int32 ShutdownPlanTestExpectedChecks = 74;
+	constexpr int32 ShutdownPlanTestExpectedChecks = 82;
 
 	using FShutdownTestEvents = TArray<FMMOShutdownEvent>;
 
@@ -269,6 +269,27 @@ namespace
 			Plan.Advance(1000, Ev); Ev.Reset();
 			Check(TEXT("terminal"), TEXT("exiting"), Plan.GetPhase() == P::Exiting && Plan.GetReason() == R::Emergency);
 			Check(TEXT("terminal"), TEXT("schedule_rejected"), Plan.Schedule(60, Rs, Ev) == S::AlreadyActive && Ev.IsEmpty());
+		}
+		// 13) L2 kayit turu bitti bilgisi: yalniz Flushing+ kabul, bir kez, atma kapisi yalniz Kicking+ ve flush bitmisse acik.
+		{
+			FMMOShutdownPlan Idle; FEvents Ev;
+			Check(TEXT("flush_done"), TEXT("idle_rejected"), !Idle.NotifyFlushDone() && !Idle.IsFlushDone());
+			FMMOShutdownPlan Plan;
+			Plan.Schedule(125, Rs, Ev); Ev.Reset();
+			Check(TEXT("flush_done"), TEXT("counting_rejected"), !Plan.NotifyFlushDone() && !Plan.IsFlushDone());
+			Plan.Advance(70, Ev); // kalan 55 = Closing
+			Check(TEXT("flush_done"), TEXT("closing_rejected"), Plan.GetPhase() == P::Closing && !Plan.NotifyFlushDone() && !Plan.IsFlushDone());
+			Plan.Advance(40, Ev); // kalan 15 = Flushing
+			Check(TEXT("flush_done"), TEXT("flushing_accepted_once"), Plan.GetPhase() == P::Flushing && Plan.NotifyFlushDone() && Plan.IsFlushDone() && !Plan.NotifyFlushDone());
+			Check(TEXT("flush_done"), TEXT("kick_not_allowed_in_flushing"), !Plan.KickAllowed());
+			Plan.Advance(11, Ev); // kalan 4 = Kicking
+			Check(TEXT("flush_done"), TEXT("kick_allowed_when_done_and_kicking"), Plan.GetPhase() == P::Kicking && Plan.KickAllowed());
+			FMMOShutdownPlan Late;
+			Late.Schedule(125, Rs, Ev); Ev.Reset();
+			Late.Advance(122, Ev); // kalan 3 = Kicking, flush bildirilmedi
+			Check(TEXT("flush_done"), TEXT("kick_denied_without_flush_done"), Late.GetPhase() == P::Kicking && !Late.KickAllowed());
+			Late.Advance(100, Ev);
+			Check(TEXT("flush_done"), TEXT("exiting_without_flush_still_denied"), Late.GetPhase() == P::Exiting && !Late.KickAllowed() && Late.NotifyFlushDone() && Late.KickAllowed());
 		}
 
 		if (OutChecks != ShutdownPlanTestExpectedChecks) { ++Failures; OutError += TEXT(" check_count_mismatch"); }
