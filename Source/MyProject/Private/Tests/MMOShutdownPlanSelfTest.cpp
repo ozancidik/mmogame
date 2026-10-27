@@ -12,7 +12,7 @@
 // FMMOShutdownPlan; olaylar metne cevrilip beklenen dizilerle karsilastirilir. Her Check benzersiz case/check cifti basar.
 namespace
 {
-	constexpr int32 ShutdownPlanTestExpectedChecks = 71;
+	constexpr int32 ShutdownPlanTestExpectedChecks = 74;
 
 	using FShutdownTestEvents = TArray<FMMOShutdownEvent>;
 
@@ -105,6 +105,10 @@ namespace
 			FMMOShutdownPlan Plan; FEvents Ev;
 			Plan.Schedule(125.5, Rs, Ev);
 			Check(TEXT("fractional"), TEXT("first_announce_rounds_up"), ShutdownPlanTestText(Ev) == TEXT("A126"));
+			// Esigin hemen ustu: 125.0000001 de yukari yuvarlanir (cift hassasiyet; float'a dusen bir Ceil 125 verirdi).
+			FMMOShutdownPlan Tiny; FEvents TinyEv;
+			Tiny.Schedule(125.0000001, Rs, TinyEv);
+			Check(TEXT("fractional"), TEXT("tiny_fraction_rounds_up_126"), ShutdownPlanTestText(TinyEv) == TEXT("A126"));
 		}
 		// 5) Esik bir kez: 1000 kucuk adim, tek buyuk adim ve 1 sn'lik adimlar ayni olay kumesini verir.
 		{
@@ -185,18 +189,22 @@ namespace
 		// 9) Cancel: Counting/Closing'de gecer, Flushing/Kicking/Exiting/Idle'da reddedilir ve durum ayni kalir.
 		{
 			FMMOShutdownPlan Plan; FEvents Ev;
-			Plan.Schedule(125, Rs, Ev); Ev.Reset();
+			Plan.Schedule(125, R::Emergency, Ev); Ev.Reset();
 			Check(TEXT("cancel_counting"), TEXT("accepted"), Plan.Cancel(Ev));
 			Check(TEXT("cancel_counting"), TEXT("idle_and_event"), Plan.GetPhase() == P::Idle && ShutdownPlanTestText(Ev) == TEXT("C"));
+			// Idle'da bayat Reason/Remaining kalmaz (docs/DESIGN_SERVER_LIFECYCLE.md: Idle = "hicbir sey").
+			Check(TEXT("cancel_counting"), TEXT("reason_remaining_reset"), Plan.GetReason() == R::Maintenance && Plan.GetRemainingSeconds() == 0.0);
 		}
 		{
 			FMMOShutdownPlan Plan; FEvents Ev;
-			Plan.Schedule(125, Rs, Ev); Ev.Reset();
+			Plan.Schedule(125, R::Update, Ev); Ev.Reset();
 			Plan.Advance(75, Ev); Ev.Reset(); // kalan 50 = Closing
 			Check(TEXT("cancel_closing"), TEXT("in_closing"), Plan.GetPhase() == P::Closing && Plan.LoginClosed());
 			Check(TEXT("cancel_closing"), TEXT("accepted"), Plan.Cancel(Ev));
 			Check(TEXT("cancel_closing"), TEXT("idle_login_reopened"), Plan.GetPhase() == P::Idle && !Plan.LoginClosed() && ShutdownPlanTestText(Ev) == TEXT("C"));
-			// Iptal sonrasi yeni plan duyuru bayraklarini sifirdan baslatir (eski plandan kalan bayrak yok).
+			Check(TEXT("cancel_closing"), TEXT("reason_remaining_reset"), Plan.GetReason() == R::Maintenance && Plan.GetRemainingSeconds() == 0.0);
+			// Yeniden planlama duyuru bayraklarini sifirdan kurar: bunu Schedule'un tum bayraklari yeniden yazmasi saglar
+			// (Cancel bayraklara dokunmaz); eski plandan kalan bayrak olsaydi kuyruk eksik duyuru verirdi.
 			Ev.Reset();
 			Plan.Schedule(125, Rs, Ev);
 			Check(TEXT("cancel_closing"), TEXT("reschedule_first_announce"), ShutdownPlanTestText(Ev) == TEXT("A125"));

@@ -75,6 +75,7 @@ public:
 	bool Cancel(TArray<FMMOShutdownEvent>& OutEvents);
 
 	EMMOShutdownPhase GetPhase() const { return Phase; }
+	/** Yalniz Idle disinda anlamlidir; Cancel sonrasi varsayilana (Maintenance) doner. */
 	EMMOShutdownReason GetReason() const { return Reason; }
 	double GetRemainingSeconds() const { return Remaining; }
 	/** Yeni girisler reddedilir: Closing ve sonrasi (Flushing, Kicking, Exiting). Iptal/Idle'da false. */
