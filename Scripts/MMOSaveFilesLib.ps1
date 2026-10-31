@@ -896,7 +896,9 @@ function Write-MMOManifest {
 function Read-MMOManifest {
     # manifest.json'u ayristirir ve sozlesmeyi denetler (dosyalara BAKMAZ; bkz. Test-MMOSnapshot).
     # Donus: Ok, Incomplete (manifest yok = yarim goruntu), Errors[], Manifest.
-    param([string]$SnapshotDir, [switch]$AllowRootAncestorReparse)
+    # -ManifestBytes (B3): cagiran manifest.json'u ZATEN okumussa (ozetini ayni diziden hesapladiysa) ayni bayt dizisini verir; dosya yeniden okunmaz
+    # (ozet ile ayristirilan icerik arasinda TOCTOU kalmaz). Verilmezse dosya okunur (onceki davranis).
+    param([string]$SnapshotDir, [switch]$AllowRootAncestorReparse, [byte[]]$ManifestBytes = $null)
     $errs = New-Object System.Collections.ArrayList
     try { $dir = (ConvertTo-MMOFullPath $SnapshotDir).TrimEnd('\') } catch {
         return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @('snapshot_path_invalid'); Manifest = $null }
@@ -917,12 +919,20 @@ function Read-MMOManifest {
     if (Test-MMOReparse $path) {
         return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @('manifest_reparse'); Manifest = $null }
     }
-    try {
-        $bytes = Read-MMOFileBytes -Path $path -MaxBytes $script:MMOSvMaxManifestBytes
-    } catch {
-        $code = 'manifest_unreadable'
-        if ($_.Exception.Message -eq 'too_large') { $code = 'manifest_too_large' }
-        return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @($code); Manifest = $null }
+    $bytes = $null
+    if ($null -ne $ManifestBytes) {
+        $bytes = $ManifestBytes
+        if ([long]$bytes.Length -gt [long]$script:MMOSvMaxManifestBytes) {
+            return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @('manifest_too_large'); Manifest = $null }
+        }
+    } else {
+        try {
+            $bytes = Read-MMOFileBytes -Path $path -MaxBytes $script:MMOSvMaxManifestBytes
+        } catch {
+            $code = 'manifest_unreadable'
+            if ($_.Exception.Message -eq 'too_large') { $code = 'manifest_too_large' }
+            return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @($code); Manifest = $null }
+        }
     }
     try {
         $r = ConvertFrom-MMOUtf8Bytes $bytes
@@ -1029,11 +1039,12 @@ function Test-MMOSnapshot {
     # Goruntu dizinini (manifest.json + files\) salt okuma ile dogrular: boyut, SHA-256, valid/notes yeniden hesabi, fazladan dosya, reparse.
     # Her dosya TEK KEZ okunur. Donus: Ok, Incomplete, Errors[], Extra[], InvalidEntries[] (valid=false olanlar; hata sayilmaz),
     # Mode ('quiesced'|'live'|''), HasInvalid, HasUnstable (kararsiz girisler; yalniz mode=live'da kabul), ProofStale, Collisions[] (bildirilmis cakismalar).
-    param([string]$SnapshotDir, [switch]$AllowRootAncestorReparse)
+    # -ManifestBytes: bkz. Read-MMOManifest (cagiranin zaten okudugu manifest baytlari; B3 tek okuma).
+    param([string]$SnapshotDir, [switch]$AllowRootAncestorReparse, [byte[]]$ManifestBytes = $null)
     $errs = New-Object System.Collections.ArrayList
     $extra = New-Object System.Collections.ArrayList
     $invalid = New-Object System.Collections.ArrayList
-    $r = Read-MMOManifest -SnapshotDir $SnapshotDir -AllowRootAncestorReparse:$AllowRootAncestorReparse
+    $r = Read-MMOManifest -SnapshotDir $SnapshotDir -AllowRootAncestorReparse:$AllowRootAncestorReparse -ManifestBytes $ManifestBytes
     $snapMode = ''
     $snapStale = $false
     $snapColl = @()
