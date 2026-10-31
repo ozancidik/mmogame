@@ -163,6 +163,8 @@ function Test-VfOneSnapshot {
             $proofLine = 'run_id=' + [string](Get-MMOMember $pr 'run_id') + ' exit_code=' + [string](Get-MMOMember $pr 'exit_code') + ' time_utc=' + (ConvertTo-MMOUtcString (Get-MMOMember $pr 'time_utc'))
         }
         if ($mode -ceq 'live') { [void]$warns.Add('mode=live: canli goruntu tutarli DEGILDIR (sunucu/editor calisirken alindi)') }
+        if ($null -ne $t -and $t.ProofStale) { [void]$warns.Add('proof_stale=true: temiz kapanis kanitindan SONRA kaynak dosya degismis (kanit bayat)') }
+        if (@($t.Collisions).Count -gt 0) { [void]$warns.Add('collisions=' + @($t.Collisions).Count + ' (cakisan ad gruplari; geri yukleme reddedilir)') }
         foreach ($e in @($mf.entries)) {
             $c = Get-MMOSaveFileClass ([string]$e.path)
             if ($c.Class -eq 'ignored') { continue }
@@ -272,7 +274,9 @@ function Invoke-VerifyMain {
         if ($null -eq $items) { Stop-Verify 3 'backup_root_unreadable' }
         $cand = New-Object System.Collections.ArrayList
         foreach ($it in $items) {
-            if ($it.Name -cmatch '^(?<p>pre-restore-)?(?<t>[0-9]{8}T[0-9]{6}Z)(-[a-z0-9-]{0,24})?\z') {
+            # last_run.json / last_ok.json = BackupSaves durum dosyalari (goruntu degil, "yabanci" da sayilmaz). Ad: etiket (<=24) + '-live' soneki.
+            if ($it.Name -ceq 'last_run.json' -or $it.Name -ceq 'last_ok.json') { continue }
+            if ($it.Name -cmatch '^(?<p>pre-restore-)?(?<t>[0-9]{8}T[0-9]{6}Z)(-[a-z0-9-]{0,29})?\z') {
                 [void]$cand.Add([pscustomobject]@{ Key = ($Matches['t'] + '|' + $it.Name); Path = $it.FullName })
             } else { $script:Counts['foreign']++ }
         }

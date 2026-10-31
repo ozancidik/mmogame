@@ -27,6 +27,8 @@ $script:MMOSvMinVersion = 1
 $script:MMOSvMaxVersion = 1000
 $script:MMOSvManifestFormat = 1
 $script:MMOSvToolName = 'MMOSaveFilesLib/2'
+$script:MMOSvNativeOk = $null
+$script:MMOSvZeroSha = ('0' * 64)        # icerigi alinamayan (read_error/too_large) giris icin "icerik yok" ozeti
 $script:MMOSvSuperscripts = ([string][char]0x00B9) + [char]0x00B2 + [char]0x00B3
 $script:MMOSvDeviceRx = '^(CON|PRN|AUX|NUL|CONIN\$|CONOUT\$|CLOCK\$|COM[0-9' + $script:MMOSvSuperscripts + ']|LPT[0-9' + $script:MMOSvSuperscripts + '])$'
 
@@ -89,13 +91,106 @@ function Get-MMOInnerException {
 
 function Test-MMOPathUnder {
     # $Path kanonik olarak $Root'un ALTINDA mi (ayrac sinirli; 'C:\ab' , 'C:\a' altinda degil). -AllowEqual: esitlik de kabul.
-    param([string]$Path, [string]$Root, [switch]$AllowEqual)
+    # Yol cozulemezse varsayilan $false ("altinda degil": Resolve-MMOSafePath path_escape icin guvenli yon). Sonucu bir IHLAL denetimi
+    # olarak kullananlar (yedek koku Saved/repo icinde mi) -ErrorIsViolation verir: cozulemeyen yol = ihlal ($true), fail-closed (D2).
+    param([string]$Path, [string]$Root, [switch]$AllowEqual, [switch]$ErrorIsViolation)
     try {
         $p = (ConvertTo-MMOFullPath $Path).TrimEnd('\')
         $r = (ConvertTo-MMOFullPath $Root).TrimEnd('\')
-    } catch { return $false }
+    } catch { return [bool]$ErrorIsViolation }
     if ($p.Equals($r, [StringComparison]::OrdinalIgnoreCase)) { return [bool]$AllowEqual }
     return $p.StartsWith($r + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Initialize-MMONative {
+    # kernel32 P/Invoke (sabit C# kaynagi, kullanici girdisi derlenmez): GetFinalPathNameByHandleW (gercek yol, junction/symlink/8.3 cozer) ve
+    # GetDiskFreeSpaceExW (bos alan; UNC dahil). Derlenemezse $false (cagiranlar fail-closed ya da belgelenmis dusus yapar).
+    if ($null -ne $script:MMOSvNativeOk) { return $script:MMOSvNativeOk }
+    $ok = $false
+    try {
+        if (-not ('MMOSaveNative' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public static class MMOSaveNative {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr CreateFileW(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr tmpl);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern uint GetFinalPathNameByHandleW(IntPtr h, StringBuilder buf, uint len, uint flags);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool GetDiskFreeSpaceExW(string dir, out ulong avail, out ulong total, out ulong free);
+    public static string FinalPath(string path) {
+        IntPtr h = CreateFileW(path, 0, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+        if (h == new IntPtr(-1)) return null;
+        try {
+            StringBuilder sb = new StringBuilder(2048);
+            uint n = GetFinalPathNameByHandleW(h, sb, (uint)sb.Capacity, 0);
+            if (n == 0) return null;
+            if (n >= sb.Capacity) { sb = new StringBuilder((int)n + 2); n = GetFinalPathNameByHandleW(h, sb, (uint)sb.Capacity, 0); if (n == 0) return null; }
+            return sb.ToString();
+        } finally { CloseHandle(h); }
+    }
+    public static long FreeBytes(string dir) {
+        ulong a, t, f;
+        if (!GetDiskFreeSpaceExW(dir, out a, out t, out f)) return -1;
+        return a > (ulong)long.MaxValue ? long.MaxValue : (long)a;
+    }
+}
+'@
+        }
+        $ok = ('MMOSaveNative' -as [type]) -ne $null
+    } catch { $ok = $false }
+    $script:MMOSvNativeOk = $ok
+    return $ok
+}
+
+function Get-MMOFinalPath {
+    # Gercek (junction / sembolik baglanti / 8.3 kisa ad cozulmus) tam yol. Yol henuz yoksa var olan en yakin atanin gercek yolu + kalan
+    # bolum. Cozulemezse $null (cagiran karar verir; BackupSaves -AllowRootAncestorReparse'te fail-closed).
+    # SINIR: anlik goruntudur (TOCTOU: cozumden sonra baglanti degistirilebilir); ag/yer imi surucularinda sonuc sunucuya baglidir.
+    param([string]$Path)
+    try { $full = (ConvertTo-MMOFullPath $Path).TrimEnd('\') } catch { return $null }
+    if (-not (Initialize-MMONative)) { return $null }
+    $rest = New-Object System.Collections.ArrayList
+    $cur = $full
+    while ($true) {
+        $a = Get-MMOAttributes $cur
+        if ($a.State -eq 'ok') { break }
+        if ($a.State -ne 'missing') { return $null }
+        $leaf = [IO.Path]::GetFileName($cur)
+        $parent = [IO.Path]::GetDirectoryName($cur)
+        if ([string]::IsNullOrEmpty($leaf) -or [string]::IsNullOrEmpty($parent)) { return $null }
+        $rest.Insert(0, $leaf)
+        $cur = $parent
+    }
+    $fp = $null
+    try { $fp = [MMOSaveNative]::FinalPath($cur) } catch { $fp = $null }
+    if ([string]::IsNullOrEmpty($fp)) { return $null }
+    if ($fp.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) { $fp = '\\' + $fp.Substring(8) }
+    elseif ($fp.StartsWith('\\?\')) { $fp = $fp.Substring(4) }
+    $fp = $fp.TrimEnd('\')
+    foreach ($seg in $rest) { $fp = $fp + '\' + $seg }
+    return $fp
+}
+
+function Get-MMOFreeBytes {
+    # Yolun bulundugu birimdeki kullanilabilir bos bayt (yol yoksa var olan en yakin ata). Olculemezse -1.
+    param([string]$Path)
+    try { $cur = (ConvertTo-MMOFullPath $Path).TrimEnd('\') } catch { return -1L }
+    if (-not (Initialize-MMONative)) { return -1L }
+    while ($true) {
+        $a = Get-MMOAttributes $cur
+        if ($a.State -eq 'ok' -and (($a.Attributes -band [IO.FileAttributes]::Directory) -ne 0)) { break }
+        if ($a.State -ne 'missing' -and $a.State -ne 'ok') { return -1L }
+        # yol yok ya da dizin degil (dosya): ayni birimdeki ust dizine bak
+        $parent = [IO.Path]::GetDirectoryName($cur)
+        if ([string]::IsNullOrEmpty($parent)) { return -1L }
+        $cur = $parent
+    }
+    try { return [long][MMOSaveNative]::FreeBytes($cur + '\') } catch { return -1L }
 }
 
 function Get-MMOAttributes {
@@ -298,17 +393,35 @@ function Find-MMOCollisions {
 function Get-MMORestoreSelection {
     # Geri yukleme politikasi (B3 kullanir): yan kilit/.tmp/.bak/.bad (soneki olan her yan dosya) VARSAYILAN geri yuklenmez;
     # yalniz -IncludeSideFiles ile. Beyaz liste disi her sey atlanir. Donus: Restore[] (yollar), Skipped[] ({Path; Reason}).
-    param($Entries, [switch]$IncludeSideFiles)
+    # O6 (B3 hazirligi): valid=false girisler (bozuk kaynak) ve notes=unstable (canli yedekte kararsiz) girisler VARSAYILAN geri yuklenmez
+    # (Skipped: invalid_entry | unstable); zorlamak icin ayri ACIK bayrak -IncludeInvalid: bu girisler Restore'a girer, Forced'a yazilir ve
+    # konsola [MMO_RESTORE_FORCE] satiri basilir (loglanir). Icerigi hic alinamayan girisler (notes=read_error|too_large: dosya goruntude YOK)
+    # bayrakla da geri yuklenemez (Skipped: no_content). -CollisionPaths: manifestin bildirdigi cakisan yollar ('collision', ret B3'te).
+    param($Entries, [switch]$IncludeSideFiles, [switch]$IncludeInvalid, [string[]]$CollisionPaths = @())
     $restore = New-Object System.Collections.ArrayList
     $skipped = New-Object System.Collections.ArrayList
+    $forced = New-Object System.Collections.ArrayList
+    $collSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($cp in @($CollisionPaths)) { [void]$collSet.Add([string]$cp) }
     foreach ($e in @($Entries)) {
         $path = [string]$e.path
         $c = Get-MMOSaveFileClass $path
         if ($c.Class -eq 'ignored') { [void]$skipped.Add([pscustomobject]@{ Path = $path; Reason = 'not_whitelisted' }); continue }
+        if ($collSet.Contains($path)) { [void]$skipped.Add([pscustomobject]@{ Path = $path; Reason = 'collision' }); continue }
         if ($c.Suffix -ne '' -and -not $IncludeSideFiles) { [void]$skipped.Add([pscustomobject]@{ Path = $path; Reason = 'side_file_requires_flag' }); continue }
+        $notes = [string](Get-MMOMember $e 'notes')
+        $ev = Get-MMOMember $e 'valid'
+        if ($notes -ceq 'read_error' -or $notes -ceq 'too_large') { [void]$skipped.Add([pscustomobject]@{ Path = $path; Reason = 'no_content' }); continue }
+        $why = ''
+        if ($notes -ceq 'unstable') { $why = 'unstable' } elseif ($ev -eq $false) { $why = 'invalid_entry' }
+        if ($why -ne '') {
+            if (-not $IncludeInvalid) { [void]$skipped.Add([pscustomobject]@{ Path = $path; Reason = $why }); continue }
+            [void]$forced.Add([pscustomobject]@{ Path = $path; Reason = $why })
+            Write-Host ('[MMO_RESTORE_FORCE] path=' + $path + ' reason=' + $why)
+        }
         [void]$restore.Add($path)
     }
-    return [pscustomobject]@{ Restore = [string[]]@($restore.ToArray()); Skipped = @($skipped.ToArray()) }
+    return [pscustomobject]@{ Restore = [string[]]@($restore.ToArray()); Skipped = @($skipped.ToArray()); Forced = @($forced.ToArray()) }
 }
 
 # ---- bayt okuma + hash + butunluk (dosya TEK KEZ okunur) --------------------------------------------------------------
@@ -595,6 +708,19 @@ function Get-MMOHeaderDigest {
         'source_saved_dir=' + [string](Get-MMOMember $Manifest 'source_saved_dir') + "`n" +
         'mode=' + [string](Get-MMOMember $Manifest 'mode') + "`n" +
         'shutdown_proof=' + $proofText + "`n"
+    # B1 sertlestirme: istege bagli ust duzey alanlar yalniz VARSA ozete girer (eski manifestlerin ozeti degismez).
+    foreach ($ok in 'proof_stale', 'ignored_count', 'ignored_summary', 'process_check') {
+        $ov = Get-MMOMember $Manifest $ok
+        if ($null -eq $ov) { continue }
+        if ($ov -is [bool]) { if ($ov) { $ov = 'true' } else { $ov = 'false' } }
+        $text += $ok + '=' + [string]$ov + "`n"
+    }
+    $cv = Get-MMOMember $Manifest 'collisions'
+    if ($null -ne $cv -and @($cv).Count -gt 0) {
+        $cl = [string[]]@(@($cv) | ForEach-Object { [string]$_ })
+        [Array]::Sort($cl, [StringComparer]::Ordinal)
+        $text += 'collisions=' + ($cl -join ';') + "`n"
+    }
     return (Get-MMOBytesSha256 ((New-Object System.Text.UTF8Encoding($false)).GetBytes($text)))
 }
 
@@ -608,6 +734,18 @@ function New-MMOManifest {
         $ShutdownProof = $null,
         [string]$CreatedUtc = '',
         [string[]]$UnstablePaths = @(),
+        # B1 sertlestirme (hepsi istege bagli; verilmezse manifest eski bicimde kalir):
+        #  ExpectedEntries = {yol -> @{Size;Sha256;Valid;Notes}} YAZILAN bayttan turetilmis beklenen tablo; goruntudeki dosyadan uretilen giris
+        #    farkliysa (ya da tabloda olmayan/eksik dosya) throw 'copy_drift:<yol>' (O1: ozet kopyadan sonra yeniden okunmus bayttan DEGIL yazilandan).
+        #  SkippedEntries = {yol -> 'read_error'|'too_large'} icerigi alinamayan dosyalar: goruntude dosya YOK; size=0, sha256=sifir, valid=false.
+        #  AllowCollisions: cakisan yollar hata degil; manifestte 'collisions' olarak bildirilir (geri yukleme B3'te reddeder).
+        $ExpectedEntries = $null,
+        $SkippedEntries = $null,
+        $ProofStale = $null,
+        [int]$IgnoredCount = -1,
+        [string]$IgnoredSummary = '',
+        [string]$ProcessCheck = '',
+        [switch]$AllowCollisions,
         [switch]$AllowRootAncestorReparse
     )
     if ($CreatedUtc -eq '') { $CreatedUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture) }
@@ -618,12 +756,35 @@ function New-MMOManifest {
         $c0 = Get-MMOSaveFileClass $rel
         if ($c0.Class -eq 'ignored') { throw ('not_whitelisted:' + $rel + ':' + $c0.Reason) }
     }
-    $coll = @(Find-MMOCollisions $rels)
-    if ($coll.Count -gt 0) { throw ('collision:' + (@($coll[0]) -join '|')) }
+    # Icerigi alinamayan dosyalar (O5): goruntude dosya olmamali; yol sozdizimi/sinif gecerli olmali.
+    $skipMap = [ordered]@{}
+    if ($null -ne $SkippedEntries) {
+        foreach ($sk in @($SkippedEntries.Keys)) {
+            $why = [string]$SkippedEntries[$sk]
+            if ($why -cne 'read_error' -and $why -cne 'too_large') { throw ('skipped_reason_invalid:' + $sk) }
+            if ($null -ne (Get-MMORelPathProblem ([string]$sk))) { throw ('skipped_path_invalid:' + $sk) }
+            if ((Get-MMOSaveFileClass ([string]$sk)).Class -eq 'ignored') { throw ('skipped_path_not_whitelisted:' + $sk) }
+            $skipMap[[string]$sk] = $why
+        }
+    }
+    $allRels = New-Object System.Collections.ArrayList
+    foreach ($rel in $rels) { [void]$allRels.Add($rel) }
+    foreach ($sk in $skipMap.Keys) {
+        foreach ($rel in $rels) { if ($rel -ceq $sk) { throw ('skipped_path_present:' + $sk) } }
+        [void]$allRels.Add($sk)
+    }
+    $coll = @(Find-MMOCollisions ([string[]]$allRels.ToArray()))
+    $collStrings = @()
+    if ($coll.Count -gt 0) {
+        if (-not $AllowCollisions) { throw ('collision:' + (@($coll[0]) -join '|')) }
+        $collStrings = [string[]]@($coll | ForEach-Object { (@($_) -join '|') })
+        [Array]::Sort($collStrings, [StringComparer]::Ordinal)
+    }
     # B1: canli yedekte kararsiz kalan dosyalar (UnstablePaths) valid=false notes='unstable' olarak isaretlenir (iceriginden turetilemez;
-    # Test-MMOSnapshot bunu yalniz "gecersiz" yonunde kabul eder). Goruntude olmayan yol = throw.
+    # Test-MMOSnapshot bunu yalniz mode=live manifestte ve yalniz "gecersiz" yonunde kabul eder). Goruntude olmayan yol = throw.
     $unstableSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     foreach ($u in @($UnstablePaths)) { [void]$unstableSet.Add([string]$u) }
+    if ($unstableSet.Count -gt 0 -and $Mode -cne 'live') { throw 'unstable_requires_live' }
     $relSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     foreach ($rel in $rels) { [void]$relSet.Add($rel) }
     foreach ($u in $unstableSet) { if (-not $relSet.Contains($u)) { throw ('unstable_path_unknown:' + $u) } }
@@ -635,6 +796,14 @@ function New-MMOManifest {
         $eValid = $info.Valid
         $eNotes = $info.Notes
         if ($unstableSet.Contains($rel)) { $eValid = $false; $eNotes = 'unstable' }
+        if ($null -ne $ExpectedEntries) {
+            # O1: beklenen = kopyalanirken YAZILAN bayttan; kopyadan sonra goruntude degisen/bozulan dosya manifeste "temiz" girmez.
+            if (-not $ExpectedEntries.ContainsKey($rel)) { throw ('copy_drift:' + $rel) }
+            $x = $ExpectedEntries[$rel]
+            if ([long]$x.Size -ne [long]$info.Size -or [string]$x.Sha256 -cne [string]$info.Sha256 -or [bool]$x.Valid -ne [bool]$eValid -or [string]$x.Notes -cne [string]$eNotes) {
+                throw ('copy_drift:' + $rel)
+            }
+        }
         [void]$entries.Add([ordered]@{
             path = $rel
             class = $c.Class
@@ -644,7 +813,23 @@ function New-MMOManifest {
             notes = $eNotes
         })
     }
+    if ($null -ne $ExpectedEntries) {
+        foreach ($xk in @($ExpectedEntries.Keys)) { if (-not $relSet.Contains([string]$xk)) { throw ('copy_drift:' + [string]$xk) } }
+    }
+    foreach ($sk in $skipMap.Keys) {
+        [void]$entries.Add([ordered]@{
+            path = $sk
+            class = (Get-MMOSaveFileClass $sk).Class
+            size = 0L
+            sha256 = $script:MMOSvZeroSha
+            valid = $false
+            notes = $skipMap[$sk]
+        })
+    }
     $arr = $entries.ToArray()
+    $ekeys = New-Object 'string[]' $arr.Length
+    for ($ei = 0; $ei -lt $arr.Length; $ei++) { $ekeys[$ei] = [string]$arr[$ei]['path'] }
+    [Array]::Sort($ekeys, $arr, [StringComparer]::Ordinal)
     $m = [ordered]@{
         format_version = $script:MMOSvManifestFormat
         created_utc = $CreatedUtc
@@ -655,6 +840,10 @@ function New-MMOManifest {
         entries = $arr
         entries_digest = (Get-MMOEntriesDigest $arr)
     }
+    if ($null -ne $ProofStale) { $m['proof_stale'] = [bool]$ProofStale }
+    if ($IgnoredCount -ge 0) { $m['ignored_count'] = $IgnoredCount; $m['ignored_summary'] = $IgnoredSummary }
+    if ($ProcessCheck -ne '') { $m['process_check'] = $ProcessCheck }
+    if ($collStrings.Count -gt 0) { $m['collisions'] = [string[]]$collStrings }
     $m['header_digest'] = (Get-MMOHeaderDigest $m)
     return $m
 }
@@ -761,6 +950,28 @@ function Read-MMOManifest {
     if ($null -ne $proof -and $null -ne $proof.Value) {
         if ($null -ne (Test-MMOShutdownProof $proof.Value)) { [void]$errs.Add('bad_shutdown_proof') }
     }
+    # Istege bagli B1 alanlari: varsa tipi dogru olmali (header_digest'e girerler)
+    if ($null -ne $props['proof_stale'] -and $props['proof_stale'].Value -isnot [bool]) { [void]$errs.Add('bad_proof_stale') }
+    if ($null -ne $props['ignored_count']) {
+        $icv = $props['ignored_count'].Value
+        if (-not ((($icv -is [int]) -or ($icv -is [long])) -and $icv -ge 0)) { [void]$errs.Add('bad_ignored_count') }
+    }
+    if ($null -ne $props['ignored_summary'] -and $props['ignored_summary'].Value -isnot [string]) { [void]$errs.Add('bad_ignored_summary') }
+    if ($null -ne $props['process_check']) {
+        $pcv = $props['process_check'].Value
+        if ($pcv -isnot [string] -or ($pcv -cne 'cim' -and $pcv -cne 'injected' -and $pcv -cne 'skipped')) { [void]$errs.Add('bad_process_check') }
+    }
+    $declaredColl = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    if ($null -ne $props['collisions']) {
+        $cvv = $props['collisions'].Value
+        if ($cvv -isnot [array] -or @($cvv).Count -eq 0) { [void]$errs.Add('bad_collisions') }
+        else {
+            foreach ($cs in $cvv) {
+                if ($cs -isnot [string] -or $cs.IndexOf('|') -lt 0) { [void]$errs.Add('bad_collisions'); break }
+                [void]$declaredColl.Add($cs)
+            }
+        }
+    }
     if ($m.entries -isnot [array]) {
         [void]$errs.Add('entries_not_array')
         return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @($errs.ToArray()); Manifest = $m }
@@ -790,9 +1001,21 @@ function Read-MMOManifest {
         if (-not ((($e.size -is [int]) -or ($e.size -is [long])) -and $e.size -ge 0 -and $e.size -le $script:MMOSvMaxFileBytes)) { [void]$errs.Add($tag + ':bad_size') }
         if ($e.valid -isnot [bool]) { [void]$errs.Add($tag + ':bad_valid') }
         if ($e.notes -isnot [string]) { [void]$errs.Add($tag + ':bad_notes') }
+        elseif ($e.notes -ceq 'read_error' -or $e.notes -ceq 'too_large') {
+            # icerigi alinamayan giris: "icerik yok" bicimi (goruntude dosya yok); aksi halde bu notlar baska girislerde kullanilamaz
+            if ($e.valid -isnot [bool] -or $e.valid -ne $false -or $e.sha256 -cne $script:MMOSvZeroSha -or $e.size -ne 0) { [void]$errs.Add($tag + ':bad_skipped_entry') }
+        }
     }
+    # Cakisma: hesaplanan gruplar manifestteki 'collisions' bildirimiyle BIREBIR ayniysa kabul (uyari; geri yukleme B3'te reddeder), aksi hata
     $coll = @(Find-MMOCollisions ([string[]]$allPaths.ToArray()))
-    if ($coll.Count -gt 0) { [void]$errs.Add('collision:' + (@($coll[0]) -join '|')) }
+    $gotColl = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($cg in $coll) { [void]$gotColl.Add((@($cg) -join '|')) }
+    $collOk = ($gotColl.Count -eq $declaredColl.Count)
+    if ($collOk) { foreach ($gc in $gotColl) { if (-not $declaredColl.Contains($gc)) { $collOk = $false } } }
+    if (-not $collOk) {
+        if ($coll.Count -gt 0) { [void]$errs.Add('collision:' + (@($coll[0]) -join '|')) }
+        else { [void]$errs.Add('collision_declared_but_absent') }
+    }
     if ($errs.Count -eq 0) {
         $digest = Get-MMOEntriesDigest $m.entries
         if ($m.entries_digest -isnot [string] -or $m.entries_digest -cne $digest) { [void]$errs.Add('digest_mismatch') }
@@ -804,24 +1027,45 @@ function Read-MMOManifest {
 
 function Test-MMOSnapshot {
     # Goruntu dizinini (manifest.json + files\) salt okuma ile dogrular: boyut, SHA-256, valid/notes yeniden hesabi, fazladan dosya, reparse.
-    # Her dosya TEK KEZ okunur. Donus: Ok, Incomplete, Errors[], Extra[], InvalidEntries[] (valid=false olanlar; hata sayilmaz).
+    # Her dosya TEK KEZ okunur. Donus: Ok, Incomplete, Errors[], Extra[], InvalidEntries[] (valid=false olanlar; hata sayilmaz),
+    # Mode ('quiesced'|'live'|''), HasInvalid, HasUnstable (kararsiz girisler; yalniz mode=live'da kabul), ProofStale, Collisions[] (bildirilmis cakismalar).
     param([string]$SnapshotDir, [switch]$AllowRootAncestorReparse)
     $errs = New-Object System.Collections.ArrayList
     $extra = New-Object System.Collections.ArrayList
     $invalid = New-Object System.Collections.ArrayList
     $r = Read-MMOManifest -SnapshotDir $SnapshotDir -AllowRootAncestorReparse:$AllowRootAncestorReparse
+    $snapMode = ''
+    $snapStale = $false
+    $snapColl = @()
+    if ($null -ne $r.Manifest) {
+        $mv = Get-MMOMember $r.Manifest 'mode'
+        if ($mv -is [string]) { $snapMode = $mv }
+        if ((Get-MMOMember $r.Manifest 'proof_stale') -eq $true) { $snapStale = $true }
+        $cvx = Get-MMOMember $r.Manifest 'collisions'
+        if ($null -ne $cvx) { $snapColl = [string[]]@(@($cvx) | ForEach-Object { [string]$_ }) }
+    }
     if (-not $r.Ok) {
-        return [pscustomobject]@{ Ok = $false; Incomplete = $r.Incomplete; Errors = $r.Errors; Extra = @(); InvalidEntries = @() }
+        return [pscustomobject]@{ Ok = $false; Incomplete = $r.Incomplete; Errors = $r.Errors; Extra = @(); InvalidEntries = @()
+            Mode = $snapMode; HasInvalid = $false; HasUnstable = $false; ProofStale = $snapStale; Collisions = $snapColl }
     }
     $filesRoot = (ConvertTo-MMOFullPath $SnapshotDir).TrimEnd('\') + '\files'
     if (-not [IO.Directory]::Exists($filesRoot)) {
         [void]$errs.Add('files_missing')
-        return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @($errs.ToArray()); Extra = @(); InvalidEntries = @() }
+        return [pscustomobject]@{ Ok = $false; Incomplete = $false; Errors = @($errs.ToArray()); Extra = @(); InvalidEntries = @()
+            Mode = $snapMode; HasInvalid = $false; HasUnstable = $false; ProofStale = $snapStale; Collisions = $snapColl }
     }
     $declared = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $hasUnstable = $false
     foreach ($e in $r.Manifest.entries) {
         [void]$declared.Add($e.path)
         $isInvalid = ($e.valid -eq $false)
+        if (($e.notes -ceq 'read_error' -or $e.notes -ceq 'too_large') -and $isInvalid) {
+            # Icerigi alinamayan giris (O5): goruntude dosya OLMAMALI (varsa manifest yalan soyluyor); hash/boyut karsilastirilmaz, her zaman gecersiz.
+            $skFull = $filesRoot + '\' + ([string]$e.path).Replace('/', '\')
+            if ((Get-MMOAttributes $skFull).State -ne 'missing') { [void]$errs.Add('skipped_entry_has_file:' + $e.path) }
+            [void]$invalid.Add($e.path)
+            continue
+        }
         try { $full = Resolve-MMOSafePath -Root $filesRoot -RelPath $e.path -MustExist -AllowRootAncestorReparse:$AllowRootAncestorReparse } catch {
             [void]$errs.Add('entry_unusable:' + $e.path + ':' + $_.Exception.Message)
             if ($isInvalid) { [void]$invalid.Add($e.path) }
@@ -844,8 +1088,10 @@ function Test-MMOSnapshot {
             continue
         }
         if (($e.notes -ceq 'unstable') -and ($e.valid -eq $false)) {
-            # B1 canli yedek: kararsizlik icerikten yeniden hesaplanamaz; yalniz "gecersiz" yonunde kabul edilir (valid=true + unstable = uyusmazlik).
+            # B1 canli yedek: kararsizlik icerikten yeniden hesaplanamaz; yalniz "gecersiz" yonunde (valid=true + unstable = uyusmazlik) ve
+            # yalniz mode=live manifestte kabul edilir (O6): quiesced bir goruntude kararsiz not = sahte/kurcalanmis manifest.
             [void]$invalid.Add($e.path)
+            if ($snapMode -ceq 'live') { $hasUnstable = $true } else { [void]$errs.Add('unstable_in_quiesced:' + $e.path) }
             continue
         }
         $integ = Get-MMOBytesIntegrity -Bytes $bytes -ClassInfo (Get-MMOSaveFileClass $e.path)
@@ -863,6 +1109,7 @@ function Test-MMOSnapshot {
     return [pscustomobject]@{
         Ok = ($errs.Count -eq 0); Incomplete = $false
         Errors = @($errs.ToArray()); Extra = @($extra.ToArray()); InvalidEntries = @($invalid.ToArray())
+        Mode = $snapMode; HasInvalid = ($invalid.Count -gt 0); HasUnstable = $hasUnstable; ProofStale = $snapStale; Collisions = $snapColl
     }
 }
 
