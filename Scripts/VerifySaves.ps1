@@ -191,6 +191,16 @@ function Test-VfOneSnapshot {
     if ($mode -ceq 'live') { $script:Counts['live']++ }
     $script:Counts['warnings'] += $warns.Count
     Add-VfLine '_SNAPSHOT' ('name=' + $name + ' status=' + $status + ' manifest_sha256=' + $shaBefore + ' mode=' + $mode + ' shutdown_proof=' + $proofState + ' entries=' + $entryCount + ' errors=' + $errors.Count + ' invalid=' + $invalid.Count)
+    if ($manifestOk) {
+        # B3.2 (D2): manifest label / tool alanlari (yoksa 'none'); serbest metin yalniz guvenli karakter kumesiyle basilir.
+        $mLabel = Get-MMOMember $rm.Manifest 'label'
+        $mTool = Get-MMOMember $rm.Manifest 'tool'
+        $lblText = 'none'
+        if ($mLabel -is [string]) { $lblText = '"' + [regex]::Replace($mLabel, '[^A-Za-z0-9-]', '?') + '"' }
+        $toolText = 'none'
+        if ($mTool -is [string]) { $toolText = [regex]::Replace($mTool, '[^A-Za-z0-9./_-]', '?') }
+        Add-VfLine '_META' ('snap=' + $name + ' label=' + $lblText + ' tool=' + $toolText)
+    }
     if ($null -ne $proofLine) { Add-VfLine '_PROOF' ('snap=' + $name + ' ' + $proofLine) }
     if ($status -eq 'incomplete') { Add-VfLine '_INCOMPLETE' ('snap=' + $name + ' reasons=' + ($reasons.ToArray() -join ',')) }
     foreach ($e in $errors) { Add-VfLine '_ERROR' ('snap=' + $name + ' ' + $e) }

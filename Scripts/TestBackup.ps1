@@ -16,7 +16,7 @@ if ($RepoRoot -eq '') { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 . (Join-Path $PSScriptRoot 'MMOSaveFilesLib.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi (asagidaki bolumlerin toplami; degisirse burada guncelle).
-$expected = 1399
+$expected = 1460
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -2900,7 +2900,7 @@ try {
     Set-Aged $g.Saved
     $tr = Get-TreeOracle $g.Saved
     $r = Invoke-Rs $g -Apply
-    Check 'rs_rollback' 'leftover_restore_tmp_blocks_write_and_is_not_deleted' (($r.Code -eq 1) -and ($r.Out -like '*write_failed_rolled_back:restore_tmp_exists*') -and ((Get-TreeOracle $g.Saved) -ceq $tr))
+    Check 'rs_rollback' 'leftover_restore_tmp_blocks_write_and_is_not_deleted' (($r.Code -eq 3) -and ($r.Out -like '*reason=leftover_restore_artifacts_require_recover*') -and (Test-Untouched $g $tr))
 
     # 18m Manifest uyarilari kuru calisma ciktisinda gorunur
     $g = New-RsFixture 'w_ign' -Prep { param($s) Write-TestBytes (Join-Path $s ('SaveGames\MMOSave_' + $oUml + 'mer.sav')) (New-SavBytes 100 3) }
@@ -2959,9 +2959,13 @@ try {
     $r2 = Invoke-Rs $g
     Check 'rs_marker' 'dry_run_warns_about_marker_exit_4' (($r2.Code -eq 4) -and ($r2.Out -like '*code=restore_in_progress_marker*') -and ($r2.Out -like '*reason=restore_marker_present*'))
     $mm = $null
-    if ($hintLine.Count -ge 1) { $mm = [regex]::Match($hintLine[0], 'RestoreSaves\.ps1 -Snapshot "(?<s>[^"]+)"(?<f>(?: -[A-Za-z]+)+) -ExpectedManifestSha256 (?<h>[0-9a-f]{64}) -Apply') }
+    if ($hintLine.Count -ge 1) { $mm = [regex]::Match($hintLine[0], 'RestoreSaves\.ps1 -Snapshot \x27(?<s>[^\x27]+)\x27(?<f>(?: -[A-Za-z]+)+) -ExpectedManifestSha256 (?<h>[0-9a-f]{64}) -Apply') }
     if ($null -eq $mm) { $mm = [regex]::Match('', 'x') }
     Check 'rs_hint' 'failure_line_prints_one_complete_rollback_command' (($null -ne $mm) -and $mm.Success -and ($mm.Groups['f'].Value -like '* -All -IncludeInvalid -IncludeSideFiles -AcceptCollisions -AcknowledgePartialState -QuarantineStaleSideFiles -AcknowledgeStaleRestoreMarker'))
+    Set-Aged $g.Saved
+    # B3.2 (O1): yazim yarida kaldi (.restore.old kaldi) -> normal -Apply (geri alma komutu dahil) once -Recover ister
+    $rcOut = Invoke-TestRestore -Snap $mm.Groups['s'].Value -Saved $g.Saved -Root $g.Root -Extra @{ Recover = $true; Apply = $true; ExpectedManifestSha256 = $mm.Groups['h'].Value }
+    Check 'rs_hint' 'recover_apply_clears_restore_old_leftover_before_rollback_command' ((($rcOut.Code -eq 0) -or ($rcOut.Code -eq 4)) -and (@(Get-ChildItem -LiteralPath $g.Saved -Recurse -Force -File | Where-Object { $_.Name -like '*.restore.old' }).Count -eq 0))
     Set-Aged $g.Saved
     $rbx = @{ Apply = $true; ExpectedManifestSha256 = $mm.Groups['h'].Value }
     foreach ($fl in ($mm.Groups['f'].Value.Trim() -split ' ')) { if ($fl -ne '') { $rbx[$fl.TrimStart('-')] = $true } }
@@ -3017,7 +3021,7 @@ try {
     Set-Aged $g.Saved
     $trN = Get-TreeOracle $g.Saved
     $r = Invoke-Rs $g -Apply
-    Check 'rs_place' 'leftover_old_with_other_content_blocks_write_and_is_kept' (($r.Code -eq 1) -and ($r.Out -like '*write_failed_rolled_back:restore_old_exists*') -and ((Get-TreeOracle $g.Saved) -ceq $trN))
+    Check 'rs_place' 'leftover_old_with_other_content_blocks_write_and_is_kept' (($r.Code -eq 3) -and ($r.Out -like '*reason=leftover_restore_artifacts_require_recover*') -and (Test-Untouched $g $trN))
 
     # Karantina: yazim hatasinda eski yan dosya yerine geri tasinir
     $g = New-RbFixture 'n_qr'
@@ -3188,7 +3192,15 @@ try {
     $g.Sha = Get-OracleSha (Join-Path $g.Snap 'manifest.json')
     $r = Invoke-Rs $g
     Check 'rs_sanitize' 'manifest_text_cannot_inject_a_log_line' (($r.Code -eq 1) -and (@($r.Lines | Where-Object { $_.StartsWith('[MMO_RESTORE_APPLIED]') }).Count -eq 0) -and $r.Out.Contains('manifest_source=x?[MMO_RESTORE_APPLIED] written=999 fake?[31m'))
-    Check 'rs_sanitize' 'no_control_character_reaches_the_console' (-not ($r.Out -cmatch '[\x00-\x09\x0b-\x1f\x7f]'))
+    # B3.2 (D9): satir bazli denetim (\x0a artik dislanmaz: her satir tek satirdir) ve C1 araligi \x80-\x9f dahil
+    Check 'rs_sanitize' 'no_control_character_reaches_the_console' (@($r.Lines | Where-Object { $_ -cmatch '[\x00-\x1f\x7f-\x9f]' }).Count -eq 0)
+    $g = New-RsFixture 'n_san2'
+    $evil2 = 'a' + [char]0x202E + 'b' + [char]0x2028 + 'c' + [char]0x2800 + 'd' + [char]0x3164 + 'e' + [char]0x0085 + 'f' + [char]0x009B + 'g' + [char]0x2066 + 'h' + [char]0x2029
+    Edit-TestManifest $g.Snap { param($m) $m.source_saved_dir = $evil2 } -FixDigest
+    $g.Sha = Get-OracleSha (Join-Path $g.Snap 'manifest.json')
+    $r = Invoke-Rs $g
+    Check 'rs_sanitize' 'bidi_line_separator_braille_hangul_filler_and_c1_are_neutralized' ($r.Out.Contains('manifest_source=a?b?c?d?e?f?g?h?'))
+    Check 'rs_sanitize' 'no_hidden_or_bidi_character_on_any_console_line' (@($r.Lines | Where-Object { $_ -cmatch '[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069\u2028\u2029\u2800\u3164]' }).Count -eq 0)
 
     # Yazim dongusu: canli yazim belirtisi, yazim penceresi, durum dosyasi
     $g = New-RbFixture 'n_mw'
@@ -3224,6 +3236,355 @@ try {
     Check 'rs_content_stamp' 'dry_run_leaves_fixture_saved_content_digest_unchanged' (($r.Code -eq 0) -and ((Get-SavedStamp -SavedRoot $g.Saved -WithContent).Digest -ceq $stCd0.Digest))
     $r = Invoke-Rs $g -Apply
     Check 'rs_content_stamp' 'apply_changes_fixture_saved_content_digest' (($r.Code -eq 0) -and ((Get-SavedStamp -SavedRoot $g.Saved -WithContent).Digest -cne $stCd0.Digest))
+
+    # ---- 18o. B3.2: son guvenlik denetimi bulgulari (O1 recover, O2 zincir, O3 kilit/isaret, D1-D10) ---------------------------------------
+    $mkP = 'restore_in_progress.json'
+    $mkM = 'MMORestoreInProgress.json'
+    $hintRx = 'RestoreSaves\.ps1 -Snapshot \x27(?<s>[^\x27]+)\x27(?<f>(?: -[A-Za-z]+)+)(?: (?<sl>[a-z0-9_,-]+))?(?<g>(?: -[A-Za-z]+)*) -ExpectedManifestSha256 (?<h>[0-9a-f]{64}) -Apply'
+    function Get-TreeNoMk {
+        param([string]$Dir)
+        $ls = @((Get-TreeOracle $Dir) -split "`n" | Where-Object { $_ -notlike ('\' + $mkM + '|*') })
+        return ($ls -join "`n")
+    }
+    function Get-LeftoverNames {
+        param([string]$Saved)
+        return , @(Get-ChildItem -LiteralPath $Saved -Recurse -Force -File | Where-Object { $_.Name -match '\.(restore\.old|restore\.tmp|rollback\.old|rollback-conflict)$' } | ForEach-Object { $_.Name })
+    }
+    $wrapPath = Join-Path $fx 'kill_wrapper.ps1'
+    Write-TestText $wrapPath @'
+param([string]$Snap, [string]$Saved, [string]$Root, [string]$Sha, [string]$Ts, [string]$Rel, [string]$Point, [string]$Script, [string]$Extra)
+$env:MMO_BACKUP_TESTMODE = '1'
+$benign = { @([pscustomobject]@{ Name = 'powershell.exe'; ProcessId = 4; CommandLine = 'x' }, [pscustomobject]@{ Name = 'explorer.exe'; ProcessId = 5; CommandLine = '' }) }
+$global:KillRel = $Rel
+$hk = @{}
+$hk[$Point] = { param($a) if ($global:KillRel -ceq '*' -or $a -ceq $global:KillRel) { Stop-Process -Id $PID -Force } }
+$p = @{ Snapshot = $Snap; SavedDir = $Saved; BackupRoot = $Root; All = $true; Apply = $true; ExpectedManifestSha256 = $Sha; Timestamp = $Ts; ProcessProvider = $benign; TestHooks = $hk }
+if ($Extra -ne 'none') { foreach ($e in $Extra.Split(',')) { $p[$e] = $true } }
+& $Script @p
+'@
+    function Invoke-KilledRestore {
+        # Ayri powershell sureci; kanca noktasinda Stop-Process ile OLDURULUR (temizleme kodu CALISMAZ = gercek cokus benzesimi).
+        param($F, [string]$Point, [string]$Rel = '*', [string]$Extra = 'none')
+        $ts = Get-RsTs
+        $global:LASTEXITCODE = -999
+        $o = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapPath -Snap $F.Snap -Saved $F.Saved -Root $F.Root -Sha $F.Sha -Ts $ts -Rel $Rel -Point $Point -Script $rsScript -Extra $Extra *>&1 | ForEach-Object { [string]$_ })
+        return [pscustomobject]@{ Code = $global:LASTEXITCODE; Out = ($o -join "`n") }
+    }
+    function Invoke-Recover {
+        param($F, [string]$PreDir, [switch]$Apply, [string]$Sha = '')
+        $e = @{ Recover = $true }
+        if ($Apply) { $e['Apply'] = $true; $e['ExpectedManifestSha256'] = $(if ($Sha -ne '') { $Sha } else { Get-OracleSha (Join-Path $PreDir 'manifest.json') }) }
+        return (Invoke-TestRestore -Snap $PreDir -Saved $F.Saved -Root $F.Root -Extra $e)
+    }
+    $dailyRel = 'MMODaily/MMOSave_Ali.json'
+    $dailyWin = 'MMODaily\MMOSave_Ali.json'
+
+    # --- O1 A: olum AfterDisplace (hedef YOK + .restore.old + .restore.tmp) ---
+    $g = New-RbFixture 'o_kA'
+    $trA = Get-TreeOracle $g.Saved
+    $dPath = Join-Path $g.Saved $dailyWin
+    $dLive = Get-OracleSha $dPath
+    $dImg = Get-OracleSha (Join-Path $g.Snap ('files\' + $dailyWin))
+    $k = Invoke-KilledRestore $g 'AfterDisplace' $dailyRel
+    $preA = Get-PreDir $g
+    Check 'rs_crash' 'killed_process_leaves_dest_missing_with_old_and_tmp' (($k.Code -ne 0) -and -not (Test-Path -LiteralPath $dPath) -and (Test-Path -LiteralPath ($dPath + '.restore.old')) -and (Test-Path -LiteralPath ($dPath + '.restore.tmp')) -and ((Get-OracleSha ($dPath + '.restore.old')) -ceq $dLive) -and ((Get-OracleSha ($dPath + '.restore.tmp')) -ceq $dImg))
+    Check 'rs_crash' 'killed_process_leaves_marker_in_backup_root_and_saved_mirror' ((Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and (Test-Path -LiteralPath (Join-Path $g.Saved $mkM)) -and (([IO.File]::ReadAllText((Join-Path $g.Root $mkP))) -ceq ([IO.File]::ReadAllText((Join-Path $g.Saved $mkM)))))
+    Set-Aged $g.Saved
+    $stK = Get-TreeOracle $g.Saved
+    $nPreK = @(Get-SnapDirs $g.Root | Where-Object { $_ -like '*-prerestore' }).Count
+    $r = Invoke-Rs $g -Apply
+    Check 'rs_recover' 'normal_apply_refused_by_marker_exit_3' (($r.Code -eq 3) -and ($r.Out -like '*reason=restore_in_progress_marker*'))
+    $r = Invoke-Rs $g -Apply -Extra @{ AcknowledgeStaleRestoreMarker = $true }
+    Check 'rs_recover' 'normal_apply_with_ack_still_refused_by_leftovers_before_preimage' (($r.Code -eq 3) -and ($r.Out -like '*reason=leftover_restore_artifacts_require_recover*') -and ((Get-TreeOracle $g.Saved) -ceq $stK) -and (@(Get-SnapDirs $g.Root | Where-Object { $_ -like '*-prerestore' }).Count -eq $nPreK))
+    $stAll = Get-FullStamp $g.Dir
+    $r = Invoke-Recover $g $preA
+    Check 'rs_recover' 'dry_run_plans_old_restore_and_tmp_discard' (($r.Code -eq 0) -and $r.Out.Contains('action=old_restore path=MMODaily/MMOSave_Ali.json.restore.old') -and $r.Out.Contains('action=tmp_discard path=MMODaily/MMOSave_Ali.json.restore.tmp') -and ($r.Out -like '*result* mode=recover-dry-run*'))
+    Check 'rs_recover' 'dry_run_wrote_nothing' ((Get-FullStamp $g.Dir).Digest -ceq $stAll.Digest)
+    $r = Invoke-Recover $g $preA -Apply -Sha ('1' * 64)
+    Check 'rs_recover' 'apply_with_wrong_digest_refused_nothing_changed' (($r.Code -eq 1) -and ($r.Out -like '*reason=manifest_sha256_mismatch*') -and ((Get-TreeOracle $g.Saved) -ceq $stK))
+    $r = Invoke-Recover $g $preA -Apply
+    Check 'rs_recover' 'apply_restores_old_discards_tmp_removes_marker_exit_0' (($r.Code -eq 0) -and ((Get-OracleSha $dPath) -ceq $dLive) -and ((Get-LeftoverNames $g.Saved).Count -eq 0) -and -not (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and -not (Test-Path -LiteralPath (Join-Path $g.Saved $mkM)) -and ((Get-TreeOracle $g.Saved) -ceq $trA))
+    Set-Aged $g.Saved
+    $r = Invoke-Rs $g -Apply
+    Check 'rs_recover' 'normal_apply_works_after_recover' (($r.Code -eq 0) -and ((Get-OracleSha $dPath) -ceq $dImg))
+
+    # --- O1 B: olum AfterWrite (ilk dosya yazildi, .restore.old kaldi): karisik durum, isaret KALIR, geri alma komutu ---
+    $g = New-RbFixture 'o_kB'
+    $trB = Get-TreeOracle $g.Saved
+    $k = Invoke-KilledRestore $g 'AfterWrite' $dailyRel
+    $preB = Get-PreDir $g
+    $dPathB = Join-Path $g.Saved $dailyWin
+    Set-Aged $g.Saved
+    $r = Invoke-Recover $g $preB
+    Check 'rs_recover' 'completed_file_old_is_planned_for_quarantine' ($r.Out.Contains('action=old_quarantine path=MMODaily/MMOSave_Ali.json.restore.old') -and ($r.Out.Contains('at_planned=1')))
+    $r = Invoke-Recover $g $preB -Apply
+    $nextLine = @($r.Lines | Where-Object { $_ -like '*geri al: RestoreSaves.ps1*' })
+    $mb = [regex]::Match('', 'x')
+    if ($nextLine.Count -ge 1) { $mb = [regex]::Match($nextLine[0], $hintRx) }
+    Check 'rs_recover' 'mixed_state_keeps_marker_exit_4_and_prints_rollback_command' (($r.Code -eq 4) -and ($r.Out -like '*recover_state_mixed_marker_kept*') -and (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and $mb.Success -and ((Get-LeftoverNames $g.Saved).Count -eq 0))
+    $rbxB = @{ Apply = $true; ExpectedManifestSha256 = $mb.Groups['h'].Value }
+    foreach ($fl in (($mb.Groups['f'].Value + $mb.Groups['g'].Value).Trim() -split ' ')) { if ($fl -ne '') { $rbxB[$fl.TrimStart('-')] = $true } }
+    Set-Aged $g.Saved
+    $r3 = [pscustomobject]@{ Code = -1; Out = '' }
+    if ($mb.Success) { $r3 = Invoke-TestRestore -Snap $mb.Groups['s'].Value -Saved $g.Saved -Root $g.Root -Extra $rbxB }
+    Check 'rs_recover' 'recover_then_printed_rollback_command_restores_pre_state_and_closes_marker' ((($r3.Code -eq 0) -or ($r3.Code -eq 4)) -and ((Get-TreeOracle $g.Saved) -ceq $trB) -and -not (Test-Path -LiteralPath (Join-Path $g.Root $mkP)))
+
+    # --- O1 C/D: olum AfterTmp (hedef saglam, tmp var); tmp icerigi farkliysa karantina ---
+    $g = New-RbFixture 'o_kC'
+    $trC = Get-TreeOracle $g.Saved
+    $k = Invoke-KilledRestore $g 'AfterTmp' $dailyRel
+    $preC = Get-PreDir $g
+    Set-Aged $g.Saved
+    $r = Invoke-Recover $g $preC
+    Check 'rs_recover' 'tmp_equal_to_planned_content_is_discard_candidate' ($r.Out.Contains('action=tmp_discard path=MMODaily/MMOSave_Ali.json.restore.tmp'))
+    $r = Invoke-Recover $g $preC -Apply
+    Check 'rs_recover' 'tmp_only_crash_recovers_to_pre_state_exit_0' (($r.Code -eq 0) -and ((Get-TreeOracle $g.Saved) -ceq $trC) -and -not (Test-Path -LiteralPath (Join-Path $g.Root $mkP)))
+    $g = New-RbFixture 'o_kD'
+    $trD = Get-TreeOracle $g.Saved
+    $k = Invoke-KilledRestore $g 'AfterTmp' $dailyRel
+    $preD = Get-PreDir $g
+    $tmpD = Join-Path $g.Saved ($dailyWin + '.restore.tmp')
+    [IO.File]::WriteAllBytes($tmpD, (New-TestBytes 40 7))
+    $tmpDSha = Get-BytesSha (New-TestBytes 40 7)
+    Set-Aged $g.Saved
+    $r = Invoke-Recover $g $preD
+    Check 'rs_recover' 'tmp_with_other_content_is_quarantine_not_discard' ($r.Out.Contains('action=tmp_quarantine path=MMODaily/MMOSave_Ali.json.restore.tmp') -and -not $r.Out.Contains('action=tmp_discard'))
+    $r = Invoke-Recover $g $preD -Apply
+    $qHit = @(Get-ChildItem -LiteralPath $g.Root -Recurse -Force -File | Where-Object { $_.FullName -like '*restore_recover_*\quarantine\MMODaily\MMOSave_Ali.json.restore.tmp' })
+    Check 'rs_recover' 'foreign_tmp_moved_to_recover_quarantine_not_deleted' (($r.Code -eq 0) -and ($qHit.Count -eq 1) -and ((Get-OracleSha $qHit[0].FullName) -ceq $tmpDSha) -and (-not (Test-Path -LiteralPath $tmpD)) -and ((Get-TreeOracle $g.Saved) -ceq $trD))
+
+    # --- O1 E: old icerigi goruntude yok -> unresolved, isaret kalir, dokunulmaz ---
+    $g = New-RbFixture 'o_kE'
+    $k = Invoke-KilledRestore $g 'AfterDisplace' $dailyRel
+    $preE = Get-PreDir $g
+    $oldE = Join-Path $g.Saved ($dailyWin + '.restore.old')
+    [IO.File]::WriteAllBytes($oldE, (New-TestBytes 41 8))
+    Set-Aged $g.Saved
+    $r = Invoke-Recover $g $preE
+    Check 'rs_recover' 'old_with_unverifiable_hash_is_unresolved' ($r.Out.Contains('action=unresolved path=MMODaily/MMOSave_Ali.json.restore.old reason=old_hash_not_in_preimage') -and ($r.Code -eq 4))
+    $r = Invoke-Recover $g $preE -Apply
+    Check 'rs_recover' 'unresolved_apply_exit_1_marker_kept_old_untouched' (($r.Code -eq 1) -and ($r.Out -like '*reason=recover_incomplete*') -and (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and ((Get-OracleSha $oldE) -ceq (Get-BytesSha (New-TestBytes 41 8))))
+    $mkTxt = [IO.File]::ReadAllText((Join-Path $g.Root $mkP))
+    [IO.File]::WriteAllText((Join-Path $g.Root $mkP), $mkTxt.Replace($preE.Substring($preE.LastIndexOf('\') + 1), '20270101T000000Z-prerestore'))
+    $r = Invoke-Recover $g $preE
+    Check 'rs_recover' 'marker_naming_another_preimage_refused' (($r.Code -eq 1) -and ($r.Out -like '*reason=recover_marker_mismatch*'))
+    $gN = New-RsFixture 'o_kG'
+    $r = Invoke-TestRestore -Snap $gN.Snap -Saved $gN.Saved -Root $gN.Root -Extra @{ Recover = $true }
+    Check 'rs_recover' 'non_preimage_snapshot_refused_for_recover' (($r.Code -eq 1) -and ($r.Out -like '*reason=recover_snapshot_not_preimage*'))
+    $r = Invoke-TestRestore -Snap $gN.Snap -Saved $gN.Saved -Root $gN.Root -Extra @{ Recover = $true; All = $true }
+    Check 'rs_recover' 'recover_with_scope_is_usage_error' (($r.Code -eq 2) -and ($r.Out -like '*reason=recover_excludes_scope*'))
+
+    # --- D10: beklenmedik istisnada isaret kalir; recover kapsar ---
+    $g = New-RbFixture 'o_kF'
+    $trF = Get-TreeOracle $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra @{ TestHooks = @{ BeforeFirstWrite = { param($pre) throw 'boom' } } }
+    $preF = Get-PreDir $g
+    Check 'rs_unexpected' 'unexpected_exception_exit_1_marker_left_with_recover_hint' (($r.Code -eq 1) -and ($r.Out -like '*reason=unexpected:*') -and ($r.Out -like '*code=marker_left_after_unexpected*') -and ($r.Out -like '*RestoreSaves.ps1 -Recover -Snapshot*') -and (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and (Test-Path -LiteralPath (Join-Path $g.Saved $mkM)))
+    Set-Aged $g.Saved
+    $r = Invoke-Recover $g $preF -Apply
+    Check 'rs_unexpected' 'recover_closes_marker_left_by_unexpected_exception' (($r.Code -eq 0) -and -not (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and -not (Test-Path -LiteralPath (Join-Path $g.Saved $mkM)) -and ((Get-TreeOracle $g.Saved) -ceq $trF))
+
+    # --- O2: bayat isaret zinciri ---
+    $g = New-RbFixture 'o_ch1'
+    $k = Invoke-KilledRestore $g 'BeforeFirstWrite'
+    $prevPre = [IO.Path]::GetFileName((Get-PreDir $g))
+    Check 'rs_chain' 'kill_before_first_write_leaves_marker_and_no_leftovers' (($k.Code -ne 0) -and (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and ((Get-LeftoverNames $g.Saved).Count -eq 0))
+    Set-Aged $g.Saved
+    $global:rsHook = @{ root = $g.Root; mk = '' }
+    $r = Invoke-Rs $g -Apply -Extra @{ AcknowledgeStaleRestoreMarker = $true; TestHooks = @{ BeforeFirstWrite = { param($pre) $global:rsHook.mk = [IO.File]::ReadAllText((Join-Path $global:rsHook.root 'restore_in_progress.json')) } } }
+    $mkj = $null
+    if ($global:rsHook.mk -ne '') { $mkj = $global:rsHook.mk | ConvertFrom-Json }
+    $staleF = @(Get-ChildItem -LiteralPath $g.Root -Force -File | Where-Object { $_.Name -like '*.stale' })
+    Check 'rs_chain' 'acknowledged_stale_marker_is_moved_not_deleted_both_copies' (($r.Code -eq 4) -and ($r.Out -like '*reason=stale_marker_acknowledged*') -and ($staleF.Count -eq 2) -and (@($staleF | Where-Object { ([IO.File]::ReadAllText($_.FullName)).Contains($prevPre) }).Count -eq 2) -and (@(Get-ChildItem -LiteralPath $g.Saved -Force -File | Where-Object { $_.Name -like '*.stale' }).Count -eq 0))
+    Check 'rs_chain' 'new_marker_carries_old_preimage_as_chain' (($null -ne $mkj) -and (@($mkj.chain).Count -eq 1) -and ($mkj.chain[0].preimage -ceq $prevPre) -and ($mkj.tool -ceq 'RestoreSaves/3') -and ($mkj.plan.Count -ge 1))
+    Check 'rs_chain' 'full_successful_restore_closes_chain_and_removes_marker' (-not (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) -and -not (Test-Path -LiteralPath (Join-Path $g.Saved $mkM)))
+    $g = New-RbFixture 'o_ch2'
+    $trCh = Get-TreeOracle $g.Saved
+    $k = Invoke-KilledRestore $g 'BeforeFirstWrite'
+    Set-Aged $g.Saved
+    $global:rsHook = @{ attempts = (New-Object System.Collections.ArrayList); victim = (Join-Path $g.Saved 'SaveGames\MMOSave_Ali Baba.sav.restore.tmp') }
+    $r = Invoke-Rs $g -Apply -Extra @{ AcknowledgeStaleRestoreMarker = $true; TestHooks = @{ BeforeFile = $failAt2 } }
+    [IO.Directory]::Delete($global:rsHook.victim)
+    $mkj2 = $null
+    if (Test-Path -LiteralPath (Join-Path $g.Root $mkP)) { $mkj2 = [IO.File]::ReadAllText((Join-Path $g.Root $mkP)) | ConvertFrom-Json }
+    Check 'rs_chain' 'full_rollback_with_open_chain_keeps_marker_and_warns' (($r.Code -eq 1) -and ($r.Out -like '*status=rolled_back*') -and ($r.Out -like '*code=restore_chain_open*') -and ($null -ne $mkj2) -and (@($mkj2.chain).Count -eq 1) -and (Test-Path -LiteralPath (Join-Path $g.Saved $mkM)) -and ((Get-TreeNoMk $g.Saved) -ceq ($trCh -split "`n" -join "`n")))
+    $g = New-RbFixture 'o_ch3'
+    $k = Invoke-KilledRestore $g 'BeforeFirstWrite'
+    Set-Aged $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra @{ AcknowledgeStaleRestoreMarker = $true; Slots = @('ali'); AcknowledgeCrossSlotRisk = $true }
+    Check 'rs_chain' 'slot_restore_with_open_chain_keeps_marker_exit_4' (($r.Code -eq 4) -and ($r.Out -like '*restore_chain_open*') -and (Test-Path -LiteralPath (Join-Path $g.Root $mkP)))
+
+    # --- O3: kilit + isaret ---
+    $g = New-RbFixture 'o_lk'
+    Set-Aged $g.Saved
+    $trLk = Get-TreeOracle $g.Saved
+    $lkFs = New-Object IO.FileStream((Join-Path $g.Root '.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    $r = Invoke-Rs $g -Apply
+    $lkFs.Dispose()
+    Check 'rs_lock' 'second_apply_while_lock_held_defers_3_and_touches_nothing' (($r.Code -eq 3) -and ($r.Out -like '*[[]MMO_RESTORE] status=deferred reason=lock_held*') -and ($r.Out -notlike '*[[]MMO_RESTORE_PRE]*') -and (Test-Untouched $g $trLk))
+    $g = New-RbFixture 'o_bk'
+    $global:rsHook = @{ saved = $g.Saved; root = $g.Root; code = -1; out = ''; p = $false; m = $false; same = $false }
+    $hkBk = { param($pre)
+        $bk = Invoke-TestBackup $global:rsHook.saved $global:rsHook.root @{ Timestamp = (Get-RsTs); Label = 'dur' }
+        $global:rsHook.code = $bk.Code; $global:rsHook.out = $bk.Out
+        $pp = Join-Path $global:rsHook.root 'restore_in_progress.json'; $mm = Join-Path $global:rsHook.saved 'MMORestoreInProgress.json'
+        $global:rsHook.p = (Test-Path -LiteralPath $pp); $global:rsHook.m = (Test-Path -LiteralPath $mm)
+        if ($global:rsHook.p -and $global:rsHook.m) { $global:rsHook.same = (([IO.File]::ReadAllText($pp)) -ceq ([IO.File]::ReadAllText($mm))) }
+    }
+    Set-Aged $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra @{ TestHooks = @{ BeforeFirstWrite = $hkBk } }
+    Check 'rs_lock' 'backup_during_restore_apply_defers_on_lock' (($r.Code -eq 0) -and ($global:rsHook.code -eq 3) -and ($global:rsHook.out -like '*reason=lock_held*') -and (@(Get-SnapDirs $g.Root | Where-Object { $_ -like '*-dur' }).Count -eq 0))
+    Check 'rs_marker' 'marker_exists_in_both_places_with_same_content_during_apply' (($global:rsHook.p -eq $true) -and ($global:rsHook.m -eq $true) -and ($global:rsHook.same -eq $true))
+    $lkProbe = $null
+    try { $lkProbe = New-Object IO.FileStream((Join-Path $g.Root '.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None, 4096, [IO.FileOptions]::DeleteOnClose) } catch { $lkProbe = $null }
+    Check 'rs_lock' 'lock_released_after_run' ($null -ne $lkProbe)
+    if ($null -ne $lkProbe) { $lkProbe.Dispose() }
+    $g = New-RsFixture 'o_bm'
+    $lastOkSha = Get-OracleSha (Join-Path $g.Root 'last_ok.json')
+    Write-TestText (Join-Path $g.Root $mkP) '{"x":1}'
+    $r = Invoke-TestBackup $g.Saved $g.Root @{ Timestamp = (Get-RsTs); Label = 'dur' }
+    Check 'rs_marker' 'backup_defers_3_when_primary_marker_present' (($r.Code -eq 3) -and ($r.Out -like '*reason=restore_in_progress*') -and (@(Get-SnapDirs $g.Root | Where-Object { $_ -like '*-dur' }).Count -eq 0))
+    [IO.File]::Delete((Join-Path $g.Root $mkP))
+    Write-TestText (Join-Path $g.Saved $mkM) '{"x":1}'
+    $r = Invoke-TestBackup $g.Saved $g.Root @{ Timestamp = (Get-RsTs); Label = 'dur' }
+    Check 'rs_marker' 'backup_defers_3_when_only_saved_mirror_present' (($r.Code -eq 3) -and ($r.Out -like '*reason=restore_in_progress*'))
+    $r = Invoke-TestBackup $g.Saved $g.Root @{ Timestamp = (Get-RsTs); Label = 'prerestore' }
+    Check 'rs_marker' 'prerestore_label_allowed_but_exit_4_and_last_ok_not_updated' (($r.Code -eq 4) -and ($r.Out -like '*reason=restore_marker_present*') -and ((Get-OracleSha (Join-Path $g.Root 'last_ok.json')) -ceq $lastOkSha))
+    $r = Invoke-Rs $g -Apply
+    Check 'rs_marker' 'restore_apply_refused_when_only_saved_mirror_present' (($r.Code -eq 3) -and ($r.Out -like '*reason=restore_in_progress_marker*') -and ($r.Out -like '*copies=saved_mirror_only*'))
+    [IO.File]::Delete((Join-Path $g.Saved $mkM))
+    $g = New-RbFixture 'o_mx'
+    Set-Aged $g.Saved
+    $trMx = Get-TreeOracle $g.Saved
+    $global:rsHook = @{ p = (Join-Path $g.Root $mkP) }
+    $r = Invoke-Rs $g -Apply -Extra @{ TestHooks = @{ BeforeMarkerWrite = { param($mp) Write-TestText $global:rsHook.p '{"x":1}' } } }
+    Check 'rs_marker' 'marker_created_by_a_concurrent_run_before_write_refuses_exit_3_nothing_written' (($r.Code -eq 3) -and ($r.Out -like '*reason=restore_marker_exists*') -and ((Get-TreeOracle $g.Saved) -ceq $trMx) -and (([IO.File]::ReadAllText($global:rsHook.p)) -ceq '{"x":1}'))
+
+    # --- D1: gercek yol (junction / 8.3) iliskisi ---
+    $g = New-RsFixture 'o_fp'
+    $jtF = Join-Path $g.Dir 'jf'
+    New-TestJunction $jtF $g.Dir
+    $trFp = Get-TreeOracle $g.Saved
+    $r = Invoke-TestRestore -Snap $g.Snap -Saved (Join-Path $jtF 'saved') -Root (Join-Path $g.Dir 'saved\bkroot') -Extra @{ All = $true; AllowRootAncestorReparse = $true; AcceptDifferentSource = $true }
+    Check 'rs_final_path' 'backup_root_inside_saved_through_junction_alias_is_caught' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_inside_saved*') -and ((Get-TreeOracle $g.Saved) -ceq $trFp))
+    Remove-TestJunction $jtF
+    $longDir = Join-Path $g.Dir 'LongDirectoryNameForEightDotThree'
+    [void][IO.Directory]::CreateDirectory($longDir)
+    $shortDir = $longDir
+    try { $shortDir = (New-Object -ComObject Scripting.FileSystemObject).GetFolder($longDir).ShortPath } catch { $shortDir = $longDir }
+    $has83 = ($shortDir -ne $longDir) -and ($shortDir -like '*~*')
+    Write-Host ('[MMO_BACKUP_INFO] eight_dot_three_available=' + $has83)
+    if ($has83) {
+        $svLong = Join-Path $longDir 'saved'
+        Copy-Item -LiteralPath $g.Saved -Destination $svLong -Recurse
+        $r = Invoke-TestRestore -Snap $g.Snap -Saved $svLong -Root (Join-Path $shortDir 'saved\bkroot') -Extra @{ All = $true; AcceptDifferentSource = $true }
+        Check 'rs_final_path' 'eight_dot_three_alias_of_saved_is_caught' (($r.Code -eq 3) -and ($r.Out -like '*reason=backup_root_inside_saved*'))
+    } else {
+        Check 'rs_final_path' 'eight_dot_three_alias_of_saved_is_caught' $true
+    }
+    $r = Invoke-TestRestore -Snap $g.Snap -Saved (Join-Path $g.Dir 'saved') -Root $g.Root -Extra @{ All = $true }
+    Check 'rs_final_path' 'ordinary_layout_not_falsely_refused' (($r.Code -eq 0) -or ($r.Code -eq 4))
+
+    # --- D2: manifest label / tool ---
+    $g = New-RsFixture 'o_lb'
+    $mLb = Read-TestManifest $g.Snap
+    Check 'rs_label' 'backup_manifest_has_label_and_tool' (($mLb.label -ceq 'img') -and ($mLb.tool -ceq 'BackupSaves/2'))
+    Check 'rs_label' 'restore_dry_run_snapshot_line_shows_label_and_tool' ((Invoke-Rs $g).Out.Contains(' label=img tool=BackupSaves/2 '))
+    $vr = Invoke-TestVerify @{ Snapshot = $g.Snap }
+    Check 'rs_label' 'verify_prints_label_and_tool_meta_line' ($vr.Out.Contains('[MMO_VERIFY_META] snap=' + [IO.Path]::GetFileName($g.Snap) + ' label="img" tool=BackupSaves/2'))
+    $cp = Join-Path $g.Dir 'lbcopy'
+    Copy-Item -LiteralPath $g.Snap -Destination $cp -Recurse
+    Edit-TestManifest $cp { param($m) $m.label = 'other' }
+    $tl = Test-MMOSnapshot -SnapshotDir $cp
+    Check 'rs_label' 'label_is_covered_by_header_digest' ((-not $tl.Ok) -and (HasErr $tl.Errors 'header_digest_mismatch'))
+    Edit-TestManifest $cp { param($m) $m.label = 'BAD LABEL' } -FixDigest
+    $tl = Read-MMOManifest -SnapshotDir $cp
+    Check 'rs_label' 'malformed_label_rejected' ((-not $tl.Ok) -and (HasErr $tl.Errors 'bad_label'))
+    $g = New-RsFixture 'o_lc'
+    Set-Live $g.Saved $alis (New-SavBytes 300 77)
+    Set-Live $g.Saved 'SaveGames\MMOSave_Zed One.sav' (New-SavBytes 120 21)
+    Set-Live $g.Saved 'SaveGames\MMOSave_Zed_One.sav' (New-SavBytes 121 22)
+    Set-Aged $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra @{ AcknowledgePartialState = $true }
+    $preLc = Get-PreDir $g
+    Check 'rs_label' 'real_preimage_manifest_has_prerestore_label' (($preLc -ne '') -and ((Read-TestManifest $preLc).label -ceq 'prerestore') -and ((Read-TestManifest $preLc).tool -ceq 'BackupSaves/2'))
+    Edit-TestManifest $preLc { param($m) $m.label = 'manual' } -FixDigest
+    $preLcSha = Get-OracleSha (Join-Path $preLc 'manifest.json')
+    Set-Aged $g.Saved
+    $r = Invoke-TestRestore -Snap $preLc -Saved $g.Saved -Root $g.Root -Extra @{ All = $true; Apply = $true; ExpectedManifestSha256 = $preLcSha; IncludeInvalid = $true; IncludeSideFiles = $true; AcknowledgePartialState = $true; AcceptCollisions = $true }
+    Check 'rs_label' 'accept_collisions_refused_when_manifest_label_is_not_prerestore_even_if_dir_name_is' (($r.Code -eq 1) -and ($r.Out -like '*reason=accept_collisions_label_mismatch*'))
+    $g = New-RbFixture 'o_lp'
+    $trLp = Get-TreeOracle $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra @{ TestHooks = @{ AfterPreimageTaken = { param($pre) Edit-TestManifest $pre { param($m) $m.label = 'manual' } -FixDigest } } }
+    Check 'rs_label' 'preimage_with_wrong_label_refused_before_any_write' (($r.Code -eq 1) -and ($r.Out -like '*reason=preimage_label_mismatch*') -and ((Get-TreeOracle $g.Saved) -ceq $trLp))
+
+    # --- D3: komut satirinda tek tirnak kacisi ---
+    $qName = 'o_q''uo$te' + [string][char]0x2019 + 'x'
+    $g = New-RbFixture $qName
+    $r = Invoke-Rs $g
+    $nl = @($r.Lines | Where-Object { $_ -like '*[[]MMO_RESTORE_NEXT]*' })
+    $parsedNext = ''
+    if ($nl.Count -ge 1) {
+        $cmdText = $nl[0].Substring($nl[0].IndexOf('RestoreSaves.ps1'))
+        $pe2 = $null
+        $ast2 = [System.Management.Automation.Language.Parser]::ParseInput($cmdText.Replace('<yedek alirken KAYDETTIGIN ozet>', 'x'), [ref]$null, [ref]$pe2)
+        $ce = $ast2.Find({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)
+        if ($null -ne $ce -and ($null -eq $pe2 -or $pe2.Count -eq 0)) { $parsedNext = $ce.CommandElements[2].Value }
+    }
+    Check 'rs_quote' 'dry_run_next_line_snapshot_path_round_trips_through_the_powershell_parser' (($g.Snap -like '*''*') -and ($parsedNext -ceq [IO.Path]::GetFullPath($g.Snap)))
+    $global:rsProcFlip = $false
+    $r = Invoke-Rs $g -Apply -Extra @{ ProcessProvider = $flipProv; TestHooks = @{ QuietEvery = 1; BeforeFile = { param($rel, $idx) if ($idx -eq 2) { $global:rsProcFlip = $true } } } }
+    $global:rsProcFlip = $false
+    $hl = @($r.Lines | Where-Object { $_ -like '*[[]MMO_RESTORE_ROLLBACK_FAILED]*' })
+    $parsedHint = ''
+    if ($hl.Count -ge 1) {
+        $cmdText2 = $hl[0].Substring($hl[0].IndexOf('RestoreSaves.ps1'))
+        $pe3 = $null
+        $ast3 = [System.Management.Automation.Language.Parser]::ParseInput($cmdText2, [ref]$null, [ref]$pe3)
+        $ce3 = $ast3.Find({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)
+        if ($null -ne $ce3 -and ($null -eq $pe3 -or $pe3.Count -eq 0)) { $parsedHint = $ce3.CommandElements[2].Value }
+    }
+    Check 'rs_quote' 'rollback_command_snapshot_path_round_trips_with_apostrophe_dollar_and_curly_quote' (($parsedHint -ceq [IO.Path]::GetFullPath((Get-PreDir $g))) -and ($parsedHint -ne ''))
+
+    # --- D4: rollback komutu kapsami + uyarilar ---
+    $g = New-RbFixture 'o_sl'
+    $global:rsProcFlip = $false
+    $r = Invoke-Rs $g -Apply -Extra @{ Slots = @('ali'); AcknowledgeCrossSlotRisk = $true; ProcessProvider = $flipProv; TestHooks = @{ QuietEvery = 1; BeforeFile = { param($rel, $idx) if ($idx -eq 2) { $global:rsProcFlip = $true } } } }
+    $global:rsProcFlip = $false
+    $hl4 = @($r.Lines | Where-Object { $_ -like '*[[]MMO_RESTORE_ROLLBACK_FAILED]*' })
+    Check 'rs_hint' 'slots_run_rollback_command_is_slot_scoped_not_all' (($hl4.Count -ge 1) -and ($hl4[0] -like '* -Slots ali -AcknowledgeCrossSlotRisk -IncludeInvalid*') -and ($hl4[0] -notlike '* -All *'))
+    Check 'rs_hint' 'failure_prints_not_routine_and_server_ran_warnings_and_recover_first' (($r.Out -like '*code=rollback_command_not_routine*') -and ($r.Out -like '*code=rollback_command_stale_if_server_ran*') -and ($r.Out -like '*code=recover_first*-Recover -Snapshot*'))
+
+    # --- D7: karantina ---
+    $g = New-RbFixture 'o_q1'
+    Set-Live $g.Saved 'MMODaily\MMOSave_Ali.json.tmp' '{"version":1,"changed":'
+    Set-Aged $g.Saved
+    $trQ1 = Get-TreeOracle $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra @{ QuarantineStaleSideFiles = $true; TestHooks = @{ BeforeQuarantineMove = { param($from, $to) Write-TestText $to 'squatter' } } }
+    Check 'rs_quarantine' 'move_failing_with_both_files_present_is_reported_and_nothing_lost' (($r.Code -eq 1) -and ($r.Out -like '*write_failed_rolled_back:quarantine_move_failed*') -and ($r.Out -like '*code=quarantine_both_present path=MMODaily/MMOSave_Ali.json.tmp*') -and ((Get-TreeOracle $g.Saved) -ceq $trQ1))
+    $g = New-RbFixture 'o_q2'
+    Set-Live $g.Saved 'MMODaily\MMOSave_Ali.json.tmp' '{"version":1,"changed":'
+    Set-Aged $g.Saved
+    $global:rsHook = @{ attempts = (New-Object System.Collections.ArrayList); victim = (Join-Path $g.Saved 'SaveGames\MMOSave_Ali Baba.sav.restore.tmp') }
+    $r = Invoke-Rs $g -Apply -Extra @{ QuarantineStaleSideFiles = $true; TestHooks = @{ BeforeFile = $failAt2; BeforeRollback = { param($pre) [IO.File]::Delete((Join-Path $pre 'quarantine\MMODaily\MMOSave_Ali.json.tmp')) } } }
+    [IO.Directory]::Delete($global:rsHook.victim)
+    Check 'rs_quarantine' 'missing_quarantined_file_at_rollback_is_a_reported_failure_not_silent' (($r.Code -eq 1) -and ($r.Out -like '*status=rollback_failed*') -and ($r.Out -like '*rollback MMODaily/MMOSave_Ali.json.tmp:quarantine_missing*'))
+
+    # --- D5: posta .bak / .tmp taramasi ---
+    $g = New-RsFixture 'o_ml1'
+    Set-Live $g.Saved $alis (New-SavBytes 300 77)
+    Set-Live $g.Saved 'MMOMail\MMOMail_ali_baba.json.bak' '{"version":2,"mails":[{"from":"Ali","text":"x","gold":5,"sent":1}]}'
+    Set-Aged $g.Saved
+    $r = Invoke-Rs $g -Extra $slotX
+    Check 'rs_mail' 'bak_mailbox_sender_trace_is_reported' (($r.Code -eq 0) -and ($r.Out -like '*code=mail_trace mailbox=MMOMail/MMOMail_ali_baba.json.bak slot=ali*'))
+    $r = Invoke-Rs $g -Apply -Extra $slotX
+    Check 'rs_mail' 'bak_mailbox_trace_requires_acknowledge' (($r.Code -eq 1) -and ($r.Out -like '*reason=partial_state_requires_acknowledge*'))
+    $g = New-RsFixture 'o_ml2'
+    Set-Live $g.Saved $alis (New-SavBytes 300 77)
+    Set-Live $g.Saved 'MMOMail\MMOMail_ali_baba.json.tmp' '{"version":2,"mai'
+    Set-Aged $g.Saved
+    $r = Invoke-Rs $g -Apply -Extra $slotX
+    Check 'rs_mail' 'unparseable_tmp_mailbox_is_warning_only' (($r.Code -eq 0) -and ($r.Out -like '*code=mail_side_unverified mailbox=MMOMail/MMOMail_ali_baba.json.tmp*'))
 
     # ---- 13. "Saved degismedi" kanitinin kendi testi (sentetik Saved, gercek degil) ----------------------------------------
     $fakeSaved = Join-Path $fx 'fake_saved'
@@ -3281,6 +3642,11 @@ try {
     Check 'realsaved' 'entry_count_unchanged' ($savedBefore.Count -eq $savedAfter.Count)
     Check 'realsaved' 'name_size_timestamp_digest_unchanged' ($savedBefore.Digest -ceq $savedAfter.Digest)
     Check 'realsaved' 'fixture_isolated' (-not (Test-MMOPathUnder -Path $fx -Root (Join-Path $RepoRoot 'Saved') -AllowEqual))
+}
+catch {
+    # Betik hatasi (istisna) sessizce cokmesin: ayrintisi yazilir ve benzersiz bir FAIL satiri uretilir (rapor satirlari yine basilir; mutasyon sinamasi cokmeyi `yakalandi` saymaz).
+    Write-Host ('[MMO_BACKUP_INFO] fatal_exception ' + $_.Exception.Message)
+    Check 'harness' 'fatal_exception' $false
 }
 finally {
     if ($null -eq $script:prevTestMode) { Remove-Item Env:\MMO_BACKUP_TESTMODE -ErrorAction SilentlyContinue } else { $env:MMO_BACKUP_TESTMODE = $script:prevTestMode }

@@ -60,7 +60,8 @@ $script:RootFull = $null
 $script:ModeName = 'quiesced'
 $script:ProcessCheck = 'none'
 $script:ManifestSha = ''
-$script:Notes = New-Object System.Collections.ArrayList
+$script:RestoreMarkerSeen = $false
+$script:Notes =New-Object System.Collections.ArrayList
 $script:Log = New-Object System.Collections.ArrayList
 
 function Write-BkLine {
@@ -372,6 +373,15 @@ function Invoke-BackupMain {
     try { $lockFs = New-Object IO.FileStream($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None, 4096, [IO.FileOptions]::DeleteOnClose) } catch { $lockErr = $_.Exception.Message }
     if ($null -ne $lockErr) { Stop-Backup 3 'lock_held' }
     try {
+        # 6b. Yarim kalmis / suren geri yukleme isareti (B3.2, O3 + D6: BackupRoot VE Saved yansimasi; kilit alindiktan SONRA bakilir).
+        # Isaret varken Saved\ yari geri yuklenmis olabilir: normal yedek "tam guvenilir" gorunurdu, bu yuzden ertelenir. Tek istisna
+        # pre-restore etiketi (RestoreSaves'in kendi on-goruntusu ya da elle alinan bozuk durum yedegi): alinir ama exit 4 + last_ok.json GUNCELLENMEZ.
+        $mk = Get-MMORestoreMarkerState -SavedFull $savedFull -RootFull $rootFull
+        if ($mk.Present) {
+            if ($Label -cne 'prerestore') { Stop-Backup 3 'restore_in_progress' }
+            $script:RestoreMarkerSeen = $true
+            Write-BkLine '_WARN' 'restore_in_progress isareti var: Saved\ yari geri yuklenmis olabilir; bu goruntu tam guvenilir sayilmaz, last_ok.json guncellenmez'
+        }
         # 7. Goruntu dizini (var olana ASLA yazilmaz)
         $snap = $rootFull + '\' + $name
         if ((Get-MMOAttributes $snap).State -ne 'missing') { Stop-Backup 1 'snapshot_exists' }
@@ -430,7 +440,7 @@ function Invoke-BackupMain {
         try {
             $m = New-MMOManifest -FilesRoot $filesRoot -SourceSavedDir $savedFull -Mode $mode -ShutdownProof $proof -UnstablePaths ([string[]]@($unstable.ToArray())) `
                 -ExpectedEntries $expected -SkippedEntries $skipped -ProofStale $proofStale -IgnoredCount $src.Ignored.Count -IgnoredSummary $ign.Text `
-                -ProcessCheck $script:ProcessCheck -AllowCollisions -AllowRootAncestorReparse:$AllowRootAncestorReparse
+                -ProcessCheck $script:ProcessCheck -AllowCollisions -AllowRootAncestorReparse:$AllowRootAncestorReparse -Label $Label -Tool 'BackupSaves/2'
             Write-MMOManifest -Manifest $m -SnapshotDir $snap -AllowRootAncestorReparse:$AllowRootAncestorReparse
         } catch { $mErr = $_.Exception.Message }
         if ($null -ne $mErr) {
@@ -461,6 +471,7 @@ function Invoke-BackupMain {
         if ($ign.PlayerData -gt 0 -and -not $AllowIgnored) { [void]$script:Notes.Add('ignored_player_data') }
         if ($coll.Count -gt 0) { [void]$script:Notes.Add('collision') }
         if ($proofStale -eq $true) { [void]$script:Notes.Add('proof_stale') }
+        if ($script:RestoreMarkerSeen) { [void]$script:Notes.Add('restore_marker_present') }
     } finally {
         if ($null -ne $lockFs) { $lockFs.Dispose() }
     }
@@ -520,7 +531,7 @@ if ($null -eq $statusRoot) {
             process_check = $script:ProcessCheck; time_utc = $stamp; tool = 'BackupSaves/2' })
     } catch { $okRun = $false }
     if (-not $okRun) { Write-BkLine '_WARN' 'last_run.json yazilamadi' }
-    if ($exitCode -eq 0 -and $script:ModeName -ceq 'quiesced') {
+    if ($exitCode -eq 0 -and $script:ModeName -ceq 'quiesced' -and -not $script:RestoreMarkerSeen) {
         $okOk = $false
         try {
             $okOk = Write-BkJsonAtomic -Path ($statusRoot + '\last_ok.json') -Object ([ordered]@{

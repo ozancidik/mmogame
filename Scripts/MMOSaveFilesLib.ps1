@@ -709,7 +709,8 @@ function Get-MMOHeaderDigest {
         'mode=' + [string](Get-MMOMember $Manifest 'mode') + "`n" +
         'shutdown_proof=' + $proofText + "`n"
     # B1 sertlestirme: istege bagli ust duzey alanlar yalniz VARSA ozete girer (eski manifestlerin ozeti degismez).
-    foreach ($ok in 'proof_stale', 'ignored_count', 'ignored_summary', 'process_check') {
+    # B3.2 (D2): 'label' (BackupSaves -Label; pre-restore goruntusu = 'prerestore') de varsa ozete girer.
+    foreach ($ok in 'proof_stale', 'ignored_count', 'ignored_summary', 'process_check', 'label') {
         $ov = Get-MMOMember $Manifest $ok
         if ($null -eq $ov) { continue }
         if ($ov -is [bool]) { if ($ov) { $ov = 'true' } else { $ov = 'false' } }
@@ -746,7 +747,10 @@ function New-MMOManifest {
         [string]$IgnoredSummary = '',
         [string]$ProcessCheck = '',
         [switch]$AllowCollisions,
-        [switch]$AllowRootAncestorReparse
+        [switch]$AllowRootAncestorReparse,
+        # B3.2 (D2): manifeste yazilan 'label' (verilmezse alan yok) ve 'tool' (verilmezse kutuphane adi). Header ozetine girerler.
+        $Label = $null,
+        [string]$Tool = ''
     )
     if ($CreatedUtc -eq '') { $CreatedUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture) }
     if (-not (Test-MMOUtcStamp $CreatedUtc)) { throw 'bad_created_utc' }
@@ -830,10 +834,13 @@ function New-MMOManifest {
     $ekeys = New-Object 'string[]' $arr.Length
     for ($ei = 0; $ei -lt $arr.Length; $ei++) { $ekeys[$ei] = [string]$arr[$ei]['path'] }
     [Array]::Sort($ekeys, $arr, [StringComparer]::Ordinal)
+    $toolName = $script:MMOSvToolName
+    if ($Tool -ne '') { $toolName = $Tool }
+    if ($null -ne $Label -and ([string]$Label) -cnotmatch '^[a-z0-9-]{0,24}\z') { throw 'bad_label' }
     $m = [ordered]@{
         format_version = $script:MMOSvManifestFormat
         created_utc = $CreatedUtc
-        tool = $script:MMOSvToolName
+        tool = $toolName
         source_saved_dir = $SourceSavedDir
         mode = $Mode
         shutdown_proof = $ShutdownProof
@@ -843,6 +850,7 @@ function New-MMOManifest {
     if ($null -ne $ProofStale) { $m['proof_stale'] = [bool]$ProofStale }
     if ($IgnoredCount -ge 0) { $m['ignored_count'] = $IgnoredCount; $m['ignored_summary'] = $IgnoredSummary }
     if ($ProcessCheck -ne '') { $m['process_check'] = $ProcessCheck }
+    if ($null -ne $Label) { $m['label'] = [string]$Label }
     if ($collStrings.Count -gt 0) { $m['collisions'] = [string[]]$collStrings }
     $m['header_digest'] = (Get-MMOHeaderDigest $m)
     return $m
@@ -970,6 +978,10 @@ function Read-MMOManifest {
     if ($null -ne $props['process_check']) {
         $pcv = $props['process_check'].Value
         if ($pcv -isnot [string] -or ($pcv -cne 'cim' -and $pcv -cne 'injected' -and $pcv -cne 'skipped')) { [void]$errs.Add('bad_process_check') }
+    }
+    if ($null -ne $props['label']) {
+        $lbv = $props['label'].Value
+        if ($lbv -isnot [string] -or $lbv -cnotmatch '^[a-z0-9-]{0,24}\z') { [void]$errs.Add('bad_label') }
     }
     $declaredColl = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     if ($null -ne $props['collisions']) {
@@ -1176,4 +1188,25 @@ function Read-MMOShutdownResult {
     $proof = [ordered]@{ run_id = $rid; exit_code = [int]$ec; time_utc = $ts }
     if ([int]$ec -ne 0) { return [pscustomobject]@{ Ok = $false; Reason = 'shutdown_not_clean'; Proof = $proof } }
     return [pscustomobject]@{ Ok = $true; Reason = ''; Proof = $proof }
+}
+
+# ---- geri yukleme is-isareti (B3.2: O3 / D6) -----------------------------------------------------------------------------
+# RestoreSaves -Apply ilk yazimdan ONCE iki yere isaret yazar: birincil <BackupRoot>\restore_in_progress.json ve AYNI BIRIMDE sabit yansima
+# <Saved>\MMORestoreInProgress.json. GEREKCE (D6): yedek koku baska birimde / baska yolda olabilir; yalniz orada duran isaret, farkli -BackupRoot ile
+# calisan bir BackupSaves / RestoreSaves tarafindan gorulmez. Yansima Saved ile birlikte durur ve backup_root alani isaretin hangi koku kullandigini soyler.
+# IKI YERDEN BIRI VARSA isaret VAR sayilir (fail-closed; erisilemeyen yol da "var").
+function Get-MMORestoreMarkerPaths {
+    param([string]$SavedFull, [string]$RootFull)
+    return [pscustomobject]@{ Primary = ($RootFull.TrimEnd('\') + '\restore_in_progress.json'); Mirror = ($SavedFull.TrimEnd('\') + '\MMORestoreInProgress.json') }
+}
+
+function Get-MMORestoreMarkerState {
+    param([string]$SavedFull, [string]$RootFull)
+    $p = Get-MMORestoreMarkerPaths -SavedFull $SavedFull -RootFull $RootFull
+    $a1 = Get-MMOAttributes $p.Primary
+    $a2 = Get-MMOAttributes $p.Mirror
+    return [pscustomobject]@{
+        Present = (($a1.State -ne 'missing') -or ($a2.State -ne 'missing'))
+        PrimaryPresent = ($a1.State -ne 'missing'); MirrorPresent = ($a2.State -ne 'missing')
+        Primary = $p.Primary; Mirror = $p.Mirror }
 }
