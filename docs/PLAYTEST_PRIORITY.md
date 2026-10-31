@@ -83,3 +83,12 @@ Süreler tahmindir **[TAHMİN]**. 2 pencere, "Play As Listen Server".
 - **Kill XP'si hasar payına orantılı ve parti payı üye sayısına bölünür** (PR #1, derlenmedi): %1 hasar = %1 XP; parti bonusu (+%10/ekstra üye, `MMOXPTuning::PartyMultiplier`) ile 8 kişilik partide herkes payın 1,7/8'ini alır (2 kişide %55).
 - **Ganimet** ilk 10 sn yalnızca XP payı olanlara rezerve (PR #1, derlenmedi).
 - `Scripts/ProgressionModel.py` ve `EconomyModel.py` **solo** oyuncuyu modeller; parti/paylaşım yok.
+
+## 7. Yedekleme araci ilk gercek deneme (kullanici isi, 2026-11-01)
+
+Arac gercek `Saved/` uzerinde hic calistirilmadi, PowerShell 7 dogrulanmadi (`docs/BACKUP_OPERATOR_GUIDE.md` §9):
+
+- [ ] `Saved` klasorunun SAHTE bir kopyasi uzerinde dene (`-SavedDir` / `-BackupRoot` ile ayri dizin); gercek `Saved`e `-Apply` yapma.
+- [ ] `BackupSaves.ps1` (sunucu kapali): cikis kodu ve `manifest_sha256` degerini ayri bir yere not et.
+- [ ] `VerifySaves.ps1 -Snapshot <goruntu> -ExpectedManifestSha256 <not ettigin ozet>`: beklenen cikis 0.
+- [ ] `RestoreSaves.ps1 -Snapshot <goruntu> -All` KURU CALISMA ciktisini oku (plan, ozet, uyarilar); `-Apply` yalniz sahte kopyada.
