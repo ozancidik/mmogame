@@ -49,6 +49,11 @@ $mut = @(
     (M 'd9_invisible_chars_not_replaced' 'RestoreSaves.ps1' @(, @(('\' + 'u3164\u2800\u115F\u1160\uFFA0\u034F\u17B4\u17B5'), '')) @('rs_sanitize/bidi_line_separator_braille_hangul_filler_and_c1_are_neutralized', 'rs_sanitize/no_hidden_or_bidi_character_on_any_console_line'))
     (M 'd5_side_mailboxes_not_scanned' 'RestoreSaves.ps1' @(, @("`$isSide = (`$c.Suffix -ceq '.bak' -or `$c.Suffix -ceq '.tmp')", '$isSide = $false')) @('rs_mail/bak_mailbox_sender_trace_is_reported', 'rs_mail/unparseable_tmp_mailbox_is_warning_only'))
     (M 'd10_no_recover_hint_after_unexpected' 'RestoreSaves.ps1' @(, @('code=marker_left_after_unexpected', 'code=nohint')) @('rs_unexpected/unexpected_exception_exit_1_marker_left_with_recover_hint') -All)
+    (M 'b1_character_bak_not_whitelisted' 'MMOSaveFilesLib.ps1' @(, @('\.tmp\.bad|\.tmp|\.bak|\.bad\.[1-4]|\.bad)?\z''', '\.tmp\.bad|\.tmp|\.bad\.[1-4]|\.bad)?\z''')) @('class/sg_bak.class'))
+    (M 'b2_character_bad_quota_widened' 'MMOSaveFilesLib.ps1' @(, @('\.bad\.[1-4]|\.bad)?\z''', '\.bad\.[1-9]|\.bad)?\z''')) @('class/sg_bad5_beyond_quota.class'))
+    (M 'b3_character_torn_tmp_marked_invalid' 'MMOSaveFilesLib.ps1' @(, @('if (-not $validS -and $ClassInfo.Suffix -eq ''.tmp'') {', 'if ($false) {')) @('charside/tmp_torn_is_valid_with_tmp_unparsable_note'))
+    (M 'b4_character_side_files_checked_as_json' 'MMOSaveFilesLib.ps1' @(, @('if ($ClassInfo.Kind -eq ''character'') {', 'if ($false) {')) @('charside/bak_with_bad_magic_is_invalid_not_json_checked', 'charside/tmp_complete_sav_valid_no_notes'))
+    (M 'b5_character_bad_n_not_a_lock' 'MMOSaveFilesLib.ps1' @(, @(' -or $suffix -cmatch ''^\.bad\.[1-4]\z''', '')) @('class/sg_bad1.class', 'class/sg_bad4.class'))
 )
 
 if ($Only.Count -gt 0) { $mut = @($mut | Where-Object { $Only -contains $_.Id }) }

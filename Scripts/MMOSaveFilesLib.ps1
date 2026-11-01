@@ -7,6 +7,8 @@
 #
 # Dosya sinifi (Get-MMOSaveFileClass):
 #   character = Saved/SaveGames/MMOSave_<ad>.sav
+#   side (karakter) = MMOSave_<ad>.sav.tmp / .sav.bak (S6.2 atomik yazim yan dosyalari; yedege girer, VARSAYILAN geri yuklenmez: -IncludeSideFiles)
+#   side-lock (karakter) = MMOSave_<ad>.sav.bad / .sav.bad.1 .. .sav.bad.4 / .sav.tmp.bad (bozuk dosya karantinasi; korunur, gecerlilik denetlenmez)
 #   side      = basarim/gunluk/posta/irk .json (+ .tmp, posta icin .bak)
 #   side-lock = .bad / .tmp.bad (karantina; irk .bad = secim kilidi, korunur)
 #   ignored   = beyaz liste disi (neden: Reason)
@@ -310,7 +312,7 @@ function Get-MMOSaveFileClass {
     $nameMode = 'player'
     if ($dir -ceq 'SaveGames') {
         $kind = 'character'
-        $rx = '^MMOSave_(?<n>.+)\.sav\z'
+        $rx = '^MMOSave_(?<n>.+?)\.sav(?<s>\.tmp\.bad|\.tmp|\.bak|\.bad\.[1-4]|\.bad)?\z'
     } elseif ($dir -ceq 'MMOAchievements') {
         $kind = 'achievement'
         $rx = '^MMOSave_(?<n>.+?)\.json(?<s>\.tmp\.bad|\.tmp|\.bad)?\z'
@@ -346,8 +348,8 @@ function Get-MMOSaveFileClass {
         $group = $name
     }
     $class = 'side'
-    if ($kind -eq 'character') { $class = 'character' }
-    elseif ($suffix -eq '.bad' -or $suffix -eq '.tmp.bad') { $class = 'side-lock' }
+    if ($kind -eq 'character' -and $suffix -eq '') { $class = 'character' }
+    elseif ($suffix -eq '.bad' -or $suffix -eq '.tmp.bad' -or $suffix -cmatch '^\.bad\.[1-4]\z') { $class = 'side-lock' }
     return (New-MMOClassResult $class $kind $group $suffix '')
 }
 
@@ -573,6 +575,14 @@ function Get-MMOBytesIntegrity {
     }
     if ($ClassInfo.Class -eq 'side-lock') {
         return [pscustomobject]@{ Valid = $true; Notes = 'lock_file' }
+    }
+    if ($ClassInfo.Kind -eq 'character') {
+        # Karakter yan dosyalari (.sav.tmp / .sav.bak) JSON degil .sav bicimindedir: boyut + GVAS basligi. Yarim yazim .tmp beklenir (valid=true).
+        $rs = Test-MMOSavBytes -Bytes $Bytes
+        $validS = $rs.Valid
+        $notesS = $rs.Reason
+        if (-not $validS -and $ClassInfo.Suffix -eq '.tmp') { $validS = $true; $notesS = 'tmp_unparsable' }
+        return [pscustomobject]@{ Valid = $validS; Notes = $notesS }
     }
     $r = Test-MMOJsonBytes -Bytes $Bytes -Kind $ClassInfo.Kind
     $notes = New-Object System.Collections.ArrayList

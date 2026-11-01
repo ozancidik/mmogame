@@ -14,7 +14,7 @@
 // Her Check benzersiz case/check cifti basar; matris sonuclari senaryo basina toplanir (satir sayisi mutasyonlarda sabit kalir).
 namespace
 {
-	constexpr int32 SlotAtomicTestExpectedChecks = 144;
+	constexpr int32 SlotAtomicTestExpectedChecks = 158;
 
 	using FSlotAtomicTestBytes = TArray<uint8>;
 
@@ -51,7 +51,9 @@ namespace
 	{
 	public:
 		TMap<FString, TArray<uint8>> Files;
-		TSet<FString> ReadOnly;          // Delete / WriteNew / Move-hedef-silme bu yollarda basarisiz olur
+		TSet<FString> ReadOnly;          // salt-okunur bit: WriteNew / Move-hedef-silme / Delete(bEvenReadOnly=false) basarisiz; Delete(true) calisir; bit yeniden adlandirmayla tasinir
+		TSet<FString> Locked;            // paylasim ihlali benzeri: Delete (her durumda) / WriteNew / Move-hedef-silme basarisiz
+		TSet<FString> EvenRoDeleted;     // Delete(bEvenReadOnly=true) ile silinmeye CALISILAN yollar (kapsam denetimi)
 		TSet<FString> Unreadable;        // ReadAll basarisiz
 		TSet<int32> FailOps;             // bu numarali alt adimlar etkisiz hata verir
 		TSet<int32> FailTornOps;         // bu numarali alt adim WriteNew ise yarim dosya birakip hata verir
@@ -85,7 +87,7 @@ namespace
 				After();
 				return false;
 			}
-			if (ReadOnly.Contains(Path)) { After(); return false; }
+			if (ReadOnly.Contains(Path) || Locked.Contains(Path)) { After(); return false; }
 			TArray<uint8> Stored = Bytes;
 			if (bCorruptWrites && Stored.Num() > 2) Stored[Stored.Num() / 2] ^= 0xFF;
 			if (OpCount == CrashAt && CrashTorn == 1) Stored.Reset();
@@ -103,27 +105,32 @@ namespace
 			{
 				// IFileManager::Move(Replace): hedef ONCE silinir (ayri adim), sonra yeniden adlandirilir.
 				if (Gate(false) != 2) return false;
-				if (ReadOnly.Contains(Dest)) { After(); return false; }
+				if (ReadOnly.Contains(Dest) || Locked.Contains(Dest)) { After(); return false; }
 				Files.Remove(Dest);
 				After();
 			}
 			if (Gate(false) != 2) return false;
 			TArray<uint8> V = Files.FindAndRemoveChecked(Src);
 			Files.Add(Dest, MoveTemp(V));
+			if (ReadOnly.Remove(Src) > 0) ReadOnly.Add(Dest); // yeniden adlandirma salt-okunur biti tasir
 			After();
 			return true;
 		}
 
-		virtual bool Delete(const FString& Path) override
+		virtual bool Delete(const FString& Path, bool bEvenReadOnly) override
 		{
 			++MutatingCalls;
+			if (bEvenReadOnly) EvenRoDeleted.Add(Path);
 			if (!Files.Contains(Path)) return true;
 			if (Gate(false) != 2) return false;
-			if (ReadOnly.Contains(Path)) { After(); return false; }
+			if (Locked.Contains(Path) || (ReadOnly.Contains(Path) && !bEvenReadOnly)) { After(); return false; }
 			Files.Remove(Path);
+			ReadOnly.Remove(Path);
 			After();
 			return true;
 		}
+
+		virtual void ClearReadOnly(const FString& Path) override { ReadOnly.Remove(Path); } // sayilan adim degil
 
 	private:
 		// 0 = surec olu (etkisiz), 1 = enjekte hata, 2 = calis.
@@ -450,7 +457,20 @@ namespace
 			F.Files.Add(P.Main, Old); F.Files.Add(P.Bak, Older);
 			F.Unreadable.Add(P.Main);
 			FMMOSlotLoadResult L = SlotAtomicTestLoad(F, P);
-			Check(TEXT("load_fail"), TEXT("unreadable_main_falls_to_bak"), L.bOk && L.Source == EMMOSlotLoadSource::Bak && L.Bytes == Older);
+			Check(TEXT("load_fail"), TEXT("unreadable_main_io_error_no_bak_fallback"), !L.bOk && L.Failure == EMMOSlotLoadFailure::IoError && L.Source == EMMOSlotLoadSource::None && L.Bytes.Num() == 0);
+		}
+		{
+			FSlotAtomicTestFs F;
+			F.Files.Add(P.Bak, Older); F.Files.Add(P.Tmp, TmpValid);
+			F.Unreadable.Add(P.Bak);
+			FMMOSlotLoadResult L = SlotAtomicTestLoad(F, P);
+			Check(TEXT("load_fail"), TEXT("unreadable_bak_with_main_missing_is_io_error_not_tmp"), !L.bOk && L.Failure == EMMOSlotLoadFailure::IoError && L.Bytes.Num() == 0);
+		}
+		{
+			FSlotAtomicTestFs F;
+			F.Files.Add(P.Main, TornMain); F.Files.Add(P.Bak, Older);
+			FMMOSlotLoadResult L = SlotAtomicTestLoad(F, P);
+			Check(TEXT("load_fail"), TEXT("content_corrupt_main_still_falls_to_bak_not_io_error"), L.bOk && L.Source == EMMOSlotLoadSource::Bak && L.Bytes == Older);
 		}
 
 		// --- Exists ---
@@ -464,6 +484,16 @@ namespace
 			F.Files.Remove(P.Bak);
 			F.Files.Add(P.Main, TornMain);
 			Check(TEXT("exists"), TEXT("corrupt_main_true"), FMMOSlotFileAtomic::Exists(F, P));
+		}
+		{
+			// D1: Exists = ana VEYA .bak VEYA GECERLI .tmp (Load ile tutarli). Yarim .tmp yetmez.
+			const FMMOSlotValidator Strict(SlotAtomicTestValidator);
+			FSlotAtomicTestFs F;
+			F.Files.Add(P.Tmp, TmpValid);
+			Check(TEXT("exists"), TEXT("valid_tmp_alone_true_with_validator_and_load_agrees"), FMMOSlotFileAtomic::Exists(F, P, &Strict) && SlotAtomicTestLoad(F, P).bOk);
+			FSlotAtomicTestFs G;
+			G.Files.Add(P.Tmp, TornTmp);
+			Check(TEXT("exists"), TEXT("torn_tmp_alone_false_with_validator"), !FMMOSlotFileAtomic::Exists(G, P, &Strict) && !SlotAtomicTestLoad(G, P).bOk);
 		}
 
 		// --- Save: erken ret (hicbir dosyaya dokunulmaz) ---
@@ -495,6 +525,22 @@ namespace
 			Check(TEXT("save_reject"), TEXT("invalid_bytes_rejected_by_validator"), !R.bOk && R.Failure == EMMOSlotSaveFailure::InvalidBytes && F.MutatingCalls == 0 && SlotAtomicTestSameFiles(F.Files, Before));
 		}
 		{
+			// S6.2 QA-2: kodun urettigi baytlar siki (.tmp) dogrulayicidan gecmezse hicbir dosyaya dokunulmaz.
+			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old);
+			const TMap<FString, TArray<uint8>> Before = F.Files;
+			const auto RejectAll = [](const TArray<uint8>&) { return false; };
+			const FMMOSlotValidator Strict(RejectAll);
+			const FMMOSlotSaveResult R = FMMOSlotFileAtomic::Save(F, P, NewD, SlotAtomicTestValidator, &Strict);
+			Check(TEXT("save_reject"), TEXT("noncanonical_bytes_rejected_before_any_write"), !R.bOk && R.Failure == EMMOSlotSaveFailure::NonCanonical && F.MutatingCalls == 0 && SlotAtomicTestSameFiles(F.Files, Before));
+		}
+		{
+			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old);
+			const auto AcceptAll = [](const TArray<uint8>&) { return true; };
+			const FMMOSlotValidator Strict(AcceptAll);
+			const FMMOSlotSaveResult R = FMMOSlotFileAtomic::Save(F, P, NewD, SlotAtomicTestValidator, &Strict);
+			Check(TEXT("save_reject"), TEXT("strict_validator_accepting_lets_save_proceed"), R.bOk && F.Files.FindRef(P.Main) == NewD);
+		}
+		{
 			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old); F.Files.Add(P.Bak, Older);
 			F.Unreadable.Add(P.Main);
 			const TMap<FString, TArray<uint8>> Before = F.Files;
@@ -512,11 +558,57 @@ namespace
 
 		// --- Save: enjekte hata sonuclari ---
 		{
+			// G-ORTA-1: kodun kendi salt-okunur .tmp'si SILINIR; Save basarili olur.
 			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old); F.Files.Add(P.Tmp, TornTmp);
 			F.ReadOnly.Add(P.Tmp);
+			const FMMOSlotSaveResult R = SlotAtomicTestSave(F, P, NewD);
+			Check(TEXT("inject"), TEXT("readonly_tmp_is_deleted_and_save_succeeds"), R.bOk && F.Files.FindRef(P.Main) == NewD && !F.Files.Contains(P.Tmp) && !F.ReadOnly.Contains(P.Tmp));
+		}
+		{
+			// Bayat (eski) .bak salt-okunursa Move(Replace) hedefi silemezdi; Save once onu kaldirir (kendi dosyamiz).
+			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old); F.Files.Add(P.Bak, Older);
+			F.ReadOnly.Add(P.Bak);
+			const FMMOSlotSaveResult R = SlotAtomicTestSave(F, P, NewD);
+			Check(TEXT("inject"), TEXT("readonly_stale_bak_replaced_save_succeeds"), R.bOk && F.Files.FindRef(P.Main) == NewD && !F.Files.Contains(P.Bak));
+		}
+		{
+			// Salt-okunur ANA dosya (eski duman testi enjeksiyonu): iki Save ust uste de basarili, veri kaybi yok, .bak kalmaz.
+			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old);
+			F.ReadOnly.Add(P.Main);
+			const FMMOSlotSaveResult R1 = SlotAtomicTestSave(F, P, NewD);
+			const FMMOSlotSaveResult R2 = SlotAtomicTestSave(F, P, Newer);
+			Check(TEXT("inject"), TEXT("readonly_main_two_saves_both_succeed_no_stale_bak"), R1.bOk && !R1.bStaleBakLeft && R2.bOk && !R2.bStaleBakLeft && F.Files.FindRef(P.Main) == Newer && F.Files.Num() == 1);
+		}
+		{
+			// Ana->.bak tasimasindan sonra .bak'in salt-okunur biti temizlenir (bayat .bak silinemese bile sonraki Save kilitlenmesin).
+			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old);
+			F.ReadOnly.Add(P.Main);
+			F.FailOps.Add(4); // .bak silme basarisiz -> bayat .bak kalir
+			const FMMOSlotSaveResult R = SlotAtomicTestSave(F, P, NewD);
+			Check(TEXT("inject"), TEXT("moved_readonly_main_clears_readonly_bit_on_bak"), R.bOk && R.bStaleBakLeft && F.Files.FindRef(P.Bak) == Old && !F.ReadOnly.Contains(P.Bak));
+		}
+		{
+			// Gercekten silinemeyen (kilitli) .tmp: dogrudan yazim YOK, Save false.
+			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old); F.Files.Add(P.Tmp, TornTmp);
+			F.Locked.Add(P.Tmp);
 			const TMap<FString, TArray<uint8>> Before = F.Files;
 			const FMMOSlotSaveResult R = SlotAtomicTestSave(F, P, NewD);
-			Check(TEXT("inject"), TEXT("readonly_tmp_fails_without_direct_write"), !R.bOk && R.Failure == EMMOSlotSaveFailure::TmpDeleteFailed && SlotAtomicTestSameFiles(F.Files, Before));
+			Check(TEXT("inject"), TEXT("locked_tmp_fails_without_direct_write"), !R.bOk && R.Failure == EMMOSlotSaveFailure::TmpDeleteFailed && SlotAtomicTestSameFiles(F.Files, Before));
+		}
+		{
+			// Kanitlar (ana dosya, .bad) HICBIR yolda bEvenReadOnly ile silinmeye calisilmaz; yalniz .tmp ve .bak.
+			bool bScoped = true;
+			FSlotAtomicTestFs Sets[4];
+			Sets[0].Files.Add(P.Main, Old); Sets[0].Files.Add(P.Bak, Older); Sets[0].Files.Add(P.Tmp, TornTmp);
+			Sets[1].Files.Add(P.Main, TornMain); Sets[1].Files.Add(P.Bak, Old); Sets[1].Files.Add(P.BadSlot(0), TornTmp);
+			Sets[2].Files.Add(P.Main, TornMain); Sets[2].Files.Add(P.Bak, TornBak);
+			Sets[3].Files.Add(P.Tmp, TmpValid);
+			for (FSlotAtomicTestFs& F : Sets)
+			{
+				SlotAtomicTestSave(F, P, NewD);
+				for (const FString& Deleted : F.EvenRoDeleted) { if (!(Deleted == P.Tmp || Deleted == P.Bak)) bScoped = false; }
+			}
+			Check(TEXT("inject"), TEXT("even_readonly_delete_scope_is_only_tmp_and_bak"), bScoped);
 		}
 		{
 			FSlotAtomicTestFs F; F.Files.Add(P.Main, Old);
@@ -605,6 +697,14 @@ namespace
 			const bool bMoved = F.Move(TEXT("D"), TEXT("S"));
 			Check(TEXT("fake_model"), TEXT("readonly_dest_makes_replace_fail_both_files_kept"), !bMoved && F.Files.FindRef(TEXT("D")) == Old && F.Files.FindRef(TEXT("S")) == NewD);
 		}
+		{
+			FSlotAtomicTestFs F; F.Files.Add(TEXT("S"), NewD);
+			F.ReadOnly.Add(TEXT("S"));
+			F.Move(TEXT("D"), TEXT("S"));
+			const bool bCarried = F.ReadOnly.Contains(TEXT("D")) && !F.ReadOnly.Contains(TEXT("S"));
+			F.ClearReadOnly(TEXT("D"));
+			Check(TEXT("fake_model"), TEXT("rename_carries_readonly_bit_and_clear_removes_it"), bCarried && !F.ReadOnly.Contains(TEXT("D")) && F.OpCount == 1);
+		}
 
 		// --- Yuva adi savunmasi (yol gecisi) ---
 		{
@@ -619,6 +719,11 @@ namespace
 			Check(TEXT("slot_name"), TEXT("trailing_space_rejected"), !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_Ali ")));
 			Check(TEXT("slot_name"), TEXT("control_char_rejected"), !FMMOSlotFileAtomic::IsValidSlotName(FString(TEXT("MMOSave_A")) + FString::Chr(0x0A) + TEXT("B")));
 			Check(TEXT("slot_name"), TEXT("over_128_chars_rejected"), !FMMOSlotFileAtomic::IsValidSlotName(FString(TEXT("MMOSave_")) + FString::ChrN(121, TEXT('a'))));
+			Check(TEXT("slot_name"), TEXT("length_boundary_128_accepted_129_rejected"), FMMOSlotFileAtomic::IsValidSlotName(FString(TEXT("MMOSave_")) + FString::ChrN(120, TEXT('a'))) && !FMMOSlotFileAtomic::IsValidSlotName(FString(TEXT("MMOSave_")) + FString::ChrN(121, TEXT('a'))));
+			Check(TEXT("slot_name"), TEXT("char_class_boundaries_and_exact_prefix"),
+				FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_AZaz09")) && !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_@")) && !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_["))
+				&& !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_`")) && !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_{")) && !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_/")) && !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSave_:"))
+				&& !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSaveAli")) && !FMMOSlotFileAtomic::IsValidSlotName(TEXT("MMOSav_Ali")));
 		}
 
 		UE_LOG(LogTemp, Display, TEXT("[MMO_SLOTATOMIC_MATRIX_TOTAL] scenarios=%d crash_points=%d fail_runs=%d fail2_runs=%d"), Scenarios.Num(), TotalCrash, TotalFail, TotalFail2);

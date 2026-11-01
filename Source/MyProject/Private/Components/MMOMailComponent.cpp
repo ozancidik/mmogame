@@ -7,6 +7,7 @@
 #include "Core/MMOMetrics.h"
 #include "Core/MMOServerLifecycle.h"
 #include "Core/MMONotify.h"
+#include "Save/MMOCharacterStoreSubsystem.h"
 #include "Player/MMOPlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Engine/World.h"
@@ -78,8 +79,14 @@ bool UMMOMailComponent::RecipientExists(const FString& Name) const
 			}
 		}
 	}
-	// Cevrimdisi: karakter kayit dosyasi var mi (yerel depo; bulut depoya gecince degistirilmeli).
-	const FString SavePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), FString(TEXT("MMOSave_")) + Wanted + TEXT(".sav"));
+	// Cevrimdisi: karakter kaydi var mi. Karakter magazasinin Exists'i (ana .sav VEYA .bak VEYA gecerli .tmp; S6.2 D1): yalniz .bak kalmis
+	// alici da "var" sayilir. Magaza yoksa eski dogrudan dosya bakisi.
+	const FString SlotName = FString(TEXT("MMOSave_")) + Wanted;
+	if (IMMOCharacterStore* Store = UMMOCharacterStoreSubsystem::Get(this))
+	{
+		return Store->Exists(SlotName);
+	}
+	const FString SavePath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames"), SlotName + TEXT(".sav"));
 	return IFileManager::Get().FileExists(*SavePath);
 }
 

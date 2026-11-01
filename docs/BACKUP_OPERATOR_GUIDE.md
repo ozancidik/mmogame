@@ -193,3 +193,23 @@ Hedefte canli dosya yokken baslayan kosuda (`preimage=none`) recover kullanilama
 - Ekrandaki hesaplanan ozeti `-ExpectedManifestSha256`'ya kopyalama (yedek alirken AYRI kaydettigin ozeti kullan).
 - Rollback komutunu rutin komut gibi calistirma; sunucu arada calistiysa hic calistirma.
 - Ayni `Saved`'e yazan baska bir makinedeki sunucu aciksa geri yukleme yapma.
+
+## 9. Karakter yan dosyalari ve bozuk dosya (.bad) kotasi (S6 atomik karakter kaydi)
+
+Karakter kaydi artik atomik yazilir (`docs/DESIGN_CHARACTER_SAVE_ATOMIC.md`). `Saved/SaveGames/` icinde `MMOSave_<ad>.sav` yaninda su dosyalar gorulebilir:
+
+| Dosya | Anlami | Yedek araci | Geri yukleme |
+|---|---|---|---|
+| `MMOSave_<ad>.sav.tmp` | yazimda gecici dosya (yarim olabilir) | yedege GIRER (`side`, yarim ise `tmp_unparsable` notu) | varsayilan HAYIR (`-IncludeSideFiles`) |
+| `MMOSave_<ad>.sav.bak` | yazim sirasinda bir onceki gecerli kayit (normalde saniyeler icinde silinir) | yedege girer (`side`; bozuksa valid=false) | varsayilan HAYIR (`-IncludeSideFiles`) |
+| `MMOSave_<ad>.sav.bad`, `.bad.1` .. `.bad.4`, `.sav.tmp.bad` | bozuk bulunup SILINMEDEN ayrilan dosya (kanit) | yedege girer (`side-lock`, icerik denetlenmez) | varsayilan HAYIR; kilit sayilir, tasinmaz |
+
+**Kota:** her karakter icin en fazla 5 bozuk dosya (`.bad`, `.bad.1`..`.bad.4`) saklanir. Kota dolunca o karakterin Save'i REDDEDILIR (`event=save_failed reason=bad_cap_reached`, `[MMOMETRIC] ev=save_bad_cap player=<ad>`): ilerleme kaydedilmez, sunucu hicbir dosyayi KENDILIGINDEN silmez. Isleyecek prosedur:
+
+1. `Saved/Logs`'ta `ev=save_bad_cap player=<ad>` gorulur. Once NEDEN bu kadar bozuk dosya oldugunu ara (`ev=load_failed reason=corrupt|io`, `event=recovered`, disk/antivirus/guc kesintisi).
+2. Oyuncu cevrimdisi iken (ya da sunucu kapaliyken) `BackupSaves.ps1` ile yedek al (bozuk dosyalar da yedege girer).
+3. `Saved/SaveGames/MMOSave_<ad>.sav.bad*` dosyalarini `LastWriteTime`'a gore sirala. **Silinecek/tasinacak olan yalniz `.bad`, `.bad.1`..`.bad.4` ve `.sav.tmp.bad` dosyalarindan EN ESKI olan(lar)dir.** Ana `.sav` ve `.sav.bak` dosyalarina ASLA dokunma (`.bak` gecerli tek kopya olabilir).
+4. Silmek yerine `Saved/SaveGames/_bad_archive/<ad>/` gibi bir alt klasore TASI (alt klasor yedek aracinca yok sayilir (`Reason=subdir`); yani arsivi AYRICA yedekle).
+5. Oyuncunun bir sonraki otomatik yazimi (60 sn) gecmeli; `ev=save_bad_cap` tekrar etmemeli. Tekrar ediyorsa kok neden hala vardir (kota yalniz belirtidir).
+
+**Bilinen sinir (R2):** yazim sirasinda ana dosya bir an `.bak`'a yeniden adlandirilir; yedek araci tam o anda calisirsa o karakteri o turda gormeyebilir. Sunucu calisirken yedek zaten tutarli degildir (bkz. bolum 1).

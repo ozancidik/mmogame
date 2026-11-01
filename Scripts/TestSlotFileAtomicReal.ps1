@@ -43,7 +43,7 @@ $lines = Get-Content -LiteralPath $log
 $cases = @($lines | Select-String '\[MMO_SLOTREAL_CASE\] (PASS|FAIL) case=\S+ check=\S+')
 $summaries = @($lines | Select-String '\[MMO_SLOTREAL_TEST\] (PASS|FAIL) checks=')
 $passes = @($lines | Select-String '\[MMO_SLOTREAL_TEST\] PASS checks=(\d+) reason=')
-$errors = @($lines | Select-String '\[MMO_SLOTREAL_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation')
+$errors = @($lines | Select-String '\[MMO_SLOTREAL_(CASE|TEST)\] FAIL|Error:|Fatal error|Ensure condition|Access violation' | Where-Object { $_.Line -notmatch 'test_injected=1' })  # QA-3 testi kasitli Error basar (ReportFormatSelfTest(false,test_injected=1)); yalniz o satir haric
 $lines | Select-String -SimpleMatch '[MMO_SLOTREAL_R1]' | ForEach-Object { Write-Output $_.Line }
 $lines | Select-String -SimpleMatch '[MMO_SLOTREAL_OBS]' | ForEach-Object { Write-Output $_.Line }
 $lines | Select-String -SimpleMatch '[MMO_SLOTREAL_INFO]' | ForEach-Object { Write-Output $_.Line }
@@ -55,7 +55,7 @@ $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
 # Beklenen N (SelfTest.cpp SlotRealTestExpectedChecks ve commit mesajiyla ayni).
-$expected = 62
+$expected = 100
 $consistent = ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_SLOTREAL_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 $savedUntouched = ((Get-SavedPrint) -eq $savedBefore)

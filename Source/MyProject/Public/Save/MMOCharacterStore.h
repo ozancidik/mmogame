@@ -50,11 +50,14 @@ private:
  *
  * Sozlesme (yerel dosya uygulamasinin bugunku davranisi):
  *  - Hepsi YALNIZ sunucuda/host'ta cagrilir (kimlik/otorite kontrolu cagiranda).
- *  - Load: yuva yoksa ya da okunamazsa false. Out yalniz true donunce anlamlidir. Verinin
- *    gecerliligi (bValid) cagiranda denetlenir; magaza veriyi yorumlamaz.
- *  - Save: yazim basarisiz olursa false; cagiran basarisizlikta durumunu ilerletmemelidir.
- *  - Exists: yuva diskte/depoda var mi.
- *  - ListSlotNames: karakter yuvalarinin adlari (klan adi cakisma taramasi icin). Bos olabilir.
+ *  - Load: yuva yoksa, okunamazsa (I/O hatasi dahil) ya da bozuksa false. Out yalniz true donunce anlamlidir. Verinin
+ *    OYUN ANLAMI (bValid, alan mantigi) cagiranda denetlenir. Yerel dosya magazasi DOSYA YAPISINI yorumlar (S6: GVAS basligi,
+ *    sinif adi, ust duzey etiket boyutlari, kanonik yeniden serilestirme) ve bozuk/kesik dosyayi motora vermeden reddeder; yan etkisizdir
+ *    (diski degistirmez). Exists true + Load false = "kayit var ama kullanilamiyor": cagiran bunu YENI karakter saymamali.
+ *  - Save: yazim basarisiz olursa false; cagiran basarisizlikta durumunu ilerletmemelidir. Yerel magaza atomiktir (.tmp -> Move; yarim
+ *    dosya asla ana dosya olmaz); her basarisizlik "[MMOMETRIC] ev=save_failed reason=<kod> player=<ad>" basar.
+ *  - Exists: yuva diskte/depoda var mi. Yerel magaza: ana dosya VEYA .bak VEYA gecerli bir .tmp (Load'un kullanabilecegi her sey).
+ *  - ListSlotNames: karakter yuvalarinin adlari (klan adi cakisma taramasi icin); yalniz-.bak ve gecerli yalniz-.tmp yuvalar dahil. Bos olabilir.
  *
  * ASENKRON SOZLESME: Gelecekteki bulut magazasi SaveAsync/LoadAsync'i gecikmeli tamamlar. Yerel
  * magaza varsayilan adaptoru senkron islemi yapip callback'i ayni karede cagirir. Bolge gecisi

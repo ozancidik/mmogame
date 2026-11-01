@@ -16,7 +16,7 @@ if ($RepoRoot -eq '') { $RepoRoot = Split-Path -Parent $PSScriptRoot }
 . (Join-Path $PSScriptRoot 'MMOSaveFilesLib.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi (asagidaki bolumlerin toplami; degisirse burada guncelle).
-$expected = 1460
+$expected = 1500
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -332,7 +332,16 @@ try {
         @('sg_nonmmo', 'SaveGames/Other.sav', 'ignored', '', '', '', 'not_whitelisted_name'),
         @('sg_lower_prefix', 'SaveGames/mmosave_ali.sav', 'ignored', '', '', '', 'not_whitelisted_name'),
         @('sg_upper_ext', 'SaveGames/MMOSave_Ali.SAV', 'ignored', '', '', '', 'not_whitelisted_name'),
-        @('sg_bak', 'SaveGames/MMOSave_Ali.sav.bak', 'ignored', '', '', '', 'not_whitelisted_name'),
+        @('sg_bak', 'SaveGames/MMOSave_Ali.sav.bak', 'side', 'character', 'ali', '.bak', ''),
+        @('sg_tmp', 'SaveGames/MMOSave_Ali.sav.tmp', 'side', 'character', 'ali', '.tmp', ''),
+        @('sg_tmpbad', 'SaveGames/MMOSave_Ali Baba.sav.tmp.bad', 'side-lock', 'character', 'ali_baba', '.tmp.bad', ''),
+        @('sg_bad', 'SaveGames/MMOSave_Ali.sav.bad', 'side-lock', 'character', 'ali', '.bad', ''),
+        @('sg_bad1', 'SaveGames/MMOSave_Ali.sav.bad.1', 'side-lock', 'character', 'ali', '.bad.1', ''),
+        @('sg_bad4', 'SaveGames/MMOSave_Ali.sav.bad.4', 'side-lock', 'character', 'ali', '.bad.4', ''),
+        @('sg_bad5_beyond_quota', 'SaveGames/MMOSave_Ali.sav.bad.5', 'ignored', '', '', '', 'not_whitelisted_name'),
+        @('sg_bad_upper', 'SaveGames/MMOSave_Ali.sav.BAD', 'ignored', '', '', '', 'not_whitelisted_name'),
+        @('sg_bak_tmp_chain', 'SaveGames/MMOSave_Ali.sav.bak.tmp', 'ignored', '', '', '', 'not_whitelisted_name'),
+        @('sg_bak_bad_name', 'SaveGames/MMOSave_Ali!.sav.bak', 'ignored', '', '', '', 'name_rule'),
         @('sg_double_ext', 'SaveGames/MMOSave_a.sav.sav', 'ignored', '', '', '', 'name_rule'),
         @('sg_umlaut', ('SaveGames/MMOSave_' + $oUml + 'mer.sav'), 'ignored', '', '', '', 'name_rule'),
         @('sg_cedilla', ('SaveGames/MMOSave_Ali' + $sCed + '.sav'), 'ignored', '', '', '', 'name_rule'),
@@ -366,6 +375,39 @@ try {
             Check 'class' ($c[0] + '.suffix') ($r.Suffix -ceq $c[5])
         }
     }
+
+    # ---- 4b. Karakter yan dosyalari (.sav.tmp/.bak/.bad, S6.2 atomik yazim): yedege girer, varsayilan geri yuklenmez ----
+    $savOk = [byte[]]@(0x47, 0x56, 0x41, 0x53) + [byte[]](, 0x01 * 80)
+    $savTorn = [byte[]]@(0x47, 0x56, 0x41, 0x53, 0x01, 0x02)
+    $savGarbage = [byte[]](, 0x41 * 100)
+    $ciTmp = Get-MMOSaveFileClass 'SaveGames/MMOSave_Ali.sav.tmp'
+    $ciBak = Get-MMOSaveFileClass 'SaveGames/MMOSave_Ali.sav.bak'
+    $ciBad = Get-MMOSaveFileClass 'SaveGames/MMOSave_Ali.sav.bad.2'
+    $itTmpOk = Get-MMOBytesIntegrity -Bytes $savOk -ClassInfo $ciTmp
+    $itTmpTorn = Get-MMOBytesIntegrity -Bytes $savTorn -ClassInfo $ciTmp
+    $itBakOk = Get-MMOBytesIntegrity -Bytes $savOk -ClassInfo $ciBak
+    $itBakGarbage = Get-MMOBytesIntegrity -Bytes $savGarbage -ClassInfo $ciBak
+    $itBad = Get-MMOBytesIntegrity -Bytes $savGarbage -ClassInfo $ciBad
+    Check 'charside' 'tmp_complete_sav_valid_no_notes' ($itTmpOk.Valid -and $itTmpOk.Notes -ceq '')
+    Check 'charside' 'tmp_torn_is_valid_with_tmp_unparsable_note' ($itTmpTorn.Valid -and $itTmpTorn.Notes -ceq 'tmp_unparsable')
+    Check 'charside' 'bak_complete_sav_valid' ($itBakOk.Valid -and $itBakOk.Notes -ceq '')
+    Check 'charside' 'bak_with_bad_magic_is_invalid_not_json_checked' ((-not $itBakGarbage.Valid) -and $itBakGarbage.Notes -ceq 'bad_magic')
+    Check 'charside' 'bad_quarantine_is_lock_file_valid_regardless_of_content' ($itBad.Valid -and $itBad.Notes -ceq 'lock_file')
+    $charEntries = @(
+        [pscustomobject]@{ path = 'SaveGames/MMOSave_Ali.sav'; valid = $true; notes = '' },
+        [pscustomobject]@{ path = 'SaveGames/MMOSave_Ali.sav.bak'; valid = $true; notes = '' },
+        [pscustomobject]@{ path = 'SaveGames/MMOSave_Ali.sav.tmp'; valid = $true; notes = 'tmp_unparsable' },
+        [pscustomobject]@{ path = 'SaveGames/MMOSave_Ali.sav.bad'; valid = $true; notes = 'lock_file' },
+        [pscustomobject]@{ path = 'SaveGames/MMOSave_Ali.sav.bad.2'; valid = $true; notes = 'lock_file' }
+    )
+    $csDef = Get-MMORestoreSelection -Entries $charEntries
+    $csOn = Get-MMORestoreSelection -Entries $charEntries -IncludeSideFiles
+    Check 'charside' 'default_restores_only_main_sav' (($csDef.Restore.Count -eq 1) -and ($csDef.Restore[0] -ceq 'SaveGames/MMOSave_Ali.sav'))
+    Check 'charside' 'default_skips_four_side_files_with_flag_reason' ((@($csDef.Skipped | Where-Object { $_.Reason -ceq 'side_file_requires_flag' }).Count -eq 4) -and ($csDef.Skipped.Count -eq 4))
+    Check 'charside' 'include_side_files_restores_all_five' (($csOn.Restore.Count -eq 5) -and ($csOn.Skipped.Count -eq 0))
+    $csGroups = Get-MMOSlotGroups ([string[]]@($charEntries | ForEach-Object { [string]$_.path }))
+    Check 'charside' 'all_five_files_form_one_slot_group_with_one_main' (($csGroups.Count -eq 1) -and ($csGroups['ali'].Items.Count -eq 5) -and (@($csGroups['ali'].Items | Where-Object { $_.Class -eq 'character' }).Count -eq 1))
+    Check 'charside' 'case_variant_bak_names_collide_but_different_suffixes_do_not' ((@(Find-MMOCollisions @('SaveGames/MMOSave_Ali.sav.bak', 'SaveGames/MMOSave_ALI.sav.bak')).Count -eq 1) -and (@(Find-MMOCollisions @('SaveGames/MMOSave_Ali.sav.bak', 'SaveGames/MMOSave_Ali.sav.tmp', 'SaveGames/MMOSave_Ali.sav')).Count -eq 0))
 
     # ---- 5. Slot gruplari ve harf cakismalari ------------------------------------------------------------------------
     $slotPaths = @(

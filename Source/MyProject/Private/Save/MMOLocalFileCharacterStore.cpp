@@ -54,6 +54,7 @@ namespace
 		{
 		case EMMOSlotSaveFailure::BadSize: return TEXT("bad_size");
 		case EMMOSlotSaveFailure::InvalidBytes: return TEXT("invalid_bytes");
+		case EMMOSlotSaveFailure::NonCanonical: return TEXT("noncanonical");
 		case EMMOSlotSaveFailure::MainUnreadable: return TEXT("main_unreadable");
 		case EMMOSlotSaveFailure::BadCapReached: return TEXT("bad_cap_reached");
 		case EMMOSlotSaveFailure::TmpDeleteFailed: return TEXT("tmp_delete_failed");
@@ -68,9 +69,29 @@ namespace
 	// Yuva adi dogrulandiktan sonra (ASCII izin listesi) log'a yazilabilir ad kismi.
 	FString MMOLocalFileStorePlayerOf(const FString& SlotName)
 	{
-		return SlotName.Mid(8); // "MMOSave_" sonrasi
+		return SlotName.Mid(8).Replace(TEXT(" "), TEXT("_")); // "MMOSave_" sonrasi; bosluk '_' (anahtar=deger satiri ayrisabilsin)
 	}
+
+	// Her Save basarisizligi icin tek tip satir (S6.2 G-ORTA-2): operatore gorunur; arayan (AMMOCharacter) zaten false'u yakalar.
+	// Gecersiz yuva adinda oyuncu adi YAZILMAZ (player=-): izin listesi disi baytlar loga girmesin.
+	void MMOLocalFileStoreReportSaveFailed(const FString& SlotName, const TCHAR* Reason, int32 Bytes)
+	{
+		const bool bNameOk = FMMOSlotFileAtomic::IsValidSlotName(SlotName);
+		if (bNameOk)
+		{
+			UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=save_failed slot=%s reason=%s bytes=%d"), *SlotName, Reason, Bytes);
+		}
+		else
+		{
+			UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=save_failed slot=- reason=%s len=%d"), Reason, SlotName.Len());
+		}
+		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOMETRIC] t=%.1f ev=save_failed reason=%s player=%s"), MMOMetrics::Seconds(), Reason, bNameOk ? *MMOLocalFileStorePlayerOf(SlotName) : TEXT("-"));
+	}
+
+	int32 GMMOLocalFileStoreFormatSelfTestRuns = 0;
 }
+
+TFunction<void(FMMOFileManagerSlotOps&)> FMMOLocalFileCharacterStore::TestOpsConfigurator;
 
 FMMOLocalFileCharacterStore::FMMOLocalFileCharacterStore(const FString& InDirectoryOverride)
 	: Directory(InDirectoryOverride.IsEmpty() ? FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("SaveGames")) : InDirectoryOverride)
@@ -226,14 +247,82 @@ bool FMMOLocalFileCharacterStore::IsValidMainBytes(const TArray<uint8>& Bytes)
 	return SerializeBytes(Parsed, Again) && Again == Bytes;
 }
 
+bool FMMOLocalFileCharacterStore::VerifyRoundTrip(const FMMOCharacterSaveData& In, const TArray<uint8>& Bytes)
+{
+	FMMOCharacterSaveData Check;
+	return ParseBytes(Bytes, Check) && Check.bValid == In.bValid;
+}
+
+bool FMMOLocalFileCharacterStore::CheckFormatRoundTrip(FString& OutWhy)
+{
+	OutWhy.Reset();
+	// Temsili ornek: her alan tipinden (dizi, struct dizisi, TMap<FName,int64>, FString, FVector/FRotator) en az bir deger.
+	FMMOCharacterSaveData Sample;
+	Sample.bValid = true;
+	Sample.Level = 17;
+	Sample.Experience = 345678;
+	Sample.Gold = 91234;
+	FMMOItemStack Stack; Stack.ItemId = TEXT("SelfTest_Potion"); Stack.Count = 3; Sample.Items.Add(Stack);
+	FMMOEquipmentInstance Equip; Equip.InstanceId = 7; Equip.ItemId = TEXT("SelfTest_Sword"); Equip.Plus = 3; Sample.EquipmentBag.Add(Equip);
+	Sample.NextInstanceId = 8;
+	Sample.LearnedSkills.Add(TEXT("SelfTest_SkillA"));
+	Sample.SkillCooldownExpiryUtcSeconds.Add(TEXT("SelfTest_SkillA"), 1700000000LL);
+	Sample.SkillCooldownExpiryUtcSeconds.Add(TEXT("SelfTest_SkillB"), 1700000999LL);
+	Sample.CompletedQuests.Add(TEXT("SelfTest_Quest"));
+	Sample.ClanName = TEXT("SelfTestClan");
+	Sample.Friends.Add(TEXT("SelfTestFriend"));
+	Sample.MapName = TEXT("SelfTest_scene");
+	Sample.Location = FVector(1.5, -2.25, 100.125);
+	Sample.Rotation = FRotator(0.0, 90.0, 0.0);
+	TArray<uint8> Bytes;
+	if (!SerializeBytes(Sample, Bytes)) { OutWhy = TEXT("serialize_failed"); return false; }
+	if (!HasSafeStructure(Bytes)) { OutWhy = TEXT("structure_walk_rejected_engine_output"); return false; }
+	FMMOCharacterSaveData Parsed;
+	if (!ParseBytes(Bytes, Parsed)) { OutWhy = TEXT("parse_failed"); return false; }
+	if (Parsed.Gold != Sample.Gold || Parsed.Level != Sample.Level || Parsed.SkillCooldownExpiryUtcSeconds.Num() != 2 || Parsed.ClanName != Sample.ClanName) { OutWhy = TEXT("fields_differ"); return false; }
+	if (!IsCanonical(Bytes)) { OutWhy = TEXT("not_canonical"); return false; }
+	return true;
+}
+
+void FMMOLocalFileCharacterStore::ReportFormatSelfTest(bool bOk, const FString& Why)
+{
+	if (bOk)
+	{
+		return;
+	}
+	UE_LOG(LogMMOSaveFile, Error, TEXT("[MMOSAVE] event=format_selftest_failed why=%s (motor surumu yukseltmesi sonrasi kayit bicimi/yapi yuruyusu uyumsuz olabilir: tum kayitlar bozuk gorunur, Save reddeder; TestSlotFileAtomicReal/TestCharacterStore kosun)"), *Why);
+	UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOMETRIC] t=%.1f ev=save_selftest_failed why=%s"), MMOMetrics::Seconds(), *Why);
+}
+
+int32 FMMOLocalFileCharacterStore::GetFormatSelfTestRunCount()
+{
+	return GMMOLocalFileStoreFormatSelfTestRuns;
+}
+
+void FMMOLocalFileCharacterStore::RunFormatSelfTestOnce()
+{
+	// Surec basina bir kez (C++ yerel statik baslatma); davranisi DEGISTIRMEZ.
+	static const bool bRan = []()
+	{
+		++GMMOLocalFileStoreFormatSelfTestRuns;
+		FString Why;
+		const bool bOk = FMMOLocalFileCharacterStore::CheckFormatRoundTrip(Why);
+		FMMOLocalFileCharacterStore::ReportFormatSelfTest(bOk, Why);
+		return true;
+	}();
+	(void)bRan;
+}
+
 bool FMMOLocalFileCharacterStore::Load(const FString& SlotName, FMMOCharacterSaveData& Out)
 {
+	RunFormatSelfTestOnce();
 	if (!FMMOSlotFileAtomic::IsValidSlotName(SlotName))
 	{
 		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=load_refused reason=bad_slot_name len=%d"), SlotName.Len());
 		return false;
 	}
 	FMMOFileManagerSlotOps Ops;
+	if (TestOpsConfigurator) { TestOpsConfigurator(Ops); }
 	const FMMOSlotAtomicPaths Paths = FMMOSlotAtomicPaths::From(SlotMainPath(SlotName));
 	const auto MainValid = [](const TArray<uint8>& B) { return FMMOLocalFileCharacterStore::IsValidMainBytes(B); };
 	const auto TmpValid = [](const TArray<uint8>& B) { return FMMOLocalFileCharacterStore::IsCanonical(B); };
@@ -241,9 +330,11 @@ bool FMMOLocalFileCharacterStore::Load(const FString& SlotName, FMMOCharacterSav
 	const FMMOSlotLoadResult R = FMMOSlotFileAtomic::Load(Ops, Paths, MainValid, &TmpValidator);
 	if (!R.bOk)
 	{
-		if (R.Failure == EMMOSlotLoadFailure::Corrupt)
+		if (R.Failure == EMMOSlotLoadFailure::Corrupt || R.Failure == EMMOSlotLoadFailure::IoError)
 		{
-			UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=load_failed slot=%s reason=corrupt"), *SlotName);
+			const TCHAR* Reason = R.Failure == EMMOSlotLoadFailure::IoError ? TEXT("io") : TEXT("corrupt");
+			UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=load_failed slot=%s reason=%s"), *SlotName, Reason);
+			UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOMETRIC] t=%.1f ev=load_failed reason=%s player=%s"), MMOMetrics::Seconds(), Reason, *MMOLocalFileStorePlayerOf(SlotName));
 		}
 		return false;
 	}
@@ -264,20 +355,33 @@ bool FMMOLocalFileCharacterStore::Load(const FString& SlotName, FMMOCharacterSav
 
 bool FMMOLocalFileCharacterStore::Save(const FString& SlotName, const FMMOCharacterSaveData& In)
 {
+	RunFormatSelfTestOnce();
 	if (!FMMOSlotFileAtomic::IsValidSlotName(SlotName))
 	{
 		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=save_refused reason=bad_slot_name len=%d"), SlotName.Len());
+		MMOLocalFileStoreReportSaveFailed(SlotName, TEXT("bad_slot_name"), 0);
+		return false;
+	}
+	// D2: .tmp yolu surec ici tek yazar varsayar (kilitsiz). Oyun is parcacigi disindan cagri reddedilir (cokertmeden: log + metrik).
+	if (!IsInGameThread())
+	{
+		MMOLocalFileStoreReportSaveFailed(SlotName, TEXT("not_game_thread"), 0);
 		return false;
 	}
 	const double Start = FPlatformTime::Seconds();
 	TArray<uint8> Bytes;
-	FMMOCharacterSaveData Check;
-	if (!SerializeBytes(In, Bytes) || !ParseBytes(Bytes, Check) || Check.bValid != In.bValid)
+	if (!SerializeBytes(In, Bytes))
 	{
-		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=save_failed slot=%s reason=serialize"), *SlotName);
+		MMOLocalFileStoreReportSaveFailed(SlotName, TEXT("serialize"), Bytes.Num());
+		return false;
+	}
+	if (!VerifyRoundTrip(In, Bytes))
+	{
+		MMOLocalFileStoreReportSaveFailed(SlotName, TEXT("roundtrip"), Bytes.Num());
 		return false;
 	}
 	FMMOFileManagerSlotOps Ops;
+	if (TestOpsConfigurator) { TestOpsConfigurator(Ops); }
 	const FMMOSlotAtomicPaths Paths = FMMOSlotAtomicPaths::From(SlotMainPath(SlotName));
 	const auto MainValid = [](const TArray<uint8>& B) { return FMMOLocalFileCharacterStore::IsValidMainBytes(B); };
 	const auto TmpValid = [](const TArray<uint8>& B) { return FMMOLocalFileCharacterStore::IsCanonical(B); };
@@ -285,7 +389,7 @@ bool FMMOLocalFileCharacterStore::Save(const FString& SlotName, const FMMOCharac
 	const FMMOSlotSaveResult R = FMMOSlotFileAtomic::Save(Ops, Paths, Bytes, MainValid, &TmpValidator);
 	if (!R.bOk)
 	{
-		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=save_failed slot=%s reason=%s bytes=%d"), *SlotName, MMOLocalFileStoreSaveFailureName(R.Failure), Bytes.Num());
+		MMOLocalFileStoreReportSaveFailed(SlotName, MMOLocalFileStoreSaveFailureName(R.Failure), Bytes.Num());
 		if (R.Failure == EMMOSlotSaveFailure::BadCapReached)
 		{
 			UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOMETRIC] t=%.1f ev=save_bad_cap player=%s"), MMOMetrics::Seconds(), *MMOLocalFileStorePlayerOf(SlotName));
@@ -295,6 +399,7 @@ bool FMMOLocalFileCharacterStore::Save(const FString& SlotName, const FMMOCharac
 	if (R.bStaleBakLeft)
 	{
 		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOSAVE] event=stale_bak_left slot=%s"), *SlotName);
+		UE_LOG(LogMMOSaveFile, Warning, TEXT("[MMOMETRIC] t=%.1f ev=save_stale_bak player=%s"), MMOMetrics::Seconds(), *MMOLocalFileStorePlayerOf(SlotName));
 	}
 	const double Elapsed = FPlatformTime::Seconds() - Start;
 	if (Elapsed > MMOLocalFileStoreSlowSaveSeconds)
@@ -306,25 +411,70 @@ bool FMMOLocalFileCharacterStore::Save(const FString& SlotName, const FMMOCharac
 
 bool FMMOLocalFileCharacterStore::Exists(const FString& SlotName)
 {
+	RunFormatSelfTestOnce();
 	if (!FMMOSlotFileAtomic::IsValidSlotName(SlotName))
 	{
 		return false;
 	}
 	FMMOFileManagerSlotOps Ops;
-	return FMMOSlotFileAtomic::Exists(Ops, FMMOSlotAtomicPaths::From(SlotMainPath(SlotName)));
+	const auto TmpValid = [](const TArray<uint8>& B) { return FMMOLocalFileCharacterStore::IsCanonical(B); };
+	const FMMOSlotValidator TmpValidator(TmpValid);
+	return FMMOSlotFileAtomic::Exists(Ops, FMMOSlotAtomicPaths::From(SlotMainPath(SlotName)), &TmpValidator);
 }
 
 void FMMOLocalFileCharacterStore::ListSlotNames(TArray<FString>& Out)
 {
-	// Yalniz karakter yuvalari (MMOSave_*): ayni klasorde baska .sav'lar olabilir. .sav.tmp/.bak/.bad eslesmez.
+	RunFormatSelfTestOnce();
+	// Yalniz karakter yuvalari (MMOSave_*): ayni klasorde baska .sav'lar olabilir.
+	// D1: yalniz .bak'i (ana kayip) ya da GECERLI .tmp'si (ilk kayit yarida kesildi) olan yuvalar da listelenir ki klan adi cakisma taramasi
+	// onlari kacirmasin (Exists ile ayni kural). .sav.bad / .sav.bad.N yuva sayilmaz.
+	TSet<FString> Seen;
+	const auto AddUnique = [&](const FString& Name)
+	{
+		bool bAlready = false;
+		Seen.Add(Name.ToLower(), &bAlready);
+		if (!bAlready)
+		{
+			Out.Add(Name);
+		}
+	};
 	TArray<FString> Files;
 	IFileManager::Get().FindFiles(Files, *FPaths::Combine(Directory, TEXT("MMOSave_*.sav")), true, false);
 	for (const FString& File : Files)
 	{
 		if (!File.EndsWith(TEXT(".sav"), ESearchCase::IgnoreCase))
 		{
-			continue; // Windows joker 8.3 kisa ad eslesmesi: yalniz tam ".sav" sonlu dosyalar
+			continue; // Windows joker 8.3 kisa ad eslesmesi (ornegin .savx): yalniz tam ".sav" sonlu dosyalar
 		}
-		Out.Add(FPaths::GetBaseFilename(File));
+		AddUnique(FPaths::GetBaseFilename(File));
+	}
+	Files.Reset();
+	IFileManager::Get().FindFiles(Files, *FPaths::Combine(Directory, TEXT("MMOSave_*.sav.bak")), true, false);
+	for (const FString& File : Files)
+	{
+		if (File.EndsWith(TEXT(".sav.bak"), ESearchCase::IgnoreCase))
+		{
+			AddUnique(File.LeftChop(8));
+		}
+	}
+	Files.Reset();
+	IFileManager::Get().FindFiles(Files, *FPaths::Combine(Directory, TEXT("MMOSave_*.sav.tmp")), true, false);
+	FMMOFileManagerSlotOps Ops;
+	for (const FString& File : Files)
+	{
+		if (!File.EndsWith(TEXT(".sav.tmp"), ESearchCase::IgnoreCase))
+		{
+			continue;
+		}
+		const FString Name = File.LeftChop(8);
+		if (Seen.Contains(Name.ToLower()))
+		{
+			continue;
+		}
+		TArray<uint8> Bytes;
+		if (Ops.ReadAll(FPaths::Combine(Directory, File), Bytes) && IsCanonical(Bytes))
+		{
+			AddUnique(Name);
+		}
 	}
 }

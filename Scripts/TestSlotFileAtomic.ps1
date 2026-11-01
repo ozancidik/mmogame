@@ -44,8 +44,8 @@ $errors | ForEach-Object { Write-Output $_.Line }
 $reported = 0
 if ($passes.Count -eq 1 -and $passes[0].Line -match 'checks=(\d+)') { $reported = [int]$Matches[1] }
 $unique = @($cases | ForEach-Object { if ($_.Line -match 'case=(\S+) check=(\S+)') { $Matches[1] + '/' + $Matches[2] } } | Sort-Object -Unique)
-# Beklenen = 144 (SelfTest.cpp SlotAtomicTestExpectedChecks ve commit mesajiyla ayni): 11 senaryo x 9 matris kontrolu + 44 adlandirilmis vaka.
-$expected = 144
+# Beklenen = 158 (SelfTest.cpp SlotAtomicTestExpectedChecks ve commit mesajiyla ayni): 11 senaryo x 9 matris kontrolu + 59 adlandirilmis vaka.
+$expected = 158
 $consistent = ($reported -eq $expected) -and ($cases.Count -eq $reported) -and ($unique.Count -eq $reported)
 Write-Output "[MMO_SLOTATOMIC_RUNNER] reported=$reported case_lines=$($cases.Count) unique_labels=$($unique.Count) consistent=$consistent"
 if ($timedOut) { Write-Output 'FAIL watchdog_90s'; exit 2 }

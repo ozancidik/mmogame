@@ -54,8 +54,9 @@ EMMOSlotFileState FMMOSlotFileAtomic::Classify(IMMOSlotFileOps& Ops, const FStri
 FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, FMMOSlotValidator Validate, const FMMOSlotValidator* TmpValidate)
 {
 	FMMOSlotLoadResult R;
-	bool bIo = false;
-	const EMMOSlotFileState MainState = Classify(Ops, Paths.Main, Validate, &R.Bytes, bIo);
+	const auto IoFail = [&R]() { R.Bytes.Reset(); R.bOk = false; R.Source = EMMOSlotLoadSource::None; R.Failure = EMMOSlotLoadFailure::IoError; return R; };
+	bool bMainIo = false;
+	const EMMOSlotFileState MainState = Classify(Ops, Paths.Main, Validate, &R.Bytes, bMainIo);
 	if (MainState == EMMOSlotFileState::Valid)
 	{
 		R.bOk = true;
@@ -63,8 +64,11 @@ FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlot
 		R.Failure = EMMOSlotLoadFailure::None;
 		return R;
 	}
+	// Ana dosya VAR ama I/O hatasiyla okunamadi: icerigi bozuk oldugu KANITLANMADI, .bak'a dusmek eski veriyi yeni gibi sunar. Belirsiz -> hata.
+	if (bMainIo) return IoFail();
 	R.Bytes.Reset();
-	const EMMOSlotFileState BakState = Classify(Ops, Paths.Bak, Validate, &R.Bytes, bIo);
+	bool bBakIo = false;
+	const EMMOSlotFileState BakState = Classify(Ops, Paths.Bak, Validate, &R.Bytes, bBakIo);
 	if (BakState == EMMOSlotFileState::Valid)
 	{
 		R.bOk = true;
@@ -72,11 +76,13 @@ FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlot
 		R.Failure = EMMOSlotLoadFailure::None;
 		return R;
 	}
+	if (bBakIo) return IoFail();
 	R.Bytes.Reset();
 	// .tmp yalniz ana VE .bak hic yokken (ilk kayit yarida kesildi) ve dogrulayici kabul ederse; yarim olabilecek dosya baska yolda kullanilmaz.
 	if (MainState == EMMOSlotFileState::Missing && BakState == EMMOSlotFileState::Missing)
 	{
-		if (Classify(Ops, Paths.Tmp, TmpValidate ? *TmpValidate : Validate, &R.Bytes, bIo) == EMMOSlotFileState::Valid)
+		bool bTmpIo = false;
+		if (Classify(Ops, Paths.Tmp, TmpValidate ? *TmpValidate : Validate, &R.Bytes, bTmpIo) == EMMOSlotFileState::Valid)
 		{
 			R.bOk = true;
 			R.Source = EMMOSlotLoadSource::Tmp;
@@ -91,15 +97,18 @@ FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlot
 	return R;
 }
 
-bool FMMOSlotFileAtomic::Exists(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths)
+bool FMMOSlotFileAtomic::Exists(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, const FMMOSlotValidator* TmpValidate)
 {
-	return Ops.Exists(Paths.Main) || Ops.Exists(Paths.Bak);
+	if (Ops.Exists(Paths.Main) || Ops.Exists(Paths.Bak)) return true;
+	// Ana ve .bak yok: Load yalniz GECERLI bir .tmp'yi kullanir (ilk kayit yarida kesildi); Exists de ayni kosulda true olmali.
+	bool bIo = false;
+	return TmpValidate && Classify(Ops, Paths.Tmp, *TmpValidate, nullptr, bIo) == EMMOSlotFileState::Valid;
 }
 
 void FMMOSlotFileAtomic::DiscardTmp(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths)
 {
-	// Kendi .tmp'miz: silinir; silinemezse .tmp.bad'e ayrilir (bir sonraki Save yeniden .tmp kullanabilsin).
-	if (Ops.Exists(Paths.Tmp) && !Ops.Delete(Paths.Tmp))
+	// Kendi .tmp'miz: salt-okunur olsa da silinir; silinemezse .tmp.bad'e ayrilir (bir sonraki Save yeniden .tmp kullanabilsin).
+	if (Ops.Exists(Paths.Tmp) && !Ops.Delete(Paths.Tmp, true))
 	{
 		Ops.Move(Paths.TmpBad(), Paths.Tmp);
 	}
@@ -113,6 +122,8 @@ FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlot
 	// 1-2) Boyut ve dogrulama: basarisizsa hicbir dosyaya dokunulmaz.
 	if (Bytes.Num() <= 0 || Bytes.Num() > MaxBytes) return Fail(EMMOSlotSaveFailure::BadSize);
 	if (!Validate(Bytes)) return Fail(EMMOSlotSaveFailure::InvalidBytes);
+	// Kodun KENDI urettigi baytlar .tmp dogrulayicisindan (sikidir: kanonik) gecmeli; kararsizsa onceki dosyaya dokunmadan reddedilir.
+	if (TmpValidate && !(*TmpValidate)(Bytes)) return Fail(EMMOSlotSaveFailure::NonCanonical);
 
 	// Mevcut dosyalari SINIFLA (yalniz okuma). Okunamayan dosya bozuk sayilip tasinmaz: fail-closed.
 	bool bIo = false;
@@ -143,8 +154,8 @@ FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlot
 		BakState = EMMOSlotFileState::Valid;
 	}
 
-	// 3) Eski .tmp: silinir; silinemezse false (dogrudan-yazim yedegi YOK, atomiklik geri gelmesin).
-	if (Ops.Exists(Paths.Tmp) && !Ops.Delete(Paths.Tmp)) return Fail(EMMOSlotSaveFailure::TmpDeleteFailed);
+	// 3) Eski .tmp: silinir (kendi dosyamiz: salt-okunur olsa da); silinemezse false (dogrudan-yazim yedegi YOK, atomiklik geri gelmesin).
+	if (Ops.Exists(Paths.Tmp) && !Ops.Delete(Paths.Tmp, true)) return Fail(EMMOSlotSaveFailure::TmpDeleteFailed);
 
 	// 4) .tmp yaz, geri oku, bayt-bayt esit olmali.
 	if (!Ops.WriteNew(Paths.Tmp, Bytes))
@@ -175,11 +186,21 @@ FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlot
 	}
 	else if (MainState == EMMOSlotFileState::Valid)
 	{
+		// Eski gecerli .bak (bayat kopya) once kaldirilir: Move(Replace) hedefi salt-okunur ise silemez (motor EvenIfReadOnly kullanmaz).
+		// Ana dosya bu sirada gecerli ve yerinde oldugundan kayip penceresi yoktur.
+		const bool bStaleBakPresent = Ops.Exists(Paths.Bak);
+		if (bStaleBakPresent && !Ops.Delete(Paths.Bak, true))
+		{
+			DiscardTmp(Ops, Paths);
+			return Fail(EMMOSlotSaveFailure::RotateFailed);
+		}
 		if (!Ops.Move(Paths.Bak, Paths.Main))
 		{
 			DiscardTmp(Ops, Paths);
 			return Fail(EMMOSlotSaveFailure::RotateFailed);
 		}
+		// Salt-okunur ana dosya yeniden adlandirmayla .bak'a gecti: biti temizle ki bayat .bak sonraki Save'i kilitlemesin.
+		Ops.ClearReadOnly(Paths.Bak);
 	}
 
 	// 6) .tmp -> ana. Bu noktada ana yol bos oldugundan Move'un "once hedefi sil" penceresi yoktur; tek yeniden adlandirma.
@@ -193,8 +214,8 @@ FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlot
 		return Fail(EMMOSlotSaveFailure::PromoteFailed);
 	}
 
-	// 7) Basari: .bak temizlenir; silinemezse bayat kopya kalir (yalniz ana yok/gecersizken kullanilir).
-	if (Ops.Exists(Paths.Bak) && !Ops.Delete(Paths.Bak)) R.bStaleBakLeft = true;
+	// 7) Basari: .bak temizlenir (kendi dosyamiz: salt-okunur olsa da); silinemezse bayat kopya kalir (yalniz ana yok/gecersizken kullanilir).
+	if (Ops.Exists(Paths.Bak) && !Ops.Delete(Paths.Bak, true)) R.bStaleBakLeft = true;
 	R.bOk = true;
 	R.Failure = EMMOSlotSaveFailure::None;
 	return R;
