@@ -40,7 +40,7 @@ $mut = @(
     (M 'm13_bak_not_put_back_on_promote_failure' @(, @('Ops.Move(Paths.Main, Paths.Bak);', ';')) @('inject/promote_failure_puts_old_back_as_main'))
     (M 'm14_bak_never_cleaned_after_success' @(, @('if (Ops.Exists(Paths.Bak) && !Ops.Delete(Paths.Bak)) R.bStaleBakLeft = true;', '')) @('main_only/clean_layout', 'main_only/steps_pinned'))
     (M 'm15_bad_cap_ignored' @(, @('if (Found < BadNeeded) return Fail(EMMOSlotSaveFailure::BadCapReached);', '')) @('save_reject/bad_cap_full_fails_closed_untouched'))
-    (M 'm16_valid_tmp_deleted_not_kept' @(, @('&& Classify(Ops, Paths.Tmp, Validate, nullptr, bIo) == EMMOSlotFileState::Valid)', '&& false)')) @('tmp_valid_first/crash_I2_no_usable_loss', 'tmp_valid_first/steps_pinned'))
+    (M 'm16_valid_tmp_deleted_not_kept' @(, @('&& Classify(Ops, Paths.Tmp, TmpValidate ? *TmpValidate : Validate, nullptr, bIo) == EMMOSlotFileState::Valid)', '&& false)')) @('tmp_valid_first/crash_I2_no_usable_loss', 'tmp_valid_first/steps_pinned'))
 )
 if ($Only.Count -gt 0) { $mut = @($mut | Where-Object { $Only -contains $_.Id.Split('_')[0] -or $Only -contains $_.Id }) }
 

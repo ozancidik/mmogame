@@ -51,7 +51,7 @@ EMMOSlotFileState FMMOSlotFileAtomic::Classify(IMMOSlotFileOps& Ops, const FStri
 	return EMMOSlotFileState::Valid;
 }
 
-FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, FMMOSlotValidator Validate)
+FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, FMMOSlotValidator Validate, const FMMOSlotValidator* TmpValidate)
 {
 	FMMOSlotLoadResult R;
 	bool bIo = false;
@@ -76,7 +76,7 @@ FMMOSlotLoadResult FMMOSlotFileAtomic::Load(IMMOSlotFileOps& Ops, const FMMOSlot
 	// .tmp yalniz ana VE .bak hic yokken (ilk kayit yarida kesildi) ve dogrulayici kabul ederse; yarim olabilecek dosya baska yolda kullanilmaz.
 	if (MainState == EMMOSlotFileState::Missing && BakState == EMMOSlotFileState::Missing)
 	{
-		if (Classify(Ops, Paths.Tmp, Validate, &R.Bytes, bIo) == EMMOSlotFileState::Valid)
+		if (Classify(Ops, Paths.Tmp, TmpValidate ? *TmpValidate : Validate, &R.Bytes, bIo) == EMMOSlotFileState::Valid)
 		{
 			R.bOk = true;
 			R.Source = EMMOSlotLoadSource::Tmp;
@@ -105,7 +105,7 @@ void FMMOSlotFileAtomic::DiscardTmp(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPa
 	}
 }
 
-FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, const TArray<uint8>& Bytes, FMMOSlotValidator Validate)
+FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, const TArray<uint8>& Bytes, FMMOSlotValidator Validate, const FMMOSlotValidator* TmpValidate)
 {
 	FMMOSlotSaveResult R;
 	const auto Fail = [&R](EMMOSlotSaveFailure Why) { R.bOk = false; R.Failure = Why; return R; };
@@ -137,7 +137,7 @@ FMMOSlotSaveResult FMMOSlotFileAtomic::Save(IMMOSlotFileOps& Ops, const FMMOSlot
 	if (Found < BadNeeded) return Fail(EMMOSlotSaveFailure::BadCapReached);
 
 	// 3a) Ana ve .bak yokken GECERLI bir .tmp, Load'un verdigi tek kopyadir (yarida kalmis ilk kayit): silinmez, .bak olur (tek yeniden adlandirma).
-	if (MainState == EMMOSlotFileState::Missing && BakState == EMMOSlotFileState::Missing && Classify(Ops, Paths.Tmp, Validate, nullptr, bIo) == EMMOSlotFileState::Valid)
+	if (MainState == EMMOSlotFileState::Missing && BakState == EMMOSlotFileState::Missing && Classify(Ops, Paths.Tmp, TmpValidate ? *TmpValidate : Validate, nullptr, bIo) == EMMOSlotFileState::Valid)
 	{
 		if (!Ops.Move(Paths.Bak, Paths.Tmp)) return Fail(EMMOSlotSaveFailure::RotateFailed);
 		BakState = EMMOSlotFileState::Valid;

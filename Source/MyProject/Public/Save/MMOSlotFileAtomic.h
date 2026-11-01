@@ -112,15 +112,37 @@ public:
 	/** ^MMOSave_[A-Za-z0-9 _-]+$ ve sonda bosluk yok (Windows sondaki boslugu atar -> iki ad ayni dosya olurdu). Yol gecisi savunmasi. */
 	static bool IsValidSlotName(const FString& SlotName);
 
-	/** Yan etkisiz: hicbir dosya olusturulmaz/silinmez/tasinmaz. */
-	static FMMOSlotLoadResult Load(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, FMMOSlotValidator Validate);
+	/**
+	 * Yan etkisiz: hicbir dosya olusturulmaz/silinmez/tasinmaz.
+	 * TmpValidate (S6.1, opsiyonel): .tmp'yi (yarim yazilmis olabilecek tek dosya) SIKI denetleyen dogrulayici; verilmezse Validate.
+	 * Ana/.bak eski (sonek yok, dogrudan yazilmis) dosyalari da icerdiginden gevsek Validate ile; .tmp ise her zaman bu kod tarafindan yazilir.
+	 */
+	static FMMOSlotLoadResult Load(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, FMMOSlotValidator Validate, const FMMOSlotValidator* TmpValidate = nullptr);
 
 	/** Ana dosya var ya da .bak var. (.tmp tek basina yetmez: yarim olabilir.) */
 	static bool Exists(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths);
 
-	static FMMOSlotSaveResult Save(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, const TArray<uint8>& Bytes, FMMOSlotValidator Validate);
+	static FMMOSlotSaveResult Save(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths, const TArray<uint8>& Bytes, FMMOSlotValidator Validate, const FMMOSlotValidator* TmpValidate = nullptr);
 
 private:
 	static EMMOSlotFileState Classify(IMMOSlotFileOps& Ops, const FString& Path, FMMOSlotValidator Validate, TArray<uint8>* OutBytes, bool& bOutIoError);
 	static void DiscardTmp(IMMOSlotFileOps& Ops, const FMMOSlotAtomicPaths& Paths);
+};
+
+/**
+ * Gercek dosya sistemi (S6.1): IFileManager / IPlatformFile uzerinde IMMOSlotFileOps.
+ *  - Move: IFileManager::Move(Replace=true, bDoNotRetryOrError=true). Motor kaynagi (FileManagerGeneric.cpp Move): hedef varsa ONCE silinir,
+ *    sonra MoveFileW; tekrar/bekleme yok (sunucu donmaz). Hedef silinemezse (salt-okunur/kilitli) MoveFileW de hedef var oldugu icin basarisiz olur.
+ *  - WriteNew: IPlatformFile::OpenWrite (CREATE_ALWAYS) + Write + Flush(tam); salt-okunur mevcut dosyada acilamaz -> false.
+ *  - ReadAll: MaxBytes'tan buyuk dosya okunmaz (false = I/O hatasi, Save fail-closed).
+ *  - Delete: salt-okunur dosyayi SILMEZ (EvenReadOnly=false); dosya yoksa true.
+ */
+class FMMOFileManagerSlotOps : public IMMOSlotFileOps
+{
+public:
+	virtual bool Exists(const FString& Path) override;
+	virtual bool ReadAll(const FString& Path, TArray<uint8>& Out) override;
+	virtual bool WriteNew(const FString& Path, const TArray<uint8>& Bytes) override;
+	virtual bool Move(const FString& Dest, const FString& Src) override;
+	virtual bool Delete(const FString& Path) override;
 };
