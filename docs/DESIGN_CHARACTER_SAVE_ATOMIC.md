@@ -143,3 +143,10 @@ Altin/XP/esya girisi-cikisi **yok**. Maliyet: yazim basina ek okuma+karsilastirm
 ## 9. "Degmez" notu
 
 Icerik karmasi/surum zarfi (format degisikligi, kazanc dusuk, R1 ile kapsami buyur), yedek araci icin `.bak` yan dosya sinifi (simdi), asenkron/arka plan yazim (oyun is parcacigi ile durum yarisi acar), HUD "kayit basarisiz" bandi (sicak dosya, deger sinirli): **simdi degmez**.
+
+## 10. S6.0 durum notu (2026-11-01, uygulandi, izole worktree'de derlendi ve kosuldu; S6.1-S6.4 YOK)
+
+- Yazildi: `Public/Save/MMOSlotFileAtomic.h`, `Private/Save/MMOSlotFileAtomic.cpp` (saf mantik, `IMMOSlotFileOps` soyut dosya sistemi; **gercek IFileManager uygulamasi S6.1'e birakildi**, burada yok), `Private/Tests/MMOSlotFileAtomicSelfTest.cpp` (bellek ici sahte FS, `MMOTestSlotAtomic`), `Scripts/TestSlotFileAtomic.ps1` (144 kontrol), `Scripts/TestSlotFileAtomicMutations.ps1` (16 mutasyon, yalniz bagli worktree'de, ana checkout reddeder).
+- Matris: 11 senaryo; 76 cokme noktasi (her alt adimdan sonra + yazma adiminda bos/yarim dosya), 87 tek hata, 229 cift hata kosusu; her biri I1/I2/I3/I4/I5 ile denetlenir. Sahte FS `Move(Replace)`'i "once hedefi sil, sonra yeniden adlandir" iki adim olarak modeller.
+- Tasarimdan SAPMALAR: (1) `.bad` yuvalari `.bad`, `.bad.1`..`.bad.4` (zaman damgasi yok, saf mantik deterministik); yuva kalmazsa Save fail-closed (`BadCapReached`, hicbir dosya silinmez). (2) Bozuk `.bak` de silinmez: `.bad`'e ayrilir. (3) Ana ve `.bak` yokken GECERLI `.tmp` (Load'un verdigi tek kopya) Save adim 3'te silinmez, `.bak`'a yeniden adlandirilir (matris `tmp_valid_first` senaryosu bu acigi yakaladi). (4) Okunamayan ana/.bak Save'i fail-closed reddeder (`MainUnreadable`). (5) Yuva adinda sondaki bosluk reddedilir (Windows sondaki boslugu atar).
+- Bilinen sinir: `bValid=true` kalan kesik dosya motorda yakalanmayabilir (R1); test dogrulayicisi sikidir, gercek `LoadGameFromMemory` dogrulayicisi S6.1'de baglanir.
