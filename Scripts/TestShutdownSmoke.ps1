@@ -1,4 +1,5 @@
-# Kapanis duman testi, GERCEK surec kosucusu (docs/DESIGN_SHUTDOWN_SMOKE.md, dilimler S2 = clean, S3 = savefail, S2b = guvenlik turu).
+# Kapanis duman testi, GERCEK surec kosucusu (docs/DESIGN_SHUTDOWN_SMOKE.md, dilimler S2 = clean, S3 = savefail, S2b = guvenlik turu, S4 = loginclosed).
+# loginclosed: sunucu logunda Closing gorulunce YENI bir ikinci istemci B baslatilir; PreLogin reddi (event=prelogin_rejected) ve B'nin hic katilmamasi beklenir.
 # Gercek dedicated sunucu (UnrealEditor-Cmd.exe -game -server -NullRHI) + 1 gercek istemci baslatir; sunucu geri sayimla KENDILIGINDEN kapanir;
 # isletim sistemi Process.ExitCode, Saved/Logs/MMOShutdownResult.json, sunucu/istemci loglari ve .sav metadatasi saf degerlendiriciye
 # (Scripts/ShutdownSmokeEvidence.ps1) verilir. Oyun kodu DEGISTIRILMEZ, derleme YAPILMAZ (hazir ikili kullanilir).
@@ -32,7 +33,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ShutdownSmokeRunnerLib.ps1')
 
 # Kullanim hatasi = cikis 2 (parametre baglama hatasi cikis 1 verirdi, bu yuzden elle dogrulanir). loginclosed S4'tur: bu dilimde YOK.
-if (@('clean', 'savefail') -cnotcontains $Scenario) { Write-Host '[MMO_SMOKE_RUN] usage Scenario must be clean or savefail (loginclosed is slice S4, not implemented)'; exit 2 }
+if (@('clean', 'savefail', 'loginclosed') -cnotcontains $Scenario) { Write-Host '[MMO_SMOKE_RUN] usage Scenario must be clean, savefail or loginclosed'; exit 2 }
 if ($Map -cnotmatch '^[A-Za-z0-9_]{1,40}$') { Write-Host '[MMO_SMOKE_RUN] usage bad Map'; exit 2 }
 if ($ShutdownAfter -lt 150 -or $ShutdownAfter -gt 900) { Write-Host '[MMO_SMOKE_RUN] usage ShutdownAfter must be 150..900'; exit 2 }
 if ($HardCapSeconds -lt 0 -or $HardCapSeconds -gt 3000) { Write-Host '[MMO_SMOKE_RUN] usage HardCapSeconds must be 0..3000'; exit 2 }
@@ -42,6 +43,9 @@ $ReadyBudgetSeconds = 120      # [PLACEHOLDER] sunucu hazir olma butcesi (S1: si
 $JoinBudgetSeconds = 100       # [PLACEHOLDER] istemci katilim butcesi (S1: ~22 sn)
 $ExitGraceSeconds = 3          # istemci logunun atilma satirlarini yazmasi icin sunucu ciktiktan sonra bekleme
 $ClientSelfExitMargin = 60     # istemci -seconds= emniyet agi: sert tavan + bu kadar (kosucu normalde istemciyi ondan once kapatir)
+$ClientBRejectBudgetSeconds = 35   # [PLACEHOLDER] loginclosed: B baslatildiktan sonra PreLogin reddini bekleme butcesi (Closing -> Flushing arasi 40 sn; S1: istemci ~13 sn'de baglanir)
+$ClientRejectPattern = 'NMT_Failure Sunucu bakima giriyor, daha sonra tekrar dene\.'   # loginclosed: B istemci logunda beklenen red izi (S4 gercek olcumu, 2026-11-01)
+$ClientBGraceSeconds = 5          # loginclosed: red satirindan sonra B'nin istemci logunu yazmasi icin bekleme, sonra kosucu B'yi KENDISI oldurur (B reddedilince yerel oyuna dusmesin)
 if ($HardCapSeconds -eq 0) { $HardCapSeconds = $ShutdownAfter + 180 }
 if ($HardCapSeconds -lt ($ShutdownAfter + 60)) { Write-Host '[MMO_SMOKE_RUN] usage HardCapSeconds must be >= ShutdownAfter + 60'; exit 2 }
 
@@ -102,6 +106,7 @@ $script:saveInfo = $null
 $script:evidence = $null
 $serverLog = ''
 $clientLog = ''
+$clientBLog = ''
 $portHold = $null
 try {
     $lockPath = Join-Path ([IO.Path]::GetFullPath($gitCommon[0])) 'agent-build.lock'
@@ -138,6 +143,7 @@ try {
     [void][IO.Directory]::CreateDirectory($LogDirectory)
     $serverLog = Join-Path $LogDirectory 'server.log'
     $clientLog = Join-Path $LogDirectory 'client.log'
+    if ($Scenario -ceq 'loginclosed') { $clientBLog = Join-Path $LogDirectory 'clientB.log' }
     $resultJson = Join-Path $saved 'Logs\MMOShutdownResult.json'
     Say ('start scenario=' + $Scenario + ' repo=' + $RepoRoot + ' head=' + ($gitHead -join '') + ' port=' + $selected + ' shutdown_after=' + $ShutdownAfter + ' hard_cap=' + $HardCapSeconds + ' logs=' + $LogDirectory)
     Say 'note editor-binary dedicated (-game -server), not a packaged Server target; PowerShell 5.1 only'
@@ -223,6 +229,42 @@ try {
         if (Test-SmokePathHasReparse $saved $script:savePath) { [void]$script:runnerInc.Add('save_path_has_reparse_component'); return }
         if (@($snapshotBefore | Where-Object { $_ -ieq $script:savePath }).Count -gt 0) { [void]$script:runnerInc.Add('player_save_preexisting (refusing to touch a save that existed before the run)'); return }
 
+        # ---- 4b. loginclosed: Closing penceresinde YENI istemci B (S4). B adini secemez (rastgele Gezgin######), bu yuzden katilimi ADA bakarak degil
+        #          'A disinda herhangi bir Join succeeded' diye ararim; B'nin reddi: sunucu 'event=prelogin_rejected' + B logunda baglanti hatasi. ----
+        if ($Scenario -ceq 'loginclosed') {
+            while ($true) {
+                $d = Get-SmokeTimeDecision $clock.Elapsed.TotalSeconds $HardCapSeconds
+                if ($d -ne 'ok') { [void]$script:runnerFails.Add('hard_cap_exceeded'); Say ('hard cap exceeded waiting for Closing at ' + [int]$clock.Elapsed.TotalSeconds + 's'); return }
+                if ($srv.HasExited -or $cli.HasExited) { [void]$script:runnerInc.Add('process_exited_before_closing'); return }
+                $slogText = Read-SmokeTextShared $serverLog
+                if (Test-SmokePhaseSeen $slogText 'Flushing') { [void]$script:runnerInc.Add('closing_window_missed_flushing_seen_first'); return }
+                if (Test-SmokeClosingSeen $slogText) { break }
+                Start-Sleep -Milliseconds 500
+            }
+            Say ('Closing seen at ' + [int]$clock.Elapsed.TotalSeconds + 's: starting client B')
+            $bargs = Get-SmokeClientArgs -Project $project -Port $selected -LogPath $clientBLog -MaxSeconds ($HardCapSeconds + $ClientSelfExitMargin)
+            $cliB = Start-Process -FilePath $ExePath -ArgumentList $bargs -PassThru -WindowStyle Hidden
+            $null = $cliB.Handle
+            Add-SmokeOwnedProcess $state $cliB
+            Say ('client B started pid=' + $cliB.Id)
+            $phase = [Diagnostics.Stopwatch]::StartNew()
+            $bResolved = $false
+            while (-not $bResolved) {
+                $d = Get-SmokeTimeDecision $clock.Elapsed.TotalSeconds $HardCapSeconds $phase.Elapsed.TotalSeconds $ClientBRejectBudgetSeconds
+                if ($d -ne 'ok') { [void]$script:runnerInc.Add('client_b_no_prelogin_decision:' + $d); return }
+                if ($srv.HasExited) { [void]$script:runnerInc.Add('server_exited_before_client_b_resolved'); return }
+                $slogText = Read-SmokeTextShared $serverLog
+                $jn = Get-SmokeJoinedNames $slogText
+                if ($jn.Invalid -or $jn.Count -gt 1) { Say 'client B: an extra Join succeeded appeared (the evaluator will FAIL this)'; $bResolved = $true }
+                elseif ((Get-SmokePreloginRejectedCount $slogText) -ge 1) { Say ('client B rejected at PreLogin after ' + [int]$phase.Elapsed.TotalSeconds + 's'); $bResolved = $true }
+                elseif (Test-SmokePhaseSeen $slogText 'Flushing') { [void]$script:runnerInc.Add('client_b_no_prelogin_before_flushing'); return }
+                else { Start-Sleep -Milliseconds 500 }
+            }
+            Start-Sleep -Seconds $ClientBGraceSeconds
+            Stop-SmokeOwnedProcess $state $cliB     # B reddedilince yerel oyuna dusmesin: KENDI surecimizi oldururuz (A ile ayni kural)
+            Say 'client B stopped by runner'
+        }
+
         # ---- 4. savefail enjeksiyonu: oyuncu KAYDI salt-okunur (kod degistirilmez) ----
         if ($Scenario -ceq 'savefail') {
             if (-not (Test-Path -LiteralPath $script:savePath -PathType Leaf)) {
@@ -250,7 +292,7 @@ try {
         Stop-SmokeOwnedProcess $state $cli     # istemci sunucu cikinca kendiliginden kapanmaz (S1 K7): KENDI surecimizi oldururuz
         Say 'client stopped by runner'
         # KANIT ONCE, TEMIZLIK SONRA: loglar, MMOShutdownResult.json (+ kopya) ve .sav metadata finally temizligi calismadan once yakalanir.
-        $script:evidence = Get-SmokeEvidenceBundle -ServerLog $serverLog -ClientLog $clientLog -ResultJson $resultJson -CopyDirectory $LogDirectory
+        $script:evidence = Get-SmokeEvidenceBundle -ServerLog $serverLog -ClientLog $clientLog -ResultJson $resultJson -CopyDirectory $LogDirectory -ClientBLog $clientBLog
         $fi = Get-Item -LiteralPath $script:savePath -ErrorAction SilentlyContinue
         if ($null -ne $fi) { $script:saveInfo = [pscustomobject]@{ Exists = $true; Length = [long]$fi.Length; LastWriteUtc = $fi.LastWriteTimeUtc; ServerStartUtc = $script:serverStartUtc } }
         else { $script:saveInfo = [pscustomobject]@{ Exists = $false; Length = 0; LastWriteUtc = $null; ServerStartUtc = $script:serverStartUtc } }
@@ -273,7 +315,9 @@ $evVerdict = $null
 if (@($script:runnerFails).Count -eq 0 -and @($script:runnerInc).Count -eq 0) {
     if ($null -eq $script:evidence) { [void]$script:runnerInc.Add('evidence_not_captured') }
     else {
-        $r = Get-ShutdownEvidenceVerdict -ServerLogText $script:evidence.ServerText -ClientLogText $script:evidence.ClientText -ResultJsonText $script:evidence.JsonText -ProcessExitCode $script:procExit -Scenario $Scenario -SaveFileInfo $script:saveInfo -PlayerA $script:playerName -ClientKickPattern 'ControlChannelClose'
+        $bArgs = @{}
+        if ($Scenario -ceq 'loginclosed') { $bArgs['ClientBLogText'] = $script:evidence.ClientBText; $bArgs['ClientRejectPattern'] = $ClientRejectPattern }
+        $r = Get-ShutdownEvidenceVerdict -ServerLogText $script:evidence.ServerText -ClientLogText $script:evidence.ClientText -ResultJsonText $script:evidence.JsonText -ProcessExitCode $script:procExit -Scenario $Scenario -SaveFileInfo $script:saveInfo -PlayerA $script:playerName -ClientKickPattern 'ControlChannelClose' @bArgs
         $evVerdict = $r.Verdict
         foreach ($l in $r.Lines) { Write-Host $l }
         try { [IO.File]::WriteAllLines((Join-Path $LogDirectory 'verdict.txt'), [string[]]$r.Lines) } catch { }

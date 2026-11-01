@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ShutdownSmokeEvidence.ps1')
 . (Join-Path $PSScriptRoot 'ShutdownSmokeRunnerLib.ps1')
 
-$expected = 289
+$expected = 323
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -130,6 +130,29 @@ try {
     Check 'ready_neg' 'null_is_not_ready' (-not (Test-SmokeServerReady $null).Ready)
     Check 'closing' 'seen_when_phase_closing_logged' (Test-SmokeClosingSeen ($ts + 'LogMMOLifecycle: Display: event=shutdown_phase phase=Closing remaining=60 players=1' + "`n"))
     Check 'closing_neg' 'not_seen_in_counting_only' (-not (Test-SmokeClosingSeen ($ts + 'LogMMOLifecycle: Display: event=shutdown_phase phase=Counting remaining=210 players=0' + "`n")))
+    # ---- S4 (loginclosed) yardimcilari: faz goruldu mu / tum katilim adlari / PreLogin red sayisi ----
+    $flushLine = $ts + 'LogMMOLifecycle: Display: event=shutdown_phase phase=Flushing remaining=20 players=1' + "`r`n"
+    Check 'phase_seen' 'flushing_logged_is_seen' (Test-SmokePhaseSeen $flushLine 'Flushing')
+    Check 'phase_seen' 'closing_logged_is_seen' (Test-SmokePhaseSeen ($ts + 'LogMMOLifecycle: Display: event=shutdown_phase phase=Closing remaining=60 players=1' + "`n") 'Closing')
+    Check 'phase_seen_neg' 'closing_only_log_does_not_show_flushing' (-not (Test-SmokePhaseSeen ($ts + 'LogMMOLifecycle: Display: event=shutdown_phase phase=Closing remaining=60 players=1' + "`n") 'Flushing'))
+    Check 'phase_seen_neg' 'phase_name_prefix_is_not_a_match' (-not (Test-SmokePhaseSeen ($ts + 'event=shutdown_phase phase=FlushingX remaining=1' + "`n") 'Flushing'))
+    Check 'phase_seen_neg' 'regex_metacharacters_in_phase_name_refused' (-not (Test-SmokePhaseSeen $flushLine 'Fl.shing') -and -not (Test-SmokePhaseSeen $flushLine '.*'))
+    Check 'phase_seen_neg' 'null_and_empty_log_give_false' ((-not (Test-SmokePhaseSeen $null 'Flushing')) -and (-not (Test-SmokePhaseSeen '' 'Flushing')))
+    $jnA = Get-SmokeJoinedNames ($ts + 'LogNet: Join succeeded: Gezgin111111' + "`r`n")
+    Check 'joined_names' 'single_join_counts_one' ($jnA.Count -eq 1 -and $jnA.Names[0] -ceq 'Gezgin111111' -and -not $jnA.Invalid)
+    $jnB = Get-SmokeJoinedNames ($ts + 'LogNet: Join succeeded: Gezgin111111' + "`r`n" + $ts + 'LogNet: Join succeeded: Gezgin222222' + "`r`n")
+    Check 'joined_names' 'second_player_makes_count_two' ($jnB.Count -eq 2 -and (SameArr $jnB.Names @('Gezgin111111', 'Gezgin222222')))
+    Check 'joined_names' 'same_name_twice_counts_one' ((Get-SmokeJoinedNames ("LogNet: Join succeeded: Abc`nLogNet: Join succeeded: Abc`n")).Count -eq 1)
+    Check 'joined_names_neg' 'invalid_name_sets_invalid_and_is_not_counted' ((Get-SmokeJoinedNames "LogNet: Join succeeded: Evil result=saved`n").Invalid -and (Get-SmokeJoinedNames "LogNet: Join succeeded: Evil result=saved`n").Count -eq 0)
+    Check 'joined_names_neg' 'other_log_category_not_a_join' ((Get-SmokeJoinedNames "LogTemp: Join succeeded: Abc`n").Count -eq 0)
+    Check 'joined_names_neg' 'null_and_empty_give_zero' (((Get-SmokeJoinedNames $null).Count -eq 0) -and ((Get-SmokeJoinedNames '').Count -eq 0))
+    $plLine = $ts + 'LogMMOLifecycle: Display: event=prelogin_rejected phase=Closing' + "`r`n"
+    Check 'prelogin_count' 'one_line_counts_one' ((Get-SmokePreloginRejectedCount $plLine) -eq 1)
+    Check 'prelogin_count' 'two_lines_count_two' ((Get-SmokePreloginRejectedCount ($plLine + $plLine)) -eq 2)
+    Check 'prelogin_count' 'last_line_without_eol_counts' ((Get-SmokePreloginRejectedCount ($ts + 'LogMMOLifecycle: Display: event=prelogin_rejected phase=Flushing')) -eq 1)
+    Check 'prelogin_count_neg' 'other_category_forgery_not_counted' ((Get-SmokePreloginRejectedCount 'LogTemp: Display: event=prelogin_rejected phase=Closing') -eq 0)
+    Check 'prelogin_count_neg' 'trailing_junk_not_counted' ((Get-SmokePreloginRejectedCount ($ts + 'LogMMOLifecycle: Display: event=prelogin_rejected phase=Closing extra' + "`n")) -eq 0)
+    Check 'prelogin_count_neg' 'null_and_empty_give_zero' (((Get-SmokePreloginRejectedCount $null) -eq 0) -and ((Get-SmokePreloginRejectedCount '') -eq 0))
     $lpLine = $ts + 'LogNet: Name:GameNetDriver Def:GameNetDriver IpNetDriver_0 IpNetDriver listening on port 18994' + "`r`n"
     Check 'listen_port' 'real_log_line_gives_port' (SameArr @(Get-SmokeListeningPort $lpLine) @(18994))
     Check 'listen_port' 'engine_moved_to_next_port_is_reported_as_logged' (SameArr @(Get-SmokeListeningPort ($ts + 'LogNet: Name:GameNetDriver Def:GameNetDriver IpNetDriver_0 IpNetDriver listening on port 18995' + "`n")) @(18995))
@@ -356,7 +379,11 @@ try {
     $null = Remove-SmokeCreatedFiles -SavedRoot $ev -Before $evSnap -PlayerName 'Result'
     Check 'evidence' 'captured_evidence_survives_cleanup' ($null -ne $bundle.JsonText -and $bundle.JsonText.Length -eq 16 -and (Test-Path -LiteralPath $bundle.JsonCopy))
     $bn = Get-SmokeEvidenceBundle -ServerLog (Join-Path $ev 'no1.log') -ClientLog (Join-Path $ev 'no2.log') -ResultJson (Join-Path $ev 'no3.json') -CopyDirectory $evCopy
-    Check 'evidence_neg' 'missing_files_give_null_texts_and_no_copy' (($null -eq $bn.ServerText) -and ($null -eq $bn.ClientText) -and ($null -eq $bn.JsonText) -and ($null -eq $bn.JsonCopy))
+    $evCliB = Join-Path $ev 'clientB.log'; [IO.File]::WriteAllText($evCliB, 'client b text')
+    $bundleB = Get-SmokeEvidenceBundle -ServerLog $evSrv -ClientLog $evCli -ResultJson $evJson -CopyDirectory $evCopy -ClientBLog $evCliB
+    Check 'evidence' 'client_b_text_is_read_when_requested' ($bundleB.ClientBText -ceq 'client b text' -and $bundleB.ClientText -ceq 'client text')
+    Check 'evidence_neg' 'client_b_text_is_null_when_not_requested_or_missing' (($null -eq $bundle.ClientBText) -and ($null -eq (Get-SmokeEvidenceBundle -ServerLog $evSrv -ClientLog $evCli -ResultJson $evJson -ClientBLog (Join-Path $ev 'nob.log')).ClientBText))
+    Check 'evidence_neg' 'missing_files_give_null_texts_and_no_copy'(($null -eq $bn.ServerText) -and ($null -eq $bn.ClientText) -and ($null -eq $bn.JsonText) -and ($null -eq $bn.JsonCopy))
 
     # ================= TEMIZLIK: surecler =================
     $st = New-TestState
@@ -736,8 +763,10 @@ try {
 
     $l4Before = @(Get-ChildItem -LiteralPath $env:TEMP -Directory -Filter 'mmo_l4_*' -ErrorAction SilentlyContinue).Count
     $mkGate = Join-Path $work 'marker_gate'
+    $g = Run-Runner @('-Scenario', 'bogus', '-RepoRoot', $rootOk, '-ExePath', $fakeExe)
+    Check 'gate' 'unknown_scenario_is_usage_error_2' ($g.Code -eq 2 -and $g.Out -like '*usage Scenario*')
     $g = Run-Runner @('-Scenario', 'loginclosed', '-RepoRoot', $rootOk, '-ExePath', $fakeExe)
-    Check 'gate' 'loginclosed_is_usage_error_2' ($g.Code -eq 2 -and $g.Out -like '*usage Scenario*')
+    Check 'gate' 'loginclosed_is_accepted_then_main_checkout_refused_defer_3' ($g.Code -eq 3 -and $g.Out -like '*main_checkout_refused*' -and $g.Out -notlike '*usage Scenario*')
     $g = Run-Runner @('-RepoRoot', $rootOk, '-ExePath', $fakeExe)
     Check 'gate' 'missing_scenario_is_usage_error_2' ($g.Code -eq 2)
     $g = Run-Runner @('-Scenario', 'clean', '-RepoRoot', $rootOk, '-ExePath', $fakeExe, '-ShutdownAfter', '60')
@@ -822,9 +851,9 @@ try {
     Check 'lint' 'main_defers_when_marker_unwritable' ($mainSrc -match 'Defer \(''marker_not_writable')
     Check 'lint' 'main_never_builds' ($codeOnly -notmatch '(?i)Build\.bat|UnrealBuildTool\.exe|dotnet ')
     Check 'lint' 'main_passes_player_name_from_log_to_evaluator' ($mainSrc -match '-PlayerA \$script:playerName')
-    Check 'lint' 'main_kills_client_itself_after_server_exit' ($mainSrc -match 'Stop-SmokeOwnedProcess \$state \$cli')
+    Check 'lint' 'main_kills_client_itself_after_server_exit' ($mainSrc -match 'Stop-SmokeOwnedProcess \$state \$cli(?!B)')
     Check 'lint' 'main_gives_client_a_self_exit_safety_net' ($mainSrc -match 'Get-SmokeClientArgs -Project \$project -Port \$selected -LogPath \$clientLog -MaxSeconds')
-    Check 'lint' 'main_enforces_hard_cap_in_exit_wait' ($mainSrc -match "Get-SmokeTimeDecision \`$clock\.Elapsed\.TotalSeconds \`$HardCapSeconds\r?\n\s*if \(\`$d -ne 'ok'\) \{ \[void\]\`$script:runnerFails\.Add\('hard_cap_exceeded'\)")
+    Check 'lint' 'main_enforces_hard_cap_in_exit_wait' ($mainSrc -match "while \(-not \`$srv\.HasExited\) \{\s*\`$d = Get-SmokeTimeDecision \`$clock\.Elapsed\.TotalSeconds \`$HardCapSeconds\r?\n\s*if \(\`$d -ne 'ok'\) \{ \[void\]\`$script:runnerFails\.Add\('hard_cap_exceeded'\)")
     Check 'lint' 'main_checks_dedicated_netmode' ($mainSrc -match 'NetMode -ne 1')
     Check 'lint' 'main_resolves_final_verdict_with_runner_reasons' ($mainSrc -match 'Resolve-SmokeFinalVerdict -EvidenceVerdict \$evVerdict -RunnerFails')
     Check 'lint' 'save_metadata_captured_before_cleanup_deletes_it' ($mainSrc.Contains('$script:saveInfo = [pscustomobject]') -and $mainSrc.Contains('-SaveFileInfo $script:saveInfo'))
@@ -838,7 +867,24 @@ try {
     Check 'lint' 'tree_kill_verifies_identity_before_holding_a_handle' ($stopBody.Contains('Test-SmokeSameInstant $hs $d.Creation'))
     Check 'lint' 'descendants_require_child_not_older_than_parent' ($libSrc.Contains('if ($cr -lt $cur.Creation.AddMilliseconds(-$script:SmokeTolMs)) { continue }'))
     Check 'lint' 'job_object_uses_kill_on_job_close_flag' ($libSrc.Contains('LimitFlags = 0x2000'))
-    Check 'lint' 'sources_are_ascii_only' (([regex]::Matches($bothSrc, '[^\x00-\x7F]')).Count -eq 0)
+    # ---- S4 loginclosed: kosucu mantigi (kaynak taramasi; gercek surec yok) ----
+    $b4 = $mainSrc.IndexOf('if ($Scenario -ceq ''loginclosed'') {' + "`r`n" + '            while ($true) {')
+    Check 'lint' 'loginclosed_block_present' ($b4 -gt 0)
+    $startB = $mainSrc.IndexOf('$cliB = Start-Process')
+    $closingBreak = $mainSrc.IndexOf('if (Test-SmokeClosingSeen $slogText) { break }')
+    Check 'lint' 'client_b_starts_only_after_closing_seen_in_server_log' ($startB -gt 0 -and $closingBreak -gt 0 -and $closingBreak -lt $startB)
+    Check 'lint' 'client_b_wait_for_closing_is_hard_capped' ($mainSrc -match "(?s)if \(\`$Scenario -ceq 'loginclosed'\) \{\s*while \(\`$true\) \{\s*\`$d = Get-SmokeTimeDecision \`$clock\.Elapsed\.TotalSeconds \`$HardCapSeconds\s*if \(\`$d -ne 'ok'\) \{ \[void\]\`$script:runnerFails\.Add\('hard_cap_exceeded'\)")
+    Check 'lint' 'client_b_registered_in_job_and_marker_via_owned_helper' ($mainSrc.Contains('Add-SmokeOwnedProcess $state $cliB'))
+    Check 'lint' 'client_b_stopped_by_runner_itself' ($mainSrc.Contains('Stop-SmokeOwnedProcess $state $cliB'))
+    Check 'lint' 'client_b_has_self_exit_safety_net' ($mainSrc.Contains('Get-SmokeClientArgs -Project $project -Port $selected -LogPath $clientBLog -MaxSeconds ($HardCapSeconds + $ClientSelfExitMargin)'))
+    Check 'lint' 'client_b_log_is_a_separate_file' ($mainSrc.Contains("Join-Path `$LogDirectory 'clientB.log'") -and $mainSrc.Contains('-ClientBLog $clientBLog'))
+    Check 'lint' 'client_b_log_and_reject_pattern_go_to_the_evaluator' ($mainSrc.Contains("`$bArgs['ClientBLogText'] = `$script:evidence.ClientBText") -and $mainSrc.Contains("`$bArgs['ClientRejectPattern'] = `$ClientRejectPattern") -and $mainSrc.Contains("-ClientKickPattern 'ControlChannelClose' @bArgs"))
+    Check 'lint' 'client_b_unresolved_before_flushing_is_inconclusive_not_pass' ($mainSrc.Contains("elseif (Test-SmokePhaseSeen `$slogText 'Flushing') { [void]`$script:runnerInc.Add('client_b_no_prelogin_before_flushing'); return }"))
+    Check 'lint' 'client_b_wait_has_its_own_budget' ($mainSrc.Contains('$phase.Elapsed.TotalSeconds $ClientBRejectBudgetSeconds'))
+    Check 'lint' 'client_b_rejection_is_read_from_server_log_not_assumed' ($mainSrc.Contains('(Get-SmokePreloginRejectedCount $slogText) -ge 1'))
+    Check 'lint' 'client_b_extra_join_is_left_to_the_evaluator_to_fail' ($mainSrc.Contains('if ($jn.Invalid -or $jn.Count -gt 1) {'))
+    Check 'lint' 'client_b_is_loginclosed_only' (($mainSrc.Split(@('$cliB = Start-Process'), [StringSplitOptions]::None).Count -eq 2) -and ($b4 -gt 0) -and ($b4 -lt $startB))
+    Check 'lint' 'sources_are_ascii_only'(([regex]::Matches($bothSrc, '[^\x00-\x7F]')).Count -eq 0)
 }
 catch {
     Write-Host ('[MMO_SMOKE_INFO] fatal_exception ' + $_.Exception.Message + ' at ' + $_.InvocationInfo.ScriptLineNumber)

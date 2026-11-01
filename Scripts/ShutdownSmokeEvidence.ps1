@@ -169,6 +169,7 @@ function Get-ShutdownEvidenceVerdict {
         $ev = @{}
         $joinA = New-Object System.Collections.ArrayList
         $joinB = New-Object System.Collections.ArrayList
+        $joinOther = New-Object System.Collections.ArrayList   # A disinda her katilim adi (S4 gercek kosu: istemci B adini secemez, rastgele Gezgin######; PlayerB adiyla arama tek basina kor kalir)
         for ($i = 0; $i -lt $lines.Length; $i++) {
             $line = $lines[$i]
             if ($line.Length -eq 0) { continue }
@@ -182,6 +183,7 @@ function Get-ShutdownEvidenceVerdict {
                     $jn = $jm.Groups['n'].Value
                     if ($jn -ceq $PlayerA) { [void]$joinA.Add($n) }
                     if ($jn -ceq $PlayerB) { [void]$joinB.Add($n) }
+                    if ($jn -cne $PlayerA -and -not $joinOther.Contains($jn)) { [void]$joinOther.Add($jn) }
                 }
             }
             if (-not $sens) { continue }
@@ -285,7 +287,7 @@ function Get-ShutdownEvidenceVerdict {
 
         # ---- istemci B (yalniz loginclosed) ---
         if ($scn -ceq 'loginclosed') {
-            if ($joinB.Count -gt 0) { AddFail 'player_b_joined_server' }
+            if ($joinB.Count -gt 0 -or $joinOther.Count -gt 0) { AddFail 'player_b_joined_server' ('other_join_names=' + $joinOther.Count) }
             $bText = $null
             if ($ClientBLogText -is [string]) { $bText = [string]$ClientBLogText }
             if ($null -eq $bText -or $bText.Trim().Length -eq 0) { AddInc 'client_b_log_missing' }
@@ -296,7 +298,10 @@ function Get-ShutdownEvidenceVerdict {
                     $bl = [string[]]$bp.Lines
                     $bWelcomed = 0
                     foreach ($l in $bl) { if ($welcomeRx.IsMatch($l)) { $bWelcomed++ } if ($sensRx.IsMatch($l)) { AddFail 'client_log_contains_server_evidence' 'clientB' } }
-                    Scan-ErrorLines $bl 'clientB' $allowRx
+                    # S4 olcumu (2026-11-01, gercek istemci B logu): PreLogin reddinde istemci TEK bir Error satiri yazar (reddin beklenen sonucu); yalniz bu sabit satir
+                    # (BroadcastNetworkFailure PendingConnectionFailure + MMOServerLifecycle::LoginRejectText) istemci B'de izinli. Baska FailureType/metin = FAIL.
+                    $bRejErrRx = New-Object System.Text.RegularExpressions.Regex('^' + $tsPre + '(?:LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = PendingConnectionFailure, ErrorString = Sunucu bakima giriyor, daha sonra tekrar dene\., Driver = Name:PendingNetDriver Def:GameNetDriver IpNetDriver_\d{1,3}\s*|LogNet: NetworkFailure: PendingConnectionFailure, Error: ''Sunucu bakima giriyor, daha sonra tekrar dene\.''\s*)$')
+                    Scan-ErrorLines $bl 'clientB' $bRejErrRx
                     if ($bWelcomed -gt 0) { AddFail 'player_b_welcomed' }
                     $rej = Cnt 'prelogin'
                     if ($rej -eq 0) { AddFail 'prelogin_rejected_missing' }

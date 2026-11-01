@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ShutdownSmokeEvidence.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi.
-$expected = 238
+$expected = 254
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -466,6 +466,32 @@ try {
     [void](CheckNeg 'neg_loginclosed_rejected_before_closing' $i 'FAIL' 'prelogin_rejected_before_closing')
     $i = New-Inputs 'loginclosed'
     [void](CheckNeg 'neg_loginclosed_reject_trace_pattern_absent' $i 'INCONCLUSIVE' 'client_b_reject_trace_absent' @{ ClientRejectPattern = 'FIXTURE_REJECT_MARKER' })
+
+    # S4 gercek olcum (2026-11-01): PreLogin reddinde istemci B logu (NMT_Failure + 2 izinli Error satiri). Metinler gercek logdan; zaman/sira numarasi fikstur.
+    $rejTxt = 'Sunucu bakima giriyor, daha sonra tekrar dene.'
+    $bNmt = '[2026.11.01-12.01.10:105][251]LogNet: NetConnection::Close() [PendingNetDriver] [NoPC] [No Owner] from NMT_Failure ' + $rejTxt
+    $bErr1 = '[2026.11.01-12.01.10:105][252]LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = PendingConnectionFailure, ErrorString = ' + $rejTxt + ', Driver = Name:PendingNetDriver Def:GameNetDriver IpNetDriver_0'
+    $bErr2 = '[2026.11.01-12.01.10:105][252]LogNet: NetworkFailure: PendingConnectionFailure, Error: ''' + $rejTxt + ''''
+    $bReal = $bNmt + "`r`n" + '[2026.11.01-12.01.10:105][252]LogNet: Warning: Network Failure: PendingNetDriver[PendingConnectionFailure]: ' + $rejTxt + "`r`n" + $bErr1 + "`r`n" + $bErr2 + "`r`n"
+    $rejPat = 'NMT_Failure Sunucu bakima giriyor, daha sonra tekrar dene\.'
+    $i = New-Inputs 'loginclosed'; $i['ClientBLogText'] = $bReal
+    [void](CheckPass 'pos_loginclosed_real_shaped_client_b_log_with_expected_errors' $i @{ ClientRejectPattern = $rejPat })
+    $items = New-LogItems 'loginclosed'; Item-Dup $items 'prelogin'
+    $i = New-Inputs 'loginclosed'; $i['ServerLogText'] = Join-Log $items; $i['ClientBLogText'] = $bReal
+    [void](CheckPass 'pos_loginclosed_two_prelogin_rejections_are_fine' $i @{ ClientRejectPattern = $rejPat })
+    $i = New-Inputs 'loginclosed'; $i['ClientBLogText'] = $bReal.Replace('FailureType = PendingConnectionFailure', 'FailureType = ConnectionLost')
+    [void](CheckNeg 'neg_loginclosed_client_b_error_with_other_failure_type' $i 'FAIL' 'log_error_line' @{ ClientRejectPattern = $rejPat })
+    $i = New-Inputs 'loginclosed'; $i['ClientBLogText'] = $bReal.Replace('ErrorString = ' + $rejTxt, 'ErrorString = Server is full')
+    [void](CheckNeg 'neg_loginclosed_client_b_error_with_other_reject_reason' $i 'FAIL' 'log_error_line' @{ ClientRejectPattern = $rejPat })
+    $i = New-Inputs 'loginclosed'; $i['ClientBLogText'] = $bReal + '[2026.11.01-12.01.11:000][  0]LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = Your connection to the host has been lost., Driver = Name:GameNetDriver Def:GameNetDriver IpNetDriver_0' + "`r`n"
+    [void](CheckNeg 'neg_loginclosed_client_a_kick_error_is_not_allowed_in_client_b' $i 'FAIL' 'log_error_line' @{ ClientRejectPattern = $rejPat })
+    $i = New-Inputs 'loginclosed'; $i['ClientBLogText'] = $bReal + 'LogTemp: Error: fixture boom' + "`r`n"
+    [void](CheckNeg 'neg_loginclosed_extra_error_line_in_client_b' $i 'FAIL' 'log_error_line' @{ ClientRejectPattern = $rejPat })
+    $items = New-LogItems 'loginclosed'; Item-After $items 'join' 'joinx' 'LogNet: Join succeeded: Gezgin222222'
+    $i = New-Inputs 'loginclosed'; $i['ServerLogText'] = Join-Log $items; $i['ClientBLogText'] = $bReal
+    [void](CheckNeg 'neg_loginclosed_random_named_second_player_joined_on_server' $i 'FAIL' 'player_b_joined_server' @{ ClientRejectPattern = $rejPat })
+    $i = New-Inputs 'loginclosed'; $i['ClientBLogText'] = $bErr1 + "`r`n" + $bErr2 + "`r`n"
+    [void](CheckNeg 'neg_loginclosed_no_nmt_failure_line_in_real_shaped_client_b_log' $i 'INCONCLUSIVE' 'client_b_reject_trace_absent' @{ ClientRejectPattern = $rejPat })
 
     # ================= HATA SATIRLARI =================
     $items = New-LogItems 'clean'; Item-After $items 'ready' 'err' 'LogTemp: Error: fixture boom'

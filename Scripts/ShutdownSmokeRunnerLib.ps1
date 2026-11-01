@@ -99,6 +99,37 @@ function Test-SmokeClosingSeen {
     return [regex]::IsMatch($ServerLogText, 'event=shutdown_phase phase=Closing ')
 }
 
+function Test-SmokePhaseSeen {
+    # Sunucu logunda 'event=shutdown_phase phase=<Faz> ' satiri var mi (Closing, Flushing, ...). Faz adi yalniz harf degilse $false.
+    param([AllowNull()][string]$ServerLogText, [string]$Phase)
+    if ([string]::IsNullOrEmpty($ServerLogText) -or $Phase -cnotmatch '^[A-Za-z]{1,12}$') { return $false }
+    return [regex]::IsMatch($ServerLogText, 'event=shutdown_phase phase=' + $Phase + ' ')
+}
+
+function Get-SmokeJoinedNames {
+    # Sunucu logundaki TUM 'Join succeeded: <ad>' adlari (tekrarsiz). Invalid: gecersiz ad bicimi gorulduyse $true.
+    # Get-SmokeJoinedPlayer tek oyuncu icindir; bu, loginclosed'da ikinci istemcinin (adi rastgele Gezgin######) katilip katilmadigini gormek icindir.
+    param([AllowNull()][string]$ServerLogText)
+    $res = [pscustomobject]@{ Names = @(); Count = 0; Invalid = $false }
+    if ([string]::IsNullOrEmpty($ServerLogText)) { return $res }
+    $names = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($m in [regex]::Matches($ServerLogText, '(?m)^(?:\[[^\]\r\n]*\]\[[ 0-9]{1,4}\])?LogNet: Join succeeded: (?<n>[^\r\n]*?)[ \t]*\r?$')) {
+        $n = $m.Groups['n'].Value
+        if ($n -cnotmatch $script:SmokeNameRx) { $res.Invalid = $true; continue }
+        if (-not $names.Contains($n)) { $names.Add($n) }
+    }
+    $res.Names = $names.ToArray()
+    $res.Count = $names.Count
+    return $res
+}
+
+function Get-SmokePreloginRejectedCount {
+    # Sunucu logundaki 'event=prelogin_rejected phase=<Faz>' (LogMMOLifecycle) satir sayisi.
+    param([AllowNull()][string]$ServerLogText)
+    if ([string]::IsNullOrEmpty($ServerLogText)) { return 0 }
+    return [regex]::Matches($ServerLogText, '(?m)LogMMOLifecycle: (?:Display|Warning): event=prelogin_rejected phase=[A-Za-z?]{1,12}[ \t]*\r?$').Count
+}
+
 function Get-SmokeBusyProcesses {
     # Girdi: {ProcessId; Name; CommandLine} satirlari. Dondurur: baska UE/UBT/derleyici/Live Coding/MyProject isi calisiyorsa o satirlar (kosucu ERTELER).
     # Desen build.ps1 Assert-NoUnrealRunning ile uyumlu + cl/link/UnrealTraceServer + Build.bat/UBT komut satirli cmd.
@@ -367,10 +398,11 @@ function Read-SmokeRawText {
 function Get-SmokeEvidenceBundle {
     # KANIT TOPLAMA: sunucu logu, istemci logu, MMOShutdownResult.json metni; JSON ayrica CopyDirectory'ye BAYT BAYT kopyalanir (Saved temizligi oncesi).
     # Temizlik (dosya silme) bundan SONRA calisir; temizlik kanit dosyasina dokunamaz (Logs\ haric) ama sira da zorunludur.
-    param([string]$ServerLog, [string]$ClientLog, [string]$ResultJson, [string]$CopyDirectory = '')
-    $b = [pscustomobject]@{ ServerText = $null; ClientText = $null; JsonText = $null; JsonCopy = $null }
+    param([string]$ServerLog, [string]$ClientLog, [string]$ResultJson, [string]$CopyDirectory = '', [string]$ClientBLog = '')
+    $b = [pscustomobject]@{ ServerText = $null; ClientText = $null; ClientBText = $null; JsonText = $null; JsonCopy = $null }
     $b.ServerText = Read-SmokeTextShared $ServerLog
     $b.ClientText = Read-SmokeTextShared $ClientLog
+    if (-not [string]::IsNullOrEmpty($ClientBLog)) { $b.ClientBText = Read-SmokeTextShared $ClientBLog }
     $b.JsonText = Read-SmokeRawText $ResultJson
     if (-not [string]::IsNullOrEmpty($CopyDirectory) -and (Test-Path -LiteralPath $ResultJson -PathType Leaf) -and (Test-Path -LiteralPath $CopyDirectory -PathType Container)) {
         try {
