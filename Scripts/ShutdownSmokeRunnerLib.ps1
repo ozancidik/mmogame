@@ -626,6 +626,7 @@ function New-SmokeState {
     return @{
         Procs = (New-Object System.Collections.ArrayList)
         ReadOnly = (New-Object System.Collections.ArrayList)
+        Locks = (New-Object System.Collections.ArrayList)
         Problems = (New-Object System.Collections.ArrayList)
         Notes = (New-Object System.Collections.ArrayList)
         AfterRestore = $null
@@ -682,6 +683,12 @@ function Stop-SmokeOwnedProcess {
     } catch { [void]$State.Problems.Add('owned_process_kill_error:' + $Proc.Id) }
 }
 
+function Add-SmokeLock {
+    # Acik tutulan (FileShare.None) dosya tutamagi kaydi: temizlikte salt-okunur geri almadan ONCE kapatilir (kilitli dosyanin ozniteligi degistirilemez / silinemez).
+    param($State, [IDisposable]$Handle)
+    [void]$State.Locks.Add($Handle)
+}
+
 function Set-SmokeReadOnly {
     # ONCE kaydeder (yarim kalirsa bile geri alinsin; kalici isaret dosyasina da yazilir), sonra bayragi koyar.
     param($State, [string]$Path)
@@ -704,6 +711,10 @@ function Restore-SmokeReadOnly {
 function Invoke-SmokeCleanup {
     param($State)
     foreach ($p in @($State.Procs.ToArray())) { Stop-SmokeOwnedProcess $State $p }
+    if ($State.ContainsKey('Locks')) {
+        foreach ($lk in @($State.Locks.ToArray())) { try { $lk.Dispose() } catch { [void]$State.Problems.Add('lock_release_error') } }
+        $State.Locks.Clear()
+    }
     Restore-SmokeReadOnly $State
     if ($null -ne $State.AfterRestore) {
         try { & $State.AfterRestore } catch { [void]$State.Problems.Add('after_restore_error') }

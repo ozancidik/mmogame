@@ -265,18 +265,30 @@ try {
             Say 'client B stopped by runner'
         }
 
-        # ---- 4. savefail enjeksiyonu: oyuncu KAYDI salt-okunur (kod degistirilmez) ----
+        # ---- 4. savefail enjeksiyonu (S6.3): oyuncunun .sav.tmp'si SALT-OKUNUR + KILITLI (kod degistirilmez) ----
+        # Karakter kaydi artik atomik: Save <ad>.sav.tmp'ye yazar, sonra Move eder. Ana .sav'i salt-okunur yapmak Save'i BASARISIZ kilmaz
+        # (yeniden adlandirma gecer; S6.1 gozlemi) ve kodun kendi salt-okunur .tmp/.bak dosyalari silinir (S6.2 G-ORTA-1), yani yalniz salt-okunur
+        # bayrak da yetmez. Enjeksiyon: ana .sav var ve dolu (kanit icin; salt-okunur DEGIL) + .sav.tmp salt-okunur ve FileShare.None ile acik tutulur:
+        # Save'in "eski .tmp'yi sil" adimi paylasim ihlaliyle basarisiz olur (reason=tmp_delete_failed), Save false, cikis kodu 2.
         if ($Scenario -ceq 'savefail') {
+            $tmpPath = $script:savePath + '.tmp'
+            if (-not (Test-SmokePathUnder $saved $tmpPath) -or (Test-SmokePathHasReparse $saved $tmpPath)) { [void]$script:runnerInc.Add('savefail_tmp_path_unsafe'); return }
+            if (Test-Path -LiteralPath $tmpPath) { [void]$script:runnerInc.Add('savefail_tmp_preexisting (refusing to touch a file that exists)'); return }
             if (-not (Test-Path -LiteralPath $script:savePath -PathType Leaf)) {
-                # S1 K6: kayit katilimda yok, atma aninda olusur. Baska bir .sav kopyalanir (yoksa yer tutucu bayt) ve salt-okunur yapilir.
+                # S1 K6: kayit katilimda yok, atma aninda olusur. Baska bir .sav kopyalanir (yoksa yer tutucu bayt); salt-okunur YAPILMAZ.
                 $tmpl = @(Get-ChildItem -LiteralPath (Join-Path $saved 'SaveGames') -Filter 'MMOSave_*.sav' -File -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 0 } | Sort-Object Name | Select-Object -First 1)
                 if ($tmpl.Count -eq 1) { [IO.File]::Copy($tmpl[0].FullName, $script:savePath, $false) }
                 else { [IO.File]::WriteAllBytes($script:savePath, [byte[]](1..64)) }
             }
-            Set-SmokeReadOnly $state $script:savePath
-            $ro = (([IO.File]::GetAttributes($script:savePath)) -band [IO.FileAttributes]::ReadOnly) -ne 0
-            Say ('savefail injection readonly=' + $ro)
-            if (-not $ro) { [void]$script:runnerInc.Add('savefail_injection_not_applied'); return }
+            [IO.File]::WriteAllBytes($tmpPath, [byte[]](1..16))
+            Set-SmokeReadOnly $state $tmpPath
+            $ro = (([IO.File]::GetAttributes($tmpPath)) -band [IO.FileAttributes]::ReadOnly) -ne 0
+            $lockHandle = $null
+            try { $lockHandle = New-Object IO.FileStream($tmpPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None) } catch { $lockHandle = $null }
+            if ($null -ne $lockHandle) { Add-SmokeLock $state $lockHandle }
+            $locked = ($null -ne $lockHandle)
+            Say ('savefail injection tmp_readonly=' + $ro + ' tmp_locked=' + $locked)
+            if (-not ($ro -and $locked)) { [void]$script:runnerInc.Add('savefail_injection_not_applied'); return }
         }
 
         # ---- 5. sunucunun KENDILIGINDEN cikmasini bekle (sert tavan) ----

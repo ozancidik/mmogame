@@ -9,7 +9,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ShutdownSmokeEvidence.ps1')
 . (Join-Path $PSScriptRoot 'ShutdownSmokeRunnerLib.ps1')
 
-$expected = 323
+$expected = 331
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -303,10 +303,11 @@ try {
         "$sr\SaveGames\MMOSave_Gezgin1.sav", "$sr\MMODaily\MMOSave_Gezgin1.json", "$sr\MMODaily\MMOSave_Gezgin1.json.tmp", "$sr\MMOAchievements\MMOSave_Gezgin1.json",
         "$sr\MMOMail\MMOMail_gezgin1.json", "$sr\MMOMail\MMOMail_gezgin1.json.bak", "$sr\MMORace\MMORace_mmosave_gezgin1.json",
         "$sr\SaveGames\MMOSave_Gezgin10.sav", "$sr\SaveGames\MMOSave_Other.sav", "$sr\MMOMail\MMOMail_gezgin10.json", "$sr\Gezgin1\other.txt", "$sr\Logs\Gezgin1.log",
-        "$sr\SaveGames\Gezgin1.sav", "$sr\SaveGames\MMOSave_Gezgin1.sav.old", "D:\Other\SaveGames\MMOSave_Gezgin1.sav", "$sr\MMOSave_Gezgin1.sav"
+        "$sr\SaveGames\Gezgin1.sav", "$sr\SaveGames\MMOSave_Gezgin1.sav.old", "D:\Other\SaveGames\MMOSave_Gezgin1.sav", "$sr\MMOSave_Gezgin1.sav",
+        "$sr\SaveGames\MMOSave_Gezgin1.sav.tmp", "$sr\SaveGames\MMOSave_Gezgin1.sav.bak", "$sr\SaveGames\MMOSave_Gezgin1.sav.bad", "$sr\SaveGames\MMOSave_Gezgin1.sav.bad.2", "$sr\SaveGames\MMOSave_Gezgin1.sav.bad.9", "$sr\SaveGames\MMOSave_Gezgin10.sav.tmp"
     )
     $cf = @(Get-SmokeCreatedFiles -Before $before -After $after -PlayerName 'Gezgin1' -SavedRoot $sr)
-    $expectHit = @("$sr\SaveGames\MMOSave_Gezgin1.sav", "$sr\MMODaily\MMOSave_Gezgin1.json", "$sr\MMODaily\MMOSave_Gezgin1.json.tmp", "$sr\MMOAchievements\MMOSave_Gezgin1.json", "$sr\MMOMail\MMOMail_gezgin1.json", "$sr\MMOMail\MMOMail_gezgin1.json.bak", "$sr\MMORace\MMORace_mmosave_gezgin1.json")
+    $expectHit = @("$sr\SaveGames\MMOSave_Gezgin1.sav", "$sr\MMODaily\MMOSave_Gezgin1.json", "$sr\MMODaily\MMOSave_Gezgin1.json.tmp", "$sr\MMOAchievements\MMOSave_Gezgin1.json", "$sr\MMOMail\MMOMail_gezgin1.json", "$sr\MMOMail\MMOMail_gezgin1.json.bak", "$sr\MMORace\MMORace_mmosave_gezgin1.json", "$sr\SaveGames\MMOSave_Gezgin1.sav.tmp", "$sr\SaveGames\MMOSave_Gezgin1.sav.bak", "$sr\SaveGames\MMOSave_Gezgin1.sav.bad", "$sr\SaveGames\MMOSave_Gezgin1.sav.bad.2")
     Check 'created' 'exactly_the_players_own_pattern_files_are_selected' (SameArr (@($cf) | Sort-Object) (@($expectHit) | Sort-Object))
     Check 'created_neg' 'preexisting_never_included' (-not ($cf -contains "$sr\SaveGames\MMOSave_Old.sav"))
     Check 'created_neg' 'new_file_of_someone_else_not_included' (-not ($cf -contains "$sr\SaveGames\MMOSave_Other.sav"))
@@ -315,6 +316,8 @@ try {
     Check 'created_neg' 'logs_directory_never_included' (-not ($cf -contains "$sr\Logs\Gezgin1.log"))
     Check 'created_neg' 'not_whitelisted_names_not_included' ((-not ($cf -contains "$sr\SaveGames\Gezgin1.sav")) -and (-not ($cf -contains "$sr\SaveGames\MMOSave_Gezgin1.sav.old")) -and (-not ($cf -contains "$sr\MMOSave_Gezgin1.sav")))
     Check 'created_neg' 'file_outside_saved_not_included' (-not ($cf -contains 'D:\Other\SaveGames\MMOSave_Gezgin1.sav'))
+    Check 'created' 'atomic_character_side_files_tmp_bak_bad_are_cleaned_up_after_a_run' (@('.sav.tmp', '.sav.bak', '.sav.bad', '.sav.bad.2' | Where-Object { $cf -contains ("$sr\SaveGames\MMOSave_Gezgin1" + $_) }).Count -eq 4)
+    Check 'created_neg' 'bad_quota_overflow_and_longer_name_tmp_not_included' ((-not ($cf -contains "$sr\SaveGames\MMOSave_Gezgin1.sav.bad.9")) -and (-not ($cf -contains "$sr\SaveGames\MMOSave_Gezgin10.sav.tmp")))
     Check 'created_neg' 'invalid_player_name_deletes_nothing' ((@(Get-SmokeCreatedFiles -Before $before -After $after -PlayerName 'bad name' -SavedRoot $sr).Count -eq 0) -and (@(Get-SmokeCreatedFiles -Before $before -After $after -PlayerName '' -SavedRoot $sr).Count -eq 0) -and (@(Get-SmokeCreatedFiles -Before $before -After $after -PlayerName 'Gezgin1' -SavedRoot '').Count -eq 0))
     Check 'created' 'case_insensitive_before_set' (@(Get-SmokeCreatedFiles -Before @('c:\r\saved\savegames\mmosave_gezgin1.sav') -After @("$sr\SaveGames\MMOSave_Gezgin1.sav") -PlayerName 'Gezgin1' -SavedRoot $sr).Count -eq 0)
     $afterShort = $before + @("$sr\SaveGames\MMOSave_a.sav", "$sr\SaveGames\MMOSave_ab.sav", "$sr\SaveGames\MMOSave_ba.sav", "$sr\SaveGames\MMOSave_Alice.sav", "$sr\Logs\Game.log", "$sr\SaveGames\MMOSave_MMO.sav", "$sr\SaveGames\MMOSave_Result.sav", "$sr\SaveGames\MMOSave_Results.sav")
@@ -414,6 +417,35 @@ try {
     Add-SmokeOwnedProcess $st $parent
     Invoke-SmokeCleanup $st
     Check 'cleanup_proc' 'child_missing_at_open_time_is_not_a_problem' ($parent.Killed -eq 1 -and $st.Problems.Count -eq 0)
+
+    # ---- temizlik: acik tutulan (FileShare.None) kilit + salt-okunur .tmp; kilit salt-okunur geri almadan ONCE kapanir (S6.3 savefail enjeksiyonu) ----
+    $lkDir = Join-Path $env:TEMP ('mmo_smoke_lock_test_' + [guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($lkDir)
+    try {
+        $lkFile = Join-Path $lkDir 'MMOSave_Gezgin1.sav.tmp'
+        [IO.File]::WriteAllBytes($lkFile, [byte[]](1..16))
+        $stLk = New-TestState
+        Set-SmokeReadOnly $stLk $lkFile
+        $lkHandle = New-Object IO.FileStream($lkFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+        Add-SmokeLock $stLk $lkHandle
+        $delBlocked = $false
+        try { [IO.File]::Delete($lkFile) } catch { $delBlocked = $true }
+        $writeBlocked = $false
+        try { $w = New-Object IO.FileStream($lkFile, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read); $w.Dispose() } catch { $writeBlocked = $true }
+        Check 'cleanup_lock' 'held_lock_blocks_delete_and_other_opens' ($delBlocked -and $writeBlocked -and (Test-Path -LiteralPath $lkFile))
+        Invoke-SmokeCleanup $stLk
+        $attrCleared = (([IO.File]::GetAttributes($lkFile)) -band [IO.FileAttributes]::ReadOnly) -eq 0
+        Check 'cleanup_lock' 'lock_released_before_readonly_restore_no_problems' (($stLk.Problems.Count -eq 0) -and $attrCleared -and ($stLk.Locks.Count -eq 0) -and ($stLk.Done -eq $true))
+        $canDelete = $true
+        try { [IO.File]::Delete($lkFile) } catch { $canDelete = $false }
+        Check 'cleanup_lock' 'file_deletable_after_cleanup' ($canDelete -and -not (Test-Path -LiteralPath $lkFile))
+        $stNoLocks = New-TestState
+        $stNoLocks.Remove('Locks')
+        Invoke-SmokeCleanup $stNoLocks
+        Check 'cleanup_lock' 'state_without_locks_key_still_cleans_up' (($stNoLocks.Problems.Count -eq 0) -and ($stNoLocks.Done -eq $true))
+    } finally {
+        if (Test-Path -LiteralPath $lkDir) { try { Remove-Item -LiteralPath $lkDir -Recurse -Force } catch { } }
+    }
 
     # ---- torun agaci: kimlik dogrulama ve sira (sahte nesnelerle) ----
     $script:events.Clear()
@@ -834,7 +866,9 @@ try {
     Check 'lint' 'removal_helper_checks_under_saved_and_reparse_chain' ($libSrc -match 'if \(\(Test-SmokePathUnder \$SavedRoot \$f\) -and -not \(Test-SmokePathHasReparse \$SavedRoot \$f\)\) \{')
     Check 'lint' 'created_selection_uses_exact_name_group_not_substring' (($libSrc -match 'if \(\$c\.Group -cne \$canon\) \{ continue \}') -and ($libSrc -notmatch 'IndexOf\(\$PlayerName'))
     Check 'lint' 'main_uses_guarded_wrapper' ($mainSrc -match 'Invoke-SmokeGuarded -State \$state -Body')
-    Check 'lint' 'main_injects_via_set_smoke_readonly' ($mainSrc -match 'Set-SmokeReadOnly \$state \$script:savePath')
+    Check 'lint' 'main_injects_via_set_smoke_readonly' ($mainSrc -match 'Set-SmokeReadOnly \$state \$tmpPath')
+    Check 'lint' 'main_savefail_locks_tmp_with_fileshare_none_and_registers_lock' (($mainSrc -match '\[IO\.FileShare\]::None') -and ($mainSrc -match 'Add-SmokeLock \$state \$lockHandle'))
+    Check 'lint' 'main_savefail_never_makes_the_main_sav_readonly' ($mainSrc -notmatch 'Set-SmokeReadOnly \$state \$script:savePath')
     Check 'lint' 'main_refuses_main_checkout' ($mainSrc -match 'Test-SmokeIsMainCheckout \$RepoRoot\) -and -not \$AllowMainCheckout')
     Check 'lint' 'main_defers_unregistered_worktree' ($mainSrc -match 'if \(-not \(Test-SmokeIsRegisteredLinkedWorktree \$RepoRoot \(\$wtList -join "`n"\)\)\) \{ Defer ''worktree_not_registered')
     Check 'lint' 'main_defers_when_worktree_list_fails' ($mainSrc -match 'if \(\$wtListCode -ne 0\) \{ Defer ''worktree_list_unresolved''')

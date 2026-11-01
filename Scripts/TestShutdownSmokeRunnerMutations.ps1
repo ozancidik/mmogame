@@ -36,7 +36,7 @@ $mut = @(
     (M 'r12_main_body_not_guarded' $main @(, @('Invoke-SmokeGuarded -State $state -Body {', 'Invoke-SmokeUnguarded -State $state -Body {')) @('lint/main_uses_guarded_wrapper'))
     (M 'r13_client_not_stopped_by_runner' $main @(, @('Stop-SmokeOwnedProcess $state $cli     #', '$null = $cli     #')) @('lint/main_kills_client_itself_after_server_exit'))
     (M 'r14_main_kills_by_name' $main @(, @("Say 'client stopped by runner'", "Stop-Process -Name MmoNoSuchProcessForMutation -Force -ErrorAction SilentlyContinue; Say 'client stopped by runner'")) @('lint/no_stop_process'))
-    (M 'r15_injection_bypasses_recording_helper' $main @(, @('Set-SmokeReadOnly $state $script:savePath', '[IO.File]::SetAttributes($script:savePath, [IO.FileAttributes]::ReadOnly)')) @('lint/main_injects_via_set_smoke_readonly', 'lint/main_never_sets_attributes_directly'))
+    (M 'r15_injection_bypasses_recording_helper' $main @(, @('Set-SmokeReadOnly $state $tmpPath', '[IO.File]::SetAttributes($tmpPath, [IO.FileAttributes]::ReadOnly)')) @('lint/main_injects_via_set_smoke_readonly', 'lint/main_never_sets_attributes_directly'))
     (M 'r16_player_name_not_passed_to_evaluator' $main @(, @('-PlayerA $script:playerName', '-PlayerA ''SmokeL4A''')) @('lint/main_passes_player_name_from_log_to_evaluator'))
     (M 'r17_busy_rows_never_reported' $lib @(, @('if ($hit) { [void]$busy.Add($p) }', 'if ($false) { [void]$busy.Add($p) }')) @('busy/unreal_editor_cmd_is_busy', 'busy/msbuild_is_busy'))
     (M 'r18_cl_and_link_not_busy' $lib @(, @('UnrealTraceServer|cl|link|MyProject', 'UnrealTraceServer|MyProject')) @('busy/cl_exe_is_busy', 'busy/link_exe_is_busy'))
@@ -96,6 +96,9 @@ $mut = @(
     (M 'r71_joined_names_count_zero' $lib @(, @('$res.Count = $names.Count', '$res.Count = 0')) @('joined_names/single_join_counts_one', 'joined_names/second_player_makes_count_two'))
     (M 'r72_prelogin_count_loose' $lib @(, @('event=prelogin_rejected phase=[A-Za-z?]{1,12}[ \t]*\r?$''', 'event=prelogin_rejected''')) @('prelogin_count_neg/trailing_junk_not_counted'))
     (M 'r73_bundle_never_reads_client_b' $lib @(, @('if (-not [string]::IsNullOrEmpty($ClientBLog)) { $b.ClientBText = Read-SmokeTextShared $ClientBLog }', '$null = 0')) @('evidence/client_b_text_is_read_when_requested'))
+    (M 'r74_cleanup_skips_lock_release' $lib @(, @('try { $lk.Dispose() } catch', 'try { $null = 0 } catch')) @('cleanup_lock/lock_released_before_readonly_restore_no_problems', 'cleanup_lock/file_deletable_after_cleanup'))
+    (M 'r75_savefail_lock_not_registered' $main @(, @('if ($null -ne $lockHandle) { Add-SmokeLock $state $lockHandle }', '$null = 0')) @('lint/main_savefail_locks_tmp_with_fileshare_none_and_registers_lock'))
+    (M 'r76_savefail_makes_main_sav_readonly_again' $main @(, @('Set-SmokeReadOnly $state $tmpPath', 'Set-SmokeReadOnly $state $script:savePath')) @('lint/main_savefail_never_makes_the_main_sav_readonly', 'lint/main_injects_via_set_smoke_readonly'))
 )
 
 if ($Only.Count -gt 0) { $mut = @($mut | Where-Object { $Only -contains $_.Id }) }
