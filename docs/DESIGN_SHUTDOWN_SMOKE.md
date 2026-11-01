@@ -1,6 +1,6 @@
 # Gercek surec dogrulamasi: kapanis duman testi (sunucu yasam dongusu L4) - tasarim
 
-**Tarih:** 2026-11-01 · **Taban:** `c874f03` (master) · **Durum: TASARIM; S0 UYGULANDI (bkz. §11), S1 OLCULDU (bkz. §10, 2026-11-01), S2-S6 baslamadi.** Yazan: `oyun-tasarimcisi`.
+**Tarih:** 2026-11-01 · **Taban:** `c874f03` (master) · **Durum: TASARIM; S0 UYGULANDI (bkz. §11), S1 OLCULDU (bkz. §10, 2026-11-01), S2 (clean) + S3 (savefail) kosucu YAZILDI (bkz. §12), S4-S6 baslamadi.** Yazan: `oyun-tasarimcisi`.
 Sayilar `[PLACEHOLDER]`; hicbiri bu makinede olculmedi. Ust belge: `docs/DESIGN_SERVER_LIFECYCLE.md` (L0-L3 uygulandi; §7 L4 ve §12 "Bilinen sinirlar").
 
 ## 0. Alan secimi ve elenenler (kisa)
@@ -220,7 +220,7 @@ Gercek sunucu logu + istemci logu + JSON + `Process.ExitCode` + `.sav` metadatas
 - ILK verdict (duzeltmeden once): kosu b `clean` = **FAIL** `log_error_line client:line=1108`; kosu c `savefail` = **FAIL** `log_error_line client:line=1110`. Neden: K7'deki iki zorunlu `Error:` satiri, degerlendirici istemcide her `Error:` satirini FAIL saydigi icin YANLIS FAIL uretti.
 - DUZELTME (yalniz S0 dosyalari): `Scripts/ShutdownSmokeEvidence.ps1` istemci A logunda YALNIZ bu iki sabitlenmis satiri izinli sayar (`BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = Your connection to the host has been lost.` ve `NetworkFailure: ConnectionLost, Error: 'Your connection to the host has been lost.'`); sunucu logunda, baska `FailureType`'ta, `Fatal` onekli satirda ve istemci B'de hala FAIL. `Scripts/TestShutdownSmokeEvidence.ps1` 219 -> **229** kontrol (1 olumlu + 4 olumsuz yeni vaka = 10 kontrol), `PASS checks=229`; `TestShutdownSmokeEvidenceMutations.ps1` 11/11 yakalandi (`not_caught=0`).
 - DUZELTME SONRASI verdict: kosu b `clean` = **PASS** (fail=0 inconclusive=0); kosu c `savefail` = **PASS** (fail=0 inconclusive=0). `client_kick_trace=unmeasured` fact'i duruyor; K7 metni artik bilindigi icin S2 kosucusu `-ClientKickPattern 'ControlChannelClose'` verebilir.
-- Kosu a (oyuncusuz, `clean` olarak beslendi): **FAIL** (`flush_done_saved_zero`, `save_trace_missing`, `kick_trace_missing`, `save_file_missing`) + `client_log_missing` INCONCLUSIVE. Oyuncusuz kapanis gecerli ama degerlendirici onu FAIL sayiyor. ONERI (UYGULANMADI): `client_log_missing` iken oyuncu-bagimli kontrolleri FAIL yerine INCONCLUSIVE'e dusur.
+- Kosu a (oyuncusuz, `clean` olarak beslendi): **FAIL** (`flush_done_saved_zero`, `save_trace_missing`, `kick_trace_missing`, `save_file_missing`) + `client_log_missing` INCONCLUSIVE. Oyuncusuz kapanis gecerli ama degerlendirici onu FAIL sayiyor. ONERI: `client_log_missing` iken oyuncu-bagimli kontrolleri FAIL yerine INCONCLUSIVE'e dusur. **S2/S3'te UYGULANDI (bkz. §12).**
 
 ## 11. S0 durum notu (2026-11-01)
 
@@ -234,3 +234,13 @@ Belgeden **bilincli sapmalar** (S2 kosucusu bunlara gore beslenir):
 4. Belge 7.2 M9-M11 (runner mutasyonlari) S2'ye aittir; bu dilimin M9-M11'i degerlendirici korumalaridir (sahte satir, istemci logunda sahte kanit, cikis kodu dogrulamasi).
 5. Log satir bicimleri `MMOServerLifecycle.cpp`'den alindi, gercek bir `-ABSLOG` ile karsilastirilmadi (S1 isi): zaman damgasi onegi `[yyyy.MM.dd-HH.mm.ss:fff][n]` istege bagli kabul edilir.
 Sonraki: S2 kosucu (S1 yapildi, bkz. §10; S0 testi S1 sonrasi 229 kontrol). S2 icin S1 girdileri: oyuncu adi logdan okunur (§10 K5b), sicak acilis + uzun sayim (K2b), istemci surecini kosucu oldurur (K7).
+
+## 12. S2 (clean) + S3 (savefail) durum notu (2026-11-01)
+
+**YAZILDI ve iki senaryo gercek surecte kosuldu** (izole worktree `shutdown-l0`, HEAD `8e36b81`, `-game -server`, Summer_scene, `-MMOShutdownAfterSeconds=240`, sicak onbellek):
+- `clean`: sunucu ~249 sn sonra kendiliginden cikti, `Process.ExitCode==0`, JSON `exit_code 0`, degerlendirici **PASS**, cikis 0.
+- `savefail`: oyuncu katildiktan sonra kayit dosyasi salt-okunur yapildi (kod degistirilmedi), `Process.ExitCode==2`, JSON `exit_code 2 failed 1`, degerlendirici **PASS**, cikis 0; salt-okunur bayrak ve olusan test dosyalari temizlendi.
+- Ilk `clean` denemesi **FAIL** verdi: kosucu `.sav` metadatasini temizlikten SONRA okuyordu (temizlik test kaydini siliyor). Duzeltildi (metadata govde icinde yakalanir) ve lint vakasi eklendi; sonraki kosular yukaridaki PASS'lar. Her senaryo TEK basarili kosu: tekrar edilebilirlik/flaky orani OLCULMEDI.
+- Dosyalar: `Scripts/TestShutdownSmoke.ps1` (kosucu; `-Scenario clean|savefail`, `-RepoRoot <worktree>`; `loginclosed` = S4, kullanim hatasi 2), `Scripts/ShutdownSmokeRunnerLib.ps1` (saf yardimcilar + temizlik), `Scripts/TestShutdownSmokeRunner.ps1` (**154 kontrol**, UE gerektirmez), `Scripts/TestShutdownSmokeRunnerMutations.ps1` (16 mutasyon, hepsi yakalandi). S0 degerlendiricisi: `client_log_missing` iken oyuncuya bagli kontroller INCONCLUSIVE (S1 onerisi uygulandi); `TestShutdownSmokeEvidence.ps1` 229 -> **238** kontrol, mutasyon 11 -> **12**.
+- Cikis kodlari: 0 PASS, 1 FAIL, 2 kullanim, 3 ertelendi (baska UE/UBT, `agent-build.lock`, derlenmemis ikili, ana depo, port), 4 INCONCLUSIVE. Kosucu derleme YAPMAZ; ana depoda `-AllowMainCheckout` olmadan reddeder (gercek `Saved/`).
+- Acik: `-UserDir` ile yol degisimi hala olculmedi (worktree'nin kendi `Saved/`'i kullanilir); toplu adima girmez; PowerShell 7 dogrulanmadi; soguk acilista (bos AssetRegistry onbellegi) ilk kosu INCONCLUSIVE olabilir (K2b).

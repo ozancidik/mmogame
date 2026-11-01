@@ -34,6 +34,7 @@ $mut = @(
     (M 'm9_forged_or_malformed_line_accepted' $ev @(, @("if (-not `$matched) { AddFail 'malformed_evidence_line' ('line=' + `$n) }", 'if ($false) { }')) @('neg_forged_exit_line_in_other_log_category/verdict_fail', 'neg_forged_exit_line_in_other_log_category/reason_malformed_evidence_line', 'neg_non_ascii_player_name_in_evidence_line/reason_malformed_evidence_line'))
     (M 'm10_client_log_fake_evidence_accepted' $ev @(, @("if (`$clientEvidence) { AddFail 'client_log_contains_server_evidence' }", 'if ($false) { }')) @('neg_client_log_carries_a_fake_shutdown_exit_line/verdict_fail', 'neg_client_log_carries_a_fake_shutdown_exit_line/reason_client_log_contains_server_evidence'))
     (M 'm11_process_exit_code_range_unchecked' $ev @(, @('if ($null -ne $pec -and ($pec -lt 0 -or $pec -gt 255)) {', 'if ($false) {')) @('neg_process_exit_code_negative/reason_process_exit_code_out_of_range', 'neg_process_exit_code_huge/reason_process_exit_code_out_of_range'))
+    (M 'm12_player_checks_not_degraded_without_client_log' $ev @(, @('if ($noClient) { AddInc $Code $Detail } else { AddFail $Code $Detail }', 'AddFail $Code $Detail')) @('neg_playerless_run_without_client_log_is_inconclusive/verdict_inconclusive', 'neg_playerless_run_without_client_log_is_inconclusive/reason_flush_done_saved_zero_degraded', 'neg_playerless_run_without_client_log_is_inconclusive/no_fail_reasons'))
 )
 
 if ($Only.Count -gt 0) { $mut = @($mut | Where-Object { $Only -contains $_.Id }) }

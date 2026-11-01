@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ShutdownSmokeEvidence.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi.
-$expected = 229
+$expected = 238
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -422,6 +422,20 @@ try {
     # ================= ISTEMCI =================
     $i = New-Inputs 'clean'; $i['ClientLogText'] = ''
     [void](CheckNeg 'neg_client_log_empty' $i 'INCONCLUSIVE' 'client_log_missing')
+    # S1 onerisi: istemci logu yokken oyuncuya bagli kontroller FAIL degil INCONCLUSIVE (oyuncusuz kapanis: gecerli ama kanitlanamaz).
+    $items = New-LogItems 'clean'; Item-Remove $items @('join', 'save', 'retry', 'kick')
+    Item-Set $items 'flush_done' ($LC + '[MMOMETRIC] t=141.5 ev=shutdown phase=flush_done players=0 saved=0 failed=0 skipped=0')
+    $playerless = Join-Log $items
+    $i = New-Inputs 'clean'; $i['ServerLogText'] = $playerless; $i['ClientLogText'] = $null; $i['SaveFileInfo'] = New-SaveInfo -Exists $false
+    $r = CheckNeg 'neg_playerless_run_without_client_log_is_inconclusive' $i 'INCONCLUSIVE' 'client_log_missing'
+    Check 'neg_playerless_run_without_client_log_is_inconclusive' 'reason_flush_done_saved_zero_degraded' (Test-Reason $r 'INCONCLUSIVE' 'flush_done_saved_zero')
+    Check 'neg_playerless_run_without_client_log_is_inconclusive' 'reason_save_trace_missing_degraded' (Test-Reason $r 'INCONCLUSIVE' 'save_trace_missing')
+    Check 'neg_playerless_run_without_client_log_is_inconclusive' 'reason_kick_trace_missing_degraded' (Test-Reason $r 'INCONCLUSIVE' 'kick_trace_missing')
+    Check 'neg_playerless_run_without_client_log_is_inconclusive' 'reason_save_file_missing_degraded' (Test-Reason $r 'INCONCLUSIVE' 'save_file_missing')
+    Check 'neg_playerless_run_without_client_log_is_inconclusive' 'no_fail_reasons' (@($r.Reasons | Where-Object { $_.StartsWith('FAIL:') }).Count -eq 0)
+    # Ayni oyuncusuz kanit istemci logu VARKEN hala FAIL (istemci katildiysa oyuncu izleri olmak zorunda).
+    $i = New-Inputs 'clean'; $i['ServerLogText'] = $playerless; $i['SaveFileInfo'] = New-SaveInfo -Exists $false
+    [void](CheckNeg 'neg_playerless_evidence_with_client_log_still_fails' $i 'FAIL' 'flush_done_saved_zero')
     $i = New-Inputs 'clean'; $i['ClientLogText'] = '[2026.11.01-12.00.20:000][  0]LogNet: Display: connecting' + "`r`n"
     [void](CheckNeg 'neg_client_never_welcomed' $i 'INCONCLUSIVE' 'client_a_never_welcomed')
     $items = New-LogItems 'clean'; Item-Remove $items @('join')

@@ -165,6 +165,7 @@ function Get-ShutdownEvidenceVerdict {
         if (-not $sp.EndsWithLf) { AddInc 'server_log_truncated' }
         $lines = [string[]]$sp.Lines
 
+        $noClient = $false    # istemci logu yok: oyuncuya bagli kontroller FAIL degil INCONCLUSIVE (S1 onerisi; oyuncusuz kapanis gecerli ama kanitlanamaz)
         $ev = @{}
         $joinA = New-Object System.Collections.ArrayList
         $joinB = New-Object System.Collections.ArrayList
@@ -207,6 +208,15 @@ function Get-ShutdownEvidenceVerdict {
             param([string]$Code, [string]$Detail = '')
             if ($logComplete) { AddFail $Code $Detail } else { AddInc $Code $Detail }
         }
+        function PFail {
+            # Oyuncuya bagli celiski: istemci logu yoksa oyuncu hic katilmamis olabilir -> kanit eksik (INCONCLUSIVE), degilse FAIL.
+            param([string]$Code, [string]$Detail = '')
+            if ($noClient) { AddInc $Code $Detail } else { AddFail $Code $Detail }
+        }
+        function PAbsent {
+            param([string]$Code, [string]$Detail = '')
+            if ($noClient) { AddInc $Code $Detail } else { Absent $Code $Detail }
+        }
 
         # ---- olay sayilari: her biri tam bir kez ---
         foreach ($k in @('sched', 'p_closing', 'p_flushing', 'p_kicking', 'p_exiting', 'flush_begin', 'flush_done', 'exiting', 'exit')) {
@@ -244,7 +254,7 @@ function Get-ShutdownEvidenceVerdict {
         # ---- istemci A ---
         $clientText = $null
         if ($ClientLogText -is [string]) { $clientText = [string]$ClientLogText }
-        if ($null -eq $clientText -or $clientText.Trim().Length -eq 0) { AddInc 'client_log_missing' }
+        if ($null -eq $clientText -or $clientText.Trim().Length -eq 0) { AddInc 'client_log_missing'; $noClient = $true }
         else {
             $cp = Split-SmokeLog $clientText
             if ($cp.TooLarge) { AddInc 'client_log_too_large' }
@@ -351,15 +361,15 @@ function Get-ShutdownEvidenceVerdict {
         }
         if ($scn -ceq 'savefail') {
             if (-not $injectionIneffective -and (Cnt 'exit') -ge 1) {
-                if ($sfA.Count -eq 0) { Absent 'savefail_no_save_failed_trace' }
-                if ($null -ne $failedFlush -and $failedFlush -lt 1) { AddFail 'flush_done_failed_zero' }
-                if ($null -ne $logFailed -and $logFailed -lt 1) { AddFail 'exit_failed_zero_in_savefail' }
-                if ($kickA.Count -eq 0) { Absent 'kick_trace_missing' $PlayerA }
+                if ($sfA.Count -eq 0) { PAbsent 'savefail_no_save_failed_trace' }
+                if ($null -ne $failedFlush -and $failedFlush -lt 1) { PFail 'flush_done_failed_zero' }
+                if ($null -ne $logFailed -and $logFailed -lt 1) { PFail 'exit_failed_zero_in_savefail' }
+                if ($kickA.Count -eq 0) { PAbsent 'kick_trace_missing' $PlayerA }
                 elseif (@($kickA | Where-Object { $_.M.Groups['r'].Value -ceq 'failed' }).Count -eq 0) { AddFail 'savefail_kick_result_not_failed' }
             }
         } else {
             if ($null -ne $flushDone) {
-                if ($savedFlush -lt 1) { AddFail 'flush_done_saved_zero' }
+                if ($savedFlush -lt 1) { PFail 'flush_done_saved_zero' }
                 if ($failedFlush -gt 0) { AddFail 'flush_done_failed_nonzero' }
             }
             if ($anyFailTrace) { AddFail 'save_failure_trace_in_clean_scenario' }
@@ -367,9 +377,9 @@ function Get-ShutdownEvidenceVerdict {
                 if ([int64]$logExit.Groups['sc'].Value + [int64]$logExit.Groups['kf'].Value -gt $logFailed) { AddFail 'exit_counters_inconsistent' }
             }
             if ((Cnt 'exit') -ge 1) {
-                if ($saveA.Count -eq 0) { Absent 'save_trace_missing' $PlayerA }
+                if ($saveA.Count -eq 0) { PAbsent 'save_trace_missing' $PlayerA }
                 elseif (@($saveA | Where-Object { $_.M.Groups['r'].Value -ceq 'saved' }).Count -eq 0) { AddFail 'save_result_not_saved' }
-                if ($kickA.Count -eq 0) { Absent 'kick_trace_missing' $PlayerA }
+                if ($kickA.Count -eq 0) { PAbsent 'kick_trace_missing' $PlayerA }
                 elseif (@($kickA | Where-Object { $_.M.Groups['k'].Value -ceq '1' }).Count -eq 0) { AddFail 'kick_not_confirmed' }
             }
         }
@@ -474,13 +484,13 @@ function Get-ShutdownEvidenceVerdict {
             $len = Get-SmokeProp $SaveFileInfo 'Length'
             $lw = ConvertTo-SmokeUtc (Get-SmokeProp $SaveFileInfo 'LastWriteUtc')
             $st = ConvertTo-SmokeUtc (Get-SmokeProp $SaveFileInfo 'ServerStartUtc')
-            if ($exists -isnot [bool] -or $exists -ne $true) { AddFail 'save_file_missing' }
-            elseif (($len -isnot [int] -and $len -isnot [long]) -or $len -le 0) { AddFail 'save_file_empty' }
+            if ($exists -isnot [bool] -or $exists -ne $true) { PFail 'save_file_missing' }
+            elseif (($len -isnot [int] -and $len -isnot [long]) -or $len -le 0) { PFail 'save_file_empty' }
             elseif ($scn -cne 'savefail') {
                 # savefail'de yazim BASARISIZ olur: dosya onceki kosudan kalir (zaman penceresi uygulanmaz, yalniz var ve bos degil).
                 if ($null -eq $lw -or $null -eq $st) { AddInc 'save_time_info_missing' }
                 else {
-                    if ($lw -lt $st.AddSeconds(-$TimeToleranceSeconds)) { AddFail 'save_file_not_written_this_run' }
+                    if ($lw -lt $st.AddSeconds(-$TimeToleranceSeconds)) { PFail 'save_file_not_written_this_run' }
                     if ($null -ne $jsonTime -and $lw -gt $jsonTime.AddSeconds($TimeToleranceSeconds)) { AddFail 'save_file_after_exit' }
                 }
             }
