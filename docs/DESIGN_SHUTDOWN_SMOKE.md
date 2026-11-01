@@ -1,6 +1,6 @@
 # Gercek surec dogrulamasi: kapanis duman testi (sunucu yasam dongusu L4) - tasarim
 
-**Tarih:** 2026-11-01 · **Taban:** `c874f03` (master) · **Durum: TASARIM; kod yok, hicbir dilim baslamadi.** Yazan: `oyun-tasarimcisi`.
+**Tarih:** 2026-11-01 · **Taban:** `c874f03` (master) · **Durum: TASARIM; S0 UYGULANDI (bkz. §11), S1-S6 baslamadi.** Yazan: `oyun-tasarimcisi`.
 Sayilar `[PLACEHOLDER]`; hicbiri bu makinede olculmedi. Ust belge: `docs/DESIGN_SERVER_LIFECYCLE.md` (L0-L3 uygulandi; §7 L4 ve §12 "Bilinen sinirlar").
 
 ## 0. Alan secimi ve elenenler (kisa)
@@ -201,3 +201,16 @@ HUD geri sayim bandi, istemci chat alindi logu (sicak dosya ve deger yok), mob/l
 | `MMOShutdownResult.json` yolu (`-UserDir` ile) | _bos_ |
 | `MMOSave_*.sav` yolu (`-UserDir` ile) | _bos_ |
 | Istemci atilma log satirinin metni | _bos_ |
+
+## 11. S0 durum notu (2026-11-01)
+
+**S0 UYGULANDI** (UE/oyun/sunucu baslatilmadi; gercek `Saved/` okunmadi/yazilmadi): `Scripts/ShutdownSmokeEvidence.ps1` (saf `Get-ShutdownEvidenceVerdict`, PASS | FAIL | INCONCLUSIVE + `[MMO_SMOKE_VERDICT|REASON|FACT]` satirlari),
+`Scripts/TestShutdownSmokeEvidence.ps1` (219 kontrol, `PASS checks=219`; 89 olumsuz + 14 olumlu vaka adi), `Scripts/TestShutdownSmokeEvidenceMutations.ps1` (11 mutasyon, hepsi belirli FAIL etiketiyle yakalandi, control temiz). Windows PowerShell 5.1 ile calistirildi; PowerShell 7 DOGRULANMADI.
+Anlam: FAIL = kanit celisiyor (yanlis kod, bayat `run_id`, sahte/bozuk satir, sira bozuk, yinelenen olay); INCONCLUSIVE = kanit eksik (yarim log, istemci katilamadi, `shutdown_exit_skipped_editor`, enjeksiyon etkisiz); PASS yalniz ikisi de yokken.
+Belgeden **bilincli sapmalar** (S2 kosucusu bunlara gore beslenir):
+1. `.sav` yazim zamani ust siniri `flush_done` degil, cikis zamanidir (JSON `time_utc` + 5 sn): atma aninda yeniden yazim ve `EndPlay` kaydi `flush_done`'dan SONRA da dosyayi yazar. `savefail`'de yazim basarisiz olur: yalniz "var ve > 0 bayt" aranir (zaman penceresi yok).
+2. Istemci atilma/ret log metni S1'de olculmedi: `-ClientKickPattern` / `-ClientRejectPattern` bos ise `[MMO_SMOKE_FACT] name=client_kick_trace value=unmeasured` basilir (PASS'i engellemez, ama "gozlenmedi" diye kayitlidir); verilirse ve bulunmazsa INCONCLUSIVE.
+3. Savefail'de `Error:` satirlari yalniz `-AllowedErrorPattern`'e uyuyorsa izinli (varsayilan bos = hic Error izinli degil); desen S1/S3 olcumunden sonra verilir.
+4. Belge 7.2 M9-M11 (runner mutasyonlari) S2'ye aittir; bu dilimin M9-M11'i degerlendirici korumalaridir (sahte satir, istemci logunda sahte kanit, cikis kodu dogrulamasi).
+5. Log satir bicimleri `MMOServerLifecycle.cpp`'den alindi, gercek bir `-ABSLOG` ile karsilastirilmadi (S1 isi): zaman damgasi onegi `[yyyy.MM.dd-HH.mm.ss:fff][n]` istege bagli kabul edilir.
+Sonraki: S1 (tek-seferlik olcum) -> S2 kosucu.
