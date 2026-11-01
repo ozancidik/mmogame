@@ -258,7 +258,11 @@ function Get-ShutdownEvidenceVerdict {
                     if ($sensRx.IsMatch($l)) { $clientEvidence = $true }
                 }
                 if ($clientEvidence) { AddFail 'client_log_contains_server_evidence' }
-                Scan-ErrorLines $cl 'client' $allowRx
+                # S1 olcumu (2026-11-01, gercek istemci logu): sunucu atinca istemci TEK bir Error satiri yazar (kick'in beklenen sonucu); yalniz istemci A'da izinli.
+                $kickErrRx = New-Object System.Text.RegularExpressions.Regex('^' + $tsPre + '(?:LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = Your connection to the host has been lost\.|LogNet: NetworkFailure: ConnectionLost, Error: ''Your connection to the host has been lost\.''\s*$)')
+                $clientAllowRx = $kickErrRx
+                if ($null -ne $allowRx) { $clientAllowRx = New-Object System.Text.RegularExpressions.Regex('(?:' + $kickErrRx.ToString() + ')|(?:' + $allowRx.ToString() + ')') }
+                Scan-ErrorLines $cl 'client' $clientAllowRx
                 if ($welcomed -eq 0) { AddInc 'client_a_never_welcomed' }
                 if ($joinA.Count -eq 0) { AddInc 'server_join_trace_missing' $PlayerA }
                 if ($ClientKickPattern.Length -gt 0) {

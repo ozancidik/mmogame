@@ -1,6 +1,6 @@
 # Gercek surec dogrulamasi: kapanis duman testi (sunucu yasam dongusu L4) - tasarim
 
-**Tarih:** 2026-11-01 · **Taban:** `c874f03` (master) · **Durum: TASARIM; S0 UYGULANDI (bkz. §11), S1-S6 baslamadi.** Yazan: `oyun-tasarimcisi`.
+**Tarih:** 2026-11-01 · **Taban:** `c874f03` (master) · **Durum: TASARIM; S0 UYGULANDI (bkz. §11), S1 OLCULDU (bkz. §10, 2026-11-01), S2-S6 baslamadi.** Yazan: `oyun-tasarimcisi`.
 Sayilar `[PLACEHOLDER]`; hicbiri bu makinede olculmedi. Ust belge: `docs/DESIGN_SERVER_LIFECYCLE.md` (L0-L3 uygulandi; §7 L4 ve §12 "Bilinen sinirlar").
 
 ## 0. Alan secimi ve elenenler (kisa)
@@ -49,6 +49,7 @@ ve otomatik yeniden baslatma yanlislikla dongu yaratmaz. Bunlarin hicbiri "bir s
 S01.04/S01.05'te kanitlanan "editor-dedicated" yolu `NetSmokeTest.ps1:198` `@($mapPath, '-server')` ile baslar ve `:166` **`-game` iceren komut satirini reddeder**
 (`EDITOR_SERVER command-line evidence ...`). Editor ikilisi `-game` olmadan `GIsEditor=true` calisir; yani bugun gecen iki bağlanti kaniti L4'te **kullanilamaz**: cikis atlanir, cikis kodu/JSON asla uretilmez.
 Cozum adayi `-game -server` (editor ikilisini oyun modunda dedicated olarak calistirmanin olagan yolu) - **[Dogrulanmadi]**: bu makinede hic denenmedi, `NM_DedicatedServer` olup olmadigi ve `GIsEditor`'un false olup olmadigi dilim S1'de OLCULECEK (§6). Tahmin dogru cikmazsa yedek plan §3.2.
+**S1 SONUCU (2026-11-01, §10): `-game -server` ile cikis yolu CALISTI (GIsEditor atlama dali alinmadi, kod 0 ve 2 OS cikis kodu olarak gozlendi). Ustelik `-game` OLMADAN `UnrealEditor-Cmd.exe <harita> -server` de ayni sekilde cikti: bu belgenin "`-game` olmadan GIsEditor=true" varsayimi bu makinede CURUTULDU (dolayli kanit: `shutdown_exit_skipped_editor` hic yazilmadi). §3.2 yedegi (`-MMOShutdownAllowEditorExit`) GEREKMEDI, uygulanmamali.**
 
 ### 1.3 Ikinci bulgu (L4 disi, ayri karar): karakter `.sav` yazimi atomik degil [Kesin, kod + motor kaynagi]
 
@@ -191,16 +192,35 @@ Kabul: native self-test (kesik ana dosya + gecerli `.bak` -> yuklenir; ikisi de 
 
 HUD geri sayim bandi, istemci chat alindi logu (sicak dosya ve deger yok), mob/loot mutasyon kapisi (§0), operator ozet araci (§0), fabrika bilesenleri (§0.1): **simdi degmez**.
 
-## 10. Olcum kaydi (S1 sonrasi doldurulur)
+## 10. Olcum kaydi (S1, 2026-11-01, elle, tek seferlik; oyun kodu DEGISMEDI)
 
-| Olcum | Sonuc |
-|---|---|
-| `-game -server` komut satiri ve acilis suresi | _bos_ |
-| `GIsEditor` / `shutdown_exit_skipped_editor` | _bos_ |
-| `Process.ExitCode` (kod 0) | _bos_ |
-| `MMOShutdownResult.json` yolu (`-UserDir` ile) | _bos_ |
-| `MMOSave_*.sav` yolu (`-UserDir` ile) | _bos_ |
-| Istemci atilma log satirinin metni | _bos_ |
+Ortam: izole worktree `C:\Users\OZAN CIDIK\.claude\worktrees\shutdown-l0` (master `8e36b81`, `MyProjectEditor` derlendi: Result Succeeded), harita `Summer_scene`, `UnrealEditor-Cmd.exe`, `-NullRHI -nosound -unattended -nosplash -stdout`. `-UserDir` KULLANILMADI (worktree'nin kendi `Saved/`'i; ana `Saved/` okunmadi/yazilmadi). Sunucu/istemci `System.Diagnostics.Process` ile baslatildi, yalniz kendi surec nesnelerine dokunuldu, `WaitForExit` + sert tavan. Baska UE/UBT calismiyordu. Her olcum TEK kosu: tekrar edilebilirlik OLCULMEDI.
+Komut (kisaltilmis): `UnrealEditor-Cmd.exe "<wt>\MyProject.uproject" /Game/HandPaintedEnvironment/Maps/Summer_scene/Summer_scene -game -server -NullRHI -nosound -unattended -nosplash -stdout -ABSLOG=<log> -port=<P> -MMOShutdownAfterSeconds=<N> -MMOMaintenanceReason=bakim`; istemci: `<proje> 127.0.0.1:<P>?Name=SmokeL4A -game -NullRHI -nosound -unattended -nosplash -stdout -ABSLOG=<log>`.
+Kosular: a = oyuncusuz, N=45; b = 1 istemci, N=240; c = 1 istemci + salt-okunur enjeksiyon, N=150; d = `-game` YOK, oyuncusuz, N=60.
+
+| Olcum | Sonuc | Etiket |
+|---|---|---|
+| (K1) `-game -server` ile cikis zinciri gercekten calisiyor mu | Kosu a/b/c: `event=lifecycle_ready netmode=1` (NM_DedicatedServer), `shutdown_exit_skipped_editor` HICBIR kosuda yok, `[MMOMETRIC] ev=shutdown_exit` sonrasi `LogWindows: FPlatformMisc::RequestExitWithStatus(0, <kod>, MMOServerLifecycle)` ve surec kendiliginden bitti. GIsEditor degerinin KENDISI loglanmiyor: kanit dolayli (atlama dali alinmadi) | DOGRULANDI (dolayli) |
+| (K1b) §1.2 varsayimi: `-game` olmadan GIsEditor=true | Kosu d: `UnrealEditor-Cmd.exe <harita> -server` (`-game` YOK): `netmode=1`, zincir tamam, `RequestExitWithStatus(0, 0, MMOServerLifecycle)`, `Process.ExitCode==0`, `shutdown_exit_skipped_editor` yok. Editor ikilisi `-server` ile de oyun/dedicated modunda; §1.2'deki "mevcut sunucu yolu cikis kodunu calistiramaz" iddiasi bu komut satiri icin YANLIS. `NetSmokeTest.ps1`'in kendi kosusu CALISTIRILMADI (yalniz ayni bayraklar elle denendi) | CURUTULDU (bu makine, bu komut satiri) |
+| (K2) Closing->Flushing->Kicking->Exiting | Kosu b: `scheduled` 01:45:07 -> `Closing remaining=60` 01:48:07 (+180 sn) -> `Flushing remaining=20` 01:48:47 (+220) -> `shutdown_flush_begin`, `shutdown_save player=<ad> result=saved`, `flush_done players=1 saved=1 failed=0` -> `Kicking remaining=5` 01:49:02 (+235; `shutdown_save_retry ... result=saved`, `shutdown_kick ... kicked=1 attempt=1`) -> `Exiting remaining=0` 01:49:07 (+240) -> `shutdown_exiting` -> `ev=shutdown_exit code=0 failed=0 gone=0 still_connected=0 kick_failed=0`. Her olay tam bir kez, duvar saati geri sayimi dogru. Kosu c (150 sn) ayni sira | DOGRULANDI |
+| (K2b) Soguk acilista geri sayim | Kosu a (ilk acilis, `CachedAssetRegistryDiscovery.bin` yok): `shutdown_scheduled` dunya BeginPlay'inde (01:43:04), sonra `FEngineLoop::Init` icinde AssetRegistry toplama 73.4 sn ana thread'i tuttu (`UNetDriver::TickDispatch: Very long time between ticks ... Realtime: 74.50`); ilk Tick'te kalan 45 sn tek hamlede bitti: `Closing` ve `Flushing` ayni saniyede. Geri sayim motor baslatma bitmeden basliyor; soguk acilista kisa sayim gercek zamanli gorulmedi (girisler fiilen hic acilmaz). Sicak onbellekte (b-d) saat dogru. Kod degisikligi ONERILMEZ; S2 sicak acilista ve yeterince uzun sayimla kosmali | GOZLENDI |
+| (K3) `Process.ExitCode` temiz kapanis | Kosu a: 0; kosu b (1 oyuncu): 0; kosu d: 0. `RequestExitWithStatus` -> `PreExit Game` -> `LogExit: Exiting.`; `shutdown_exit` ile surec sonu arasi ~1 sn | DOGRULANDI |
+| (K4) `MMOShutdownResult.json` | Yol: `<wt>\Saved\Logs\MMOShutdownResult.json` (`-UserDir` ile yolun degisimi OLCULMEDI). Her kosuda uretildi. Kosu b: `{"run_id":"20261101T014507Z-14864","exit_code":0,"failed":0,"gone":0,"still_connected":0,"kick_failed":0,"time_utc":"2026-11-01T01:49:07.589Z"}`; `run_id` = logdaki `event=stale_result_cleared ok=1 run_id=20261101T014507Z-14864`; `time_utc` = `shutdown_exit` log zamani | DOGRULANDI |
+| (K5) Savefail: gercek cikis kodu 2 | Kosu c: oyuncu katildiktan sonra (`Join succeeded: Gezgin273079`, +22 sn) `Saved\SaveGames\MMOSave_Gezgin273079.sav` baska bir `.sav`'dan KOPYALANIP salt-okunur yapildi (kosu sonunda kaldirildi; `writable=True`, dosya degismedi). Sunucu: `shutdown_save ... result=failed`, `[MMOMETRIC] ev=shutdown_save_failed`, `flush_done saved=0 failed=1`, `shutdown_save_retry ... previous=failed result=failed`, `shutdown_kick ... result=failed kicked=1`, `ev=shutdown_exit code=2 failed=1`, `RequestExitWithStatus(0, 2, MMOServerLifecycle)`, `event=shutdown_forced_exit code=2`, `RequestExitWithStatus(1, 2, MMOServerLifecycleForcedCode)`; log `LogExit: Exiting.` OLMADAN biter (TerminateProcess yolu). **`Process.ExitCode == 2`**; JSON `exit_code:2, failed:1`, `run_id` eslesti | DOGRULANDI (OnPreExit TerminateProcess yolu Windows'ta kodu OS'e tasiyor) |
+| (K5b) Enjeksiyon notu | Karakter adi istemciden SECILEMEDI: URL'deki `?Name=SmokeL4A` yoksayildi; sunucu `Login request: ?Name=CIDIK-<32 hex>` (OnlineSubsystemNull takma adi) gordu ve ad kurali bunu rastgele `Gezgin######` yapti. Bu yuzden §4 / S0 varsayilani `SmokeL4A` bu istemci acilisiyla GECERSIZ; kosucu adi sunucu logundaki `Join succeeded: (\S+)` satirindan okumali, salt-okunur enjeksiyonu O ADLA ve katilimdan sonra yapmali. Salt-okunur hedef kaydi gercekten basarisiz kildi (INCONCLUSIVE gerekmedi) | DOGRULANDI |
+| (K6) `MMOSave_*.sav` yolu | `<wt>\Saved\SaveGames\MMOSave_<ad>.sav` (4085 bayt; `-UserDir` ile degisimi OLCULMEDI). Kosu b'de oyuncunun dosyasi katilimda YOKTU, atma aninda yeniden yazimda olustu (mtime 01:49:02 UTC, `flush_done` +220 sn'den SONRA): S0'in "ust sinir = cikis zamani" sapmasi (§11 madde 1) dogru cikti | DOGRULANDI |
+| (K7) Istemci atilma log satirlari | Kosu b istemci logu 01:49:02.636: `LogNet: NMT_CloseReason: (Server Disconnect Reasons) 127.0.0.1:<P>`, `LogNet:  - ControlChannelClose`, `LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = Your connection to the host has been lost., Driver = ...`, `LogNet: NetworkFailure: ConnectionLost, Error: 'Your connection to the host has been lost.'`. Istemci sunucu ciktiktan sonra da canli kaldi (kosucu kendi surecini oldurmeli) | GOZLENDI |
+| (K8) Acilis suresi | Sicak: surec baslangici -> `lifecycle_ready` ~8 sn (kosu b); istemci +9 sn'de baslatildi, `Join succeeded` +22 sn. Soguk: ~23 sn + 74 sn AssetRegistry (K2b) | GOZLENDI (tek kosu) |
+| `PreLogin` reddi gercek ikinci istemciye ulasiyor mu (§4.3), `UNetConnection` atmasinin ayrintilari | S1 kapsaminda DEGILDI | OLCULEMEDI |
+
+### 10.1 S0 degerlendiricisinin gercek log/JSON uzerindeki verdict'i ve duzeltme
+
+Gercek sunucu logu + istemci logu + JSON + `Process.ExitCode` + `.sav` metadatasi `Get-ShutdownEvidenceVerdict`'e beslendi (`-PlayerA` = logdan okunan ad):
+- Sunucu logunda `malformed_evidence_line` YOK: §11 madde 5 bicim varsayimlari (zaman damgasi onegi, `LogMMOLifecycle: Display:`, `[MMOMETRIC] t=... ev=...`, `Warning:` seviyeli `ev=shutdown_save_failed`) gercek logla tuttu.
+- ILK verdict (duzeltmeden once): kosu b `clean` = **FAIL** `log_error_line client:line=1108`; kosu c `savefail` = **FAIL** `log_error_line client:line=1110`. Neden: K7'deki iki zorunlu `Error:` satiri, degerlendirici istemcide her `Error:` satirini FAIL saydigi icin YANLIS FAIL uretti.
+- DUZELTME (yalniz S0 dosyalari): `Scripts/ShutdownSmokeEvidence.ps1` istemci A logunda YALNIZ bu iki sabitlenmis satiri izinli sayar (`BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = Your connection to the host has been lost.` ve `NetworkFailure: ConnectionLost, Error: 'Your connection to the host has been lost.'`); sunucu logunda, baska `FailureType`'ta, `Fatal` onekli satirda ve istemci B'de hala FAIL. `Scripts/TestShutdownSmokeEvidence.ps1` 219 -> **229** kontrol (1 olumlu + 4 olumsuz yeni vaka = 10 kontrol), `PASS checks=229`; `TestShutdownSmokeEvidenceMutations.ps1` 11/11 yakalandi (`not_caught=0`).
+- DUZELTME SONRASI verdict: kosu b `clean` = **PASS** (fail=0 inconclusive=0); kosu c `savefail` = **PASS** (fail=0 inconclusive=0). `client_kick_trace=unmeasured` fact'i duruyor; K7 metni artik bilindigi icin S2 kosucusu `-ClientKickPattern 'ControlChannelClose'` verebilir.
+- Kosu a (oyuncusuz, `clean` olarak beslendi): **FAIL** (`flush_done_saved_zero`, `save_trace_missing`, `kick_trace_missing`, `save_file_missing`) + `client_log_missing` INCONCLUSIVE. Oyuncusuz kapanis gecerli ama degerlendirici onu FAIL sayiyor. ONERI (UYGULANMADI): `client_log_missing` iken oyuncu-bagimli kontrolleri FAIL yerine INCONCLUSIVE'e dusur.
 
 ## 11. S0 durum notu (2026-11-01)
 
@@ -213,4 +233,4 @@ Belgeden **bilincli sapmalar** (S2 kosucusu bunlara gore beslenir):
 3. Savefail'de `Error:` satirlari yalniz `-AllowedErrorPattern`'e uyuyorsa izinli (varsayilan bos = hic Error izinli degil); desen S1/S3 olcumunden sonra verilir.
 4. Belge 7.2 M9-M11 (runner mutasyonlari) S2'ye aittir; bu dilimin M9-M11'i degerlendirici korumalaridir (sahte satir, istemci logunda sahte kanit, cikis kodu dogrulamasi).
 5. Log satir bicimleri `MMOServerLifecycle.cpp`'den alindi, gercek bir `-ABSLOG` ile karsilastirilmadi (S1 isi): zaman damgasi onegi `[yyyy.MM.dd-HH.mm.ss:fff][n]` istege bagli kabul edilir.
-Sonraki: S1 (tek-seferlik olcum) -> S2 kosucu.
+Sonraki: S2 kosucu (S1 yapildi, bkz. §10; S0 testi S1 sonrasi 229 kontrol). S2 icin S1 girdileri: oyuncu adi logdan okunur (§10 K5b), sicak acilis + uzun sayim (K2b), istemci surecini kosucu oldurur (K7).

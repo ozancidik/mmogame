@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ShutdownSmokeEvidence.ps1')
 
 # Beklenen = benzersiz case/check etiketi sayisi.
-$expected = 219
+$expected = 229
 
 $script:labels = @{}
 $script:caseLines = 0
@@ -462,6 +462,20 @@ try {
     [void](CheckNeg 'neg_ensure_line_in_server_log' $i 'FAIL' 'log_error_line')
     $i = New-Inputs 'clean'; $i['ClientLogText'] = $clientA + 'LogWindows: Fatal error: fixture' + "`r`n"
     [void](CheckNeg 'neg_fatal_line_in_client_log' $i 'FAIL' 'log_error_line')
+    # S1 gercek olcum: atilan istemci A'nin logundaki tek beklenen Error satiri izinli; baska her sey ve sunucu logunda ayni satir FAIL.
+    $kickErr = '[2026.11.01-01.49.02:636][158]LogNet: Error: UEngine::BroadcastNetworkFailure: FailureType = ConnectionLost, ErrorString = Your connection to the host has been lost., Driver = Name:GameNetDriver Def:GameNetDriver IpNetDriver_0'
+    $kickErr2 = '[2026.11.01-01.49.02:636][158]LogNet: NetworkFailure: ConnectionLost, Error: ''Your connection to the host has been lost.'''
+    $i = New-Inputs 'clean'; $i['ClientLogText'] = $clientA + $kickErr + "`r`n" + $kickErr2 + "`r`n"
+    [void](CheckPass 'pos_client_kick_connectionlost_error_is_allowed' $i)
+    $i = New-Inputs 'clean'; $i['ClientLogText'] = $clientA + $kickErr2.Replace('ConnectionLost', 'NetDriverAlreadyExists') + "`r`n"
+    [void](CheckNeg 'neg_other_networkfailure_summary_line_in_client_still_fails' $i 'FAIL' 'log_error_line')
+    $items = New-LogItems 'clean'; Item-After $items 'ready' 'err' $kickErr
+    $i = New-Inputs 'clean'; $i['ServerLogText'] = Join-Log $items
+    [void](CheckNeg 'neg_kick_error_line_in_server_log_still_fails' $i 'FAIL' 'log_error_line')
+    $i = New-Inputs 'clean'; $i['ClientLogText'] = $clientA + $kickErr.Replace('ConnectionLost', 'NetDriverAlreadyExists') + "`r`n"
+    [void](CheckNeg 'neg_other_network_failure_in_client_still_fails' $i 'FAIL' 'log_error_line')
+    $i = New-Inputs 'clean'; $i['ClientLogText'] = $clientA + '[2026.11.01-01.49.02:636][158]LogWindows: Fatal error: ' + $kickErr + "`r`n"
+    [void](CheckNeg 'neg_fatal_prefix_with_kick_text_still_fails' $i 'FAIL' 'log_error_line')
     $items = New-LogItems 'clean'; Item-After $items 'ready' 'err' 'LogSaveGame: Error: fixture write failed'
     $i = New-Inputs 'clean'; $i['ServerLogText'] = Join-Log $items
     [void](CheckNeg 'neg_allowed_error_pattern_is_ignored_outside_savefail' $i 'FAIL' 'log_error_line' @{ AllowedErrorPattern = 'LogSaveGame' })
